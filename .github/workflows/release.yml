@@ -46,7 +46,7 @@ jobs:
           node-version: 22
       - if: steps.v.outputs.skip != '1'
         run: npm ci
-      - name: 빌드 (npm run release:prep 과 같은 순서: 빌드 → 카드 → 빌드 → release/ 로 복사)
+      - name: '빌드 (npm run release:prep 과 같은 순서: 빌드 → 카드 → 빌드 → release/ 로 복사)'
         if: steps.v.outputs.skip != '1'
         run: node scripts/release-prep.mjs --skip-tests --no-fixture
       - name: release 브랜치에 올리기
