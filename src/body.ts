@@ -115,7 +115,7 @@ const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** 직전 조립이 새로 끼운 system 글들. Risu 는 요청이 실패하면 앞 회차 결과에 replacer 를 다시 돌린다 (자동 재시도) — 그때 다시 조립하지 않는다 */
 let lastAdded = new Set<string>();
 const sysTexts = (ms: PromptMessage[]): string[] => ms.filter((m) => m?.role === 'system' && typeof m.content === 'string').map((m) => m.content as string);
-/** 플러그인이 끼운 글: 끼우기 전(before)에 없던 메시지는 통째로, 고친 메시지는 앞뒤 같은 곳을 뺀 가운데. 호출 기록에 「플러그인이 더한 토큰」으로 (전수검사 11-13) */
+/** 플러그인이 끼운 글: 끼우기 전(before)에 없던 메시지는 통째로, 고친 메시지는 앞뒤 같은 곳을 뺀 가운데. 호출 기록에 「이 중 플러그인이 넣은 것」으로 (전수검사 11-13) */
 function addedTexts(before: PromptMessage[], after: PromptMessage[]): string[] {
   const str = (m: PromptMessage) => (typeof m?.content === 'string' ? m.content : '');
   const left = new Map<string, number>();
@@ -169,7 +169,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   }
   const input0 = messages;
   const failed: string[] = [];
-  /** 플러그인이 끼운 글 (호출 기록의 「플러그인이 더한 토큰」, 전수검사 11-13) */
+  /** 플러그인이 끼운 글 (호출 기록의 「이 중 플러그인이 넣은 것」, 전수검사 11-13) */
   let added: string[] | undefined;
   /** 한 단계: 던지면 이름·까닭을 모으고 fallback(= 그 단계 이전 모양) */
   const step = <T>(name: string, run: () => T, fallback: T): T => {

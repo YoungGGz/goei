@@ -1,4 +1,4 @@
-// 여쭐 것 C-3 (사용자 11-14 (가)): 호출 기록의 메인 요청 조립 줄, 총 토큰 옆에 「플러그인이 더한 토큰 N」을 붙인다
+// 호출 기록의 메인 요청 조립 줄: 보낸 것 전부의 토큰 옆에 「(이 중 플러그인이 넣은 것 N토큰)」 (사용자 11-15: 둘을 더하는 것처럼 읽히지 않게)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -41,7 +41,7 @@ const page = async () => {
 const mainMeta = (html) => html.split('메인 요청 조립</b>')[1].match(/<small class="gw-flow-meta">([^<]*)<\/small>/)[1];
 const tick = () => new Promise((r) => setTimeout(r, 20));
 
-test('호출 기록: 메인 요청 조립 줄, 총 토큰 옆에 「플러그인이 더한 토큰 N」이 보인다', async () => {
+test('호출 기록: 메인 요청 조립 줄, 보낸 것 전부 옆에 「이 중 플러그인이 넣은 것 N토큰」이 보인다', async () => {
   await M.clearTrace();
   await M.traceBegin();
   const added = ['끼운 로어 글 하나', '참고 기록 '.repeat(400)];
@@ -54,7 +54,7 @@ test('호출 기록: 메인 요청 조립 줄, 총 토큰 옆에 「플러그인
   const meta = mainMeta(await page());
   const total = `${main.totalTokens.toLocaleString('ko-KR')}토큰`;
   // 총 토큰 바로 옆, 천 단위 쉼표는 다른 숫자와 같게
-  assert.ok(meta.includes(`${total} · 플러그인이 더한 토큰 ${n.toLocaleString('ko-KR')}`), meta);
+  assert.ok(meta.includes(`${total} (이 중 플러그인이 넣은 것 ${n.toLocaleString('ko-KR')}토큰)`), meta);
 });
 
 test('호출 기록: 더한 글이 없으면 0, 기록에 숫자가 없으면(옛 기록) 글을 붙이지 않는다', async () => {
@@ -62,14 +62,14 @@ test('호출 기록: 더한 글이 없으면 0, 기록에 숫자가 없으면(�
   await M.traceBegin();
   M.traceMain([{ role: 'user', content: '안녕' }], [], []);
   await tick();
-  assert.ok(mainMeta(await page()).includes(' · 플러그인이 더한 토큰 0'));
+  assert.ok(mainMeta(await page()).includes(' (이 중 플러그인이 넣은 것 0토큰)'));
 
   await M.clearTrace();
   await M.traceBegin();
   M.traceMain([{ role: 'user', content: '안녕' }], ['라우터']);
   await tick();
   const meta = mainMeta(await page());
-  assert.ok(!meta.includes('플러그인이 더한 토큰'), meta);
+  assert.ok(!meta.includes('플러그인이 넣은 것'), meta);
   assert.ok(/토큰 · 건너뛴 단계 라우터$/.test(meta), meta);
   await new Promise((r) => setTimeout(r, 1700)); // 모아 쓰기가 끝난 뒤 정리
   await M.clearTrace();
