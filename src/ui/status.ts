@@ -44,7 +44,8 @@ export function linkTerms(text: string, terms: StatusContext['terms']): string {
   return out + esc(text.slice(i));
 }
 
-const kv = (rows: [string, string][]) => `<span class="gst-tip"><span class="gst-kv">${rows.map(([k, v]) => `<i>${esc(k)}</i><em>${esc(v)}</em>`).join('')}</span></span>`;
+// 값은 span 으로 쓴다: em 은 Risu 채팅 글의 기울임 글자색을 받아 밝은 풍선 바탕에서 안 보였다
+const kv = (rows: [string, string][]) => `<span class="gst-tip"><span class="gst-kv">${rows.map(([k, v]) => `<span class="gst-k">${esc(k)}</span><span class="gst-v">${esc(v)}</span>`).join('')}</span></span>`;
 
 export function statusHtml(tag: StatusTag, ctx: StatusContext): string {
   const hid = (id: ColId) => !!ctx.hide?.has(id);
@@ -140,11 +141,11 @@ const STATUS_CSS = `
 .gst-cash small{margin-left:7px;font-size:12px;font-weight:700}.gst-cash>span+.gst-pt{margin-left:14px}.gst-up{color:var(--gs-blue)}.gst-down{color:var(--gs-red)}
 .gst-link{cursor:pointer;text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 50%,transparent);text-underline-offset:3px}
 [data-gst-tip]{cursor:pointer}
-.gst-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:5;padding:6px 10px;border-radius:9px;background:var(--gs-text);color:var(--gs-panel);font-size:12px;font-weight:600;line-height:1.4;letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s}
-.gst-tip::before{content:'';position:absolute;left:50%;top:100%;margin-left:-5px;border:5px solid transparent;border-top-color:var(--gs-text)}
+.gst-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:5;padding:6px 10px;border-radius:9px;border:1px solid var(--gs-line);background:var(--gs-panel);color:var(--gs-text);box-shadow:0 6px 18px -8px var(--gs-shadow);font-size:12px;font-weight:600;line-height:1.4;letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s}
+.gst-tip::before{content:'';position:absolute;left:50%;top:100%;margin-left:-5px;width:8px;height:8px;margin-top:-4px;box-sizing:border-box;background:var(--gs-panel);border:solid var(--gs-line);border-width:0 1px 1px 0;transform:rotate(45deg)}
 .gst-clock .gst-tip{left:0;transform:none}.gst-clock .gst-tip::before{left:20px}
 .gst-kv{display:grid;grid-template-columns:auto auto;gap:2px 10px;align-items:baseline;text-align:left}
-.gst-kv i{font-style:normal;font-size:11px;opacity:.7}.gst-kv em{font-style:normal;font-weight:700}
+.gst-kv .gst-k{font-size:11px;opacity:.7}.gst-kv .gst-v{font-weight:700}
 @media (hover:hover){[data-gst-tip]:hover>.gst-tip{opacity:1;visibility:visible}}
 [data-gst-tip].open>.gst-tip{opacity:1;visibility:visible}
 @media (max-width:450px){.gst{padding:11px 12px}.gst-clock{font-size:17px}.gst-top{gap:8px}}

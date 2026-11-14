@@ -149,12 +149,14 @@ test('반영: 다시 굴려 응답이 바뀌면 그 응답 근거 항목·계기
   assert.deepEqual(S.unreadIndexes(c2, store), [1, 3]);
 });
 
-test('새 인물: 2턴 규칙·역할 명사·별명 충돌·상한, 확인 모드', () => {
+test('새 인물: 2턴 규칙·별명 충돌·상한, 확인 모드 (역할로 된 이름을 코드가 걸러내지 않는다)', () => {
   const { c, store, input } = setup();
   const np = (name, extra = {}) => ({ name, aliases: [], m: 'm4', quote: '감싸 안으며', identity: '관리국 사람', ...extra });
   let rep = U.applyUpdate(store, c, input, { new_people: [np('김철수'), np('택시 기사'), np('Jyaldi')] }, { settings: settings({ twoTurn: true }) });
   assert.ok(rep.held.some((h) => h.who === '김철수' && /2턴/.test(h.reason)));
-  assert.ok(rep.dropped.some((d) => d.who === '택시 기사' && d.reason === '역할 명사'));
+  // 이름이 역할·묘사 꼴인지는 코드가 보지 않는다 (갱신기 판단). 다른 이름과 같은 규칙으로 기다린다
+  assert.ok(rep.held.some((h) => h.who === '택시 기사' && /2턴/.test(h.reason)));
+  assert.ok(!rep.dropped.some((d) => d.who === '택시 기사'));
   assert.ok(rep.dropped.some((d) => d.who === 'Jyaldi' && /이미 있는/.test(d.reason)));
   assert.ok(!store.people.김철수 && store.pending.김철수);
   // 다음 턴에 다시 나오면 등록

@@ -8,9 +8,6 @@ import { guideTxt } from './guides';
 export const imgKeywordsDefault = (): string[] => guideTxt('Asset', 'MAIN_KEYWORDS').split(',').map((k) => k.trim()).filter(Boolean);
 /** 지침 틀 기본 (카드 로어북 「Asset」 원문에서 CBS 를 뺀 것). 글은 지침 「이미지(보조 모델)」 MAIN_TEMPLATE 절. 자리표: {characters} {keywords} {user_rule} {user_skip} */
 export const imgPromptDefault = (): string => guideTxt('Asset', 'MAIN_TEMPLATE');
-/** 불러올 때의 기본 지침 파일 값 (설정 화면이 기본과 같은지 견줄 때). 요청은 위 함수로 그때그때 읽는다 */
-export const IMG_KEYWORDS_DEFAULT = imgKeywordsDefault();
-export const IMG_PROMPT_DEFAULT = imgPromptDefault();
 
 export interface ImgPromptConfig {
   template: string;

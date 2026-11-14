@@ -858,10 +858,8 @@ async function startedWithReply(page, { phoneAuto = false } = {}) {
   const where = `${geo.sido[code]} ${geo.sigun[code][Number(idx)]}`;
   const reply = [`본문`, `[AN|${where}|${preset.name}|활성|A|P001]`, '[AG|P001|작전투입|현장]', '[AG|P002|휴게|사무실]', '[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|없음]'].join('\n');
   await page.evaluate(async ({ reply, phoneAuto }) => {
-    // 장면 인물이 없어도 소지품 읽기가 켜져 있으면 갱신기가 돈다(11-08): 이 시험의 모델 호출 수에 끼지 않게 끈다
-    window.__chat.scriptstate.$it_auto = '0';
-    // 상점 판단이 「자동」이면 갱신기가 매 턴 돈다(11-09): 같은 까닭으로 메인 모델이 판단하게 둔다
-    window.__chat.scriptstate.$sh_judge = 'main';
+    // 인물 기록 갱신기는 장면 인물이 없는 응답에도 돈다 (기록에 없는 새 인물을 찾고, 소지품·상점 판단도 읽는다): 이 시험의 모델 호출 수에 끼지 않게 자동 호출을 끈다
+    window.__chat.scriptstate.$pp_when = 'manual';
     // 괴담톡 자동 확인은 이 테스트(15)에서만 켠다 (다른 테스트의 모델 호출 순서를 지키려고)
     if (!phoneAuto) window.__chat.scriptstate.$ph_auto = '0';
     window.__chat.message.push({ role: 'user', data: '시작' }, { role: 'char', data: reply });

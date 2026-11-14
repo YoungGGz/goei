@@ -192,6 +192,8 @@ export interface Person {
   reviewTurn?: number;
   /** 성적 욕망·이상성욕 (리수폿 sexualDesire·paraphilia, 2026-11-07). core/people/sexual.ts */
   sexual?: SexualProfile;
+  /** 이름이 아직 밝혀지지 않아 글에 쓰인 호칭으로 적어 둔 기록 (설정 「이름 없는 인물 기록」). 이름이 밝혀져 기록을 옮기면(store.ts renamePerson) 없어진다 */
+  provisional?: true;
 }
 
 // ── 성적 욕망·이상성욕 (리수폿 원본 People profile 의 sexualDesire·paraphilia) ──
@@ -307,13 +309,16 @@ export interface PeopleStore {
   /** 읽은 메시지: chatId(또는 #순번) → 내용 해시 */
   read: Record<string, string>;
   identity?: Identity;
-  /** 새 인물 후보 (2턴 규칙·확인 모드): 이름 → 처음 본 기준 메시지 */
-  pending: Record<string, { anchor: string; aliases: string[] }>;
+  /** 새 인물 후보 (2턴 규칙·확인 모드): 이름 → 처음 본 기준 메시지. provisional = 이름이 아니라 호칭으로 올라온 후보 (등록하면 기록에 그대로 옮긴다) */
+  pending: Record<string, { anchor: string; aliases: string[]; provisional?: true }>;
   /** 마지막 갱신이 만든 것 (되돌리기용, 리수폿 J-4). 되돌리면 지운다 */
   lastRun?: LastRun;
   /** 사용자가 「무시」한 이름: 다시 새 인물로 올리지 않는다 */
   ignored: string[];
   migrated?: string[];
+  /** 장면에 남아 있는 인물 (설정 「장면 인물 유지」): 응답 열쇠(messageKey) → 갱신기가 그 응답 끝에 장면에 있다고 본 기록 이름.
+   *  그 응답의 읽음 해시(read)가 지금 내용과 같을 때만 쓴다 (select.ts carriedScene) */
+  scene?: Record<string, string[]>;
 }
 
 export const emptyStore = (): PeopleStore => ({ schema: 1, people: {}, factions: {}, docs: {}, log: [], folded: {}, read: {}, pending: {}, ignored: [] });

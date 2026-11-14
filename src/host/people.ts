@@ -6,18 +6,18 @@ import { generate, runModel, LlmError, type LlmMessage } from './llm';
 import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, repairDirector, runSearches, type DirectorInput, type DirectorNote } from '../core/people/director';
 import { loadContext, updateChat, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
-import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, messageHash as messageHashOf, liveness, recordRun, snapshotRun, dropGoneChanges } from '../core/people/store';
+import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, pruneScene } from '../core/people/store';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
 import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, recordChars, type ApplyReport } from '../core/people/updater';
 import { applyConsolidate, buildConsolidate, consolidateUserText, parseConsolidate, type ConsolidateReport } from '../core/people/consolidate';
-import { peopleSettings, type PeopleSettings } from '../core/people/settings';
+import { peopleSettings, PP, type PeopleSettings } from '../core/people/settings';
 import { seedPerson } from '../core/people/seed';
-import { nameMatcher } from '../core/people/select';
+import { nameMatcher, namesWith } from '../core/people/select';
 import { buildRouter, parseRouter, type RouterHint } from '../core/people/router';
 import { speechVarietyBlock } from '../core/people/speech';
 import { sexualWriterSection } from '../core/people/sexual';
-import { allNames, extraNames, seedBaseFor, temperOf, valuesOf } from '../core/people/base';
+import { allNames, extraNames, seedBaseFor, temperOf, valuesOf, type RosterRow } from '../core/people/base';
 import { playerAgent } from '../core/player';
 import { peopleBlockFor } from '../core/people/request';
 import { userInfo } from './user';
@@ -40,10 +40,11 @@ import { parseIdentity, rankLevel } from '../core/people/identity';
 import type { Identity, PeopleStore } from '../core/people/types';
 import { factionList } from '../core/factions';
 import type { LoreEntry } from '../core/types';
+import { readDirectory } from '../core/world/directory';
 
 // ── 진단 ──
 
-/** 장면 인물이 없는 갱신기 호출(소지품·가계부·상점만 읽음): 새 인물에게 쓸 수 없는 절은 뺀다 (전수검사 11-13, 약 3천 토큰).
+/** 장면 인물이 없는 갱신기 호출(새 인물을 찾거나 소지품·가계부·상점만 읽음): 새 인물에게 쓸 수 없는 절은 뺀다 (전수검사 11-13, 약 3천 토큰).
  *  호감·호칭·지각 절은 남긴다: 이 응답에서 새로 등록한 인물의 cues·address·knowledge 를 쓴다 */
 function dropNoPeople(sections: Set<string>, settings: PeopleSettings): void {
   for (const k of ['axes', 'sexual']) sections.delete(k);
@@ -140,24 +141,38 @@ export function factionNamesOf(lore: LoreEntry[] | undefined): Record<string, st
   }
 }
 
+/** 명부의 요원 줄 (인물 기록이 쓰는 칸만). 이름 표(base.ts allNames)·시작값(seedBaseFor)·갱신기 자료 roster 의 근거 */
+export function rosterOf(lore: LoreEntry[] | undefined): RosterRow[] {
+  try {
+    return readDirectory(lore).agents.map((a) => ({ name: a.name, english: a.english, legacyEnglish: a.legacyEnglish ?? [], aliases: a.aliases ?? [], affiliation: a.affiliation, rank: a.rank, department: a.department }));
+  } catch {
+    return [];
+  }
+}
+
 function userFaction(chat: Chat): string {
   const v = chat.scriptstate?.['$st_faction'] ?? chat.scriptstate?.['st_faction'];
   return typeof v === 'string' ? v : '';
 }
 
 /** 처음 등장한 인물의 기록을 만든다 (시트 → 시작값). 확정 구간 글에 이름이 나온, 아직 기록이 없는 사람.
+ *  이름 표는 미리 만든 표 ∪ 명부(roster)라, 명부 인물은 초상 태그(<img=영문_표정>)만 떠도 등장으로 본다.
  *  유저가 연기하는 요원(exclude)은 기록하지 않는다 (있던 기록은 지운다). 호칭 시작값은 유저 신분(identity)으로 고른다 */
-export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[], sheet: (name: string) => string | null, o: { exclude?: string[]; identity?: Identity } = {}): string[] {
+export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[], sheet: (name: string) => string | null, o: { exclude?: string[]; identity?: Identity; roster?: RosterRow[] } = {}): string[] {
   const list = Array.isArray(chat.message) ? chat.message : [];
   const exclude = new Set(o.exclude ?? []);
-  const match = nameMatcher(allNames().filter((n) => !store.people[n.name] && !exclude.has(n.name)));
+  const match = nameMatcher(allNames(o.roster).filter((n) => !store.people[n.name] && !exclude.has(n.name)));
   const texts = indexes.flatMap((i) => [list[i - 1], list[i]]).filter(Boolean).map((m) => messageText(String(m!.data ?? '')));
   const found = new Set<string>();
   for (const t of texts) for (const n of match(t)) found.add(n);
   const faction = userFaction(chat);
   const made: string[] = [];
   for (const name of found) {
-    store.people[name] = seedPerson(name, sheet(name), seedBaseFor(name, faction, o.identity ?? store.identity));
+    // 같은 이름으로 등록을 기다리던 줄(2턴 규칙·확인 뒤 등록)은 기록이 생기니 없앤다 (별명은 받는다). 남겨 두면 그 줄을 지울 길이 없다
+    const pend = store.pending[name];
+    const base = seedBaseFor(name, faction, o.identity ?? store.identity, o.roster?.find((r) => r.name === name));
+    store.people[name] = seedPerson(name, sheet(name), { ...base, aliases: [...new Set([...(base.aliases ?? []), ...(pend?.aliases ?? [])])] });
+    delete store.pending[name];
     made.push(name);
   }
   return made;
@@ -261,12 +276,16 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   // 유저가 연기하는 요원은 기록하지 않는다
   const exclude = excludedNames(ctx);
   const dropped = dropExcluded(store, exclude);
-  const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity });
+  const roster = rosterOf(ctx.char.globalLore);
+  const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity, roster });
   if (seeded.length || idChanged || dropped.length) {
     await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
       const s = peopleStore(cur);
       dropExcluded(s, exclude);
-      for (const n of seeded) if (!s.people[n]) s.people[n] = store.people[n];
+      for (const n of seeded) {
+        if (!s.people[n]) s.people[n] = store.people[n];
+        delete s.pending[n];
+      }
       if (identity && idChanged) s.identity = identity;
       return withPeople(cur, s);
     }).catch(() => null);
@@ -308,7 +327,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const lastChar = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' ? i : a), -1);
       const shopAt = !o.scope?.only && shopOn(fresh.chat.scriptstate) && shopJudgeBy(fresh.chat.scriptstate).by === 'updater' && batches[b].includes(lastChar) ? lastChar : -1;
       const shopSelf = shopAt >= 0 ? [...exclude, userInfo().name] : [];
-      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: allNames(), hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat) : [] });
+      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat) : [] });
       // 지침은 자료를 본 뒤 조립한다 (저장 상한을 넘긴 인물이 있으면 정리 절을 켠다)
       const sections = enabledSections(settings);
       if (input.tidy.length) sections.add('tidy');
@@ -328,18 +347,11 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         continue;
       }
       // 장면 인물이 없어도 소지품·가계부는 이 갱신기가 읽는다 (11-08 전수점검: 혼자 있는 장면에서 얻은 물건·쓴 돈이 기록되지 않았다).
-      // 소지품 읽기가 켜져 있거나, 가계부가 켜져 있고 글에 금액이 있거나 어림도 받을 때만 부른다 (쓸데없는 호출은 그대로 안 함)
+      // 읽을 돈·물건이 있나: 소지품 읽기가 켜져 있거나, 가계부가 켜져 있고 글에 금액이 있거나 어림도 받을 때 (아래 다시 읽기 판단에 쓴다)
       const moneyOrItems = !!input.shop || itemsOn || (walletOn && (walletLoose(fresh.chat.scriptstate) || batches[b].some((i) => mentionsAmount(messageText(String(fresh.chat.message[i]?.data ?? '')))))) || (pointsUse && batches[b].some((i) => mentionsPoints(messageText(String(fresh.chat.message[i]?.data ?? '')))));
-      if (!input.people.length && !moneyOrItems) {
-        // 장면 인물이 없으면 모델을 부르지 않고 읽음 표시만 (다시 읽기는 표시도 안 바꿈)
-        if (!o.scope?.only) await updateChat(fresh.charIndex, fresh.chatIndex, (cur) => {
-          const s = peopleStore(cur);
-          for (const i of input.indexes) {
-            const m = cur.message[i];
-            if (m) s.read[messageKey(m, i)] = messageHashOf(m);
-          }
-          return withPeople(cur, s);
-        });
+      // 여느 갱신은 장면 인물이 없어도 부른다: 기록에 없는 사람(새 이름, 이름 없는 인물, 명부 인물)이 처음 나온 응답일 수 있고, 그 판단은 모델이 한다.
+      // 다시 읽기(only)는 그 인물만 다루니, 그 인물 기록이 없고 읽을 돈·물건도 없으면 부르지 않는다 (읽음 표시는 안 바꿈)
+      if (o.scope?.only && !input.people.length && !moneyOrItems) {
         diag.ok = true;
         diag.stage = 'skip';
         diag.error = '장면 인물 없음';
@@ -374,7 +386,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         const report = applyUpdate(s, cur, input, value, {
           settings,
           sheetOf: sheet,
-          baseOf: (name) => seedBaseFor(name, userFaction(cur), s.identity),
+          baseOf: (name) => seedBaseFor(name, userFaction(cur), s.identity, roster.find((r) => r.name === name)),
           exclude,
           only: o.scope?.only,
           keepRead: !!o.scope?.only,
@@ -386,15 +398,19 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         diag.report = report;
         // 되돌리기용 (리수폿 J-4): 이 갱신이 새로 만든 것. 다시 읽기(only)는 적지 않는다
         // 변경 기록(store.log)은 접지 않고 전부 남긴다 (사용자 결정 나-80 ②). 여기서 접기 함수를 부르지 않는다
-        if (!o.scope?.only) recordRun(s, before, new Date().toISOString());
-        // 다시 굴려(지워서) 채팅에서 사라진 응답이 만든 변경 줄만 버린다 (사용자 2026-11-14 F-1 (나))
+        if (!o.scope?.only) recordRun(s, before, new Date().toISOString(), report.applied.renamed);
+        // 다시 굴려(지워서) 채팅에서 사라진 응답이 만든 변경 줄만 버린다 (사용자 2026-11-14 F-1 (나)). 장면 인물 목록도 같이
         dropGoneChanges(s, cur);
+        pruneScene(s, cur);
         let next = cur;
+        // 이름을 옮긴 기록이 설정 「항상 포함할 인물」에 옛 호칭으로 적혀 있으면 새 이름으로 고쳐 적는다 (이름으로 적는 채팅 저장값은 인물 기록 밖에 이것뿐)
+        const always = renameAlways(cur.scriptstate?.[PP('always')], report.applied.renamed);
+        if (always !== null) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), [PP('always')]: always } };
         if (report.wallet.length) {
           let w = readWallet(cur.scriptstate, walletStart);
           const alive = aliveAnchors(cur); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
           for (const e of report.wallet) w = addWalletEntry(w, { ...e, src: 'story' }, alive);
-          next = { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...walletVars(w) } };
+          next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...walletVars(w) } };
         }
         if (report.points.length) {
           let p = readPoints(next.scriptstate);
@@ -479,6 +495,15 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
 
 const input0Names = (s: PeopleStore) => Object.keys(s.people);
 
+/** 설정 「항상 포함할 인물」(쉼표·줄바꿈 목록)의 옛 호칭을 새 이름으로. 바뀐 것이 없으면 null */
+export function renameAlways(raw: unknown, renamed: { from: string; to: string }[]): string | null {
+  if (typeof raw !== 'string' || !raw.trim() || !renamed.length) return null;
+  const to = new Map(renamed.map((r) => [r.from, r.to]));
+  const names = raw.split(/[,\n]/).map((x) => x.trim().normalize('NFC')).filter(Boolean);
+  if (!names.some((n) => to.has(n))) return null;
+  return [...new Set(names.map((n) => to.get(n) ?? n))].join(', ');
+}
+
 /** 갱신기 지침 조립 (실제 호출·미리보기 같은 길). 상점 판단을 맡으면 「상점」 절을 켜고 기준 글(지침 「상점」 SHOP_RULE·SHOP_JUDGE)을 채운다.
  *  지침을 고쳐 둔 사용자는 고친 글에 상점 절이 없을 수 있어 기본 글의 절을 덧붙인다 (릴리스 점검 11-09: 안 그러면 상점이 매 턴 닫혔다) */
 function updaterSystem(settings: PeopleSettings, sections: Set<string>, vars: Record<string, unknown> | undefined, shop: boolean): string {
@@ -513,7 +538,7 @@ export async function rereadPerson(name: string, turns: number): Promise<RunResu
   const store = peopleStore(ctx.chat);
   const p = store.people[name];
   if (!p) return { ran: 0, applied: 0, skipped: ['기록이 없는 인물'], errors: [], cleared: 0 };
-  const indexes = mentionIndexes(ctx.chat, name, [...p.aliases, ...(allNames().find((n) => n.name === name)?.aliases ?? [])], turns);
+  const indexes = mentionIndexes(ctx.chat, name, [...p.aliases, ...(allNames(rosterOf(ctx.char.globalLore)).find((n) => n.name === name)?.aliases ?? [])], turns);
   if (!indexes.length) {
     let cleared = 0;
     await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
@@ -607,9 +632,9 @@ let routerHints: RouterHint[] = [];
 export const routerHintsNow = (): RouterHint[] => routerHints;
 
 /** 모델이 고른 장면 인물. 실패·지연·빈 결과면 null (코드 Router 로). 입력·최근 글·명단이 같으면 재사용 */
-export async function routerPeople(chat: Chat, store: PeopleStore, input: string, settings: PeopleSettings, exclude: string[] = [], identityOf?: (name: string) => string | null | undefined): Promise<string[] | null> {
+export async function routerPeople(chat: Chat, store: PeopleStore, input: string, settings: PeopleSettings, exclude: string[] = [], identityOf?: (name: string) => string | null | undefined, roster: RosterRow[] = []): Promise<string[] | null> {
   if (settings.router !== 'model' || !Object.keys(store.people).length) return null;
-  const names = allNames();
+  const names = allNames(roster);
   const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf });
   if (routerCache?.key === built.key) return routerCache.selected;
   const t0 = Date.now();
@@ -703,14 +728,15 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
   const exclude = excludedNames(ctx);
   const lastUser = [...(ctx.chat.message ?? [])].reverse().find((m) => m.role === 'user');
   const input = messageText(String(lastUser?.data ?? ''));
-  const names = allNames();
+  const roster = rosterOf(ctx.char.globalLore);
+  const names = allNames(roster);
   if (settings.router === 'model' && Object.keys(store.people).length) {
     const b = buildRouter(ctx.chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf: sheetOf(ctx) });
     out.router = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];
   }
   if ((settings.director === 'scene' || settings.director === 'facts') && Object.keys(store.people).length) {
     const me = playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
-    const { people } = peopleBlockFor(ctx.chat, { settings, store, sheetOf: sheetOf(ctx), temperOf, extraNames: extraNames(), input, user: me?.name || userInfo().name || guideTxt('Common', 'REFS.USER_NAME'), factionNames: factionNamesOf(ctx.char.globalLore) });
+    const { people } = peopleBlockFor(ctx.chat, { settings, store, sheetOf: sheetOf(ctx), temperOf, extraNames: extraNames(roster), input, user: me?.name || userInfo().name || guideTxt('Common', 'REFS.USER_NAME'), factionNames: factionNamesOf(ctx.char.globalLore) });
     const memory = await hypaMemory(ctx.chat, ctx.char, [input, ...people].join('\n'), settings, Math.min(settings.hypaCap, 6000)).catch(() => [] as string[]);
     const b = buildDirector(ctx.chat, store, people, input, settings, Object.fromEntries(people.map((n) => [n, valuesOf(n)])), memory);
     if (b) out.director = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];
@@ -729,7 +755,7 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
       const memory = await hypaMemory(ctx.chat, ctx.char, [messageText(String(list[last]?.data ?? '')), ...Object.keys(store.people)].join('\n'), settings).catch(() => [] as string[]);
       // 상점 판단 (실제 호출과 같게, 릴리스 점검 11-09)
       const shopOnNow = shopOn(ctx.chat.scriptstate) && shopJudgeBy(ctx.chat.scriptstate).by === 'updater';
-      const inp = buildUpdate(ctx.chat, store, [last], { shop: shopOnNow ? { at: last, self: [...exclude, userInfo().name] } : null, settings, system: '', values: Object.fromEntries(input0Names(store).map((n) => [n, valuesOf(n)])), names, hints: routerHintsNow(), memory, exclude, factionNames: factionNamesOf(ctx.char.globalLore), wallet: balance, points: pointsOn(ctx.chat) ? walletBalance(readPoints(ctx.chat.scriptstate), aliveAnchors(ctx.chat)) : null, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(ctx.chat) : [] });
+      const inp = buildUpdate(ctx.chat, store, [last], { shop: shopOnNow ? { at: last, self: [...exclude, userInfo().name] } : null, settings, system: '', values: Object.fromEntries(input0Names(store).map((n) => [n, valuesOf(n)])), names: namesWith(store, names), roster, hints: routerHintsNow(), memory, exclude, factionNames: factionNamesOf(ctx.char.globalLore), wallet: balance, points: pointsOn(ctx.chat) ? walletBalance(readPoints(ctx.chat.scriptstate), aliveAnchors(ctx.chat)) : null, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(ctx.chat) : [] });
       const sections = enabledSections(settings);
       if (inp.tidy.length) sections.add('tidy');
       if (walletOn) sections.add('wallet');

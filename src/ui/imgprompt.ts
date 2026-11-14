@@ -4,7 +4,7 @@ import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
 import { savePrefs } from '../host/prefs';
 import { getPrefs, basicSettings } from '../core/settings';
-import { IMG_KEYWORDS_DEFAULT, IMG_PROMPT_DEFAULT, IMG_TEMPLATE_MAX, buildImgPrompt, imgCandidates, imgCharacters, imgPromptConfig } from '../core/imgprompt';
+import { IMG_TEMPLATE_MAX, buildImgPrompt, imgCandidates, imgCharacters, imgKeywordsDefault, imgPromptConfig, imgPromptDefault } from '../core/imgprompt';
 import { playerAgent } from '../core/player';
 import { userInfo } from '../host/user';
 import { copyBtn } from './copy';
@@ -37,7 +37,7 @@ export function imgPromptPane(ctx: ChatContext): string {
     <section class="ps-group"><h3>출력 대상 캐릭터<b>${picked.length}</b></h3><p class="ps-note">명부의 요원 영문명을 자동으로 읽어요 (한글 이름·별칭도 명부에서 가져와 보조 모델 자료로 써요). 체크를 풀면 그 인물은 태그를 안 만들어요. 그림 에셋 이름(영문명_표정)과 같아야 해요.</p>
       <div class="ip-names">${rows}</div>
       <div class="ip-extra"><input class="gx-search" data-input="ip-extra" name="ip-extra" maxlength="40" placeholder="임의 추가 (영문명, 예: Avensha)" value="${esc(imgUi.extra)}"><button class="gx-mini ps-save" data-action="ip-extra-add" data-take="ip-extra"${needAttr('ip-extra', imgUi.extra)}>추가</button></div></section>
-    <section class="ps-group"><h3>표정 세트<b>${cfg.keywords.length}</b></h3><p class="ps-note">쉼표로 나눠요. 카드 그림(영문명_표정)에 있는 이름이어야 해요. 비우면 기본 ${IMG_KEYWORDS_DEFAULT.length}종.</p>
+    <section class="ps-group"><h3>표정 세트<b>${cfg.keywords.length}</b></h3><p class="ps-note">쉼표로 나눠요. 카드 그림(영문명_표정)에 있는 이름이어야 해요. 비우면 기본 ${imgKeywordsDefault().length}종.</p>
       <div class="gw-copyto gw-copybox"><textarea class="gx-search nw-reqbox" name="ip-keywords" data-input="ip-keywords" data-autosave="ip-keywords-save" rows="3" maxlength="1200">${esc(keywords)}</textarea>${copyBtn()}</div></section>
     ${imgUi.info ? `<p class="gx-hint">${esc(imgUi.info)}</p>` : ''}
   </article>`;
@@ -55,7 +55,8 @@ export async function handleImgPrompt(action: string, value: string | undefined,
   imgUi.notice = '';
   switch (action) {
     case 'ip-template-save':
-      await savePrefs((p) => ({ ...p, imgPrompt: v.trim() && v.trim() !== IMG_PROMPT_DEFAULT ? v.slice(0, IMG_TEMPLATE_MAX) : undefined }));
+      // 기본과 같은지는 지금의 지침 절(지침 탭에서 고친 글 포함)과 견준다: 불러올 때의 파일 글과 견주면 고친 절과 같은 글이 따로 저장돼, 그 뒤 지침 탭에서 고친 것이 안 먹힌다 (2026-11-15)
+      await savePrefs((p) => ({ ...p, imgPrompt: v.trim() && v.trim() !== imgPromptDefault().trim() ? v.slice(0, IMG_TEMPLATE_MAX) : undefined }));
       // 바로 저장 (2026-11-08 사용자): 치는 중인 글칸은 그대로 두고 조용히 적는다
       return true;
     case 'ip-preview':
@@ -90,7 +91,7 @@ export async function handleImgPrompt(action: string, value: string | undefined,
       return true;
     case 'ip-keywords-save': {
       const list = v.split(/[,\n]/).map((x) => x.trim().toLowerCase()).filter(Boolean);
-      const same = list.join(',') === IMG_KEYWORDS_DEFAULT.join(',');
+      const same = list.join(',') === imgKeywordsDefault().join(',');
       await savePrefs((p) => ({ ...p, imgKeywords: list.length && !same ? list : undefined }));
       return true;
     }

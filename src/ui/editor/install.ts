@@ -1,7 +1,7 @@
 // 세계 편집 창 「설치 · 점검」 (설계안 9절): 깡통봇에 플러그인 카드 요소를 심고, 없어진 것을 알려 주고 다시 만든다.
 import { setRow } from '../setrow';
 import { installSummary, type InstallState } from '../../core/install';
-import { checkInstall, installIcon, installLoreAndGreetings, installPictures, installTokenizer, installWikiPack, restoreIcon } from '../../host/install';
+import { checkInstall, installIcon, installLoreAndGreetings, installPictures, installTokenizer, installWikiPack, restoreIcon, tidyIconList } from '../../host/install';
 import type { ChatContext } from '../../host/risu';
 import { notifyInstalled } from '../../host/hooks';
 import { BRAND } from '../brand';
@@ -68,7 +68,7 @@ function statusList(s: InstallState): string {
     ${li(s.firstMessage, '첫 메시지', s.firstMessage ? '시작 안내' : '시작 안내가 아님 (안내판이 안 떠요)')}
     ${li(s.greetings.ok, '인사말', s.greetings.ok ? `${s.greetings.total}개` : `${s.greetings.total - s.greetings.missing.length}/${s.greetings.total}개`)}
     ${li(!pics.missing.length, '카드 사진', pics.missing.length ? `${pics.total - pics.missing.length}/${pics.total}장 (약 ${mb(pics.bytes)} 받아야 함)` : `${pics.total}장`)}
-    ${li(s.icon, '아이콘', s.icon ? '플러그인 아이콘이 메인' : '다른 아이콘')}
+    ${s.iconOld ? setRow('아이콘', '<span class="gw-inst-no">새 그림 있음</span>', '플러그인 아이콘이 옛 그림 (새 그림으로 다시 받기)') : li(s.icon, '아이콘', s.icon ? '플러그인 아이콘이 메인' : '다른 아이콘')}
     ${!s.wikiPack && instUi.wikiOld ? setRow('위키 기본 문서', '<span class="gw-inst-no">새 판 있음</span>', '새 판 있음 (다시 받기, 약 1MB)') : li(s.wikiPack, '위키 기본 문서', s.wikiPack ? '저장소에 있음 (이 기기 공통)' : '없음 (약 1MB)')}
     ${li(s.tokenizer, '토크나이저 (o200k_base)', s.tokenizer ? '저장소에 있음 (이 기기 공통). 토큰 수를 정확히 세요' : '없음 (약 2MB). 받기 전엔 토큰 수가 어림값')}
   </div></section>`;
@@ -167,6 +167,7 @@ export async function installAction(action: string, ctx: ChatContext, env: Env):
       return n ? `사진 ${n}장` : null;
     });
     if (!s?.icon && !instUi.iconDeclined) await run('아이콘', async () => (await installIcon(ctx.charIndex, progress), '아이콘'));
+    else await run('아이콘 목록', async () => ((await tidyIconList(ctx.charIndex)) ? '아이콘 목록 정리' : null));
     if (!s?.wikiPack) await run('위키 기본 문서', async () => (await installWikiPack(progress), '위키 기본 문서'));
     if (!s?.tokenizer) await run('토크나이저', async () => (await installTokenizer(progress), '토크나이저'));
   } else if (step === 'icon') {

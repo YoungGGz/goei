@@ -82,7 +82,7 @@ import { peopleStore } from './core/people/store';
 import { peopleSettings } from './core/people/settings';
 import { identityText } from './core/people/identity';
 import { extraNames, temperOf } from './core/people/base';
-import { requestPeopleUpdate, directorNoteText, factionNamesOf, routerPeople } from './host/people';
+import { requestPeopleUpdate, directorNoteText, factionNamesOf, rosterOf, routerPeople } from './host/people';
 import { traceBegin, traceEnd, traceMain, traceReply, traceTurnId } from './host/trace';
 import { progressAbort, progressEnd, progressPlan, progressTurn, progressWatch } from './core/progress';
 import { turnPlan } from './core/progplan';
@@ -115,7 +115,7 @@ const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 /** 직전 조립이 새로 끼운 system 글들. Risu 는 요청이 실패하면 앞 회차 결과에 replacer 를 다시 돌린다 (자동 재시도) — 그때 다시 조립하지 않는다 */
 let lastAdded = new Set<string>();
 const sysTexts = (ms: PromptMessage[]): string[] => ms.filter((m) => m?.role === 'system' && typeof m.content === 'string').map((m) => m.content as string);
-/** 플러그인이 끼운 글: 끼우기 전(before)에 없던 메시지는 통째로, 고친 메시지는 앞뒤 같은 곳을 뺀 가운데. 호출 기록에 「플러그인이 더한 토큰」으로 (전수검사 11-13) */
+/** 플러그인이 끼운 글: 끼우기 전(before)에 없던 메시지는 통째로, 고친 메시지는 앞뒤 같은 곳을 뺀 가운데. 호출 기록에 「이 중 플러그인이 넣은 것」으로 (전수검사 11-13) */
 function addedTexts(before: PromptMessage[], after: PromptMessage[]): string[] {
   const str = (m: PromptMessage) => (typeof m?.content === 'string' ? m.content : '');
   const left = new Map<string, number>();
@@ -169,7 +169,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   }
   const input0 = messages;
   const failed: string[] = [];
-  /** 플러그인이 끼운 글 (호출 기록의 「플러그인이 더한 토큰」, 전수검사 11-13) */
+  /** 플러그인이 끼운 글 (호출 기록의 「이 중 플러그인이 넣은 것」, 전수검사 11-13) */
   let added: string[] | undefined;
   /** 한 단계: 던지면 이름·까닭을 모으고 fallback(= 그 단계 이전 모양) */
   const step = <T>(name: string, run: () => T, fallback: T): T => {
@@ -461,8 +461,10 @@ async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }
     return text || bookText({ char, chat }, name) || null;
   };
   // 모델 Router (선택): 보조 모델이 장면 인물을 고른다. 실패·지연이면 코드 Router (이름이 나온 사람)
-  const routed = await routerPeople(chat, store, input, settings, me?.name ? [me.name] : [], sheetOf).catch(() => null);
-  const opts = { settings, store, sheetOf, temperOf, extraNames: extraNames(), input, user, factionNames: factionNamesOf(char.globalLore), ...(routed ? { people: routed } : {}) };
+  // 이름 표는 명부(요원 줄)에서도 받는다: 명부에만 있는 인물의 영문 표기·초상 태그로도 장면 인물을 고른다
+  const roster = rosterOf(char.globalLore);
+  const routed = await routerPeople(chat, store, input, settings, me?.name ? [me.name] : [], sheetOf, roster).catch(() => null);
+  const opts = { settings, store, sheetOf, temperOf, extraNames: extraNames(roster), input, user, factionNames: factionNamesOf(char.globalLore), ...(routed ? { people: routed } : {}) };
   let out = withPeopleBlock(messages, chat, opts);
   // 연출형 Director (선택): 장면 인물에 대해 본편 앞 보조 1회. 실패·지연이면 메모 없이 진행
   if (settings.director === 'scene' || settings.director === 'facts') {

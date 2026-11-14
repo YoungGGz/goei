@@ -9,7 +9,7 @@ import { messageText } from '../core/refs';
 import { tokens } from '../core/gnet';
 import { factionList } from '../core/factions';
 import { updateChat, type ChatContext } from '../host/risu';
-import { backfillPeople, chatId, clearDiag, consolidatePerson, loadDiag, rereadPerson, onPeopleStatus, peopleStatus, requestPeopleUpdate, sheetOf, type DiagRun } from '../host/people';
+import { backfillPeople, chatId, clearDiag, consolidatePerson, loadDiag, rereadPerson, onPeopleStatus, peopleStatus, requestPeopleUpdate, rosterOf, sheetOf, type DiagRun } from '../host/people';
 import { anchorOf, changeId, entryId, entryStates, isAlive, liveChanges, liveEntries, liveness, messageKey, peopleStore, plain, putChange, putEntry, splitUnread, withPeople, type EntryState, type Liveness } from '../core/people/store';
 import { addressOf, affinityView, opennessOf, tasteOf } from '../core/people/affinity';
 import { factionNow, knownFactionCodes, stageMid as factionStageMid, userFactionOf } from '../core/people/faction';
@@ -386,6 +386,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
   const ctxRows = [
     ppRow('inject', s.inject),
     ppRow('always', '', { ctl: `<input class="gx-search pp-always" data-change="pp-always" name="pp-always" value="${esc(v('always'))}" placeholder="예: 쟈알디, 스팡달" maxlength="400" aria-label="항상 포함할 인물">` }),
+    ppRow('scene_carry', v('scene_carry') === '1' ? '1' : '0'),
     ppRow('block_cap', String(s.blockCap)),
   ].join('');
   const refRows = [
@@ -423,6 +424,8 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
   const newPeople = [
     ppRow('newpeople', s.newPeople),
     ppRow('twoturn', v('twoturn') === '1' ? '1' : '0'),
+    ppRow('roster_hint', v('roster_hint') === '1' ? '1' : '0'),
+    ppRow('new_unnamed', v('new_unnamed') === '1' ? '1' : '0'),
   ].join('');
   const update = [
     ppRow('model', s.model),
@@ -1090,8 +1093,10 @@ export async function handlePeople(action: string, value: string | undefined, ct
       await mutate(ctx, env, (store, chat) => {
         const pend = store.pending[v];
         if (!pend || store.people[v]) return false;
-        const base = seedBaseFor(v, userFaction(chat), store.identity);
+        // 명부 인물이면 명부 줄의 소속·영문 표기로 시작한다. 호칭으로 올라온 후보(provisional)는 기록에도 그대로 표시한다
+        const base = seedBaseFor(v, userFaction(chat), store.identity, rosterOf(ctx.char.globalLore).find((r) => r.name === v));
         store.people[v] = seedPerson(v, sheet(v), { ...base, aliases: [...new Set([...(base.aliases ?? []), ...(pend.aliases ?? [])])] });
+        if (pend.provisional) store.people[v].provisional = true;
         delete store.pending[v];
         return true;
       });

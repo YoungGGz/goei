@@ -4,13 +4,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { build } from 'esbuild';
 import { installPackText } from '../scripts/data-pack.mjs';
 
 const out = await build({
   stdin: {
     contents: `
-      export { checkInstall, installIcon, restoreIcon } from './src/host/install';
+      export { checkInstall, installIcon, restoreIcon, tidyIconList } from './src/host/install';
       export { installAction, installPage, instUi, refreshInstall } from './src/ui/editor/install';
       export { applyInstallPack } from './src/core/datapack';
       export { installData, installLore, plantGreetings, installLoreSettings } from './src/core/install';
@@ -27,16 +28,22 @@ M.applyInstallPack(installPackText());
 // 설치 아이콘은 카드 빌드가 카드/봇카드.webp 를 그대로 release/icon.webp 로 쓴 것 (release/ 는 빌드 결과라 저장소에 없다)
 const ICON = new Uint8Array(readFileSync(new URL('../카드/봇카드.webp', import.meta.url)));
 const ICON_KEY = 'goei:icon';
+const DIGEST = createHash('sha1').update(ICON).digest('hex').slice(0, 12);
 
 /** 캐릭터 하나와 기기 저장소만 있는 가짜 Risu. 아이콘 파일만 받을 수 있다 (그 밖의 받기는 실패) */
 function fakeRisu(char) {
   const store = new Map();
-  const box = { char, store, fetched: [] };
+  const box = { char, store, fetched: [], files: new Map() };
   let n = 0;
   globalThis.risuai = {
     getCharacterFromIndex: async () => structuredClone(box.char),
     setCharacterToIndex: async (_i, next) => void (box.char = structuredClone(next)),
-    saveAsset: async () => `assets/saved-${++n}.webp`,
+    saveAsset: async (bytes) => {
+      const path = `assets/saved-${++n}.webp`;
+      box.files.set(path, new Uint8Array(bytes));
+      return path;
+    },
+    readImage: async (path) => box.files.get(path) ?? null,
     nativeFetch: async (url) => {
       box.fetched.push(String(url));
       if (/\/icon\.(png|webp)\?/.test(String(url))) return { ok: true, status: 200, arrayBuffer: async () => ICON.buffer.slice(0) };
@@ -53,7 +60,7 @@ test('host: 「이전 아이콘으로」는 기록을 지우지 않고 되돌렸
   const box = fakeRisu({ chaId: 'c1', name: '내 봇', image: 'assets/mine.png' });
   await M.installIcon(0, () => {});
   assert.equal(box.char.image, 'assets/saved-1.webp');
-  assert.deepEqual(note(box), { ours: 'assets/saved-1.webp', prev: 'assets/mine.png' }, '되돌리기 전 기록 모양은 그대로');
+  assert.deepEqual(note(box), { ours: 'assets/saved-1.webp', prev: 'assets/mine.png', digest: DIGEST }, '기록: 우리 아이콘·설치 전 아이콘·그림 지문');
   let r = await M.checkInstall(0);
   assert.equal(r.state.icon, true);
   assert.equal(r.iconPrev, 'assets/mine.png');
@@ -68,7 +75,7 @@ test('host: 「이전 아이콘으로」는 기록을 지우지 않고 되돌렸
   assert.equal(r.iconPrev, '', '이미 이전 아이콘이므로 「이전 아이콘으로」는 내지 않는다');
 
   await M.installIcon(0, () => {});
-  assert.deepEqual(note(box), { ours: 'assets/saved-2.webp', prev: 'assets/mine.png' }, '다시 넣으면 되돌린 표시가 풀린다');
+  assert.deepEqual(note(box), { ours: 'assets/saved-2.webp', prev: 'assets/mine.png', digest: DIGEST }, '다시 넣으면 되돌린 표시가 풀린다');
   r = await M.checkInstall(0);
   assert.equal(r.state.icon, true);
   assert.equal(r.iconDeclined, false);
@@ -146,4 +153,66 @@ test('화면: 되돌린 봇은 전체 단추가 아이콘을 건드리지 않고
   html = M.installPage(ctx());
   assert.match(html, /data-action="ed-inst-icon-back"/);
   assert.doesNotMatch(html, /data-action="ed-inst-icon"[ >]/);
+});
+
+const icons = (box) => (box.char.ccAssets ?? []).filter((a) => a.type === 'icon').map((a) => a.uri);
+
+test('host: 메인이 되는 아이콘은 목록에 넣지 않는다 (같은 그림 두 장 X). 되돌리면 메인과 목록을 맞바꾼다 (사용자 2026-11-15)', async () => {
+  const box = fakeRisu({ chaId: 'd1', name: '내 봇', image: 'assets/mine.png' });
+  await M.installIcon(0, () => {});
+  assert.equal(box.char.image, 'assets/saved-1.webp');
+  assert.deepEqual(icons(box), ['assets/mine.png'], '목록에는 설치 전 아이콘만');
+  assert.equal(await M.restoreIcon(0), true);
+  assert.equal(box.char.image, 'assets/mine.png');
+  assert.deepEqual(icons(box), ['assets/saved-1.webp'], '되돌리면 목록에는 플러그인 아이콘만');
+
+  // 아이콘이 없던 봇: 목록이 빈 채로 메인만
+  const bare = fakeRisu({ chaId: 'd2', name: '빈 봇', image: '' });
+  await M.installIcon(0, () => {});
+  assert.deepEqual(icons(bare), []);
+});
+
+test('host: 옛 판이 넣은 옛 그림 아이콘은 「새 그림 있음」으로 세고, 다시 받으면 새 그림이 메인이 된다 (사용자 2026-11-15)', async () => {
+  // 옛 판이 넣은 상태: 지문 없는 기록, 메인 = 옛 그림, 목록에 설치 전 아이콘과 옛 그림이 둘 다 있다
+  const box = fakeRisu({ chaId: 'e1', name: '내 봇', image: 'assets/old-ours.png', ccAssets: [{ type: 'icon', uri: 'assets/mine.png', name: 'main', ext: 'png' }, { type: 'icon', uri: 'assets/old-ours.png', name: 'goei', ext: 'png' }] });
+  box.files.set('assets/old-ours.png', new Uint8Array([1, 2, 3]));
+  box.store.set(ICON_KEY, JSON.stringify({ e1: { ours: 'assets/old-ours.png', prev: 'assets/mine.png' } }));
+  let r = await M.checkInstall(0);
+  assert.equal(r.state.icon, false);
+  assert.equal(r.state.iconOld, true);
+  assert.equal(r.iconPrev, 'assets/mine.png', '되돌릴 길은 그대로');
+  await M.installIcon(0, () => {});
+  assert.equal(box.char.image, 'assets/saved-1.webp');
+  assert.deepEqual(note(box), { ours: 'assets/saved-1.webp', prev: 'assets/mine.png', digest: DIGEST }, '설치 전 아이콘 기록은 그대로');
+  assert.deepEqual(icons(box), ['assets/mine.png'], '옛 그림은 목록에서 빠진다');
+  r = await M.checkInstall(0);
+  assert.equal(r.state.icon, true);
+  assert.equal(r.state.iconOld, false);
+
+  // 옛 판이 넣었지만 그림이 이번 판과 같으면 그대로 두고 지문만 적어 둔다
+  const same = fakeRisu({ chaId: 'e2', name: '내 봇', image: 'assets/ours.webp' });
+  same.files.set('assets/ours.webp', ICON);
+  same.store.set(ICON_KEY, JSON.stringify({ e2: { ours: 'assets/ours.webp', prev: '' } }));
+  r = await M.checkInstall(0);
+  assert.equal(r.state.icon, true);
+  assert.equal(r.state.iconOld, false);
+  assert.equal(note(same).digest, DIGEST);
+  assert.equal(iconFetches(same), 0);
+
+  // 그림을 읽지 못하면 같은 것으로 본다
+  const blind = fakeRisu({ chaId: 'e3', name: '내 봇', image: 'assets/gone.webp' });
+  blind.store.set(ICON_KEY, JSON.stringify({ e3: { ours: 'assets/gone.webp', prev: '' } }));
+  r = await M.checkInstall(0);
+  assert.equal(r.state.icon, true);
+  assert.equal(r.state.iconOld, false);
+});
+
+test('host: 옛 판이 목록에도 넣어 둔 메인 아이콘을 목록에서 뺀다 (기록이 있는 봇만)', async () => {
+  const dup = [{ type: 'icon', uri: 'assets/ours.webp', name: 'goei', ext: 'webp' }, { type: 'icon', uri: 'assets/mine.png', name: 'main', ext: 'png' }, { type: 'x', uri: 'assets/ours.webp', name: 'other', ext: 'webp' }];
+  const box = fakeRisu({ chaId: 'f1', name: '내 봇', image: 'assets/ours.webp', ccAssets: structuredClone(dup) });
+  assert.equal(await M.tidyIconList(0), false, '기록이 없는 봇은 건드리지 않는다');
+  box.store.set(ICON_KEY, JSON.stringify({ f1: { ours: 'assets/ours.webp', prev: 'assets/mine.png' } }));
+  assert.equal(await M.tidyIconList(0), true);
+  assert.deepEqual(box.char.ccAssets, dup.slice(1), '메인과 같은 아이콘만 빠지고 나머지는 그대로');
+  assert.equal(await M.tidyIconList(0), false);
 });

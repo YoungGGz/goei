@@ -25,6 +25,11 @@ export function hasImgTag(text: string): boolean {
   return text.includes('<img=');
 }
 
+/** 글에 든 태그의 이름 부분들 (<img=이름_표정> 의 「이름」, 나온 순서·겹침 없이). 인물 기록이 「이 응답에 초상이 뜬 사람」을 갱신기 자료에 싣는 데 쓴다 */
+export function imgTagNames(text: string): string[] {
+  return [...new Set([...text.matchAll(TAG)].map((m) => m[1].trim()).filter(Boolean))];
+}
+
 /** 페르소나 태그(<img=페르소나이름_표정>)에 맞는 에셋이 없을 때 쓰는 그림: Risu의 유저 사진 (표정과 상관없이 한 장).
  *  나중에 「페르소나이름_표정」 에셋을 넣으면 그것이 먼저다 */
 const SELF = '{{source::user}}';

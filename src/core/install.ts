@@ -19,7 +19,7 @@ export interface InstallData {
   pictures: Picture[];
   /** 기본 명부(Directory) */
   directory: Record<string, unknown>;
-  /** 아이콘: release/icon.png 파일 이름·지문·크기 */
+  /** 아이콘: release 의 아이콘 파일(icon.webp) 이름·지문·크기 */
   icon: { file?: string; digest?: string; bytes?: number };
 }
 
@@ -95,8 +95,10 @@ export interface InstallState {
   greetings: { ok: boolean; missing: string[]; total: number };
   /** 사진: 카드 에셋에 없는 카드 사진 */
   pictures: { missing: Picture[]; bytes: number; total: number };
-  /** 아이콘: 우리 아이콘이 메인인가 (지문 기록으로 판단) */
+  /** 아이콘: 이번 판 그림의 우리 아이콘이 메인인가 (지문 기록으로 판단) */
   icon: boolean;
+  /** 우리 아이콘이 메인이지만 이번 판 그림이 아니다 (옛 그림). 빠진 것으로 세어 새 그림을 받게 한다 (사용자 2026-11-15) */
+  iconOld: boolean;
   /** 위키 기본 문서 묶음이 있나 (카드 로어북 또는 저장소) */
   wikiPack: boolean;
   /** 토크나이저(o200k_base) 순위표가 저장소에 있나 */
@@ -114,6 +116,8 @@ export interface CheckInput {
   assets: unknown;
   /** 지금 아이콘이 우리 것인지 (host 가 저장소 기록으로 안다) */
   iconOurs: boolean;
+  /** 우리 아이콘이지만 이번 판 그림과 다르다 (host 가 그림 지문으로 안다) */
+  iconOld?: boolean;
   wikiPack: boolean;
   tokenizer: boolean;
 }
@@ -156,7 +160,8 @@ export function installCheck(i: CheckInput): InstallState {
     loreSettings: !installLoreSettings(i.loreSettings),
     greetings: { ok: !missing.length, missing, total: Object.keys(inst.greetings.index).length },
     pictures: { missing: missingPics, bytes: missingPics.reduce((n, p) => n + (Number(p[3]) || 0), 0), total: want.length },
-    icon: i.iconOurs,
+    icon: i.iconOurs && !i.iconOld,
+    iconOld: i.iconOurs && !!i.iconOld,
     wikiPack: i.wikiPack,
     tokenizer: i.tokenizer,
   };
@@ -351,6 +356,7 @@ export function installSummary(s: InstallState): string[] {
   if (!s.loreSettings) out.push('로어북 설정 없음');
   if (!s.greetings.ok) out.push(`인사말 ${s.greetings.missing.length}/${s.greetings.total}개 없음`);
   if (s.pictures.missing.length) out.push(`카드 사진 ${s.pictures.missing.length}/${s.pictures.total}장 없음`);
+  if (s.iconOld) out.push('아이콘 새 그림 있음');
   if (!s.wikiPack) out.push('위키 기본 문서 없음');
   if (!s.tokenizer) out.push('토크나이저 없음');
   return out;
