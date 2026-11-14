@@ -65,7 +65,8 @@ if (version !== before) {
 } else log(`① 판 그대로 ${version} (--bump 또는 --version 으로 올릴 수 있음)`);
 
 // ③ 카드 + release 부속 (card-update.* · version.json · wiki-base.* · icon.webp · pic/). release/ 는 비우고 새로 만든다
-if (!opt.dry) rmSync(resolve(ROOT, 'release'), { recursive: true, force: true });
+// --no-card 면 비우지 않는다: 카드 부속(card-update.* · version.json · wiki-base.* · icon · pic/)은 카드 빌드만 만들 수 있어, 비우면 ⑤ 단위 시험이 그 파일을 못 찾아 멈춘다 (2026-11-15 점검)
+if (!opt.dry && opt.card) rmSync(resolve(ROOT, 'release'), { recursive: true, force: true });
 if (!opt.dry) mkdirSync(resolve(ROOT, 'release'), { recursive: true });
 if (opt.card) {
   const src = '카드/원본_봇카드.jpeg';
@@ -83,6 +84,9 @@ run('npm', ['run', 'build'], '② 빌드');
 // ④ dist → release (시작기·본체 조각·자료 팩·토크나이저 조각)
 {
   const dist = resolve(ROOT, 'dist');
+  const mine = /^(goei-plugin\.js|goei-body\.(json|\d+\.txt)|goei-data-(world|install|items|looks|homeshop)\.(json|\d+\.txt)|tok-o200k\.(json|\d+\.txt))$/;
+  // 지난 빌드의 조각이 남지 않게 (--no-card 로 release/ 를 비우지 않았을 때 조각 수가 줄면 옛 조각이 남는다)
+  if (!opt.dry) for (const f of readdirSync(resolve(ROOT, 'release'))) if (mine.test(f)) unlinkSync(resolve(ROOT, 'release', f));
   const files = readdirSync(dist).filter((f) => /^(goei-plugin\.js|goei-body\.(json|\d+\.txt)|goei-data-(world|install|items|looks|homeshop)\.(json|\d+\.txt)|tok-o200k\.(json|\d+\.txt))$/.test(f));
   log(`④ dist → release 복사 ${files.length}개`);
   if (!opt.dry) for (const f of files) copyFileSync(resolve(dist, f), resolve(ROOT, 'release', f));

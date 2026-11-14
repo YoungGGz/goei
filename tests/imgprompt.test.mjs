@@ -3,15 +3,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { imgprompt, settings } from '../dist-test/core.mjs';
 
-const { imgPromptConfig, imgCandidates, imgCharacters, buildImgPrompt, stripImgLore, applyImgConfig, IMG_PROMPT_DEFAULT, IMG_KEYWORDS_DEFAULT } = imgprompt;
+const { imgPromptConfig, imgCandidates, imgCharacters, buildImgPrompt, stripImgLore, applyImgConfig, imgPromptDefault, imgKeywordsDefault } = imgprompt;
 import { imgDirLore } from './fixtures/imgdir.mjs';
 // 명부만 본다 (v0.16.66: 로어북 「Image tag」「Asset」 없음)
 const bookLore = imgDirLore([{ name: '쟈알디', english: 'Jyaldi' }, { name: '아벤샤', english: 'Avensha' }, { name: '브라우니', english: 'Brownie' }]);
 
 test('설정 읽기: 비어 있으면 기본 틀·기본 표정, 이름은 금지 문자 제거', () => {
   const c = imgPromptConfig({});
-  assert.equal(c.template, IMG_PROMPT_DEFAULT);
-  assert.deepEqual(c.keywords, IMG_KEYWORDS_DEFAULT);
+  assert.equal(c.template, imgPromptDefault());
+  assert.deepEqual(c.keywords, imgKeywordsDefault());
   const d = imgPromptConfig({ imgPrompt: '  ', imgNamesOff: ['Jyaldi', ' Jy<al>di '], imgNamesExtra: ['Secriem', 'Bad_Name'], imgKeywords: ['Happy', 'sad!!', ''] });
   assert.ok(d.off.includes('Jyaldi') && d.off.length === 1, '같은 이름은 한 번');
   assert.deepEqual(d.extra, ['Secriem', 'BadName']);
