@@ -9,6 +9,7 @@ import { worldSettings } from '../settings';
 import { applyOutput, bootstrap, cancelMission, parseWorld, reports, serializeWorld, type Rng, type WorldSettings, type WorldState } from './engine';
 import { cleanOutput, hasWorldTags } from './tags';
 import { splitThoughts } from '../thoughts';
+import { guideTxt } from '../guides';
 
 export const WORLD_KEY = '$goei_world';
 const LAST_KEY = '$goei_last';
@@ -144,7 +145,7 @@ export function processOutput(chat: Chat, messageIndex: number, raw: string, c: 
   if (result.faction) {
     vars.$st_faction = result.faction;
     vars.$st_pick = result.faction;
-    vars.$ib_affiliation = c.affiliations?.[result.faction] ?? findFaction(result.faction)?.affiliation ?? '미등록';
+    vars.$ib_affiliation = c.affiliations?.[result.faction] ?? findFaction(result.faction)?.affiliation ?? guideTxt('Main', 'WORLD.AFFILIATION_UNKNOWN');
   }
   const message = messages.slice();
   message[index] = { ...msg, data: clean };

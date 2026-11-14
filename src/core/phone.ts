@@ -919,7 +919,12 @@ export function announcementPacket(chat: Chat, set: PhoneSettings, names: Record
   };
 }
 
-const CATEGORIES = new Set(['공지', '업무', '시설', '인사', '안전']);
+/** 공지 분류: 모델에 주는 지침 「괴담톡」 ANNOUNCEMENTS 절의 "category":"공지|업무|…" 그 글을 그대로 읽는다 (한 곳에서 고치면 지시와 검사가 같이 바뀐다).
+ *  절에 그 꼴이 없으면(분류를 지시하지 않으면) 분류를 가리지 않는다 */
+function noticeCategories(): Set<string> | null {
+  const m = /"category":"([^"]*)"/.exec(guideTxt('Phone', 'ANNOUNCEMENTS'));
+  return m ? new Set(m[1].split('|')) : null;
+}
 export interface NoticeRow {
   issuer: string;
   category: string;
@@ -942,7 +947,8 @@ export function validateAnnouncements(rows: unknown, packet: AnnouncementCheck |
 
 function noticeProblem(row: NoticeRow): string | null {
   if (!row || typeof row.issuer !== 'string' || typeof row.category !== 'string' || typeof row.title !== 'string' || typeof row.text !== 'string') return guideTxt('Phone', 'ERR.NOTICE_FORMAT');
-  if (!CATEGORIES.has(row.category)) return guideTxt('Phone', 'ERR.NOTICE_CATEGORY');
+  const categories = noticeCategories();
+  if (categories && !categories.has(row.category)) return guideTxt('Phone', 'ERR.NOTICE_CATEGORY');
   if (!row.issuer.trim() || [...row.issuer].length > LIMITS.notice_issuer || !row.title.trim() || [...row.title].length > LIMITS.notice_title || !row.text.trim()) return guideTxt('Phone', 'ERR.NOTICE_FIELDS');
   if (tokens(row.text) > LIMITS.notice_tokens) return guideTxt('Phone', 'ERR.NOTICE_TOKENS', { limit: LIMITS.notice_tokens });
   return null;

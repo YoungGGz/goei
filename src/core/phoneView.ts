@@ -4,9 +4,12 @@
 // - 다중인격 혼잣말: 시점 인물의 마음속 여러 갈래(1~9)가 단톡처럼 주고받는다
 // 내가 끼지 않는 방이라 괴담톡 대화 기록(PState)과 따로 둔다. 선톡·새로고침·채팅 반영에는 섞이지 않는다.
 import { decodeJson, parseReactions, PH, phoneValue, PhoneError } from './phone';
+import { guideTxt } from './guides';
 
 export type ViewPreset = 'side' | 'mono' | 'multi';
-export const VIEW_PRESETS: Record<ViewPreset, string> = { side: '사이드스토리', mono: '혼잣말', multi: '다중인격 혼잣말' };
+/** 종류 이름 (화면과, 이름 없는 방의 이름으로 모델에 다시 가는 글이 같이 쓴다): 지침 「괴담톡」 VIEW.NAME.<종류> 절. 부를 때마다 읽는다 */
+const viewName = (p: ViewPreset): string => guideTxt('Phone', `VIEW.NAME.${p.toUpperCase()}`);
+export const VIEW_PRESETS: Record<ViewPreset, string> = { get side() { return viewName('side'); }, get mono() { return viewName('mono'); }, get multi() { return viewName('multi'); } };
 export const PH_VIEWS = PH('views');
 export const PH_VIEW_LAST = PH('view_last');
 export const VIEW_KEEP = 30;
@@ -86,7 +89,7 @@ const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 /** 응답 {name, pov, participants:[{id,name}], messages:[{sender,type,content,reactions}]} → 방. 틀린 말풍선만 빼고, 남는 게 없으면 실패 */
 export function parseView(raw: string, preset: ViewPreset): Omit<ViewRoom, 'id' | 'time' | 'unread'> {
   const value = decodeJson(raw) as Record<string, unknown>;
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PhoneError('보기 전용 방 형식이 올바르지 않아요.', raw);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new PhoneError(guideTxt('Phone', 'ERR.VIEW_FORMAT'), raw);
   const people: ViewPerson[] = [];
   for (const p of (Array.isArray(value.participants) ? value.participants : []) as Record<string, unknown>[]) {
     const id = str(p?.id).slice(0, 40);
@@ -94,7 +97,7 @@ export function parseView(raw: string, preset: ViewPreset): Omit<ViewRoom, 'id' 
     if (id && name && id !== '-' && !people.some((x) => x.id === id)) people.push({ id, name });
   }
   const pov = str(value.pov);
-  if (!people.length || !people.some((p) => p.id === pov)) throw new PhoneError('시점 인물이 참여자 목록에 없어요.', raw);
+  if (!people.length || !people.some((p) => p.id === pov)) throw new PhoneError(guideTxt('Phone', 'ERR.VIEW_POV'), raw);
   if (preset === 'mono' && people.length !== 1) people.splice(0, people.length, people.find((p) => p.id === pov)!);
   const ids = new Set(people.slice(0, VIEW_LIMITS.people).map((p) => p.id));
   const messages: ViewMsg[] = [];
@@ -110,7 +113,7 @@ export function parseView(raw: string, preset: ViewPreset): Omit<ViewRoom, 'id' 
     if (messages.length >= VIEW_LIMITS.messages) break;
   }
   while (messages.length && messages[messages.length - 1].type !== 'text') messages.pop();
-  if (!messages.some((m) => m.type === 'text')) throw new PhoneError('보기 전용 방에 메시지가 하나도 없어요.', raw);
+  if (!messages.some((m) => m.type === 'text')) throw new PhoneError(guideTxt('Phone', 'ERR.VIEW_EMPTY'), raw);
   const name = str(value.name).slice(0, VIEW_LIMITS.name) || VIEW_PRESETS[preset];
   return { preset, name, pov, people: people.filter((p) => ids.has(p.id)), messages };
 }

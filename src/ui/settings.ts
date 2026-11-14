@@ -7,7 +7,7 @@ import { mallSettingsPane } from './malls';
 import { homeshopSettingsPane } from './homeshop';
 import { HS_LOG_KINDS, HS_MAIN_KEY, HS_MAIN_SET, hsMainSettings, type HsLogKind } from '../core/hslog';
 import { SHOP_MAIN_KINDS, SHOP_MAIN_LINES, SHOP_MAIN_LINES_VAR, isShopPlace, shopMainKey, type ShopMainKind } from '../core/shopctx';
-import { GUIDE_NAMES, setGuideOverride } from '../core/guides';
+import { GUIDE_NAMES, guideTxt, setGuideOverride } from '../core/guides';
 import { onOffSwitch, switchHtml } from './controls';
 import { repaintTheme } from './theme';
 import {
@@ -97,7 +97,8 @@ function seg(action: string, cur: string, items: [string, string][], disabled = 
 /** scope 'device' = 이 기기 공통 값(채팅·기본값 구분 없음). 줄 이름 옆에 배지로 보인다 (2026-10-27 리수폿식 범위 표시) */
 /** scope 'chat'·'defaults' = 화면 페이지처럼 범위 전환이 없는 곳에서 그 줄만 다른 범위일 때 (테마) */
 /** 고유 상점 표 (11-09 사용자: 로어 고유 상점은 설정에서 따로 정한다, 하드코딩 금지). 줄마다 사용·이름·다른 이름·인터넷 사이트·직접 갔을 때 창 */
-const OWN_WEB: [string, string][] = [['none', '없음'], ['cos', '우주 쇼핑몰'], ['bm', '백일몽 포인트몰'], ['hs', '망상홈쇼핑']];
+/** 인터넷 접속 고르기: 쇼핑몰·망상홈쇼핑 이름은 지침 절(우주 쇼핑몰·백일몽 포인트몰 MALL_NAME · 망상홈쇼핑 CHANNEL_NAME)을 부를 때마다 읽는다 (화면과 요청이 같은 글) */
+const ownWeb = (): [string, string][] => [['none', '없음'], ['cos', guideTxt('Cos', 'MALL_NAME')], ['bm', guideTxt('Bm', 'MALL_NAME')], ['hs', guideTxt('Hs', 'CHANNEL_NAME')]];
 const OWN_VISIT: [string, string][] = [['shop', '기본 상점창'], ['none', '열지 않음']];
 function ownShopsField(vars: Record<string, unknown> | undefined, busy: boolean): string {
   const list = ownShops(vars);
@@ -106,7 +107,7 @@ function ownShopsField(vars: Record<string, unknown> | undefined, busy: boolean)
   const rows = list.map((o) => `<div class="ms-fx${o.on ? '' : ' off'}">
       <div class="ms-fx-head">${text(o, 'name', '상점 이름 (로어 이름 그대로)', 30)}${switchHtml({ action: 'set-own-on', value: o.on ? `${o.id}:0` : `${o.id}:1`, on: o.on, disabled: busy, label: `${o.name || '고유 상점'} 켜고 끄기` })}<button class="gx-mini danger" data-action="set-own-del" data-value="${esc(o.id)}" aria-label="지우기"${busy ? ' disabled' : ''}>×</button></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>다른 이름</span>${text(o, 'alias', '쉼표로 나눠서 (예: 포인트몰, 복지몰)', 120)}</span></div>
-      <div class="ms-fx-row"><span class="ph-inline"><span>인터넷 접속</span>${seg('set-own-web', `${o.id}:${o.web || 'none'}`, OWN_WEB.map(([v, l]) => [`${o.id}:${v}`, l]), busy)}</span></div>
+      <div class="ms-fx-row"><span class="ph-inline"><span>인터넷 접속</span>${seg('set-own-web', `${o.id}:${o.web || 'none'}`, ownWeb().map(([v, l]) => [`${o.id}:${v}`, l]), busy)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>직접 가면</span>${seg('set-own-visit', `${o.id}:${o.visit || 'none'}`, OWN_VISIT.map(([v, l]) => [`${o.id}:${v}`, l]), busy)}</span></div>
     </div>`).join('');
   const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini primary" data-action="set-own-add"${list.length >= OWN_MAX || busy ? ' disabled' : ''}>고유 상점 추가</button><button class="gx-mini" data-action="set-own-reset"${busy ? ' disabled' : ''}>기본 표로 되돌리기</button></div>`;
@@ -994,7 +995,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       const t = fm[3].replace(/\s+/g, ' ').trim();
       next = edit((o) => (fm[2] === 'name' ? { ...o, name: t.slice(0, 30) } : { ...o, alias: t.slice(0, 120) }));
     } else if (action === 'set-own-on' && (val === '1' || val === '0')) next = edit((o) => ({ ...o, on: val === '1' }));
-    else if (action === 'set-own-web' && OWN_WEB.some(([w]) => w === val)) next = edit((o) => ({ ...o, web: val === 'none' ? '' : val }));
+    else if (action === 'set-own-web' && ownWeb().some(([w]) => w === val)) next = edit((o) => ({ ...o, web: val === 'none' ? '' : val }));
     else if (action === 'set-own-visit' && OWN_VISIT.some(([w]) => w === val)) next = edit((o) => ({ ...o, visit: val === 'none' ? '' : val }));
     else if (action === 'set-own-add' && cur.length < OWN_MAX) next = [...cur, { id: `o${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, on: true, name: '', alias: '', web: '', visit: 'shop' }];
     else if (action === 'set-own-del') next = cur.filter((o) => o.id !== v);

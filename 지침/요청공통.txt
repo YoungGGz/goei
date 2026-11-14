@@ -217,3 +217,7 @@ Expected {"body":"reply text"} with a non-empty body.
 @@SECTION USER_RULES.DEFAULT_TITLE
 규칙
 @@END
+
+@@SECTION GNET.ANON_AUTHOR
+ㅇㅇ
+@@END

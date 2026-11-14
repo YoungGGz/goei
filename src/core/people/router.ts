@@ -51,9 +51,9 @@ export function parseRouter(raw: string, store: PeopleStore, names: NameEntry[],
   if (fence) t = fence[1].trim();
   const a = t.indexOf('{');
   const b = t.lastIndexOf('}');
-  if (a < 0 || b <= a) throw new Error('JSON 객체가 없어요');
+  if (a < 0 || b <= a) throw new Error(guideTxt('Router', 'ERR.NO_JSON'));
   const v = JSON.parse(t.slice(a, b + 1)) as { selected?: unknown; new_characters?: unknown };
-  if (!Array.isArray(v.selected)) throw new Error('selected 목록이 없어요');
+  if (!Array.isArray(v.selected)) throw new Error(guideTxt('Router', 'ERR.NO_SELECTED'));
   const canon = (s: string): string | null => {
     const q = s.trim().normalize('NFC');
     if (!q) return null;

@@ -1634,3 +1634,11 @@ NEW [AG|{id}|<상태>|<상황>]
 @@SECTION INVENTORY.SHOP.PAID_POINTS
 {price} Baekilmong points{extra}
 @@END
+
+@@SECTION STATUS.RECENT_POINT_LINE
+{amount} p {memo}
+@@END
+
+@@SECTION WORLD.AFFILIATION_UNKNOWN
+미등록
+@@END

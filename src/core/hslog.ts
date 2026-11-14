@@ -12,8 +12,8 @@ import type { Chat } from './types';
 export const HS_LOG_VAR = '$hs_log';
 /** 기록 줄 수 한계: 넘으면 오래된 줄부터 버린다 (변수가 끝없이 자라지 않게. 내 채팅·주문은 맨 나중에 버린다) */
 export const HS_LOG_MAX = 400;
-/** 진행자 줄의 who */
-export const HS_LOG_HOST = '진행자';
+/** 진행자 줄의 who: 지침 「망상홈쇼핑」의 LOG_HOST_NICK 절. 적는 쪽(ui/hsplayer.ts)과 가려내는 쪽(여기)이 같은 절을 읽는다 */
+export const hsLogHost = (): string => guideTxt('Hs', 'LOG_HOST_NICK');
 const TEXT_MAX = 200;
 
 type Vars = Record<string, unknown> | undefined;
@@ -154,7 +154,7 @@ function lineOf(e: HsLogEntry): Line {
   if (e.k === 'chat') return { type: 'viewer', nick: e.who, text: e.text };
   if (e.k === 'buy') return { type: 'user_order', text: e.text };
   if (e.me) return { type: 'user_chat', nick: e.who, text: e.text };
-  return e.who === HS_LOG_HOST ? { type: 'host_reply_to_user', text: e.text } : { type: 'viewer_reply_to_user', nick: e.who, text: e.text };
+  return e.who === hsLogHost() ? { type: 'host_reply_to_user', text: e.text } : { type: 'viewer_reply_to_user', nick: e.who, text: e.text };
 }
 
 /**
@@ -194,7 +194,8 @@ export function hsMainContext(chat: Chat, rule: string, focus?: Focus | null, ca
   if (!(limit > 0) || tokens(payload(none)) <= limit) return payload(none);
   // 버리는 순서: 갈래(시청자 채팅 → 진행자 대사 → 반응 → 내 채팅·주문), 갈래 안에서는 장면과 무관한 것 먼저 · 오래된 것 먼저
   const rank = (e: HsLogEntry) => (e.k === 'chat' ? 0 : e.k === 'show' ? 1 : mine(e) ? 3 : 2);
-  const rel = entries.map((e) => (focus ? related(focus, e.who === HS_LOG_HOST ? [] : [e.who], e.text) : false));
+  const host = hsLogHost();
+  const rel = entries.map((e) => (focus ? related(focus, e.who === host ? [] : [e.who], e.text) : false));
   const order = entries.map((_, i) => i).sort((a, b) => rank(entries[a]) - rank(entries[b]) || Number(rel[a]) - Number(rel[b]) || a - b);
   // 몇 개를 버려야 들어가나 (버릴수록 줄어드니 이분 탐색)
   const fits = (n: number) => tokens(payload(new Set(order.slice(0, n)))) <= limit;

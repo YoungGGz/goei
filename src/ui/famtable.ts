@@ -6,7 +6,7 @@ import { fnGrids, refChipLabels } from './fngrid';
 import { CFG, COUNT_RANGE, GN_DEFAULTS, STORAGE_MAX, gnetRetention, gnetSettings, type CountKey } from '../core/gnet';
 import { jointOn } from '../core/netjoint';
 import { MALL_NAME, mallSettings } from '../core/malls';
-import { HS_NAME, hsSettings } from '../core/homeshop';
+import { hsName, hsSettings } from '../core/homeshop';
 import { SHOP_SIZE_HI, SHOP_SIZE_LO, shopBlocked, shopSettings, type ShopSettings } from '../core/shop';
 import { HS_MAIN_SET, hsMainSettings, type HsLogKind } from '../core/hslog';
 import { SHOP_MAIN_ALL, SHOP_MAIN_KINDS, SHOP_MAIN_LABEL, SHOP_MAIN_LINES, SHOP_PLACES, shopMain, shopMainLines, type ShopPlace } from '../core/shopctx';
@@ -181,24 +181,28 @@ export async function famAction(action: string, value: string | undefined, env: 
   return env.render(), true;
 }
 
-const SHOP_ROWS: { id: ShopCol; name: string; icon: string }[] = [
+/** 상점 줄: 쇼핑몰·망상홈쇼핑 이름은 지침 절(MALL_NAME·CHANNEL_NAME)을 부를 때마다 읽는다 (고친 지침이 바로 보이게) */
+const shopRows = (): { id: ShopCol; name: string; icon: string }[] => [
   { id: 'shop', name: '기본 상점', icon: ICONS.swap },
   { id: 'cos', name: MALL_NAME.cos, icon: siteLogo('cos') },
   { id: 'bm', name: MALL_NAME.bm, icon: siteLogo('bm') },
-  { id: 'hs', name: HS_NAME, icon: siteLogo('hs') },
+  { id: 'hs', name: hsName(), icon: siteLogo('hs') },
 ];
-const isShopCol = (v: string): v is ShopCol => SHOP_ROWS.some((r) => r.id === v);
+const SHOP_COLS: ShopCol[] = ['shop', 'cos', 'bm', 'hs'];
+const isShopCol = (v: string): v is ShopCol => (SHOP_COLS as string[]).includes(v);
 
 /** 설정 → 상점: 상점마다 따로 정하는 값(격자) + 기능마다 따로 정하는 값(격자) + 네 곳이 같이 쓰는 값 + 기본 상점에만 있는 값의 머리.
  *  vars = 그 페이지의 범위(이 채팅 · 시작 전에는 새 채팅 기본값)의 변수 */
 export function shopTable(vars: State, busy = false): string {
   const v = vars as never;
+  const rows = shopRows();
+  const hsN = hsName();
   const hs = hsSettings(v);
   const set: Record<ShopCol, ShopSettings> = { shop: shopSettings(v), cos: mallSettings(v, 'cos'), bm: mallSettings(v, 'bm'), hs: hs.shop };
   const blocked = shopBlocked(v);
   const autoOf: Record<string, string> = { cos: mallSettings(v, 'cos').auto, bm: mallSettings(v, 'bm').auto, hs: hs.auto };
-  const L = SHOP_ROWS.map(({ name, icon }) => nm(icon, name));
-  const each = <T,>(f: (id: ShopCol, s: ShopSettings) => T): T[] => SHOP_ROWS.map(({ id }) => f(id, set[id]));
+  const L = rows.map(({ name, icon }) => nm(icon, name));
+  const each = <T,>(f: (id: ShopCol, s: ShopSettings) => T): T[] => rows.map(({ id }) => f(id, set[id]));
   const size = (n: number) => ({ n, lo: SHOP_SIZE_LO, hi: SHOP_SIZE_HI });
 
   /* ── 1. 상점마다 따로 정하는 값: 격자 하나(호출 · 진열대) + 글자 칸 표(값 기준) ── */
@@ -223,14 +227,14 @@ export function shopTable(vars: State, busy = false): string {
       ['상품 수', '한 번에 받는 물건의 수예요. 망상홈쇼핑은 한 편성의 상품 수예요.'],
       ['구획', '켜면 눈에 띄는 물건을 따로 받아 딱지를 붙여 보여 줘요.'],
     ]) };
-  const price = mxGrid([{ name: '모델에 알려 줄 말' }], SHOP_ROWS.map(({ id, name, icon }) => ({ label: nm(icon, name), cells: [text('fam-text', `s:${id}:price`, set[id].price, '', 80, `${name} 값 기준`, busy)] })),
+  const price = mxGrid([{ name: '모델에 알려 줄 말' }], rows.map(({ id, name, icon }) => ({ label: nm(icon, name), cells: [text('fam-text', `s:${id}:price`, set[id].price, '', 80, `${name} 값 기준`, busy)] })),
     helpBox('물건값을 매길 때 모델이 따를 기준이에요. 비우면 그곳에 어울리는 값으로 매겨요.'), '값 기준');
 
   /* ── 1-2. 메인 요청에 붙이는 것 (상점 → 메인 요청, core/shopctx.ts): 줄 = 가게, 칸 = 그 가게에서 생기는 것. 없는 것은 빈 칸 (2026-11-12 사용자: 「메뉴마다 다른데」).
    *  맨 앞 「컨텍스트 포함」은 게시판 격자의 같은 칸과 같은 조작(그 가게 것 전부 켬/끔). 꺼지면 그 줄의 나머지 칸은 잠긴다. 망상홈쇼핑 줄은 칸이 달라 따로 붙인다 ── */
-  const places = SHOP_ROWS.filter((r): r is { id: ShopPlace; name: string; icon: string } => (SHOP_PLACES as string[]).includes(r.id));
+  const places = rows.filter((r): r is { id: ShopPlace; name: string; icon: string } => (SHOP_PLACES as string[]).includes(r.id));
   // 망상홈쇼핑 줄 (2026-11-13): 방송에서 생기는 것은 다른 가게와 달라 칸 셋(방송 내용·시청자 채팅·내 채팅)을 더한다. 주문은 「구매」 칸. 값은 core/hslog.ts ($hs_main·$hs_main_kinds·$hs_main_tokens)
-  const hsRow = SHOP_ROWS.find((r) => r.id === 'hs')!;
+  const hsRow = rows.find((r) => r.id === 'hs')!;
   const hm = hsMainSettings(v);
   const HS_EXTRA: [HsLogKind, string][] = [['show', '방송 내용'], ['chat', '시청자 채팅'], ['say', '내 채팅']];
   const hsCell = (k: HsLogKind) => hm.kinds.includes(k);
@@ -254,13 +258,13 @@ export function shopTable(vars: State, busy = false): string {
     ]) };
   const numBox = (key: string, n: number, lo: number, hi: number, unit: string, label: string) => `<div class="st-step adv-step${stepSize(hi, unit, '제한 없음')}"><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.max(lo, n - 1)}" ${n <= lo || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 줄이기">−</button><input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" data-change="fam-num" data-key="${key}" value="${n === 0 ? '' : n}" placeholder="제한 없음" aria-label="최대 양 ${label}"${busy ? ' disabled' : ''}><span>${unit}</span><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.min(hi, n + 1)}" ${n >= hi || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 늘리기">+</button></div>`;
   const HT = HS_MAIN_SET.tokens;
-  const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [HS_NAME, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, HS_NAME)]]), helpBox('', [
+  const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [hsN, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, hsN)]]), helpBox('', [
     ['대화', '「문의」와 「1:1 상담」으로 붙이는 대화의 줄 수예요. 넘으면 최근 줄만 붙여요.'],
-    [HS_NAME, '망상홈쇼핑에서 붙이는 것의 토큰 상한이에요. 넘으면 오래된 시청자 채팅부터 빼요.'],
+    [hsN, '망상홈쇼핑에서 붙이는 것의 토큰 상한이에요. 넘으면 오래된 시청자 채팅부터 빼요.'],
   ])));
   /* ── 1-2. 가게 표: 줄 = 가게 넷, 칸 = 넘길 내용 여섯 + 맥락 반영 (core/shopfn.ts) ── */
   const GIVE_OPTS = ['봇 설명', '작가 노트', '페르소나', '상시 로어북', '관련 로어북', '2차 참조', '맥락 반영'];
-  const giveRows = SHOP_ROWS.filter((r) => (GIVE_SHOPS as string[]).includes(r.id));
+  const giveRows = rows.filter((r) => (GIVE_SHOPS as string[]).includes(r.id));
   const giveShop: CkBand = { title: '넘길 내용', groups: [{ name: '', opts: GIVE_OPTS, kind: 'check' }],
     marks: giveRows.map((r) => SHOP_GIVE_KEYS.map((k) => shopGiveOn(v, r.id as GiveShop, k))),
     acts: giveRows.map((r) => SHOP_GIVE_KEYS.map((k) => `s:${r.id}:${k === 'ctx' ? 'ctx' : `give_${k}`}=${shopGiveOn(v, r.id as GiveShop, k) ? '0' : '1'}`)),

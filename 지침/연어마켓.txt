@@ -525,3 +525,19 @@ sender and recipient only
 @@SECTION POST.INPUT_TAG
 [{tag}] {input}
 @@END
+
+@@SECTION SITE.NAME
+연어 마켓
+@@END
+
+@@SECTION POST.TRADE_TAG.SELL
+팝니다
+@@END
+
+@@SECTION POST.TRADE_TAG.BUY
+삽니다
+@@END
+
+@@SECTION POST.TRADE_TAG.FREE
+나눔
+@@END

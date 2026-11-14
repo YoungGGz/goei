@@ -15,3 +15,11 @@ Rules:
 @@SECTION USER_RULES.HEAD
 ## User rules
 @@END
+
+@@SECTION ERR.NO_JSON
+JSON 객체가 없어요
+@@END
+
+@@SECTION ERR.NO_SELECTED
+selected 목록이 없어요
+@@END

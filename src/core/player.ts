@@ -25,8 +25,6 @@ export function playableAgents(lore: LoreEntry[] | undefined, faction: string): 
   return readDirectory(lore).agents.filter((a) => /^P\d{3,}$/.test(a.id) && a.name && a.rosterFor.includes(faction));
 }
 
-export const PLAYER_HEAD = '## Player Character';
-
 /** 이름 뒤에 붙는 조사·서술격 (applyPlayer 이름 바꾸기). 겹쳐 붙을 수 있다 (「에게는」「씨는」「이에게도」) */
 const HANGUL_JOSA = [
   '에게서', '한테서', '으로서', '으로써', '이에게', '이한테', '에게', '한테', '에서', '께서', '까지', '부터', '처럼', '보다', '마다', '조차', '마저', '밖에', '만큼', '같이', '하고',

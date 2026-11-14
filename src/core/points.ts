@@ -6,6 +6,7 @@ import { findStatusTags } from './world/status';
 import { addWalletEntry, aliveAnchors, liveWallet, removeWalletEntry, walletBalance, WALLET_MAX, type Wallet } from './wallet';
 import { messageKey } from './people/store';
 import { colConfig, isPointsOrg, POINTS_ON_VAR } from './world/statuscols';
+import { guideTxt } from './guides';
 export { isPointsOrg, POINTS_ORG } from './world/statuscols';
 
 export const POINTS_VAR = '$st_points';
@@ -49,10 +50,10 @@ export function pointsOn(chat: Chat): boolean {
   return colConfig(chat.scriptstate).points !== 'off' || readPoints(chat.scriptstate).log.length > 0;
 }
 
-/** 최근 포인트 거래 n줄 (영어 한 줄: 「-100 p 탈모약」). 상태창 맞춤 줄은 뺀다 */
+/** 최근 포인트 거래 n줄 (영어 한 줄: 「-100 p 탈모약」, 지침 「메인 요청에 붙는 글」의 STATUS.RECENT_POINT_LINE 절). 상태창 맞춤 줄은 뺀다 */
 export function recentPointLines(w: Wallet, alive: Set<string>, n: number): string[] {
   if (n <= 0) return [];
-  return liveWallet(w, alive).filter((e) => e.memo !== POINTS_SYNC_MEMO).slice(-n).map((e) => `${e.amount > 0 ? '+' : ''}${e.amount.toLocaleString('en-US')} p ${e.memo}`);
+  return liveWallet(w, alive).filter((e) => e.memo !== POINTS_SYNC_MEMO).slice(-n).map((e) => guideTxt('Main', 'STATUS.RECENT_POINT_LINE', { amount: `${e.amount > 0 ? '+' : ''}${e.amount.toLocaleString('en-US')}`, memo: e.memo }));
 }
 
 export const POINTS_SYNC_MEMO = '상태창 포인트';

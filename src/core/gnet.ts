@@ -214,6 +214,9 @@ export function mergeKeyFigures(state: Record<string, unknown> | undefined, rows
   return changed ? { [GN_KEYFIG]: JSON.stringify(list.slice(-60)) } : null;
 }
 
+/** 글쓴이를 비운 글의 익명 닉 (저장되어 다시 모델에 가고, 화면이 익명 글쓴이를 알아보는 데도 쓴다): 지침 「요청 공통」 GNET.ANON_AUTHOR 절 */
+export const anonAuthor = (): string => guideTxt('Common', 'GNET.ANON_AUTHOR');
+
 export function userNick(state: Record<string, unknown> | undefined): string {
   const n = String(state?.[GN_NICK] ?? '').trim();
   // 기본 닉네임은 지침 「요청 공통」 GNET.ANON_NICK 절 (화면과 요청이 같은 글)
@@ -779,7 +782,7 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     let date = validDate(raw.date);
     if (!date) date = day && str(raw.time).trim() ? `${day} ${str(raw.time).trim()}` : o.date;
     const q: GPost = {
-      id: pid, nick: cut(author || 'ㅇㅇ', 80), title: str(raw.title), body: stripForged(str(raw.content)), date,
+      id: pid, nick: cut(author || anonAuthor(), 80), title: str(raw.title), body: stripForged(str(raw.content)), date,
       views: Math.max(0, int(raw.views) ?? 0), votes: Math.max(0, int(raw.upvotes) ?? 0), mine: prev?.mine ?? false, comments: [],
       ...(cleanTag(raw.tag) ? { tag: cleanTag(raw.tag) } : {}),
     };

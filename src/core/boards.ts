@@ -3,12 +3,14 @@
 // 다른 사이트는 읽을 때 그 사이트 변수를 괴담넷 이름으로 비춰 보이고(boardView), 쓸 때 되돌린다(boardWrite).
 // 괴담넷(gn)은 그대로라 옛 채팅 변수와 같다.
 import type { Chat, ScriptState } from './types';
-import type { GuideName } from './guides';
+import { guideTxt, type GuideName } from './guides';
 
 export type BoardSite = 'gn' | 'gal' | 'wpf' | 'sm';
 export const BOARD_SITES: BoardSite[] = ['gn', 'gal', 'wpf', 'sm'];
 export const isBoardSite = (v: unknown): v is BoardSite => (BOARD_SITES as unknown[]).includes(v);
-export const BOARD_NAME: Record<BoardSite, string> = { gn: '괴담넷', gal: '괴담갤', wpf: '세정게', sm: '연어 마켓' };
+/** 사이트 이름 (화면과 모델에 가는 글이 같이 쓴다): 그 사이트 지침의 SITE.NAME 절. 부를 때마다 읽는다 */
+const siteName = (site: BoardSite): string => guideTxt(BOARD_GUIDE[site], 'SITE.NAME');
+export const BOARD_NAME: Record<BoardSite, string> = { get gn() { return siteName('gn'); }, get gal() { return siteName('gal'); }, get wpf() { return siteName('wpf'); }, get sm() { return siteName('sm'); } };
 /** 사이트마다 따로 쓰는 지침 (2026-11-08 사용자: 공용 없이 전부 따로) */
 export const BOARD_GUIDE: Record<BoardSite, GuideName> = { gn: 'GNet', gal: 'Gal', wpf: 'Wpf', sm: 'Salmon' };
 /** 화면 이름(BOARD_NAME) → 사이트. 모르는 이름이면 괴담넷 */

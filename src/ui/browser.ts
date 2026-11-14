@@ -2,6 +2,7 @@
 // 탭은 실제로 열고 닫히고(+·×), 탭마다 앞뒤 기록을 따로 가진다. 즐겨찾기 줄의 사이트만 열 수 있다(광고·☆·확장 없음).
 // 사이트마다 로고·디자인이 다르고 창 테마를 따라가지 않는다. 사이트 화면은 app.ts 가 그리고, 여기서는 틀(탭·주소창·즐겨찾기·로그인)만.
 import { needAttr } from './needfill';
+import { guideTxt } from '../core/guides';
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export type SiteId = 'gn' | 'gal' | 'wpf' | 'sm' | 'cos' | 'wk' | 'bm' | 'hs';
@@ -16,15 +17,16 @@ export interface Site {
   path: string;
 }
 
+/** 쇼핑몰·망상홈쇼핑 이름은 지침 절(우주 쇼핑몰·백일몽 포인트몰 MALL_NAME · 망상홈쇼핑 CHANNEL_NAME)을 읽을 때마다 부른다: 화면과 요청이 같은 글 (고친 지침이 바로 보이게) */
 export const SITES: Site[] = [
   { id: 'gn', name: '괴담넷', title: '괴담넷 - 자유게시판', host: 'goedam.net', path: '/board/free' },
   { id: 'gal', name: '괴담 갤러리', title: '괴담 갤러리 - 괴담갤', host: 'gall.goedam.co.kr', path: '/board/lists/?id=horror' },
   { id: 'wpf', name: '세정게', title: '::: 世界政治 게시판 :::', host: 'www.wpf.or.kr', path: '/zboard/zboard.php?id=politics' },
   { id: 'sm', name: '연어 마켓', title: '연어 마켓 | 미친 세상을 거슬러 오르는 우리들', host: 'salmon-market.kr', path: '' },
-  { id: 'cos', name: '우주 쇼핑몰', title: '★우주 쇼핑몰★에 오는 것을 환영하는 것이다', host: 'cosmic-mall.alien', path: '/~shop/index.html' },
+  { id: 'cos', get name() { return guideTxt('Cos', 'MALL_NAME'); }, get title() { return `★${guideTxt('Cos', 'MALL_NAME')}★에 오는 것을 환영하는 것이다`; }, host: 'cosmic-mall.alien', path: '/~shop/index.html' },
   { id: 'wk', name: '괴이위키', title: '괴이위키', host: 'goei.wiki', path: '/w/괴이위키:대문' },
-  { id: 'bm', name: '백일몽 포인트몰', title: '백일몽 포인트몰', host: 'point.baekilmong.intra', path: '/mall/main' },
-  { id: 'hs', name: '망상홈쇼핑', title: '망상홈쇼핑 LIVE', host: 'live.mangsang.tv', path: '/onair' },
+  { id: 'bm', get name() { return guideTxt('Bm', 'MALL_NAME'); }, get title() { return guideTxt('Bm', 'MALL_NAME'); }, host: 'point.baekilmong.intra', path: '/mall/main' },
+  { id: 'hs', get name() { return guideTxt('Hs', 'CHANNEL_NAME'); }, get title() { return `${guideTxt('Hs', 'CHANNEL_NAME')} LIVE`; }, host: 'live.mangsang.tv', path: '/onair' },
 ];
 export const siteOf = (id: string): Site | undefined => SITES.find((s) => s.id === id);
 export const isSite = (id: string): id is SiteId => SITES.some((s) => s.id === id);

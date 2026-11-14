@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { applyPlayer, playerBlock, playerAgent, playableAgents, PLAYER_HEAD, migrateLore, parseCatalog, rosterFor, emptyWorld, lore as L } from '../dist-test/core.mjs';
+import { applyPlayer, playerBlock, playerAgent, playableAgents, migrateLore, parseCatalog, rosterFor, emptyWorld, lore as L } from '../dist-test/core.mjs';
+
+// 주인공 글 머리 (예시 글). 코드에는 이 머리가 없다 (옛 PLAYER_HEAD 상수는 아무도 쓰지 않아 지움)
+const PLAYER_HEAD = '## Player Character';
 
 import { REAL } from './realcard.mjs';
 const books = existsSync(REAL) ? (() => { const m = JSON.parse(readFileSync(REAL, 'utf8')); return migrateLore(m.lorebook ?? m.module?.lorebook); })() : null;

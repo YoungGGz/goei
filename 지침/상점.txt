@@ -385,3 +385,19 @@ mode="all" 인데 물건 줄이 없어요.
 @@SECTION ASK_SELL_BARE
 [판매: {item}]
 @@END
+
+@@SECTION TRAIT_HAND
+손
+@@END
+
+@@SECTION TRAIT_GEAR
+장비
+@@END
+
+@@SECTION TRAIT_USE
+사용
+@@END
+
+@@SECTION TRAIT_USES
+소모{n}
+@@END

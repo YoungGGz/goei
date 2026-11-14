@@ -8,7 +8,7 @@ import {
   dateNow, deleteComment, deletePost, deleteThread, dmThreads, dmUnread, findPost, GN_COOLDOWN, GN_DEFAULTS, GN_NICK, GnetError, gnetSettings,
   GN_STORAGE_AUTO, GN_STORAGE_LIMIT, gnetRetention, incomingPlan, LIMITS, parseDmBody, parseJsonPayload, parsePostDraft, postKey, postUnread, COUNT_RANGE, type CountKey,
   readGnet, findAnyPost, archived, sourceFor, STORAGE_MAX, storyTurns, tokens, trimBoard,
-  userNick, writeGnet, mergeKeyFigures, type GPost, type GSource, type GState, type IncomingOrigin, type IncomingPlan, gnetLabel } from '../core/gnet';
+  userNick, writeGnet, mergeKeyFigures, anonAuthor, type GPost, type GSource, type GState, type IncomingOrigin, type IncomingPlan, gnetLabel } from '../core/gnet';
 import { commentPrompt, dmPrompt, POST_REFRESH_ACTION, postPrompt, refreshPrompt, retryMessages } from '../core/gnetPrompt';
 import { guideTxt } from '../core/guides';
 import { composeBody, describe, previewText, type UserKind } from '../core/attach';
@@ -526,7 +526,7 @@ function composeView(c: Compose, busy: boolean): string {
     : c.kind === 'dm' ? `<p class="gn-to">받는 사람 <b>${esc(c.nick)}</b></p>` : '';
   const ph = post ? '올릴 글이나 쓰고 싶은 내용 (제목과 본문은 다듬어서 올려요)' : gnet.attach.length ? '함께 보낼 글 (선택)' : `${dmW()} 내용`;
   return `<div class="ph-form gn-cpane">${paneHead(post ? '새 글' : `새 ${dmW()}`, c.kind === 'dm' ? esc(c.label) : '')}
-    <div class="ph-form-body">${to}${post && uiSite === 'sm' ? `<div class="cats gn-wtags" role="group" aria-label="거래 구분">${SM_TAGS.map((t) => `<button class="${(c.tag ?? SM_TAGS[0]) === t ? 'on' : ''}" data-action="gn-wtag" data-value="${t}" aria-pressed="${(c.tag ?? SM_TAGS[0]) === t}">${t}</button>`).join('')}</div>` : ''}
+    <div class="ph-form-body">${to}${post && uiSite === 'sm' ? `<div class="cats gn-wtags" role="group" aria-label="거래 구분">${smTags().map((t, _i, tags) => `<button class="${(c.tag ?? tags[0]) === t ? 'on' : ''}" data-action="gn-wtag" data-value="${esc(t)}" aria-pressed="${(c.tag ?? tags[0]) === t}">${esc(t)}</button>`).join('')}</div>` : ''}
       <textarea class="gx-search gn-text" data-input="gn-draft" rows="${post ? 8 : 5}" placeholder="${esc(ph)}" aria-label="내용">${esc(gnet.draft)}</textarea>
       ${attachEditor('gn', gnet.attach, GN_KINDS, busy)}
     </div>
@@ -619,9 +619,9 @@ const PAGE = 20;
 const LOGO_SM = (id: BoardSite, cls = 'bs-logo') => siteLogo(id === 'gal' ? 'gal' : id === 'wpf' ? 'wpf' : id === 'sm' ? 'sm' : 'gn', cls);
 /** 목록에 보일 글 (분류·찾기·정렬) */
 /** 연어 마켓 말머리 (전수검사 11-13, 사용자 8-1): 「구합니다」류도 삽니다, 「정보」가 들어간 말머리도 오컬트 정보 */
-const smWant = (p: GPost): boolean => /삽니다|구합니다|구해요|구함|구매|매입/.test(p.tag ?? '');
+const smWant = (p: GPost): boolean => { const t = p.tag ?? ''; const buy = smTag('BUY'); return (!!buy && t.includes(buy)) || /구합니다|구해요|구함|구매|매입/.test(t); };
 const tagHit = (site: BoardSite, p: GPost, cat: string): boolean =>
-  site === 'sm' && cat === '삽니다' ? smWant(p) : site === 'sm' && cat === '정보' ? (p.tag ?? '').includes('정보') : p.tag === cat;
+  site === 'sm' && cat === smTag('BUY') ? smWant(p) : site === 'sm' && cat === '정보' ? (p.tag ?? '').includes('정보') : p.tag === cat;
 function shownPosts(st: GState, site: BoardSite): GPost[] {
   const q = gnet.q.trim().toLowerCase();
   // 보관함의 글(새로고침으로 게시판에서 빠진 내 글·스크랩)은 「내가 쓴 글」「스크랩」에만 이어 붙는다 (2026-11-10 사용자)
@@ -682,7 +682,7 @@ const catBtn = (v: string, label: string, cls = '', extra = '', on = onCat(v)) =
 const dmBtn = (st: GState, unreadDm: number, label = '쪽지함', cls = '') => `<button class="${[cls, dmTakes() ? 'on' : '', narrow() ? '' : 'gn-dmpop'].filter(Boolean).join(' ')}" data-action="gn-sub" data-value="dm" ${narrow() ? `aria-pressed="${dmTakes()}"` : `aria-haspopup="dialog" aria-expanded="${gnet.sub === 'dm'}"`}>${narrow() ? '' : ICONS.mail}${label}${unreadDm ? ` <b class="bs-new">${unreadDm}</b>` : dmUnread(st) ? '<span class="gn-dot"></span>' : ''}</button>`;
 /** 익명(ㅇㅇ) 글쓴이 옆 IP 앞자리: 글 번호로 늘 같게 (시안 괴담갤) */
 const ipOf = (id: number) => `${(id * 37) % 200 + 20}.${(id * 101) % 250}`;
-const nickIp = (nick: string, id: number) => `${esc(nick)}${nick === 'ㅇㅇ' ? ` <span class="ip">(${ipOf(id)})</span>` : ''}`;
+const nickIp = (nick: string, id: number) => `${esc(nick)}${nick === anonAuthor() ? ` <span class="ip">(${ipOf(id)})</span>` : ''}`;
 /** 목록 작은 그림 */
 function thumb(p: GPost): string {
   const t = boardThumb(p.body);
@@ -694,14 +694,16 @@ function priceOf(p: GPost): string {
   const s = `${p.title}\n${previewText(p.body)}`;
   const m = /(\d[\d,]*\s*(?:만\s*)?원)/.exec(s);
   if (m) return m[1].replace(/\s+/g, '');
-  if (p.tag === '나눔' || /나눔/.test(s)) return '나눔';
+  const free = smTag('FREE');
+  if (free && (p.tag === free || s.includes(free))) return free;
   if (smWant(p)) return '가격 제안';
   return '';
 }
 /** 연어 마켓 매물 그림: 본문 [사진:…]이 있으면 그것, 없으면 제목의 물건 이름으로 소지품 그림 팩(host/itemicons.ts)에서 (11-09 사용자: 매칭이 전혀 안 됐다).
  *  제목 앞 「[직거래/계양]」 같은 꼬리표를 떼고, 「및·,·/·+」로 이어진 것은 첫 물건만 본다 */
 function smItemName(p: GPost): string {
-  const t = p.title.replace(/^\s*(?:\[[^\]]*\]\s*)+/, '').replace(/\s*(?:팝니다|삽니다|나눔|급처|급매|판매|구합니다|구매)\s*$/u, '');
+  const words = [...smTags().filter(Boolean).map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), '급처', '급매', '판매', '구합니다', '구매'];
+  const t = p.title.replace(/^\s*(?:\[[^\]]*\]\s*)+/, '').replace(new RegExp(`\\s*(?:${words.join('|')})\\s*$`, 'u'), '');
   return t.split(/\s*(?:\s및\s|,|\/|\+|·|~)\s*/)[0].trim();
 }
 function smPicUrl(p: GPost): string | null {
@@ -711,8 +713,9 @@ function smPicUrl(p: GPost): string | null {
   return name ? iconQuiet(() => titleIconUrl(name)) : null;
 }
 const CAMERA = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-/** 연어 마켓 글쓰기 거래 구분 (목록·본문이 이 말머리로 사진 칸·꼬리표를 정한다) */
-const SM_TAGS = ['팝니다', '삽니다', '나눔'];
+/** 연어 마켓 글쓰기 거래 구분 (목록·본문이 이 말머리로 사진 칸·꼬리표를 정한다). 글쓴이가 고른 말머리는 글 요청에 그대로 가므로 지침 「연어 마켓」 POST.TRADE_TAG.<SELL|BUY|FREE> 절을 읽는다 (화면 칩·비교와 같은 글) */
+const smTag = (k: 'SELL' | 'BUY' | 'FREE'): string => guideTxt('Salmon', `POST.TRADE_TAG.${k}`);
+const smTags = (): string[] => [smTag('SELL'), smTag('BUY'), smTag('FREE')];
 const SM_BG = ['cloth', 'news', 'floor', 'wood', 'desk', 'dark'];
 
 /** 사이트 머리 */
@@ -725,11 +728,11 @@ function siteHead(site: BoardSite, st: GState, unreadDm: number): string {
       return `<div class="ban">${home(`<b>世界政治 게시판</b><small>WORLD POLITICS FORUM</small>${LOGO_SM(site, 'bs-logo wlogo')}`, 'bh0')}</div>${narrow() ? `
         <div class="bar">${wpfMenu(st, unreadDm)}</div>` : ''}`;
     case 'sm':
-      return `<div class="hd">${home(`${LOGO_SM(site)}연어 마켓`)}<nav>${catBtn('', '중고거래')}${catBtn('삽니다', '삽니다')}${catBtn('정보', '오컬트 정보')}</nav><label class="sr">${searchInput('물건 이름으로 찾기')}</label>${writeBtn('wr')}<button class="ch" data-action="gn-sub" data-value="dm">내 채팅${unreadDm ? `<em>${unreadDm}</em>` : ''}</button></div>
+      return `<div class="hd">${home(`${LOGO_SM(site)}${esc(BOARD_NAME.sm)}`)}<nav>${catBtn('', '중고거래')}${catBtn(smTag('BUY'), smTag('BUY'))}${catBtn('정보', '오컬트 정보')}</nav><label class="sr">${searchInput('물건 이름으로 찾기')}</label>${writeBtn('wr')}<button class="ch" data-action="gn-sub" data-value="dm">내 채팅${unreadDm ? `<em>${unreadDm}</em>` : ''}</button></div>
         <div class="note">⚠ 직거래는 사람 많은 곳에서 하세요. 연어 마켓은 거래하다 생긴 일을 책임지지 않습니다.</div>`;
     default: {
       const nav = `<nav><button class="${!dmTakes() && gnet.sort !== 'hot' ? 'on' : ''}" data-action="gn-home">커뮤니티</button>${dmBtn(st, unreadDm, '쪽지')}<button class="${!dmTakes() && gnet.sort === 'hot' ? 'on' : ''}" data-action="gn-sort" data-value="hot">랭킹</button></nav>`;
-      return `<div class="hd">${home(`${LOGO_SM(site)}괴담넷<small>.net</small>`)}${nav}<label class="sr">${ICONS.search}${searchInput('괴담넷 검색')}</label></div>`;
+      return `<div class="hd">${home(`${LOGO_SM(site)}${esc(BOARD_NAME.gn)}<small>.net</small>`)}${nav}<label class="sr">${ICONS.search}${searchInput(`${BOARD_NAME.gn} 검색`)}</label></div>`;
     }
   }
 }
@@ -798,7 +801,7 @@ function siteList(site: BoardSite, st: GState, now: string, busy: boolean, unrea
         : `<tr${p.mine ? ' class="mine"' : ''}><td>${p.id}</td><td>${esc(p.tag ?? '일반')}</td><td class="t">${openBtn(p, `${ic(p)}${esc(p.title)}<em>[${p.comments.length}]</em>${dot(p)}`)}</td><td class="n">${nickIp(p.nick, p.id)}</td><td>${esc(when(p, now))}</td><td>${p.views}</td><td>${p.votes}</td></tr>`).join('');
       const table = `<table><colgroup><col style="width:72px"><col style="width:54px"><col><col style="width:120px"><col style="width:56px"><col style="width:52px"><col style="width:42px"></colgroup>
         <tr><th>번호</th><th>말머리</th><th>제목</th><th>글쓴이</th><th>작성일</th><th>조회</th><th>추천</th></tr>${rows}</table>`;
-      const mlist = `<div class="mlist">${list.map((p) => `<div class="it${ntc(p) ? ' ntc' : ''}">${openBtn(p, `<div class="t">${ntc(p) ? '' : `[${esc(p.tag ?? '일반')}] `}${esc(p.title)}${ntc(p) ? '' : `<em>[${p.comments.length}]</em>`}${dot(p)}</div><div class="m">${ntc(p) ? `${esc(p.nick)} · ${esc(when(p, now))}` : `${esc(p.nick)}${p.nick === 'ㅇㅇ' ? `(${ipOf(p.id)})` : ''} · ${esc(when(p, now))} · 조회 ${p.views} · 추천 ${p.votes}`}</div>`)}</div>`).join('')}</div>`;
+      const mlist = `<div class="mlist">${list.map((p) => `<div class="it${ntc(p) ? ' ntc' : ''}">${openBtn(p, `<div class="t">${ntc(p) ? '' : `[${esc(p.tag ?? '일반')}] `}${esc(p.title)}${ntc(p) ? '' : `<em>[${p.comments.length}]</em>`}${dot(p)}</div><div class="m">${ntc(p) ? `${esc(p.nick)} · ${esc(when(p, now))}` : `${esc(p.nick)}${p.nick === anonAuthor() ? `(${ipOf(p.id)})` : ''} · ${esc(when(p, now))} · 조회 ${p.views} · 추천 ${p.votes}`}</div>`)}</div>`).join('')}</div>`;
       // 글이 하나도 없으면 탭 줄과 안내(새로고침·글쓰기)만 (2026-11-10 사용자: 빈 게시판에 글쓰기 단추 셋·분류·찾기칸이 다 떠 지저분했다)
       if (empty) return `<div class="body">${tabs}${empty}</div>`;
       return `<div class="body">${tabs}${heads}${table}${mlist}${none(list)}
@@ -822,8 +825,8 @@ function siteList(site: BoardSite, st: GState, now: string, busy: boolean, unrea
         const u = smPicUrl(p);
         const img = u ? `<img src="${esc(u)}" alt="">` : ICONS.bag;
         const ph = want
-          ? `<div class="ph want"><span class="tag">삽니다</span><p>${esc([...previewText(p.body)].slice(0, 70).join(''))}</p></div>`
-          : `<div class="ph ${SM_BG[p.id % SM_BG.length]}">${img}${p.tag ? `<span class="tag${p.tag === '나눔' ? ' g' : ''}">${esc(p.tag)}</span>` : ''}</div>`;
+          ? `<div class="ph want"><span class="tag">${esc(smTag('BUY'))}</span><p>${esc([...previewText(p.body)].slice(0, 70).join(''))}</p></div>`
+          : `<div class="ph ${SM_BG[p.id % SM_BG.length]}">${img}${p.tag ? `<span class="tag${p.tag === smTag('FREE') ? ' g' : ''}">${esc(p.tag)}</span>` : ''}</div>`;
         const price = priceOf(p);
         return openBtn(p, `${ph}<div><div class="nm">${esc(p.title)}${dot(p)}</div>${price ? `<div class="pr">${esc(price)}</div>` : ''}<div class="mt">${esc(ago(p, now))} · 관심 ${p.votes} · 댓글 ${p.comments.length}</div></div>`, 'c');
       }).join('');
@@ -857,11 +860,11 @@ function commentTree(site: BoardSite, p: GPost, busy: boolean): string {
       seen.add(k);
       const c = p.comments[k - 1];
       const confirm = gnet.confirm === `c:${p.id}:${k}`;
-      const shown = site === 'wpf' && c.nick === 'ㅇㅇ' ? '익명' : c.nick;
+      const shown = site === 'wpf' && c.nick === anonAuthor() ? '익명' : c.nick;
       const author = c.mine
         ? `<b class="gn-me">${esc(shown)}</b>`
         : `<button class="gn-nick" data-action="gn-dm-from" data-value="${p.id}:${k}" title="${dmW()} 보내기"><b>${esc(shown)}</b></button>`;
-      const ip = site === 'gal' && c.nick === 'ㅇㅇ' ? ` <span class="ip">(${ipOf(p.id + k)})</span>` : '';
+      const ip = site === 'gal' && c.nick === anonAuthor() ? ` <span class="ip">(${ipOf(p.id + k)})</span>` : '';
       const del = c.mine
         ? confirm
           ? `<button class="gx-mini danger" data-action="gn-del-comment" data-value="${p.id}:${k}">정말 삭제</button>`
@@ -901,7 +904,7 @@ function sitePost(site: BoardSite, p: GPost, busy: boolean, now: string): string
     case 'gal': {
       const files = boardFiles(p.body);
       const att = files.length ? `<div class="att"><b>원본 첨부파일 ${files.length}</b>${files.map((f) => (f.url ? `<a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(f.text)}</a>` : `<a>${f.kind === 'file' ? '📎' : '🔗'} ${esc(f.text)}</a>`)).join('')}</div>` : '';
-      return `<article class="body dpost gn-post"><div class="vt"><h3>${p.tag ? `<span>[${esc(p.tag)}]</span> ` : ''}<span class="gn-post-title">${esc(p.title)}</span></h3><div class="vm"><span>${who}${p.nick === 'ㅇㅇ' ? ` <span class="ip">(${ipOf(p.id)})</span>` : ''} · ${esc(p.date)}</span><span>조회 ${p.views} · 추천 ${p.votes} · 댓글 ${p.comments.length}</span></div></div>
+      return `<article class="body dpost gn-post"><div class="vt"><h3>${p.tag ? `<span>[${esc(p.tag)}]</span> ` : ''}<span class="gn-post-title">${esc(p.title)}</span></h3><div class="vm"><span>${who}${p.nick === anonAuthor() ? ` <span class="ip">(${ipOf(p.id)})</span>` : ''} · ${esc(p.date)}</span><span>조회 ${p.views} · 추천 ${p.votes} · 댓글 ${p.comments.length}</span></div></div>
         ${att}<div class="pb gn-post-body">${attachBody(p.body, true, true)}</div>
         <div class="rec">${vote('b up', `<b>${p.votes}</b><span>개념 추천</span>`)}<button class="b dn${p.down ? ' on' : ''}" data-action="gn-down" data-value="${p.id}" aria-pressed="${!!p.down}"><b>${p.down ? 1 : 0}</b><span>비추</span></button></div>
         <div class="cmh">전체 댓글 <b>${p.comments.length}</b>개</div>${list}${cin}
@@ -920,7 +923,7 @@ function sitePost(site: BoardSite, p: GPost, busy: boolean, now: string): string
       // 삽니다 글은 물건 그림 없이 빈 사진 칸만 (사용자: 포맷상 칸은 있어야 한다)
       const want = smWant(p);
       const u = want ? null : smPicUrl(p);
-      const pic = want ? '<div class="ph want"><span class="tag">삽니다</span></div>' : `<div class="ph ${SM_BG[p.id % SM_BG.length]}">${u ? `<img src="${esc(u)}" alt="">` : ICONS.bag}</div>`;
+      const pic = want ? `<div class="ph want"><span class="tag">${esc(smTag('BUY'))}</span></div>` : `<div class="ph ${SM_BG[p.id % SM_BG.length]}">${u ? `<img src="${esc(u)}" alt="">` : ICONS.bag}</div>`;
       // 판매자와 관심·댓글·조회는 사진 아래 한 묶음(왼쪽 칸), 오른쪽은 제목 → 값 → 말머리·날짜 → 본문
       return `<article class="detail gn-post"><div class="side">${pic}<div class="seller"><i></i><div>${who}<small>관심 ${p.votes} · 댓글 ${p.comments.length} · 조회 ${p.views}</small></div></div></div><div class="info">
         <h2 class="gn-post-title">${esc(p.title)}</h2>${price ? `<div class="price">${esc(price)}</div>` : ''}<div class="mt2">${p.tag ? `${esc(p.tag)} · ` : ''}${esc(p.date)} · ${esc(ago(p, now))}</div>
@@ -1303,7 +1306,7 @@ export async function handleGnet(action: string, value: string | undefined, base
         gnet.notice = `첨부 내용과 글이 작성 상한(${cap}토큰)을 넘었어요. 조금 줄여 주세요.`;
         break;
       }
-      if (c.kind === 'post') void writePost(ctx, env, text, siteOf(ctx) === 'sm' ? c.tag ?? SM_TAGS[0] : '');
+      if (c.kind === 'post') void writePost(ctx, env, text, siteOf(ctx) === 'sm' ? c.tag ?? smTag('SELL') : '');
       else if (c.kind === 'comment') void writeComment(ctx, env, c.post, c.parent, text);
       else if (c.kind === 'dm') void sendDm(ctx, env, c.nick, text, c.source);
       else {

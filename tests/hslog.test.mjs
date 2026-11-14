@@ -2,13 +2,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { hslog, homeshop, budget, focus, guideDefaultSec } from '../dist-test/core.mjs';
-const { appendLog, readLog, hsMainContext, hsMainSettings, hsMainOn, hsMainRules, HS_LOG_VAR, HS_LOG_MAX, HS_LOG_HOST, HS_MAIN_SET, HS_MAIN_KEY, sameProgram } = hslog;
+const { appendLog, readLog, hsMainContext, hsMainSettings, hsMainOn, hsMainRules, HS_LOG_VAR, HS_LOG_MAX, hsLogHost, HS_MAIN_SET, HS_MAIN_KEY, sameProgram } = hslog;
 
 const item = (id, name, pay, desc) => ({ id, name, pay, desc, price: 0 });
 const showOf = (key, ids = ['a1', 'a2']) => ({
   loaded: true, key, title: '금요 심야 특집', at: 0, prev: [], chat: [],
   parts: [{ item: item(ids[0], '행운의 무전기', '무이자 6회', '건전지 없이도 누군가 받습니다.'), cues: [] }, { item: item(ids[1], '잠들지 않는 베개', '무이자 3회', '아침까지 눈이 떠 있습니다.'), cues: [] }],
 });
+// 진행자 줄의 닉 = 지침 「망상홈쇼핑」의 LOG_HOST_NICK 절 (적는 쪽과 가려내는 쪽이 같은 절)
+const HS_LOG_HOST = hsLogHost();
+assert.equal(HS_LOG_HOST, '진행자');
 const host = (p, text) => ({ k: 'show', p, who: HS_LOG_HOST, text });
 const chat = (p, who, text) => ({ k: 'chat', p, who, text });
 const me = (p, text) => ({ k: 'say', p, who: '김솔음', text, me: 1 });

@@ -525,3 +525,7 @@ sender and recipient only
 @@SECTION POST.INPUT_TAG
 [{tag}] {input}
 @@END
+
+@@SECTION SITE.NAME
+세정게
+@@END

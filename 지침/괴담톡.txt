@@ -575,3 +575,27 @@ updates는 배열이어야 해요.
 @@SECTION NOTICE_CHANNEL.E00
 특수재난대응협회 안내
 @@END
+
+@@SECTION VIEW.NAME.SIDE
+사이드스토리
+@@END
+
+@@SECTION VIEW.NAME.MONO
+혼잣말
+@@END
+
+@@SECTION VIEW.NAME.MULTI
+다중인격 혼잣말
+@@END
+
+@@SECTION ERR.VIEW_FORMAT
+보기 전용 방 형식이 올바르지 않아요.
+@@END
+
+@@SECTION ERR.VIEW_POV
+시점 인물이 참여자 목록에 없어요.
+@@END
+
+@@SECTION ERR.VIEW_EMPTY
+보기 전용 방에 메시지가 하나도 없어요.
+@@END

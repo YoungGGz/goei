@@ -314,3 +314,7 @@ watched by the user on the broadcast
 @@SECTION FORMS_DEFAULT
 전화 출연, 엑스트라, 모델
 @@END
+
+@@SECTION LOG_HOST_NICK
+진행자
+@@END

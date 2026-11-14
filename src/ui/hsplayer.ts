@@ -4,11 +4,12 @@
 // - 글자·숫자·띠는 그림이 아니라 HTML 로 얹는다 (도트 글꼴, 11-10 도트 시안 site_mock_dot).
 // - 화면을 다시 그려도(app render) 캔버스·채팅 줄은 같은 DOM 을 다시 꽂아 끊기지 않는다. 화면에서 빠지면(탭 닫기·창 닫기) 멈추고, 다시 꽂히면 그 자리부터.
 // - 동작 고르기·길이 계산은 core/homeshop.ts (설정 값). 여기는 시간 흐름과 그리기만.
-import { clipsOf, cueMs, dropEnd, dropRest, nextDrop, moodMap, moodName, CUE_EVENT_LABEL, idleState, installments, moodClip, nextIdle, parseClipGroups, pickVersion, type CueCut, type CutId, type HsClip, type HsCue, type HsSettings, type HsShow, type IdleState } from '../core/homeshop';
+import { clipsOf, cueMs, dropEnd, dropRest, nextDrop, moodMap, moodName, CUE_EVENT_LABEL, hsName, idleState, installments, moodClip, nextIdle, parseClipGroups, pickVersion, type CueCut, type CutId, type HsClip, type HsCue, type HsSettings, type HsShow, type IdleState } from '../core/homeshop';
 import type { HsArt } from '../host/homeshop';
 import { HS_FONT } from '../host/homeshop';
 import { itemPic } from './items';
-import { HS_LOG_HOST, type HsLogEntry, type HsLogKind } from '../core/hslog';
+import { hsLogHost, type HsLogEntry, type HsLogKind } from '../core/hslog';
+import { guideTxt } from '../core/guides';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -290,7 +291,7 @@ function tick(): void {
     r.frameAt = t;
     r.talking = true;
     if (f.s.fx.tear && c.ev !== 'tear' && Math.random() < f.s.fx.tearP) r.tearUntil = t + TEAR_MS[0] + Math.random() * (TEAR_MS[1] - TEAR_MS[0]);
-    pushChat(HS_LOG_HOST, c.text, 'host', own ? 'say' : undefined);
+    pushChat(hsLogHost(), c.text, 'host', own ? 'say' : undefined);
   };
   const startIdle = () => {
     r.clip = nextIdle(clips(r.cut), idle[cutArt(r.cut)], f.s.rules);
@@ -572,7 +573,7 @@ function drawCg(f: PlayerFeed, r: Run, t: number): void {
   const it = part.item;
   const cue = said && r.talking ? said : r.talking && r.cue >= 0 && r.cue < part.cues.length ? part.cues[r.cue] : null;
   const n = installments(it);
-  const pay = it.pay || (it.price > 0 ? `${it.price.toLocaleString('en-US')}원` : '');
+  const pay = it.pay || (it.price > 0 ? guideTxt('Hs', 'LOG_PAY_WON', { price: it.price.toLocaleString('en-US') }) : ''); // 값 글: 시청 기록(core/hslog.ts)과 같은 절
   const art = cutArt(r.cut);
   const board = r.flags.price && r.cut !== 'C' && r.cut !== 'D'
     ? `<div class="hs-board hs-b${art}">${n ? `<span><span class="sm">무이자 </span><span class="big">${n}회</span></span>` : `<span class="big">${esc(pay)}</span>`}<span class="sm">오늘 방송에서만</span></div>` : '';
@@ -580,7 +581,7 @@ function drawCg(f: PlayerFeed, r: Run, t: number): void {
   const key = [r.part, r.cut, r.flags.price, r.flags.soon, r.flags.sold, r.flags.rush, r.flags.call, r.left, f.tel, stage?.classList.contains('sm')].join('|');
   if (cg.dataset.h !== key) {
     cg.dataset.h = key;
-    cg.innerHTML = `<div class="hs-lg"><b>망상홈쇼핑</b><i>${r.part + 1}부</i></div>
+    cg.innerHTML = `<div class="hs-lg"><b>${esc(hsName())}</b><i>${r.part + 1}부</i></div>
 <div class="hs-live">LIVE</div>
 ${r.flags.soon && !r.flags.sold ? '<div class="hs-soon">매진 임박</div>' : ''}
 ${r.flags.sold ? '<div class="hs-soon sold">매진</div>' : `<div class="hs-left">남은 수량 ${r.left}</div>`}

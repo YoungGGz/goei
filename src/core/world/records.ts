@@ -3,6 +3,7 @@
 // 기본 세계는 본체에 번들하지 않는다 (QC 개선 나1): 부팅 때 자료 팩(goei-data-world, core/datapack.ts·host/datapack.ts)을 풀어
 // setWorldData() 로 한 번 넣는다. 아래 export 는 그대로 동기이며, 자료가 들어오기 전에 불리면 분명한 오류를 던진다 (조용히 빈 결과 금지).
 import { FIELDS, type WorldKind, anomalyNoteDefault } from './schema';
+import { guideTxt } from '../guides';
 
 /** 기록별 추가 칸. kind=line 은 요원 Identity·Appearance 절의 「- 이름: 값」 한 줄(sec 절, at 칸 뒤·'' 이면 절 맨 앞), block 은 절 하나(맨 뒤) */
 export interface ExtraField {
@@ -44,7 +45,15 @@ export interface WorldRecord {
 
 export type RelationStage = 'hostile' | 'wary' | 'neutral' | 'favorable' | 'friendly';
 export const RELATION_STAGES: RelationStage[] = ['hostile', 'wary', 'neutral', 'favorable', 'friendly'];
-export const RELATION_LABEL: Record<RelationStage, string> = { hostile: '적대', wary: '경계', neutral: '중립', favorable: '호의', friendly: '우호' };
+/** 단계 이름: 인물 세력 단계와 같은 낱말이라 한 곳(지침 「Main」 FACTION.LABEL.<단계> 절)을 읽는다. 부를 때마다 읽어 고친 지침이 바로 보인다 */
+const relationLabel = (s: RelationStage): string => guideTxt('Main', `FACTION.LABEL.${s}`);
+export const RELATION_LABEL: Record<RelationStage, string> = {
+  get hostile() { return relationLabel('hostile'); },
+  get wary() { return relationLabel('wary'); },
+  get neutral() { return relationLabel('neutral'); },
+  get favorable() { return relationLabel('favorable'); },
+  get friendly() { return relationLabel('friendly'); },
+};
 
 export interface RelationCell {
   stage: RelationStage;
