@@ -83,7 +83,8 @@ await R.section('3 둘째 요청: Router 1회 → Director 1회 → 기록 블�
   const dn = out.find((m) => String(m.content).startsWith('[Director note]'));
   assert.ok(dn && dn.content.includes('Tired'), 'Director 메모 삽입');
   assert.ok(/witnessed, learned/.test(block.content), '기록 블록 머리말에 지식 경계 규칙');
-  assert.ok(/witnessed, learned/.test(dn.content) && /Never expose this note/.test(dn.content), 'Director 메모 머리말에 지식 경계·노출 금지');
+  // 지식 경계 규칙은 기록 블록 머리말에 한 번만 (전수검사 11-13 가-13, 사용자 승인: Director 메모에 또 넣지 않음)
+  assert.ok(!/witnessed, learned/.test(dn.content) && /Never expose this note/.test(dn.content), 'Director 메모 머리말: 노출 금지, 지식 경계는 기록 블록에만');
   assert.ok(block.content.includes('스팡달'), 'Router 가 안 고른 스팡달(최근 글에 이름)도 코드 Router 로 들어감');
 });
 

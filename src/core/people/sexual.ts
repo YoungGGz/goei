@@ -53,9 +53,9 @@ export const sexualDirectorPolicy = (): string => guideTxt('Main', 'SEXUAL.POLIC
 const contextRule = (): string => guideTxt('UpdaterExtra', 'SEXUAL.CONTEXT_RULE');
 const explicitStyle = (): string => guideTxt('UpdaterExtra', 'SEXUAL.EXPLICIT_STYLE');
 const plainStyle = (): string => guideTxt('UpdaterExtra', 'SEXUAL.PLAIN_STYLE');
-/** 원본 peopleSexualPromptRules(explicit) */
-export function sexualPromptRules(explicit: boolean): string {
-  return guideTxt('UpdaterExtra', 'SEXUAL.PROMPT_RULES', { style: explicit ? explicitStyle() : plainStyle() });
+/** 원본 peopleSexualPromptRules. 말씨 규칙은 인물별 문장(SEXUAL.WRITER 의 plain_false·explicit_true)에만 (전수검사 11-13 가-3, 사용자 승인) */
+export function sexualPromptRules(_explicit?: boolean): string {
+  return guideTxt('UpdaterExtra', 'SEXUAL.PROMPT_RULES');
 }
 
 /** 갱신기 지침 절 (설정에 따라 조립; 원본 6A 의 4줄 + 어휘 규칙). 둘 다 꺼져 있으면 '' */
