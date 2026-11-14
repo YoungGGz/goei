@@ -78,6 +78,8 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
   }
   const slot = (k: keyof Person['slots']) => kept[k] ?? [];
   const out: string[] = [main('PEOPLE.BLOCK.HEAD', { name: p.name })];
+  // 호칭으로 적어 둔 기록: 머리의 이름이 이름이 아니라는 것을 알린다 (본편이 호칭을 이름처럼 부르지 않게)
+  if (p.provisional) out.push(main('PEOPLE.BLOCK.PROVISIONAL', { name: p.name }));
   const mode = o.mode ?? 'split';
   if (o.sheet && mode === 'append') out.push(o.sheet.trim());
   const id = slot('identity');

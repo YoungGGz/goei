@@ -82,7 +82,7 @@ import { peopleStore } from './core/people/store';
 import { peopleSettings } from './core/people/settings';
 import { identityText } from './core/people/identity';
 import { extraNames, temperOf } from './core/people/base';
-import { requestPeopleUpdate, directorNoteText, factionNamesOf, routerPeople } from './host/people';
+import { requestPeopleUpdate, directorNoteText, factionNamesOf, rosterOf, routerPeople } from './host/people';
 import { traceBegin, traceEnd, traceMain, traceReply, traceTurnId } from './host/trace';
 import { progressAbort, progressEnd, progressPlan, progressTurn, progressWatch } from './core/progress';
 import { turnPlan } from './core/progplan';
@@ -461,8 +461,10 @@ async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }
     return text || bookText({ char, chat }, name) || null;
   };
   // 모델 Router (선택): 보조 모델이 장면 인물을 고른다. 실패·지연이면 코드 Router (이름이 나온 사람)
-  const routed = await routerPeople(chat, store, input, settings, me?.name ? [me.name] : [], sheetOf).catch(() => null);
-  const opts = { settings, store, sheetOf, temperOf, extraNames: extraNames(), input, user, factionNames: factionNamesOf(char.globalLore), ...(routed ? { people: routed } : {}) };
+  // 이름 표는 명부(요원 줄)에서도 받는다: 명부에만 있는 인물의 영문 표기·초상 태그로도 장면 인물을 고른다
+  const roster = rosterOf(char.globalLore);
+  const routed = await routerPeople(chat, store, input, settings, me?.name ? [me.name] : [], sheetOf, roster).catch(() => null);
+  const opts = { settings, store, sheetOf, temperOf, extraNames: extraNames(roster), input, user, factionNames: factionNamesOf(char.globalLore), ...(routed ? { people: routed } : {}) };
   let out = withPeopleBlock(messages, chat, opts);
   // 연출형 Director (선택): 장면 인물에 대해 본편 앞 보조 1회. 실패·지연이면 메모 없이 진행
   if (settings.director === 'scene' || settings.director === 'facts') {

@@ -139,7 +139,7 @@ async function open(page) {
 const want = (id) => !process.env.ONLY || process.env.ONLY.split(',').includes(id);
 
 /** A00으로 시작하고 첫 응답(상황판 태그 포함)을 넣어 「진행 중」 상태로. 창은 닫아 둔다 */
-async function startedWithReply(page, { phoneAuto = false, gnetAuto = false } = {}) {
+async function startedWithReply(page, { phoneAuto = false, gnetAuto = false, people = false } = {}) {
   await open(page);
   await page.waitForSelector('.gx-fac');
   await page.click('.gx-fac[data-value="A00"]');
@@ -151,18 +151,23 @@ async function startedWithReply(page, { phoneAuto = false, gnetAuto = false } = 
   const [code, idx] = preset.loc.split('-');
   const where = `${geo.sido[code]} ${geo.sigun[code][Number(idx)]}`;
   const reply = [`본문`, `[AN|${where}|${preset.name}|활성|A|P001]`, '[AG|P001|작전투입|현장]', '[AG|P002|휴게|사무실]', '[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|없음]'].join('\n');
-  await page.evaluate(async ({ reply, phoneAuto, gnetAuto }) => {
+  await page.evaluate(async ({ reply, phoneAuto, gnetAuto, people }) => {
     if (!phoneAuto) window.__chat.scriptstate.$ph_auto = '0';
     if (!gnetAuto) window.__chat.scriptstate['$lb_cfg_lb-gn.lazy'] = '1';
-    // 장면 인물이 없어도 소지품 읽기가 켜져 있으면 갱신기가 돈다(11-08): 이 시험의 모델 호출 수에 끼지 않게 끈다
-    window.__chat.scriptstate.$it_auto = '0';
-    // 상점 판단이 「자동」이면 갱신기가 매 턴 돈다(11-09): 같은 까닭으로 메인 모델이 판단하게 둔다
-    window.__chat.scriptstate.$sh_judge = 'main';
+    // 인물 기록 갱신기는 장면 인물이 없는 응답에도 돈다 (기록에 없는 새 인물을 찾고, 소지품·상점 판단도 읽는다).
+    // 인물 기록을 보지 않는 시험은 모델 호출 수에 끼지 않게 자동 호출을 끈다.
+    // 보는 시험(people)은 이 첫 응답에 빈 답을 줘서 읽음으로 넘기고, 갱신기가 인물만 읽게 소지품 읽기·상점 판단은 맡기지 않는다
+    if (!people) window.__chat.scriptstate.$pp_when = 'manual';
+    else {
+      window.__chat.scriptstate.$it_auto = '0';
+      window.__chat.scriptstate.$sh_judge = 'main';
+      window.__llm = [{ type: 'success', result: '{}' }];
+    }
     window.__chat.message.push({ role: 'user', data: '시작' }, { role: 'char', data: reply });
     const c = window.__chat;
     await window.__calls.listeners[0]({ char: JSON.parse(JSON.stringify(window.__char)), chat: JSON.parse(JSON.stringify(c)), characterIndex: 0, chatIndex: 0, messageIndex: c.message.length - 1 });
     const g = document.querySelector('.gx'); if (g) g.style.display = 'none';
-  }, { reply, phoneAuto, gnetAuto });
+  }, { reply, phoneAuto, gnetAuto, people });
   return { preset, where, code };
 }
 // 창은 열 때 채팅을 다시 읽는다: 밖에서(시험이) 채팅 값을 바꾼 뒤엔 닫았다 다시 연다 (마지막 탭으로 열린다)
@@ -1313,7 +1318,7 @@ const upd = (o) => ok(JSON.stringify(o));
 // PP1) 매 턴 갱신: 장면 인물이 있으면 보조 모델 1회(직렬: 괴담톡보다 먼저), 같은 응답은 다시 안 읽음. 응답 정상/부분/깨짐/빈 → 반영·버림·실패가 진단에. 병렬 설정. 끔.
 if (want('PP1')) {
   const { page, errors } = await boot(fixture, { message: [], scriptstate: {} });
-  await startedWithReply(page);
+  await startedWithReply(page, { people: true });
   const n0 = await llmCount(page);
   // 응답에 쟈알디가 나오면 시트에서 시작값을 만들고 갱신 호출 1회
   await llm(page, [upd({ entries: [{ who: '쟈알디', slot: 'state', op: 'add', text: '현장에서 보고를 받는 중', m: 'm5', quote: '쟈알디 부장이 보고를 받았다' }, { who: '없는사람', slot: 'state', op: 'add', text: 'x', m: 'm5', quote: '쟈알디' }, { who: '쟈알디', slot: 'scene', op: 'add', text: '인용 없음', m: 'm5', quote: '이 글은 원문에 없다' }], cues: [{ who: '쟈알디', cue: '도움', m: 'm5', quote: '보고를 받았다', reason: '보고' }], address: [{ who: '쟈알디', toUser: '자네', register: '반말', m: 'm5', quote: '자네, 수고했네' }] })]);
@@ -1387,7 +1392,7 @@ if (want('PP1')) {
 // PP2) 위키 화면 연동: 인물 목록 → 상세(호감·호칭·칸·근거·고정·취소·되살리기·변경 기록) → 세력 평판(값·구간·고정) → 문서. 메시지당 상한·경계 설정값. 되감기(메시지 수정 → 항목 빠짐)
 if (want('PP2')) {
   const { page, errors } = await boot(fixture, { message: [], scriptstate: {} });
-  await startedWithReply(page);
+  await startedWithReply(page, { people: true });
   const n0 = await llmCount(page);
   await llm(page, [upd({
     entries: [{ who: '쟈알디', slot: 'state', op: 'add', text: '부상 (왼팔)', m: 'm5', quote: '왼팔을 다쳤다' }, { who: '쟈알디', slot: 'knowledge', op: 'add', text: '관람차 비밀을 안다', m: 'm5', quote: '관람차' }],

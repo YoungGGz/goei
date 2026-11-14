@@ -435,6 +435,10 @@ new plant allowed ({tiers})
 ## {name} (living record · updated in this chat)
 @@END
 
+@@SECTION PEOPLE.BLOCK.PROVISIONAL
+(`{name}` is the label this record uses for a person whose name the story has not given. It is not a name: no character knows it as one or calls the person by it as a name.)
+@@END
+
 @@SECTION PEOPLE.BLOCK.IDENTITY
 Identity:
 @@END

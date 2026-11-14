@@ -29,7 +29,8 @@ export function buildRouter(chat: Chat, store: PeopleStore, names: NameEntry[], 
     const e = names.find((n) => n.name === p.name);
     const ident = plain(o.identityOf?.(p.name) || liveEntries(p.slots.identity, live).map((x) => x.text).join(' '), ROUTER_IDENTITY_CHARS);
     const relations = [...new Set(liveEntries(p.slots.relationship, live).map((x) => x.target).filter((t): t is string => !!t && t !== '@user'))].slice(0, 6);
-    const row = { name: p.name, aliases: [...new Set([...p.aliases, ...(e?.aliases ?? [])])].slice(0, 8), titles: (e?.titles ?? []).slice(0, 4), faction: p.faction, ...(ident ? { identity: ident } : {}), ...(relations.length ? { relations } : {}) };
+    // provisional: 이름이 아니라 호칭으로 적어 둔 기록 (지침 「Router」 ROLE 이 뜻을 설명한다)
+    const row = { name: p.name, ...(p.provisional ? { provisional: true as const } : {}), aliases: [...new Set([...p.aliases, ...(e?.aliases ?? [])])].slice(0, 8), titles: (e?.titles ?? []).slice(0, 4), faction: p.faction, ...(ident ? { identity: ident } : {}), ...(relations.length ? { relations } : {}) };
     const size = JSON.stringify(row).length;
     if (size > budget && row.identity) { delete (row as { identity?: string }).identity; }
     budget -= JSON.stringify(row).length;

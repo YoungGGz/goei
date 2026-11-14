@@ -4,6 +4,7 @@ import type { Chat } from '../types';
 import { messageText } from '../refs';
 import { keyRegex } from '../lore';
 import { findStatusTags } from '../world/status';
+import { messageHash, messageKey } from './store';
 import type { PeopleStore } from './types';
 
 export interface NameEntry {
@@ -43,9 +44,11 @@ export interface SceneOpts {
   max?: number;
   /** 지금 쓰려는 유저 입력 (아직 채팅에 없을 때) */
   input?: string;
+  /** 장면에 남아 있는 인물 (carriedScene). 글에 나온 사람·동행 칸 뒤에 넣는다 */
+  carry?: string[];
 }
 
-/** 장면 인물: 기록이 있는 사람 중 최근 글에 나온 사람 + 동행 칸. 나온 순서 (최근 글 먼저) */
+/** 장면 인물: 기록이 있는 사람 중 최근 글에 나온 사람 + 동행 칸 + 장면에 남아 있는 사람(carry). 나온 순서 (최근 글 먼저) */
 export function scenePeople(chat: Chat, store: PeopleStore, match: (text: string) => string[], o: SceneOpts = {}): string[] {
   const list = Array.isArray(chat.message) ? chat.message : [];
   const recent = list.slice(-(o.recent ?? 2)).reverse().map((m) => messageText(String(m.data ?? '')));
@@ -61,7 +64,22 @@ export function scenePeople(chat: Chat, store: PeopleStore, match: (text: string
     const tags = findStatusTags(String(lastBot.data ?? ''));
     for (const c of tags.at(-1)?.companions ?? []) for (const n of match(c)) push(n);
   }
+  for (const n of o.carry ?? []) push(n);
   return out.slice(0, o.max ?? 6);
+}
+
+/** 장면에 남아 있는 인물 (설정 「장면 인물 유지」): before 앞의 마지막 응답에 갱신기가 적어 둔 이름 가운데 기록이 있는 사람.
+ *  before 가 없으면 채팅의 마지막 응답. 그 응답의 읽음 해시가 지금 내용과 같을 때만 쓴다
+ *  (다시 굴리거나 고친 응답, 갱신기가 아직 읽지 않은 응답이면 빈 목록 → 글에 나온 이름만으로 고른다) */
+export function carriedScene(store: PeopleStore, chat: Chat, before?: number): string[] {
+  const list = Array.isArray(chat.message) ? chat.message : [];
+  for (let i = Math.min(before ?? list.length, list.length) - 1; i >= 0; i--) {
+    if (list[i].role !== 'char') continue;
+    const key = messageKey(list[i], i);
+    if (store.read[key] !== messageHash(list[i])) return [];
+    return (store.scene?.[key] ?? []).filter((n) => !!store.people[n]);
+  }
+  return [];
 }
 
 /** 기록에 있는 사람들로 이름 표를 만든다 (relations-base aliases 와 합쳐 쓴다) */
@@ -71,4 +89,14 @@ export function entriesOf(store: PeopleStore, extra: Record<string, { aliases?: 
     aliases: [...new Set([...p.aliases, ...(extra[p.name]?.aliases ?? [])])],
     titles: extra[p.name]?.titles ?? [],
   }));
+}
+
+/** 갱신기용 이름 표: 미리 만든 표(table, base.ts allNames) 전체 + 표에 없는 기록의 인물. 기록이 있는 사람은 기록의 별명도 열쇠가 된다.
+ *  표만 쓰면 갱신기가 등록한 표 밖 인물(이름 없는 인물 포함)이 글에 나와도 다음 갱신의 장면 인물로 잡히지 않는다 */
+export function namesWith(store: PeopleStore, table: NameEntry[]): NameEntry[] {
+  const inTable = new Set(table.map((e) => e.name));
+  return [
+    ...table.map((e) => (store.people[e.name] ? { ...e, aliases: [...new Set([...store.people[e.name].aliases, ...e.aliases])] } : e)),
+    ...Object.values(store.people).filter((p) => !inTable.has(p.name)).map((p) => ({ name: p.name, aliases: [...p.aliases], titles: [] })),
+  ];
 }

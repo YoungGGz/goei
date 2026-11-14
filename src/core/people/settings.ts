@@ -68,6 +68,12 @@ export const PP_DEFAULTS: Record<string, string> = {
   /** auto / confirm */
   newpeople: 'auto',
   twoturn: '0',
+  /** 명부 대조: 기록이 없는 명부 인물의 이름·별칭·소속·직급을 갱신기 자료(roster)로 보낸다 */
+  roster_hint: '1',
+  /** 이름 없는 인물 기록: 이름이 밝혀지지 않은 인물을 글에 쓰인 호칭으로 등록하고, 이름이 밝혀지면 기록을 옮긴다 */
+  new_unnamed: '1',
+  /** 장면 인물 유지: 갱신기가 장면에 남아 있다고 본 인물을 다음 메인 요청·다음 갱신에 넣는다 */
+  scene_carry: '1',
   /** 갱신기 앞에 붙이는 직전 유저·봇 쌍 (원본 stageContext.writer 2). 2026-11-07 W3: 1 → 2 */
   prev_pairs: '2',
   /** 기록 본문 언어 (ko / en). 이름·인용·호칭은 늘 원문 */
@@ -135,6 +141,9 @@ export interface PeopleSettings {
   qualitative: Set<NumericFeature>;
   newPeople: 'auto' | 'confirm';
   twoTurn: boolean;
+  rosterHint: boolean;
+  newUnnamed: boolean;
+  sceneCarry: boolean;
   prevPairs: number;
   lang: 'ko' | 'en';
   personCap: number;
@@ -209,6 +218,9 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     qualitative: new Set(NUMERIC_FEATURES.filter((f) => v(f) === '1' && v(`num_${f}`) === '0')),
     newPeople: v('newpeople') === 'confirm' ? 'confirm' : 'auto',
     twoTurn: v('twoturn') !== '0',
+    rosterHint: v('roster_hint') !== '0',
+    newUnnamed: v('new_unnamed') !== '0',
+    sceneCarry: v('scene_carry') !== '0',
     prevPairs: num('prev_pairs', 0, 3),
     lang: v('lang') === 'en' ? 'en' : 'ko',
     personCap: num('person_cap', 2000, 40000),

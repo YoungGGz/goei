@@ -3,7 +3,7 @@
 import { sexualTexts } from './sexual';
 import type { Chat } from '../types';
 import { peopleBlock, personBlock, rhythmBlock, unknownTo, TRIM_ORDER } from './inject';
-import { nameMatcher, scenePeople, entriesOf, type NameEntry } from './select';
+import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
 import { liveChanges, liveEntries, liveness, type Liveness } from './store';
 import { latestNote } from './updater';
 import { rhythmClock, rhythmClockLines } from './rhythm';
@@ -43,7 +43,8 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
   // 2026-11-07 전수검사 2 의 B: 모델 결과가 코드 결과를 대체하면 모델이 빠뜨린 인물이 그 턴 기록에서 사라졌다 (원본 includeMentionedCharacters 와 같게)
   // 항상 포함할 인물(설정 always, 원본 tracked)은 맨 앞에: 글에 안 나와도 그 턴 기록·Director 자료에 든다
   const always = o.settings.always.filter((n) => o.store.people[n]);
-  const byCode = scenePeople(chat, o.store, match, { input: o.input }).filter((n) => !always.includes(n));
+  // 장면에 남아 있는 인물(설정 「장면 인물 유지」)은 글에 나온 사람·동행 칸 뒤, 모델 Router 가 고른 사람 앞
+  const byCode = scenePeople(chat, o.store, match, { input: o.input, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
   const byModel = (o.people ?? []).filter((n) => o.store.people[n] && !always.includes(n) && !byCode.includes(n));
   const people = [...always, ...byCode, ...byModel].slice(0, Math.max(6, always.length));
   if (!people.length) return { text: '', people: [], sheets: [] };

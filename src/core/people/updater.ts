@@ -9,7 +9,7 @@ import { SPEECH_ENTRY_CHARS, applySpeechSign, parseSpeechMarker, speechVariety }
 import { SEXUAL_FIELDS, SEXUAL_AXIS_OF, explicitOn, isSexualAxis, sexualAnyOn, sexualFieldOn, sexualGlobal, setSexualText } from './sexual';
 import { unknownTo } from './inject';
 import { seedPerson } from './seed';
-import { temperOf } from './base';
+import { temperOf, type RosterRow } from './base';
 import { rhythmClock, rhythmClockLines, parseHookHead, turnAt, type RhythmClock } from './rhythm';
 import { axesView, ensureAxes, isAxis, isDirection, observe, readAxes, setAxes, pruneCandidates } from './axes';
 import { AXES } from './types';
@@ -19,8 +19,9 @@ import { mentionsAmount, parseWon } from '../wallet';
 import { mentionsPoints, parsePoints } from '../points';
 import { cleanIcon, itemsRule, itemEquip, itemState, stripGrades, itemUses, itemWeight, sameItemName, type ItemEquip, type ItemState, type UsedNow } from '../items';
 import { leftWordIn, offWordIn } from '../itemrules';
-import { nameMatcher, scenePeople, entriesOf, type NameEntry } from './select';
-import { changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, putChange, putDoc, putEntry, sentText, type Liveness } from './store';
+import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
+import { imgTagNames } from '../imgtag';
+import { changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
 import type { Feature, PeopleSettings } from './settings';
 import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
 
@@ -129,6 +130,8 @@ export function personPayload(p: Person, live: Liveness, changes: Change[], unkn
   return {
     name: p.name,
     aliases: p.aliases,
+    // 이름이 아직 밝혀지지 않아 호칭으로 적어 둔 기록
+    ...(p.provisional ? { provisional: true as const } : {}),
     express: p.express,
     ...(extra.qual?.has('affinity') ? {} : { affinity_now: `${aff.stage.label}(${aff.stage.max})` }),
     address_now: addr,
@@ -180,6 +183,8 @@ export interface BuildOpts {
   away?: { name: string; place?: string }[];
   /** 상점 판단 (갱신기가 판단할 때): 판단할 응답 위치(가장 최근 응답)와 주인공 이름들 */
   shop?: { at: number; self: string[] } | null;
+  /** 명부의 요원 줄 (host/people.ts rosterOf). 설정 「명부 대조」가 켜져 있으면 기록이 없는 줄을 자료 roster 로 보낸다 */
+  roster?: RosterRow[];
 }
 
 /** 관계 재검토 간격 (턴). 리수폿 원문 20 */
@@ -278,7 +283,27 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
       }
     }
   }
+  // 장면에 남아 있는 인물 (설정 「장면 인물 유지」): 묶음 앞 응답 끝에 갱신기가 장면에 있다고 본 사람. 글에 이름이 안 나와도 이어서 읽게, 위에서 고른 사람들 뒤에 넣는다
+  const carried = o.settings.sceneCarry && !o.only?.length ? carriedScene(store, chat, first) : [];
+  for (const n of carried) push(n);
   const chosen = o.only?.length ? o.only.filter((n) => store.people[n]).slice(0, 6) : people.slice(0, 6);
+  // 초상: 확정 응답에 초상 태그가 뜬 장면 인물 (태그는 span 에서 지워져 모델이 못 본다). 태그의 이름 부분을 이름 표의 영문 표기로 찾는다
+  const tagOwner = (tag: string): string | null => {
+    const t = tag.toLowerCase();
+    return o.names.find((e) => e.name.toLowerCase() === t || e.aliases.some((a) => a.toLowerCase() === t))?.name ?? null;
+  };
+  const portraits = [...tags].filter(([, idx]) => confirmedIdx.has(idx)).map(([m, idx]) => ({ m, who: [...new Set(imgTagNames(str(list[idx].data)).map(tagOwner).filter((n): n is string => !!n && chosen.includes(n)))] })).filter((x) => x.who.length);
+  // 다시 읽기(only)는 새 인물·이름 옮기기·장면 인물을 받지 않으니 그 자료도 싣지 않는다
+  const fresh = !o.only?.length;
+  const excluded = new Set(o.exclude ?? []);
+  const roster = fresh && o.settings.rosterHint ? (o.roster ?? []).filter((r) => r.name && !store.people[r.name] && !excluded.has(r.name)).map((r) => ({ name: r.name, names: [...new Set([r.english, ...r.aliases].filter(Boolean))], affiliation: o.factionNames?.[r.affiliation] ?? r.affiliation, rank: r.rank, department: r.department })) : [];
+  // 대기 이름: 근거 응답이 채팅에 살아 있는 줄만 싣는다 (다시 굴리거나 지운 응답에서만 나온 이름은 이야기에 없던 이름이다).
+  // 설정 「이름 없는 인물 기록」이 꺼져 있으면 호칭으로 올라온 줄도 뺀다 (다시 와도 받지 않는다)
+  const waiting = fresh ? Object.entries(store.pending).filter(([, row]) => live.at.has(row.anchor) && (o.settings.newUnnamed || !row.provisional)) : [];
+  const held = waiting.map(([name]) => name);
+  // 호칭: 호칭으로 적어 둔 기록 전부 + 호칭으로 올라와 기다리는 이름. 이름 옮기기(renames)의 from 이 될 수 있는 이름이 이것이다
+  const handles = fresh && o.settings.newUnnamed ? [...Object.values(store.people).filter((p) => p.provisional).map((p) => p.name), ...waiting.filter(([, row]) => row.provisional).map(([name]) => name)] : [];
+  const sceneBefore = carried.filter((n) => chosen.includes(n));
   const already = [
     ...changes.filter((c) => c.kind === 'cue' && chosen.includes(c.who) && [...confirmedIdx].some((idx) => live.at.get(c.anchor) === idx)).map((c) => ({ who: c.who, kind: 'cue', cue: c.cue })),
     ...chosen.flatMap((n) => SLOTS.flatMap((s) => liveEntries(store.people[n].slots[s], live).filter((e) => [...confirmedIdx].some((idx) => live.at.get(e.anchor) === idx)).map((e) => ({ who: n, kind: 'entry', slot: s, text: e.text })))),
@@ -313,6 +338,11 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
       return { ...personPayload(p, live, changes, wantNote || o.settings.features.has('perception') ? unknownTo(p, store, live) : undefined, { taste: o.settings.features.has('taste'), openness: o.settings.features.has('openness'), axes: o.settings.features.has('axes'), turnCap: o.settings.turnCap, slots: slotsFor(o.settings.features, o.settings.qualitative), qual: o.settings.qualitative, sexual: o.settings, aff: { temper: temperOf(n), speed: o.settings.speed, speedDown: o.settings.speedDown, turnCap: o.settings.turnCap }, folded: store.folded[n] ?? 0 }), values: o.values[n] ?? '' };
     }),
     known_names: Object.keys(store.people),
+    ...(handles.length ? { handles } : {}),
+    ...(held.length ? { held_names: held } : {}),
+    ...(portraits.length ? { portraits } : {}),
+    ...(roster.length ? { roster } : {}),
+    ...(sceneBefore.length ? { scene_before: sceneBefore } : {}),
     ...(o.hints?.length ? { name_hints: o.hints.filter((h) => !store.people[h.name]).slice(0, 12) } : {}),
     ...(o.memory?.length ? { memory: o.memory } : {}),
     docs_now: DOC_TYPES.some((t) => o.settings.features.has(docFeature(t) as Feature))
@@ -405,6 +435,10 @@ export function enabledSections(s: PeopleSettings): Set<string> {
   if (on.has('affinity_num') || on.has('faction_rep_num')) on.add('cue_table');
   if (s.director === 'note') on.add('next_note');
   if (sexualAnyOn(s)) on.add('sexual');
+  // 새 인물 절: 이름이 나온 인물만(new_named) / 이름 없는 인물도(new_unnamed) 둘 중 하나, 명부 대조(new_roster), 장면 인물 유지(scene_carry)
+  on.add(s.newUnnamed ? 'new_unnamed' : 'new_named');
+  if (s.rosterHint) on.add('new_roster');
+  if (s.sceneCarry) on.add('scene_carry');
   return on;
 }
 
@@ -416,7 +450,12 @@ export interface UpdateResult {
   cues?: { who: string; cue: string; m: string; quote: string; reason?: string }[];
   address?: { who: string; toUser: string; register: string; m: string; quote: string }[];
   identity?: { faction?: string | null; rank?: string | null } | null;
-  new_people?: { name: string; aliases?: string[]; m: string; quote: string; identity?: string | null; speech?: string | null }[];
+  /** provisional: 이름이 아니라 글에 쓰인 호칭으로 올린 인물 (설정 「이름 없는 인물 기록」) */
+  new_people?: { name: string; aliases?: string[]; m: string; quote: string; identity?: string | null; speech?: string | null; provisional?: boolean | null }[];
+  /** 호칭으로 적어 둔 인물의 이름이 밝혀짐: from(호칭 기록 또는 등록 대기 중인 호칭) → to(이름). 근거 인용 필요 */
+  renames?: { from: string; to: string; m: string; quote: string }[];
+  /** 확정 구간 끝에 주인공과 같은 장면에 있는 기록 인물 (설정 「장면 인물 유지」) */
+  present?: string[];
   docs?: { type: string; key: string; op: string; replace?: string | null; text?: string | null; m: string; quote: string; date?: string | null; place?: string | null; who?: string[] }[];
   suspicion?: { who: string; target: string; kind: string; op: string; text: string; m: string; quote: string; weight?: string | null; stage?: string | null; result?: string | null }[];
   next_note?: { who: string; now?: string; must_not_reveal?: string[] }[];
@@ -459,7 +498,7 @@ export function parseUpdate(raw: string): UpdateResult {
   const v = JSON.parse(t.slice(a, b + 1)) as unknown;
   if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(guideTxt('UpdaterExtra', 'ERR.NOT_OBJECT'));
   const r = v as UpdateResult;
-  for (const k of ['entries', 'cues', 'address', 'new_people', 'docs', 'suspicion', 'next_note', 'taste', 'openness', 'faction_cues', 'faction_stance', 'transactions', 'point_transactions', 'items', 'observations', 'axes_init', 'sexual_init', 'issues'] as const) {
+  for (const k of ['entries', 'cues', 'address', 'new_people', 'renames', 'present', 'docs', 'suspicion', 'next_note', 'taste', 'openness', 'faction_cues', 'faction_stance', 'transactions', 'point_transactions', 'items', 'observations', 'axes_init', 'sexual_init', 'issues'] as const) {
     // null 은 빈 목록으로 받는다 (응답 전체를 버리지 않게, 전수검사 11-13). 글·객체는 그대로 오류
     if (r[k] === null) delete (r as Record<string, unknown>)[k];
     if (r[k] !== undefined && !Array.isArray(r[k])) throw new Error(guideTxt('UpdaterExtra', 'ERR.NOT_LIST', { key: k }));
@@ -471,7 +510,7 @@ export function parseUpdate(raw: string): UpdateResult {
 
 export interface Dropped { kind: string; who?: string; reason: string; item: unknown }
 export interface ApplyReport {
-  applied: { entries: number; cues: number; address: number; docs: number; suspicion: number; newPeople: string[]; notes: number; identity: boolean; taste: number; openness: number; factions: number; transactions: number; observations?: number; axesInit?: number; sexualInit?: number; items?: number };
+  applied: { entries: number; cues: number; address: number; docs: number; suspicion: number; newPeople: string[]; /** 이름을 옮긴 기록 (호칭 → 이름). 되돌리기 목록(store.ts recordRun)과 설정 「항상 포함할 인물」 고쳐 쓰기에 쓴다 */ renamed: { from: string; to: string }[]; notes: number; identity: boolean; taste: number; openness: number; factions: number; transactions: number; observations?: number; axesInit?: number; sexualInit?: number; items?: number };
   dropped: Dropped[];
   /** 「확인 필요」로 보류한 것 */
   held: Dropped[];
@@ -513,8 +552,6 @@ export interface ApplyCtx {
   sheetOf?: (name: string) => string | null;
   /** 새 인물의 시작값 */
   baseOf?: (name: string) => { faction?: string; affinityBase?: number; express?: 0 | 1 | 2 | 3; aliases?: string[] };
-  /** 역할 명사만인 이름 (새 인물 거부) */
-  roleWords?: Set<string>;
   now?: string;
   /** 기록하지 않는 이름 (유저가 연기하는 요원): 새 인물로도 받지 않는다 */
   exclude?: string[];
@@ -531,8 +568,6 @@ export interface ApplyCtx {
   /** 소지품 절 켜짐: 변화를 받아 report.items 에 담는다 (input.items 가 null 이면 아무것도 안 받는다) */
   items?: boolean;
 }
-
-const ROLE_WORDS = new Set(['택시 기사', '기사', '점원', '경비', '경비원', '간호사', '의사', '행인', '남자', '여자', '아저씨', '아주머니', '학생', '직원', '요원', '사원', '대리', '과장', '부장', '선배', '후배', '언니', '오빠', '형', '누나', '손님', '주인', '사장', '경찰', '시민']);
 
 /** 두 문장이 거의 같은가 (정규화 뒤 포함 또는 2글자 조각 80% 일치) */
 export function similar(a: string, b: string): boolean {
@@ -574,9 +609,8 @@ export function resolveName(who: string, store: PeopleStore, names: NameEntry[] 
 export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, r: UpdateResult, ctx: ApplyCtx): ApplyReport {
   const list = msgs(chat);
   const live = liveness(chat);
-  const report: ApplyReport = { applied: { entries: 0, cues: 0, address: 0, docs: 0, suspicion: 0, newPeople: [], notes: 0, identity: false, taste: 0, openness: 0, factions: 0, transactions: 0 }, dropped: [], held: [], wallet: [], points: [], items: [], issues: (Array.isArray(r.issues) ? r.issues : []).slice(0, 12).map((x) => ({ code: plain(x?.code, 40) || 'note', who: plain(x?.who, 40), reason: plain(x?.reason, 120) })) };
+  const report: ApplyReport = { applied: { entries: 0, cues: 0, address: 0, docs: 0, suspicion: 0, newPeople: [], renamed: [], notes: 0, identity: false, taste: 0, openness: 0, factions: 0, transactions: 0 }, dropped: [], held: [], wallet: [], points: [], items: [], issues: (Array.isArray(r.issues) ? r.issues : []).slice(0, 12).map((x) => ({ code: plain(x?.code, 40) || 'note', who: plain(x?.who, 40), reason: plain(x?.reason, 120) })) };
   const drop = (kind: string, item: unknown, reason: string, who?: string) => report.dropped.push({ kind, who, reason, item });
-  const roleWords = ctx.roleWords ?? ROLE_WORDS;
   const seqs = new Map<string, number>();
   const nextSeq = (anchor: string) => {
     const n = (seqs.get(anchor) ?? 0) + 1;
@@ -599,7 +633,22 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     if (idx === undefined || !input.confirmed.has(idx)) return '확정 구간 밖 메시지';
     return { anchor: messageKey(list[idx], idx), index: idx };
   };
-  const resolveAny = (who: string): string | null => resolveName(who, store, input.names);
+  /** 이 응답에서 이름을 옮긴 인물의 옛 호칭(과 그 별명) → 새 이름. 옛 호칭은 새 기록의 별명이 되지 않으니(store.ts renamePerson),
+   *  같은 응답의 나머지 항목이 옛 호칭으로 적혀 오면 여기서 찾는다. 이 응답 안에서만 쓴다 */
+  const moved = new Map<string, string>();
+  const resolveAny = (who: string): string | null => {
+    const hit = resolveName(who, store, input.names);
+    if (hit) return hit;
+    let to = moved.get(norm(String(who ?? '')));
+    for (let i = 0; to && !store.people[to] && i < 8; i++) to = moved.get(norm(to));
+    return to && store.people[to] ? to : null;
+  };
+  /** 기록이 아직 없는 사람의 이름을 이름 표(input.names)의 이름으로: 표의 다른 표기(영문 표기·별명)로 오면 표의 이름, 표에 없으면 그대로.
+   *  갱신기 자료(roster)에는 영문 표기도 실려 있어 그 표기로 답할 수 있다. 그대로 기록을 만들면 같은 사람이 이름·초상 태그로 다시 나올 때 기록이 둘이 된다 */
+  const tableName = (raw: string): string => {
+    const w = norm(raw);
+    return (w && input.names.find((e) => norm(e.name) === w || e.aliases.some((a) => norm(a) === w))?.name) || raw;
+  };
   /** only 가 있으면 그 인물만 (다른 인물은 「다시 읽기 대상 아님」으로 버려짐) */
   const nameOf = (who: string): string | null => {
     const n = resolveAny(who);
@@ -607,17 +656,48 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
   };
 
   // 1. 새 인물 먼저 (그래야 아래 항목이 이름을 찾는다). 다시 읽기(only)에서는 받지 않는다
+  /** 대기·확인 규칙을 거쳐 등록한다 (새 인물과 「등록 대기 중인 호칭 → 이름」이 같이 쓴다). 등록했으면 true, 대기로 두었으면 false.
+   *  pend = 이 인물이 전에 올라와 대기 중인 줄 (이름이 바뀌어 오면 옛 호칭의 줄) */
+  const register = (name: string, aliases: string[], ev: { anchor: string }, pend: PeopleStore['pending'][string] | undefined, item: unknown, provisional: boolean): boolean => {
+    const row = (anchor: string) => ({ anchor, aliases: [...new Set([...(pend?.aliases ?? []), ...aliases])], ...(provisional ? { provisional: true as const } : {}) });
+    // 2턴 규칙: 처음 본 이름은 대기, 다른 기준 메시지에서 다시 나오면 등록
+    if (ctx.settings.twoTurn && !pend) {
+      store.pending[name] = row(ev.anchor);
+      report.held.push({ kind: 'new_people', who: name, reason: '2턴 규칙: 대기', item });
+      return false;
+    }
+    if (ctx.settings.twoTurn && pend && pend.anchor === ev.anchor) {
+      store.pending[name] = row(pend.anchor);
+      report.held.push({ kind: 'new_people', who: name, reason: '2턴 규칙: 같은 턴', item });
+      return false;
+    }
+    if (ctx.settings.newPeople === 'confirm') {
+      store.pending[name] = row(ev.anchor);
+      report.held.push({ kind: 'new_people', who: name, reason: '확인 뒤 등록', item });
+      return false;
+    }
+    const sheet = ctx.sheetOf?.(name) ?? null;
+    const base = ctx.baseOf?.(name) ?? {};
+    const p = seedPerson(name, sheet, { ...base, aliases: [...new Set([...(base.aliases ?? []), ...(pend?.aliases ?? []), ...aliases])] }, ctx.now);
+    if (provisional) p.provisional = true;
+    store.people[name] = p;
+    delete store.pending[name];
+    return true;
+  };
+  // 근거 응답이 채팅에서 사라진 대기 줄은 먼저 버린다 (다시 굴린 응답이 2턴 규칙의 「다른 응답」으로 세어지지 않게)
+  prunePending(store, chat);
   let newCount = 0;
   for (const n of ctx.only?.length ? [] : r.new_people ?? []) {
-    const name = plain(n?.name, 40);
-    if (!name) {
+    const given = plain(n?.name, 40);
+    if (!given) {
       drop('new_people', n, '이름 없음');
       continue;
     }
-    if (nameOf(name)) {
-      drop('new_people', n, '이미 있는 인물(별명 포함)', name);
+    if (nameOf(given)) {
+      drop('new_people', n, '이미 있는 인물(별명 포함)', given);
       continue;
     }
+    const name = tableName(given);
     if (ctx.exclude?.some((x) => norm(x) === norm(name) || (Array.isArray(n.aliases) && n.aliases.some((a) => norm(String(a)) === norm(x))))) {
       drop('new_people', n, '유저가 연기하는 요원', name);
       continue;
@@ -626,8 +706,12 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       drop('new_people', n, '사용자가 무시한 이름', name);
       continue;
     }
-    if (roleWords.has(name) || /^[가-힣]{1,3}\s?(기사|점원|경비|행인|직원|손님)$/.test(name)) {
-      drop('new_people', n, '역할 명사', name);
+    // 이름 없는 인물(호칭으로 올린 것)을 받을지는 설정이 정한다. 어떤 호칭이 기록할 만한지는 모델이 판단한다 (지침 4절).
+    // 호칭으로 올라와 기다리던 이름은 다시 올 때 표시가 빠져 있어도 호칭이다 (같은 글자의 같은 인물이다)
+    const pend = store.pending[name];
+    const provisional = n.provisional === true || pend?.provisional === true;
+    if (provisional && !ctx.settings.newUnnamed) {
+      drop('new_people', n, '이름 없는 인물 기록 꺼짐', name);
       continue;
     }
     const ev = evidence(n.m, n.quote);
@@ -640,32 +724,65 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       continue;
     }
     const aliases = Array.isArray(n.aliases) ? n.aliases.map((a) => plain(a, 40)).filter(Boolean) : [];
-    // 2턴 규칙: 처음 본 이름은 대기, 다른 기준 메시지에서 다시 나오면 등록
-    const pend = store.pending[name];
-    if (ctx.settings.twoTurn && !pend) {
-      store.pending[name] = { anchor: ev.anchor, aliases };
-      report.held.push({ kind: 'new_people', who: name, reason: '2턴 규칙: 대기', item: n });
-      continue;
-    }
-    if (ctx.settings.twoTurn && pend && pend.anchor === ev.anchor) {
-      report.held.push({ kind: 'new_people', who: name, reason: '2턴 규칙: 같은 턴', item: n });
-      continue;
-    }
-    if (ctx.settings.newPeople === 'confirm') {
-      store.pending[name] = { anchor: ev.anchor, aliases: [...new Set([...(pend?.aliases ?? []), ...aliases])] };
-      report.held.push({ kind: 'new_people', who: name, reason: '확인 뒤 등록', item: n });
-      continue;
-    }
-    const sheet = ctx.sheetOf?.(name) ?? null;
-    const base = ctx.baseOf?.(name) ?? {};
-    const p = seedPerson(name, sheet, { ...base, aliases: [...new Set([...(base.aliases ?? []), ...(pend?.aliases ?? []), ...aliases])] }, ctx.now);
-    store.people[name] = p;
-    delete store.pending[name];
+    if (!register(name, aliases, ev, pend, n, provisional)) continue;
+    const sheeted = store.people[name].seeded.from === 'lore';
     const seq0 = nextSeq(ev.anchor);
-    if (n.identity && !sheet) putEntry(store, name, 'identity', { id: entryId(name, 'identity', ev.anchor, seq0, n.identity), text: n.identity, src: 'story', anchor: ev.anchor, seq: seq0, quote: n.quote });
+    if (n.identity && !sheeted) putEntry(store, name, 'identity', { id: entryId(name, 'identity', ev.anchor, seq0, n.identity), text: n.identity, src: 'story', anchor: ev.anchor, seq: seq0, quote: n.quote });
     if (n.speech) putEntry(store, name, 'speech', { id: entryId(name, 'speech', ev.anchor, seq0 + 1, n.speech), text: n.speech, src: 'story', anchor: ev.anchor, seq: seq0 + 1, quote: n.quote, target: '@user' });
     report.applied.newPeople.push(name);
     newCount++;
+  }
+
+  // 1b. 이름 옮기기: 호칭으로 적어 둔 인물의 이름이 글에서 밝혀졌을 때. 새 인물 바로 뒤에 해야 아래 항목이 새 이름으로 찾는다. 턴당 상한에는 세지 않는다
+  for (const x of ctx.only?.length ? [] : r.renames ?? []) {
+    const fromRaw = plain(x?.from, 40);
+    const toRaw = plain(x?.to, 40);
+    if (!fromRaw || !toRaw) {
+      drop('rename', x, '이름 없음', fromRaw || toRaw);
+      continue;
+    }
+    // from: 호칭으로 적어 둔 기록이거나, 호칭으로 올라와 등록을 기다리는 줄
+    const rec = resolveAny(fromRaw);
+    const from = rec && store.people[rec].provisional ? rec : null;
+    const pend = !from && !rec && store.pending[fromRaw]?.provisional ? store.pending[fromRaw] : undefined;
+    if (!from && !pend) {
+      drop('rename', x, '호칭으로 적어 둔 인물이 아님', fromRaw);
+      continue;
+    }
+    const ev = evidence(x.m, x.quote);
+    if (typeof ev === 'string') {
+      drop('rename', x, ev, fromRaw);
+      continue;
+    }
+    const to = resolveAny(toRaw) ?? tableName(toRaw);
+    if (to === from || norm(to) === norm(fromRaw)) {
+      drop('rename', x, '같은 이름', fromRaw);
+      continue;
+    }
+    if (ctx.exclude?.some((e) => norm(e) === norm(to))) {
+      drop('rename', x, '유저가 연기하는 요원', fromRaw);
+      continue;
+    }
+    if (store.ignored.includes(to)) {
+      drop('rename', x, '사용자가 무시한 이름', fromRaw);
+      continue;
+    }
+    if (from) {
+      const old = [from, ...store.people[from].aliases];
+      const seed = store.people[to] ? null : seedPerson(to, ctx.sheetOf?.(to) ?? null, ctx.baseOf?.(to) ?? {}, ctx.now);
+      renamePerson(store, from, to, seed);
+      for (const k of old) moved.set(norm(k), to);
+      report.applied.renamed.push({ from, to });
+      continue;
+    }
+    // 등록을 기다리던 호칭: 기다리던 줄을 없애고, 이름에 기록이 없으면 그 이름의 새 인물로 대기·확인 규칙을 그대로 거친다 (처음 본 응답은 호칭 줄의 것을 잇는다).
+    // 호칭과 그 별명은 이름의 별명으로 넘기지 않는다 (store.ts renamePerson 과 같은 이유). 이름도 호칭 기록이면(호칭끼리 합침) 받는다
+    delete store.pending[fromRaw];
+    const old = [fromRaw, ...(pend!.aliases ?? [])];
+    for (const k of old) moved.set(norm(k), to);
+    if (store.people[to]) {
+      if (store.people[to].provisional) store.people[to].aliases = [...new Set([...store.people[to].aliases, ...old])].filter((a) => a !== to);
+    } else if (register(to, [], ev, { anchor: pend!.anchor, aliases: store.pending[to]?.aliases ?? [] }, x, false)) report.applied.newPeople.push(to);
   }
 
   // 2. 칸 항목 (켜진 기능의 칸만. 2026-11-06 「I」: 기능별 전용 칸)
@@ -1416,9 +1533,12 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
   // 8. 다음 턴 메모 (사실형 Director)
   if (ctx.settings.director === 'note') {
     const anchor = messageKey(list[Math.max(...input.indexes)], Math.max(...input.indexes));
+    // 장면 인물(input.people)은 갱신 전에 고른 이름이다. 이 응답에서 이름을 옮긴 인물은 새 이름으로 본다
+    const movedTo = new Map(report.applied.renamed.map((x) => [x.from, x.to]));
+    const scene = new Set(input.people.map((n) => movedTo.get(n) ?? n));
     for (const n of r.next_note ?? []) {
       const who = nameOf(str(n?.who));
-      if (!who || !input.people.includes(who)) {
+      if (!who || !scene.has(who)) {
         drop('note', n, '장면 인물이 아님', str(n?.who));
         continue;
       }
@@ -1438,6 +1558,24 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       const seq = nextSeq(anchor);
       if (putChange(store, { id: changeId('@rhythm', 'note', anchor, seq, now), anchor, seq, src: 'story', who: '@rhythm', kind: 'note', now, reason: '리듬 메모' })) report.applied.notes++;
     }
+  }
+
+  // 9. 장면 인물 (설정 「장면 인물 유지」): 확정 구간 끝에 장면에 있다고 모델이 답한 기록 인물을 묶음 마지막 응답에 적어 둔다.
+  // 누가 남아 있는지는 모델 판단이고, 여기서는 기록 이름으로 풀기만 한다. 다시 읽기(only)에서는 적지 않는다.
+  // 목록은 그 응답의 읽음 해시와 짝이다 (select.ts carriedScene). 아래에서 읽음 해시를 새로 적는 응답의 옛 목록은 먼저 지운다 —
+  // 고친 응답을 다시 읽었는데 답에 present 가 없거나 설정이 꺼져 있으면, 옛 내용에 대한 목록이 새 해시와 짝이 되어 다시 쓰인다
+  if (!ctx.keepRead && store.scene) {
+    for (const i of input.indexes) if (list[i]) delete store.scene[messageKey(list[i], i)];
+    if (!Object.keys(store.scene).length) delete store.scene;
+  }
+  if (ctx.settings.sceneCarry && !ctx.only?.length && Array.isArray(r.present)) {
+    const present: string[] = [];
+    for (const x of r.present) {
+      const who = resolveAny(str(x));
+      if (who && !ctx.exclude?.includes(who) && !present.includes(who)) present.push(who);
+    }
+    const last = Math.max(...input.indexes);
+    if (list[last]) (store.scene ??= {})[messageKey(list[last], last)] = present;
   }
 
   if (!ctx.keepRead) markRead(store, chat, input.indexes);

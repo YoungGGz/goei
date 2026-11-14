@@ -4,7 +4,7 @@
 import type { Chat, ChatMessage } from '../types';
 import { messageText } from '../refs';
 import { findStatusTags } from '../world/status';
-import { AXES, PEOPLE_KEY, SLOTS, DOC_TYPES, REGISTERS, DEFAULT_AXES, EXPRESS_TO_AXIS, emptyStore, expressOf, type Candidate, type Change, type Doc, type Entry, type LastRun, type Observation, type PeopleStore, type Person, type Register, type SexualProfile, type SexualRecord, type SlotId, SEXUAL_CHARS } from './types';
+import { AXES, PEOPLE_KEY, SLOTS, SLOT_META, DOC_TYPES, REGISTERS, DEFAULT_AXES, EXPRESS_TO_AXIS, emptyStore, expressOf, type Candidate, type Change, type Doc, type Entry, type LastRun, type Observation, type PeopleStore, type Person, type Register, type SexualProfile, type SexualRecord, type SlotId, SEXUAL_CHARS } from './types';
 
 /** 채팅 마지막 메시지 chatId (없으면 #순번): 기록의 기준 자리 */
 export function anchorOf(chat: Chat): string {
@@ -53,6 +53,7 @@ export function peopleStore(chat: Chat): PeopleStore {
       candidates: readCandidates(p.candidates),
       ...(Number.isInteger(p.reviewTurn) ? { reviewTurn: p.reviewTurn as number } : {}),
       ...(p.sexual && typeof p.sexual === 'object' ? { sexual: readSexual(p.sexual as unknown as Record<string, unknown>) } : {}),
+      ...(p.provisional === true ? { provisional: true as const } : {}),
     };
     const me = out.people[name];
     // 축: 저장된 것이 있으면 읽고, 없으면 express 에서 (감정 표출성만). express 는 늘 축에서 다시 계산
@@ -77,6 +78,10 @@ export function peopleStore(chat: Chat): PeopleStore {
   out.ignored = Array.isArray(raw.ignored) ? raw.ignored.filter((n): n is string => typeof n === 'string') : [];
   if (raw.identity && typeof raw.identity === 'object') out.identity = raw.identity;
   if (Array.isArray(raw.migrated)) out.migrated = raw.migrated.filter((m): m is string => typeof m === 'string');
+  if (raw.scene && typeof raw.scene === 'object') {
+    const scene = Object.fromEntries(Object.entries(raw.scene).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((n): n is string => typeof n === 'string')]));
+    if (Object.keys(scene).length) out.scene = scene;
+  }
   return out;
 }
 
@@ -231,9 +236,21 @@ export function snapshotRun(store: PeopleStore): RunSnapshot {
   for (const d of Object.values(store.docs)) for (const e of d.entries) docs.add(`${d.key}|${e.id}`);
   return { entries, docs, changes: new Set(store.log.map((c) => c.id)), observations, people: new Set(Object.keys(store.people)) };
 }
-/** 갱신 뒤: 전과 비교해 새로 생긴 것을 lastRun 에 적는다 (하나도 없으면 지움) */
-export function recordRun(store: PeopleStore, before: RunSnapshot, at: string): LastRun | undefined {
+/** 갱신 뒤: 전과 비교해 새로 생긴 것을 lastRun 에 적는다 (하나도 없으면 지움).
+ *  renamed: 이 갱신에서 이름을 옮긴 기록 (renamePerson). 갱신 전 목록의 열쇠를 새 이름으로 바꿔 놓고 비교한다 —
+ *  옮겨 온 항목·관찰이 새것으로 적히면 되돌리기가 그것들을 취소하고 옮긴 기록을 통째로 지운다.
+ *  이름을 옮긴 것 자체는 되돌리지 않는다 */
+export function recordRun(store: PeopleStore, before: RunSnapshot, at: string, renamed: { from: string; to: string }[] = []): LastRun | undefined {
   const after = snapshotRun(store);
+  if (renamed.length) {
+    const to = new Map(renamed.map((r) => [r.from, r.to]));
+    const rekey = (set: Set<string>) => new Set([...set].map((k) => { const i = k.indexOf('|'); const who = i < 0 ? k : k.slice(0, i); return to.has(who) ? `${to.get(who)!}${i < 0 ? '' : k.slice(i)}` : k; }));
+    before = { ...before, entries: rekey(before.entries), observations: rekey(before.observations), people: rekey(before.people) };
+    // 옮길 이름에 기록이 없어 새로 만든 경우, 그 기록의 시작값 항목(시트)은 이 갱신이 쓴 것이 아니라 적지 않는다
+    for (const name of new Set(to.values())) {
+      for (const [slot, list] of Object.entries(store.people[name]?.slots ?? {})) for (const e of list ?? []) if (e.src === 'seed') before.entries.add(`${name}|${slot}|${e.id}`);
+    }
+  }
   const diff = (a: Set<string>, b: Set<string>) => [...b].filter((x) => !a.has(x));
   const run: LastRun = {
     at,
@@ -272,6 +289,90 @@ export function undoLastRun(store: PeopleStore): number {
   for (const name of run.newPeople) if (store.people[name]) { delete store.people[name]; n++; }
   delete store.lastRun;
   return n;
+}
+
+// ── 이름 옮기기 (이름 없는 인물의 이름이 밝혀졌을 때) ──
+
+/** 호칭으로 적어 둔 기록(from)을 이름(to)의 기록으로 옮긴다. to 에 기록이 있으면 거기에 합치고, 없으면 seed(시트·시작값으로 만든 새 기록)에 옮긴다.
+ *  옮기는 것: 칸 항목, 성격 변화 후보, 변경 기록(계기·호칭·메모)의 주인, 접힌 호감 합, 다른 인물 항목의 대상, 문서의 등장 인물, 장면 인물 목록.
+ *  to 쪽 값이 이긴다: 시작값·호칭 고정·축은 to 것이 정해져 있으면 그대로, 비어 있을 때만 from 것을 받는다.
+ *  from 이름과 그 별명은 to 의 별명으로 넘기지 않는다. 이름을 모를 때 글이 그 사람을 가리킨 말이라, 별명(글에서 인물을 찾고 응답의 이름을 푸는 열쇠)이 되면
+ *  같은 말로 적힌 다른 사람의 글에 이 기록이 골라지고 그 사람 항목이 이 기록에 적힌다. to 도 호칭 기록이면(호칭끼리 합침) 받는다: 호칭 기록은 갱신기가 한 사람의 것으로 알고 읽는다.
+ *  글 속에 적힌 옛 호칭(다른 항목 본문·인용)은 바꾸지 않는다.
+ *  호칭 표시(provisional)는 from 과 함께 없어진다 (to 가 원래 호칭 기록이면 to 것은 남는다) */
+export function renamePerson(store: PeopleStore, from: string, to: string, seed: Person | null): boolean {
+  const src = store.people[from];
+  const target = store.people[to] ?? seed;
+  if (!src || !target || from === to) return false;
+  store.people[to] = target;
+  // 칸 항목. 시트로 시작한 기록에는 이야기에서 적은 신원 항목을 옮기지 않는다 (새 인물 등록과 같다: 시트가 있으면 신원은 시트 것).
+  // 한 번만 쓰는 칸(첫인상)은 같은 대상에 이미 있으면 옮기지 않고, 옮기면 자기 자신이 대상이 되는 항목도 옮기지 않는다
+  for (const slot of SLOTS) {
+    for (const e of src.slots[slot] ?? []) {
+      if (e.target === to) continue;
+      if (slot === 'identity' && e.src === 'story' && target.seeded.from === 'lore') continue;
+      if (SLOT_META[slot].once && (target.slots[slot] ?? []).some((x) => (x.target ?? '@user') === (e.target ?? '@user'))) continue;
+      const list = (target.slots[slot] ??= []);
+      if (!list.some((x) => x.id === e.id)) list.push(e);
+    }
+  }
+  for (const [id, c] of Object.entries(src.candidates ?? {})) {
+    const cur = target.candidates[id];
+    if (!cur) target.candidates[id] = c;
+    else cur.evidence = [...cur.evidence, ...c.evidence.filter((o) => !cur.evidence.some((x) => x.id === o.id))];
+  }
+  if (target.axesFrom === 'default' && src.axesFrom !== 'default') {
+    target.axes = { ...src.axes };
+    target.axesFrom = src.axesFrom;
+    target.express = src.express;
+  }
+  target.patterns = [...new Set([...target.patterns, ...src.patterns])].slice(0, 30);
+  if (!target.sexual && src.sexual) target.sexual = src.sexual;
+  if (!target.faction) target.faction = src.faction;
+  if (!target.address.toUser && !target.address.pin && src.address.toUser) target.address = { ...src.address };
+  if (src.reviewTurn !== undefined) target.reviewTurn = Math.max(target.reviewTurn ?? -1, src.reviewTurn);
+  if (target.provisional) target.aliases = [...new Set([...target.aliases, from, ...src.aliases])].filter((a) => a !== to);
+  delete store.people[from];
+  // 이름으로 가리키는 곳들
+  for (const c of store.log) if (c.who === from) c.who = to;
+  if (store.folded[from] !== undefined) {
+    store.folded[to] = (store.folded[to] ?? 0) + store.folded[from];
+    delete store.folded[from];
+  }
+  // 다른 인물 항목의 대상은 새 이름으로. 받는 쪽 기록이 옛 호칭을 대상으로 적어 둔 항목은 자기 자신이 대상이 되니 버린다 (위에서 「대상 = to」 항목을 옮기지 않는 것과 같다)
+  for (const p of Object.values(store.people)) {
+    for (const slot of SLOTS) {
+      const list = p.slots[slot];
+      if (!list) continue;
+      if (p === target) p.slots[slot] = list.filter((e) => e.target !== from);
+      else for (const e of list) if (e.target === from) e.target = to;
+    }
+  }
+  for (const d of Object.values(store.docs)) for (const e of d.entries) if (e.who?.includes(from)) e.who = [...new Set(e.who.map((w) => (w === from ? to : w)))];
+  for (const [k, list] of Object.entries(store.scene ?? {})) if (list.includes(from)) store.scene![k] = [...new Set(list.map((n) => (n === from ? to : n)))];
+  // 같은 이름으로 등록을 기다리던 후보는 기록이 생겼으니 없앤다. 별명은 to 로 기다리던 줄 것만 받는다 (옛 호칭 줄의 별명은 위와 같은 이유로 호칭끼리 합칠 때만)
+  for (const k of [from, to]) {
+    const pend = store.pending[k];
+    if (!pend) continue;
+    if (k === to || target.provisional) target.aliases = [...new Set([...target.aliases, ...(pend.aliases ?? [])])].filter((a) => a !== to);
+    delete store.pending[k];
+  }
+  return true;
+}
+
+/** 등록 대기 줄(pending)에서 근거 응답이 채팅에 없는 것을 버린다 (다시 굴리거나 지운 응답에서만 나온 이름).
+ *  남겨 두면 사라진 응답이 2턴 규칙의 「처음 본 것」으로 세어지고, 그 이름이 갱신기 자료(held_names)로 계속 나간다 */
+export function prunePending(store: PeopleStore, chat: Chat): void {
+  const at = anchorPositions(chat);
+  for (const [name, row] of Object.entries(store.pending)) if (!at.has(row.anchor)) delete store.pending[name];
+}
+
+/** 장면 인물 목록(scene)에서 채팅에 없는 응답의 것을 버린다 (다시 굴리거나 지운 응답) */
+export function pruneScene(store: PeopleStore, chat: Chat): void {
+  if (!store.scene) return;
+  const keep = new Set(msgs(chat).map((m, i) => messageKey(m, i)));
+  for (const k of Object.keys(store.scene)) if (!keep.has(k)) delete store.scene[k];
+  if (!Object.keys(store.scene).length) delete store.scene;
 }
 
 export function putChange(store: PeopleStore, c: Change): boolean {
