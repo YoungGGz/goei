@@ -7,7 +7,7 @@ import { addWalletEntry, aliveAnchors, liveWallet, removeWalletEntry, walletBala
 import { messageKey } from './people/store';
 import { colConfig, isPointsOrg, POINTS_ON_VAR } from './world/statuscols';
 import { guideTxt } from './guides';
-export { isPointsOrg, POINTS_ORG } from './world/statuscols';
+export { isPointsOrg, pointsOrg } from './world/statuscols';
 
 export const POINTS_VAR = '$st_points';
 

@@ -1,5 +1,6 @@
 // 상황판 목록: 괴이·미스틱 사이트·요원은 카드 명부(directory.ts: 로어북 폴더 + 괴이봇 명부 + 옛 목록),
 // 거점과 세력 호칭도 카드 명부(옛 카드는 World catalog 랜드마크 줄·Faction display).
+import { worldOrgCodes } from './records';
 import { extraNames, factionList, factionVars } from '../factions';
 import type { FactionCode, LoreEntry, ScriptState } from '../types';
 import { SIGUN } from './geo';
@@ -51,13 +52,6 @@ export interface Catalog {
 
 export class CatalogError extends Error {}
 
-const FALLBACK_DISPLAY: Record<string, string> = {
-  A00: '관리국',
-  B00: '가짜 관리국',
-  C00: '백일몽',
-  D00: '민간인',
-  E00: '프리랜서',
-};
 
 function loreText(lore: LoreEntry[], comment: string): string | null {
   const parts = lore.filter((e) => e.comment === comment && typeof e.content === 'string' && e.content.trim());
@@ -130,10 +124,12 @@ export function parseCatalog(lore: LoreEntry[] | undefined): Catalog {
 export function factionNames(catalog: Catalog, viewer: string | undefined): Record<string, string> {
   const map = catalog.factionDisplay[viewer ?? ''] ?? catalog.factionDisplay.none;
   if (map && typeof map === 'object') return catalog.extraNames ? { ...catalog.extraNames, ...map } : map;
-  const m = { ...catalog.extraNames, ...FALLBACK_DISPLAY };
-  if (viewer === 'B00') {
-    m.A00 = '가짜 관리국';
-    m.B00 = '관리국';
+  // 기본 세력 이름은 세계 자료 orgCodes (기본 명부 「조직」의 code). B00 에서 보면 A00·B00 이름이 서로 바뀐다
+  const base = worldOrgCodes();
+  const m = { ...catalog.extraNames, ...base };
+  if (viewer === 'B00' && base.A00 && base.B00) {
+    m.A00 = base.B00;
+    m.B00 = base.A00;
   }
   return m;
 }

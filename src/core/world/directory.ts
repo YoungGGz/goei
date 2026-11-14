@@ -11,7 +11,7 @@ import { freeGroupCode, migrateRoster, NEUTRAL_BLURB, NEUTRAL_ENGLISH, NEUTRAL_G
 import type { LoreEntry } from '../types';
 import { readStartItems, type StartItem } from '../startitems';
 import { itemWeight } from '../itemtraits';
-import { defaultAppendixWhen } from './records';
+import { defaultAppendixWhen, placeholderOrgs, worldOrgCodes } from './records';
 
 export { DIRECTORY_COMMENT } from '../lorebooks';
 export const DIRECTORY_SCHEMA = 1;
@@ -570,12 +570,10 @@ export function phoneTabs(lore: LoreEntry[]): TabInfo[] {
 /** 기본 플레이 세력 코드 (요원 소속에 코드로 들어가는 세력) */
 export const FACTIONS = BUILTIN;
 
-/** 기본 세력의 기본 세계 이름 (세계 기록·관계의 열쇠) */
-const DEFAULT_FACTION_NAMES: Record<string, string> = { A00: '관리국', B00: '가짜 관리국', C00: '백일몽', D00: '민간인', E00: '프리랜서' };
 
 export function factionDisplayNames(lore: LoreEntry[]): Record<string, string> {
   const m = displaySection(lore).none ?? {};
-  const out: Record<string, string> = { ...DEFAULT_FACTION_NAMES };
+  const out: Record<string, string> = worldOrgCodes(); // 기본 세력의 기본 세계 이름 (세계 자료 orgCodes = 기본 명부 「조직」의 code)
   for (const f of FACTIONS) if (s(m[f])) out[f] = s(m[f]);
   return { ...extraNames(lore), ...out };
 }
@@ -689,7 +687,7 @@ export function buildOrgs(lore: LoreEntry[], agents: AgentRow[], saved: Record<s
   };
   // 기본 세력 조직은 「기본」 호칭이 아니라 저장 줄의 code 로 찾는다. 호칭을 바꿔도 기록·관계가 떨어지지 않게 (전수검사 11-13)
   const keyOf = (f: string): string =>
-    Object.keys(saved).find((n) => s(obj(saved[n]).code) === f) ?? (names[f] in saved ? names[f] : (DEFAULT_FACTION_NAMES[f] ?? names[f]));
+    Object.keys(saved).find((n) => s(obj(saved[n]).code) === f) ?? (names[f] in saved ? names[f] : (worldOrgCodes()[f] ?? names[f] ?? f));
   for (const f of FACTIONS) make(keyOf(f), f);
   for (const name of Object.keys(saved)) if (s(name) && !out.some((o) => o.name === name)) make(name, '');
   for (const a of agents) if (a.affiliation && !orgOf(out, a.affiliation)) make(a.affiliation, '');
@@ -870,7 +868,7 @@ export function readDirectory(lore: LoreEntry[] | undefined): Directory {
       seen.add(name);
       const old = legacy.rows.find((r) => !used.has(r) && r.lore === name);
       if (old) used.add(old);
-      out.push(merge(old ?? { lore: name, id: '', name, english: '', aliases: [], legacyEnglish: [], affiliation: '미분류', rosterFor: [], phoneTabs: [], rank: '', department: '', group: '', inFolder: false }, obj(d)));
+      out.push(merge(old ?? { lore: name, id: '', name, english: '', aliases: [], legacyEnglish: [], affiliation: [...placeholderOrgs()][0] ?? '', rosterFor: [], phoneTabs: [], rank: '', department: '', group: '', inFolder: false }, obj(d)));
     }
     for (const r of legacy.rows) if (!used.has(r) && !seen.has(r.lore) && !(members?.agent.length && data)) out.push(r);
     const sorted = ordered(out, Object.keys(saved), legacy.rows.map((r) => r.lore), legacyLore);

@@ -79,6 +79,10 @@ export interface WorldData {
   scenes?: ScenesDefaults;
   /** 부록이 켜지는 조건의 기본값: 부록 이름 → 기본 명부(src/data/install/directory.json)의 「부록」 줄. 옛 팩에는 없다 */
   appendixWhen?: Record<string, Record<string, unknown>>;
+  /** 세력 코드 → 조직 이름 (기본 명부 「조직」의 code). scripts/data-pack.mjs */
+  orgCodes?: Record<string, string>;
+  /** 자리 조직: 명부에는 있고 세계 기록은 없는 조직 (소속 없는 요원용, 「미분류」) */
+  placeholderOrgs?: string[];
 }
 
 export interface SceneDefault {
@@ -93,7 +97,8 @@ export interface ScenesDefaults {
   인물: Record<string, SceneDefault>;
 }
 
-let data: WorldData | null = null;
+/** 시험: npm test 가 tests/world-preload.mjs 로 globalThis 에 세계 자료를 둔다 (시험마다 따로 묶은 모듈도 부팅 뒤와 같은 상태). 본체에서는 없다 */
+let data: WorldData | null = (globalThis as { __goeiWorldData?: WorldData }).__goeiWorldData ?? null;
 
 /** 부팅 때 한 번 (host/datapack.ts loadWorldData → core/datapack.ts applyWorldPack). 시험은 tests/data-init.mjs 가 파일에서 읽어 넣는다 */
 export function setWorldData(d: WorldData): void {
@@ -243,9 +248,9 @@ export function worldRelations(overrides?: WorldOverrides): Relations {
 }
 
 /** 세력 관계도에서 뺀 조직 이름들 */
-/** 명부가 소속 없는 요원에게 붙이는 자리 조직 (directory.ts). 세력이 아니라 관계 표·Faction 요약에 넣지 않는다 */
-export const PLACEHOLDER_ORGS: ReadonlySet<string> = new Set(['미분류']);
-export const excludedOrgs = (orgs: Map<string, WorldRecord>): Set<string> => new Set([...[...orgs.entries()].filter(([, r]) => r.relOff).map(([n]) => n), ...PLACEHOLDER_ORGS]);
+/** 명부가 소속 없는 요원에게 붙이는 자리 조직 (세계 자료 placeholderOrgs, 「미분류」). 세력이 아니라 관계 표·Faction 요약에 넣지 않는다 */
+export const placeholderOrgs = (): ReadonlySet<string> => new Set(data?.placeholderOrgs ?? []);
+export const excludedOrgs = (orgs: Map<string, WorldRecord>): Set<string> => new Set([...[...orgs.entries()].filter(([, r]) => r.relOff).map(([n]) => n), ...placeholderOrgs()]);
 
 /** 뺀 조직이 낀 쌍을 지운 관계 (격자·Faction 목록·평판 시작값이 쓴다) */
 export function filterRelations(rel: Relations, excluded: Set<string>): Relations {
@@ -264,18 +269,18 @@ export const isDefaultRecord = (kind: WorldKind, name: string): boolean => name 
 export const defaultRecord = (kind: WorldKind, name: string): WorldRecord | undefined => DEFAULTS(kind)[name];
 
 // ── 지금 보고 있는 카드의 세계 (가상 로어북을 만들 때 기록해 둔다. 인물 기록의 세력 시작값 등이 읽는다) ──
-/** 기본 세력 코드 → 기본 세계의 조직 이름 (명부를 읽기 전·시험에서도 격자를 코드로 찾을 수 있게) */
-export const BUILTIN_ORG_CODES: Record<string, string> = { A00: '관리국', B00: '가짜 관리국', C00: '백일몽', D00: '민간인', E00: '프리랜서' };
+/** 기본 세력 코드 → 기본 세계의 조직 이름 (세계 자료 orgCodes. 명부를 읽기 전·시험에서도 격자를 코드로 찾을 수 있게) */
+export const worldOrgCodes = (): Record<string, string> => ({ ...(data?.orgCodes ?? {}) });
 /** 아직 카드를 읽기 전(setActiveWorld 전)에는 기본 세계의 관계·기본 코드·기본 머리말 */
 let active: { relations: Relations; orgCodes: Record<string, string>; anomalyNote: string } | null = null;
 export function setActiveWorld(relations: Relations, orgCodes: Record<string, string>, anomalyNote: string = anomalyNoteDefault()): void {
-  active = { relations, orgCodes: { ...BUILTIN_ORG_CODES, ...orgCodes }, anomalyNote };
+  active = { relations, orgCodes: { ...worldOrgCodes(), ...orgCodes }, anomalyNote };
 }
 export const activeRelations = (): Relations => active?.relations ?? DEFAULT_RELATIONS();
 /** 지금 카드의 괴이 공통 머리말 (body.ts 가 괴이 묶음 앞에 한 번 넣는다) */
 export const activeAnomalyNote = (): string => active?.anomalyNote ?? anomalyNoteDefault();
 /** 조직 코드(A00)나 이름 → 격자의 조직 이름 */
-export const activeOrgName = (codeOrName: string): string => (active?.orgCodes ?? BUILTIN_ORG_CODES)[codeOrName] ?? codeOrName;
+export const activeOrgName = (codeOrName: string): string => (active?.orgCodes ?? worldOrgCodes())[codeOrName] ?? codeOrName;
 
 /** 단계 → 평판 시작값 (단계 경계의 가운데: 적대 -80 · 경계 -40 · 중립 0 · 호의 40 · 우호 80) */
 export const STAGE_VALUE: Record<RelationStage, number> = { hostile: -80, wary: -40, neutral: 0, favorable: 40, friendly: 80 };

@@ -3,7 +3,7 @@ import { switchHtml } from '../controls';
 import type { Directory } from '../../core/world/directory';
 import { tokenizerName } from '../../core/tokenizer';
 import { emptyRecord, moveField, moveFieldTo, parseImport, putRecord, recordText, removeRecord, type ImportResult } from '../../core/world/draft';
-import { fieldOrder, fieldValue, isDefaultRecord, PLACEHOLDER_ORGS, worldAnomalyNote, worldRecord, worldRecords, type ExtraField, type WorldOverrides, type WorldRecord } from '../../core/world/records';
+import { fieldOrder, fieldValue, isDefaultRecord, placeholderOrgs, worldAnomalyNote, worldRecord, worldRecords, type ExtraField, type WorldOverrides, type WorldRecord } from '../../core/world/records';
 import { anomalyNoteDefault } from '../../core/world/schema';
 import { agentGroup, orgOf } from '../../core/world/directory';
 import { FIELDS, WORLD_KIND_LABEL, type FieldDef, type WorldKind } from '../../core/world/schema';
@@ -70,7 +70,7 @@ export function rowsOf(ctx: ChatContext, kind: WorldKind, over: WorldOverrides):
   if (kind === 'agent') names.push(...d.agents.map((a) => a.lore));
   else if (kind === 'anomaly') names.push(...d.anomalies.map((p) => p.lore));
   else if (kind === 'site') names.push(...d.sites.map((p) => p.lore));
-  else if (kind === 'org') names.push(...d.orgs.map((o) => o.name).filter((n) => !PLACEHOLDER_ORGS.has(n))); // 「미분류」는 소속 없는 요원(브라우니 등)용 자리 조직이라 목록에 안 보인다 (2026-11-05 사용자)
+  else if (kind === 'org') names.push(...d.orgs.map((o) => o.name).filter((n) => !placeholderOrgs().has(n))); // 「미분류」는 소속 없는 요원(브라우니 등)용 자리 조직이라 목록에 안 보인다 (2026-11-05 사용자)
   else names.push(...d.appendices.map((r) => r.lore));
   for (const n of recs.keys()) if (!names.includes(n)) names.push(n);
   for (const n of Object.keys(bucket)) if (!names.includes(n)) names.push(n);

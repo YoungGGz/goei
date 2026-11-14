@@ -28,7 +28,12 @@ export function worldPackText() {
   out.relations = { pairs: rel.pairs, common: rel.common };
   out.scenes = scenesData();
   // 부록이 켜지는 조건의 기본값 (기본 명부의 「부록」 그대로). 카드 명부에 줄이 없는 부록이 이 값을 쓴다 (src/core/world/directory.ts buildAppendices)
-  out.appendixWhen = readJson('src/data/install/directory.json').부록 ?? {};
+  const dir = readJson('src/data/install/directory.json');
+  out.appendixWhen = dir.부록 ?? {};
+  // 세력 코드 → 조직 이름, 자리 조직(세계 기록이 없는 조직, 「미분류」): 기본 명부(카드 빌드가 씀)의 「조직」 그대로. 코드에 조직 이름을 두지 않는다 (2026-11-15 사용자)
+  const orgs = dir.조직 ?? {};
+  out.orgCodes = Object.fromEntries(Object.entries(orgs).flatMap(([name, o]) => (o?.code ? [[o.code, name]] : [])));
+  out.placeholderOrgs = Object.keys(orgs).filter((name) => !(name in out.org));
   return JSON.stringify(out);
 }
 

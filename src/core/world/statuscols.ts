@@ -3,6 +3,7 @@
 // 칸 구성은 채팅 변수 `$st_col_<id>` (on=사용·표시, hide=사용·숨김, off=미사용), 바뀐 기록은 `$st_col_log` (메시지 N부터 이 칸들).
 // 파서(status.ts)는 지금 칸 구성과 기록된 구성으로 먼저 읽고, 칸 수가 안 맞으면 알려진 모양(6·8·9·10)으로 읽는다.
 import { guideTxt } from '../guides';
+import { activeOrgName } from './records';
 
 export type ColId = 'date' | 'time' | 'weather' | 'temp' | 'place' | 'target' | 'companions' | 'deployed' | 'identity' | 'wallet' | 'points';
 export type ColMode = 'on' | 'hide' | 'off';
@@ -39,10 +40,14 @@ export const COL_LOG_VAR = '$st_col_log';
 export const COL_VAR_RE = /^\$st_col_(date|time|weather|temp|place|target|companions|deployed|identity|wallet|points)$/;
 /** 포인트 칸 「자동」일 때 켜짐 여부 ('1' = 신분이 백일몽). 응답마다 body.ts 가 마지막 신분으로 맞춘다 */
 export const POINTS_ON_VAR = '$st_points_on';
-/** 포인트를 쓰는 조직 (상태창 신분 칸 「조직/직급」의 조직, 시작 소속) */
-export const POINTS_ORG = '백일몽';
-/** 신분·소속 글이 백일몽인가 (「백일몽/사원」「백일몽 주식회사」) */
-export const isPointsOrg = (identity: string) => String(identity ?? '').split(/[/／]/)[0].trim().startsWith(POINTS_ORG);
+/** 포인트를 쓰는 조직: 세력 코드 C00 의 조직 이름 (세계 자료 orgCodes. 상태창 신분 칸 「조직/직급」의 조직, 시작 소속) */
+export const POINTS_FACTION = 'C00';
+export const pointsOrg = (): string => activeOrgName(POINTS_FACTION);
+/** 신분·소속 글이 포인트 조직(백일몽)인가 (「백일몽/사원」「백일몽 주식회사」) */
+export const isPointsOrg = (identity: string): boolean => {
+  const org = pointsOrg();
+  return org !== POINTS_FACTION && String(identity ?? '').split(/[/／]/)[0].trim().startsWith(org);
+};
 /** 포인트 칸만 쓰는 모드: 자동 (사용자가 사용·사용 안 함을 고르기 전 기본) */
 export const AUTO = 'auto';
 /** 자동 + 상태창 상자에서 숨김 */

@@ -3,7 +3,8 @@
 // 무엇이 평판을 바꾸는지는 갱신기 모델이 판단한다 (공식·집단 제한 없음, 사용자 2026-10-26). 코드는 인용·세력당 1건·메시지당 ±10 만 검사.
 import { factionView } from './affinity';
 import { factionBase } from './base';
-import { factionCodesIn, ORG_NAMES } from './identity';
+import { factionCodesIn } from './identity';
+import { activeOrgName, worldOrgCodes } from '../world/records';
 import type { PeopleSettings } from './settings';
 import { FACTION_STAGES, factionWho, type Change, type FactionStage, type PeopleStore } from './types';
 import { guideTxt } from '../guides';
@@ -18,10 +19,10 @@ export function userFactionOf(store: PeopleStore, chat: { scriptstate?: Record<s
 
 /** 아는 세력 코드 전부: 기본 5 + 장부에 있는 것 + 이름표(명부)에 있는 것 */
 export function knownFactionCodes(store: PeopleStore, names: Record<string, string> = {}): string[] {
-  return [...new Set([...Object.keys(ORG_NAMES), ...Object.keys(store.factions), ...Object.keys(names)])];
+  return [...new Set([...Object.keys(worldOrgCodes()), ...Object.keys(store.factions), ...Object.keys(names)])];
 }
 
-export const factionName = (code: string, names: Record<string, string> = {}, store?: PeopleStore): string => names[code] || store?.factions[code]?.name || ORG_NAMES[code] || code;
+export const factionName = (code: string, names: Record<string, string> = {}, store?: PeopleStore): string => names[code] || store?.factions[code]?.name || activeOrgName(code);
 
 /** 세력 하나의 현재값 */
 export function factionNow(store: PeopleStore, code: string, changes: Change[], userFaction: string, settings: PeopleSettings, names: Record<string, string> = {}): FactionNow {

@@ -70,6 +70,9 @@ export function applyWorldPack(text: string): void {
     ...(obj(j.scenes) && obj(j.scenes.세력) && obj(j.scenes.인물) ? { scenes: j.scenes as never } : {}),
     // 부록 조건 기본값 (옛 팩에는 없다)
     ...(obj(j.appendixWhen) ? { appendixWhen: j.appendixWhen as never } : {}),
+    // 세력 코드 → 조직 이름, 자리 조직 (2026-11-15: 코드에 조직 이름을 두지 않는다)
+    ...(obj(j.orgCodes) ? { orgCodes: j.orgCodes as never } : {}),
+    ...(Array.isArray(j.placeholderOrgs) ? { placeholderOrgs: (j.placeholderOrgs as unknown[]).filter((x): x is string => typeof x === 'string') } : {}),
   });
 }
 

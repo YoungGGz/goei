@@ -1,7 +1,7 @@
 // 세력 관계 (2026-10-27 새 레이아웃): 격자 대신 왼쪽에 조직 목록, 오른쪽에 「고른 조직 → 다른 조직」 한 줄씩 단계 고르기.
 // 다른 설정 페이지와 같은 줄 모양(이름 · 조작 · 설명). 「대칭」이 켜져 있으면 반대 방향도 같이. 메모는 기본이 비어 있고 쓴 것만 Faction 표 아래 Notes 로.
 import { switchHtml } from '../controls';
-import { excludedOrgs, filterRelations, PLACEHOLDER_ORGS, RELATION_LABEL, RELATION_STAGES, worldRecord, worldRecords, worldRelations, type RelationCell, type RelationStage, type WorldOverrides } from '../../core/world/records';
+import { excludedOrgs, filterRelations, placeholderOrgs, RELATION_LABEL, RELATION_STAGES, worldRecord, worldRecords, worldRelations, type RelationCell, type RelationStage, type WorldOverrides } from '../../core/world/records';
 import { tokenizerName } from '../../core/tokenizer';
 import { assembleFaction } from '../../core/world/faction';
 import { emptyRecord, putRecord } from '../../core/world/draft';
@@ -45,7 +45,7 @@ export function relationsPage(ctx: ChatContext, over: WorldOverrides, rulesOnly:
   const recs = worldRecords('org', over);
   const excluded = excludedOrgs(recs);
   const rel = filterRelations(worldRelations(over), excluded);
-  const all = d.orgs.map((o) => o).filter((o) => !PLACEHOLDER_ORGS.has(o.name));
+  const all = d.orgs.map((o) => o).filter((o) => !placeholderOrgs().has(o.name));
   const included = all.filter((o) => !excluded.has(o.name));
   if (!relUi.org || !all.some((o) => o.name === relUi.org)) relUi.org = included[0]?.name ?? all[0]?.name ?? '';
   const sel = relUi.org;

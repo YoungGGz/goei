@@ -1,5 +1,6 @@
 // 유저 신분: 상태창 9번째 칸 `조직/직급` → 조직 코드와 직급 사다리 숫자 (docs/필드_대사_설계_결정.md 확정 사다리).
 import type { Identity } from './types';
+import { activeOrgName } from '../world/records';
 
 const ORG_CODES: [RegExp, string][] = [
   [/가짜\s*관리국|fake/i, 'B00'],
@@ -55,8 +56,7 @@ export function parseIdentity(text: string, anchor: string, from: Identity['from
 }
 
 /** 상태창에 넣을 표기 */
-export const identityText = (id: Identity | undefined): string => (id ? `${ORG_NAMES[id.faction] ?? id.faction}/${id.rank || '-'}` : '');
-export const ORG_NAMES: Record<string, string> = { A00: '관리국', B00: '가짜 관리국', C00: '백일몽', D00: '민간인', E00: '프리랜서' };
+export const identityText = (id: Identity | undefined): string => (id ? `${activeOrgName(id.faction)}/${id.rank || '-'}` : '');
 
 /** 유저와 인물의 상하: 같은 조직일 때만 비교. up = 유저가 위 */
 export function relativeRank(user: Identity | undefined, personFaction: string, personLevel: number | null): 'up' | 'peer' | 'down' | 'outsider' {
