@@ -540,7 +540,7 @@ const stageRange = (i: number) => `${i ? STAGES[i - 1].max + 1 : AFF_MIN}~${STAG
 const stageBadge = (value: number) => {
   const st = stageOf(value);
   const idx = STAGES.indexOf(st);
-  return `<span class="gx-badge pp-stage s-${idx}" title="호감 단계 「${esc(st.label)}」 (${stageRange(idx)}). 8단계 중 ${idx + 1}번째, 무관심이 기준">${esc(st.label)}</span>`;
+  return `<span class="gx-badge pp-stage s-${idx}" title="호감 단계 「${esc(st.label)}」 (${stageRange(idx)}). 8단계 중 ${idx + 1}번째, ${esc(STAGES[BASE_STAGE].label)}이 기준">${esc(st.label)}</span>`;
 };
 
 /** 인물 목록 (소속별), 등록 대기, 지금 갱신 */
@@ -641,7 +641,7 @@ function factionBar(value: number, bounds: readonly number[]): string {
   const hi = Math.max(cur, base);
   const ranges = [`${FACTION_MIN}~${bounds[3] - 1}`, `${bounds[3]}~${bounds[2] - 1}`, `${bounds[2]}~${bounds[1] - 1}`, `${bounds[1]}~${bounds[0] - 1}`, `${bounds[0]}~${FACTION_MAX}`];
   const cells = ids.map((id, i) => `<i class="pp-cell${i === base ? ' base' : ''}${i >= lo && i <= hi && i !== base ? (i < base ? ' on neg' : ' on pos') : ''}${i === cur ? ' cur' : ''}" title="${esc(FACTION_STAGES[id].label)} (${ranges[i]}) · ${esc(FACTION_STAGES[id].mob)}"></i>`).join('');
-  return `<div class="pp-aff"><div class="pp-aff-top"><b>${esc(FACTION_STAGES[ids[cur]].label)}</b><span class="pp-aff-num">${value} <small>· 범위 ${FACTION_MIN}~${FACTION_MAX}</small></span></div><div class="pp-cells" role="img" aria-label="세력 평판 ${value}">${cells}</div><div class="pp-aff-ends" aria-hidden="true"><span>적대</span><span>우호</span></div></div>`;
+  return `<div class="pp-aff"><div class="pp-aff-top"><b>${esc(FACTION_STAGES[ids[cur]].label)}</b><span class="pp-aff-num">${value} <small>· 범위 ${FACTION_MIN}~${FACTION_MAX}</small></span></div><div class="pp-cells" role="img" aria-label="세력 평판 ${value}">${cells}</div><div class="pp-aff-ends" aria-hidden="true"><span>${esc(FACTION_STAGES.hostile.label)}</span><span>${esc(FACTION_STAGES.friendly.label)}</span></div></div>`;
 }
 const factionStageId = (value: number, b: readonly number[]) => (value >= b[0] ? 'friendly' : value >= b[1] ? 'favorable' : value >= b[2] ? 'neutral' : value >= b[3] ? 'wary' : 'hostile');
 
@@ -696,7 +696,7 @@ function affinityBar(value: number): string {
     return `<i class="pp-cell s-${i}${i === BASE_STAGE ? ' base' : ''}${fill}${i === idx ? ' cur' : ''}" title="${esc(s.label)} (${stageRange(i)})${i === BASE_STAGE ? ' · 기준' : ''}${i === idx ? ' · 지금' : ''}"></i>`;
   }).join('');
   const num = peopleUi.showNum
-    ? `<span class="pp-aff-num" title="호감 숫자. 범위는 ${AFF_MIN}~${AFF_MAX}, 무관심이 ${stageRange(BASE_STAGE)}">${value} <small>· 범위 ${AFF_MIN}~${AFF_MAX}, 무관심 ${stageRange(BASE_STAGE)}</small></span>`
+    ? `<span class="pp-aff-num" title="호감 숫자. 범위는 ${AFF_MIN}~${AFF_MAX}, ${esc(STAGES[BASE_STAGE].label)}이 ${stageRange(BASE_STAGE)}">${value} <small>· 범위 ${AFF_MIN}~${AFF_MAX}, ${esc(STAGES[BASE_STAGE].label)} ${stageRange(BASE_STAGE)}</small></span>`
     : '';
   return `<div class="pp-aff" data-pp-hold="num"><div class="pp-aff-top"><b title="지금 호감 단계 (${stageRange(idx)}). 계기(작은친절·도움·배신…)가 쌓여 바뀌어요">${esc(st.label)}</b>${num}<button class="ph-tool sm" data-action="pp-num-toggle" title="호감 숫자와 범위 보기" aria-label="호감 숫자와 범위 보기" aria-pressed="${peopleUi.showNum}">${ICONS.info}</button></div>
     <div class="pp-cells" role="img" aria-label="호감 ${value}, ${esc(st.label)}">${cells}</div>

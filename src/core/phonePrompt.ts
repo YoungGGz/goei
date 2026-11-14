@@ -233,7 +233,7 @@ function narrator(src: RefSource, names: Record<string, string>, fn: string, t: 
     else universe.activeLoreBooks.push({ source: r.sources.join(' / '), content: r.content, kind: r.kind });
   }
   return {
-    owner: { name: '주인공', faction, factionDisplayName: names[faction] ?? faction, ...ownerCharacter(src) },
+    owner: { name: guideTxt('Common', 'REFS.USER_NAME'), faction, factionDisplayName: names[faction] ?? faction, ...ownerCharacter(src) },
     recentStory, currentSceneEntries: last ? (last.user ? 1 : 0) + last.char.length : 0, currentSceneTime: phoneTime(src.chat), factionLabels: names, universe,
   };
 }
@@ -447,7 +447,7 @@ export function viewPrompt(src: RefSource, names: Record<string, string>, views:
   const previousRoom = previousView(views, set.preset, fnHistory(src.chat.scriptstate, 'ph', 'view'));
   const owner = ownerCharacter(src).character;
   const body = {
-    viewpoint: { name: set.pov || owner || '주인공', isPhoneOwner: !set.pov || set.pov === owner },
+    viewpoint: { name: set.pov || owner || guideTxt('Common', 'REFS.USER_NAME'), isPhoneOwner: !set.pov || set.pov === owner },
     kind: set.preset,
     ...(previousRoom ? { previousRoom } : {}),
     narratorOnly: narrator(src, names, 'view', fnRefs(src.chat.scriptstate, 'ph', 'view'), `${set.pov}\n${JSON.stringify(previousRoom ?? '')}`),

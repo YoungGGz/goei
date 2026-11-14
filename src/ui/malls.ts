@@ -20,7 +20,7 @@ import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
 import { DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
-import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, mallAutoKey, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
+import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAutoKey, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
 import { SHOP_SIZE_HI, SHOP_SIZE_LO } from '../core/shop';
 import { onOffSwitch } from './controls';
 import { shopSource } from './shop';
@@ -570,7 +570,7 @@ export function deskSource(ctx: ChatContext): DeskSource {
   const vars = ctx.chat.scriptstate;
   const s = mallSettings(vars, 'bm');
   const st = readMall(vars, 'bm', aliveAnchors(ctx.chat));
-  const src = shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: mallVars(vars, 'bm') as typeof ctx.chat.scriptstate } }, { ...st, shop: '백일몽', owner: '' }, s, shopGive(vars, 'bm', 'desk'));
+  const src = shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: mallVars(vars, 'bm') as typeof ctx.chat.scriptstate } }, { ...st, shop: guideTxt('BmDesk', 'SHOP_NAME'), owner: '' }, s, shopGive(vars, 'bm', 'desk'));
   return { refs: src.refs, shelf: onShelf(st).map((x) => guideTxt('BmDesk', 'SHELF_LINE', { name: x.name, price: x.price, desc: x.desc })).join('\n'), points: balanceOf(ctx, 'bm'), nick: loggedNick(ctx), language: src.language };
 }
 
@@ -770,9 +770,9 @@ function cosAsk(ctx: ChatContext, st: ShopState, v: View, mobile: boolean): stri
   const chip = st.items.find((x) => x.id === v.chip && !x.sold);
   const orders = liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat));
   const log = st.talk.length
-    ? st.talk.map((l) => (l.who === 'me' ? `<div class="q-m q-me"><b>나</b><p>${esc(l.text)}</p></div>` : `<div class="q-m q-op"><b>운영자</b><p>${opText(l.text, st)}</p>${noteCard(st, l.note, v)}${quoteCard(st, l.quote, v, orders)}</div>`)).join('')
-    : '<div class="q-m q-op"><b>운영자</b><p>안녕하신가! 무엇을 도울까, 만일 상품을 물어보면 붙여라 그것을 여기에.</p></div>';
-  const wait = v.loading === 'talk' ? '<div class="q-m q-op q-wait"><b>운영자</b><p>운영자가 입력하는 중…</p></div>' : '';
+    ? st.talk.map((l) => (l.who === 'me' ? `<div class="q-m q-me"><b>나</b><p>${esc(l.text)}</p></div>` : `<div class="q-m q-op"><b>${esc(MALL_OWNER.cos)}</b><p>${opText(l.text, st)}</p>${noteCard(st, l.note, v)}${quoteCard(st, l.quote, v, orders)}</div>`)).join('')
+    : `<div class="q-m q-op"><b>${esc(MALL_OWNER.cos)}</b><p>안녕하신가! 무엇을 도울까, 만일 상품을 물어보면 붙여라 그것을 여기에.</p></div>`;
+  const wait = v.loading === 'talk' ? `<div class="q-m q-op q-wait"><b>${esc(MALL_OWNER.cos)}</b><p>운영자가 입력하는 중…</p></div>` : '';
   const pickList = v.picking ? `<div class="q-pick">${onShelf(st).map((x) => `<button data-action="mall-chip" data-value="${esc(x.id)}">${esc(x.name)} <b>${won(x.price)}</b></button>`).join('') || '<p>없다 붙일 상품.</p>'}</div>` : '';
   // 상담원: 내 물건 팔기 — 소지품 목록(장착한 것 포함)에서 고른다
   const mine: Item[] = v.selling ? liveItemsOf(readItems(ctx.chat.scriptstate), ctx.chat) : [];
@@ -781,7 +781,7 @@ function cosAsk(ctx: ChatContext, st: ShopState, v: View, mobile: boolean): stri
   const offered = !!o && typeof o.price === 'number';
   const sellCard = o ? `<div class="q-card q-sell"><i class="q-th">${itemPic({ name: o.name, icon: o.icon })}</i><span>파는 물건</span><b>${esc(o.name)}</b>${o.paid !== undefined ? `<small>산 값 ${won(o.paid)}</small>` : ''}<em>${offered ? `우리의 값 ${o.first !== undefined ? `<s>${won(o.first)}</s> ` : ''}${won(o.price as number)}` : o.price === null ? '우리는 사지 않는다' : '값을 아직 말하지 않았다'}</em>${offered ? `<button class="cs-btn" data-action="mall-sell"${v.loading ? ' disabled' : ''}>판매</button>` : ''}<button class="q-x" data-action="mall-sell-cancel" aria-label="그만">×</button></div>` : '';
   return `<div class="cs-win cs-askwin" role="dialog" aria-label="운영자에게 질문"${at}><div class="cs-wt"><b>★ 운영자에게 질문 ★ - Netscape</b><button data-action="mall-ask-close" aria-label="닫기">×</button></div>
-    <div class="q-hd">${ufo}<div><b>운영자</b><small>● 운영자 여기에 있음, 지금</small></div></div>
+    <div class="q-hd">${ufo}<div><b>${esc(MALL_OWNER.cos)}</b><small>● 운영자 여기에 있음, 지금</small></div></div>
     <div class="q-lg" data-chatlog="cos">${log}${wait}</div>${failBox(v, 'q-fail')}${pickList}${sellList}${sellCard}${chip ? `<div class="q-card"><i class="q-th">${pic(chip)}</i><span>붙인 상품</span><button class="cs-ln" data-action="mall-show" data-value="${esc(chip.id)}">${esc(chip.name)} <b>${won(chip.price)}</b></button><button class="q-x" data-action="mall-chip" data-value="" aria-label="상품 떼기">×</button></div>` : ''}
     <div class="q-in"><button class="cs-btn" data-action="mall-pick" aria-pressed="${v.picking}">상품 붙이기</button><button class="cs-btn" data-action="mall-sell-open" aria-pressed="${v.selling}">내 물건 팔기</button><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${o ? (offered ? '값을 다시 불러 보거나 그냥 팔아라' : '값을 부르거나 그냥 보내라') : '넣어라 질문, 여기에'}" aria-label="질문"${v.loading ? ' disabled' : ''}><button class="cs-btn" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, !!v.loading || !st.loaded)}>전송</button></div><i class="cs-rs" aria-hidden="true"></i></div>`;
 }
@@ -813,11 +813,11 @@ function cosHtml(ctx: ChatContext, mobile: boolean): string {
   const how = `<div class="cs-how"><b>◈ 구매의 방법 ◈</b><br>1. 상품을 장바구니에 담는다 &nbsp; 2. 아래 계좌로 입금한다 &nbsp; 3. 입금이 확인되면 상품은 즉시 간다<br>입금 계좌 : <b>${esc(COS_ACCOUNT)}</b><br><span class="cs-red">※ 환불의 존재는 없다. 반품 또한 그렇다.</span><br>질문이 있으면 <button class="cs-ln" data-action="mall-ask" data-value="">운영자에게 질문</button> 해라.</div>`;
   const head = `<div class="cs-title">${mobile ? '' : ufo} Cosmic Shopping Mall ${mobile ? '' : ufo.replace('cs-ufo', 'cs-ufo cs-flip')}</div><div class="cs-subt">※우주에서 온 굉장한 상품※</div><hr class="cs-rb">
     <div class="cs-mq"><span>☆ 어서 와라 ☆★ 물건을 보겠습니다 ★☆ 입금 확인되면 상품 간다, 즉시 ★☆ 환불 다음 기회 ☆</span></div>
-    <div class="cs-wel"><p><span>안녕하신가! 굉장하고 강한 상품, 만일 우리에게 물어보면 우리는 <b>우주 쇼핑몰</b>.</span> <span>모든 상품 <b>진짜</b>, 그러나 사용의 결과 우리의 <b>책임 아님</b>.</span>${note ? '' : ' <span class="blink">NEW!!</span>'}</p>${note ? `<p><span class="cs-op">운영자 :</span> ${opText(note, st)} <span class="blink">NEW!!</span></p>` : ''}</div>`;
+    <div class="cs-wel"><p><span>안녕하신가! 굉장하고 강한 상품, 만일 우리에게 물어보면 우리는 <b>${esc(MALL_NAME.cos)}</b>.</span> <span>모든 상품 <b>진짜</b>, 그러나 사용의 결과 우리의 <b>책임 아님</b>.</span>${note ? '' : ' <span class="blink">NEW!!</span>'}</p>${note ? `<p><span class="cs-op">${esc(MALL_OWNER.cos)} :</span> ${opText(note, st)} <span class="blink">NEW!!</span></p>` : ''}</div>`;
   const info = v.info ? `<div class="cs-info" role="status">${esc(v.info)}</div>` : '';
   const side = mobile
     ? `<nav class="cs-top">${menu}</nav>`
-    : `<nav class="cs-lf"><div class="cs-lt">★우주 쇼핑몰★</div>${ufo.replace('cs-ufo', 'cs-ufo cs-big')}${menu}<hr class="cs-rb"><div class="cs-cnt">TOTAL <span>${String(st.items.length + st.talk.length + 700).padStart(6, '0')}</span></div><small>800×600 해상도를<br>권장 합니다</small></nav>`;
+    : `<nav class="cs-lf"><div class="cs-lt">★${esc(MALL_NAME.cos)}★</div>${ufo.replace('cs-ufo', 'cs-ufo cs-big')}${menu}<hr class="cs-rb"><div class="cs-cnt">TOTAL <span>${String(st.items.length + st.talk.length + 700).padStart(6, '0')}</span></div><small>800×600 해상도를<br>권장 합니다</small></nav>`;
   return `<main class="ms ms-cos${mobile ? ' ms-m' : ''}"><div class="cs-fr">${side}<div class="cs-mn">${head}${info}${failBox(v, 'cs-fail')}${main}${how}<div class="cs-ft">Copyright ⓒ 1997 Cosmic Shopping Mall. All rights reserved.<br>이 페이지는 <span>Netscape Now!</span> 에서 가장 좋게 보입니다 · 웹 관리자 : 운영자</div></div></div>${v.ask ? cosAsk(ctx, st, v, mobile) : ''}${v.pay ? cosPay(st, v, bal) : ''}</main>`;
 }
 
@@ -844,7 +844,7 @@ function bmHtml(ctx: ChatContext, mobile: boolean): string {
   const list = onShelf(st);
   const gnb = `<div class="bp-gnb"><b>백일몽 사내망</b><span>공지</span><span>포인트몰</span>${mobile ? '' : '<span class="r">보안 등급 C · 외부 반출 금지</span>'}</div>`;
   const me = nick ? `<div class="bp-me"><b>${esc(nick)}</b><div class="bp-pt"><small>보유 포인트</small>${pts(bal)}</div></div>` : '<button class="bp-login" data-action="br-login">로그인</button>';
-  const hd = `<div class="bp-hd"><span class="bp-lg">${siteLogo('bm', 'bp-logo')}백일몽 포인트몰<small>임직원 복지</small></span>${me}</div>`;
+  const hd = `<div class="bp-hd"><span class="bp-lg">${siteLogo('bm', 'bp-logo')}${esc(MALL_NAME.bm)}<small>임직원 복지</small></span>${me}</div>`;
   let body: string;
   if (!s.on) body = '<div class="bp-box">소지품·가계부가 꺼져 있어 이용할 수 없습니다.</div>';
   else if (!nick) body = '<div class="bp-box bp-need"><b>로그인이 필요합니다</b><p>포인트몰은 임직원 계정으로 로그인한 뒤 이용할 수 있습니다.</p><button class="bp-buy" data-action="br-login">로그인</button></div>';
@@ -872,7 +872,7 @@ function bmDesk(ctx: ChatContext, v: View, mobile: boolean): string {
   const at = mobile ? '' : winStyle(v.win);
   const busy = !!v.dl;
   const badge = a
-    ? `<div class="bd-badge"><i aria-hidden="true">${esc(deskTag(a).slice(-2))}</i><div><small>백일몽 포인트몰</small><b>${esc(deskTag(a))}</b><span>임직원 복지 상담</span></div></div>`
+    ? `<div class="bd-badge"><i aria-hidden="true">${esc(deskTag(a).slice(-2))}</i><div><small>${esc(MALL_NAME.bm)}</small><b>${esc(deskTag(a))}</b><span>임직원 복지 상담</span></div></div>`
     : `<div class="bd-badge bd-wait"><i aria-hidden="true">…</i><div><small>백일몽 주식회사</small><b>${v.dl === 'make' ? '상담원 연결 중…' : '연결된 상담원 없음'}</b></div></div>`;
   const line = (l: { who: string; text: string }) => (l.who === 'sys'
     ? `<div class="bd-sys">${esc(l.text)}</div>`
@@ -880,7 +880,7 @@ function bmDesk(ctx: ChatContext, v: View, mobile: boolean): string {
   const wait = v.dl === 'make' ? '<div class="bd-sys">상담원을 연결하고 있습니다…</div>' : v.dl === 'talk' ? `<div class="bd-m bd-op bd-typing"><small>${esc(a ? deskTag(a) : '상담원')}</small><p>입력 중…</p></div>` : '';
   const log = `${d.talk.map(line).join('')}${wait}`;
   const tools = `<div class="bd-tools"><button data-action="mall-desk-next"${busy ? ' disabled' : ''}>다른 상담사 연결</button><button data-action="mall-desk-end"${busy || !a ? ' disabled' : ''}>상담 종료</button></div>`;
-  return `<div class="bd-win" role="dialog" aria-label="1:1 상담"${at}><div class="bd-wt"><b>1:1 상담</b><span>백일몽 포인트몰</span><button data-action="mall-ask-close" aria-label="닫기">×</button></div>
+  return `<div class="bd-win" role="dialog" aria-label="1:1 상담"${at}><div class="bd-wt"><b>1:1 상담</b><span>${esc(MALL_NAME.bm)}</span><button data-action="mall-ask-close" aria-label="닫기">×</button></div>
     <div class="bd-hd">${badge}${tools}</div>
     <div class="bd-lg"><div>${log}</div></div>${failBox(v, 'bp-fail bd-fail')}
     <div class="bd-in"><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${a ? '메시지를 입력하세요' : '상담사가 연결되면 입력할 수 있습니다'}" aria-label="메시지"${busy || !a ? ' disabled' : ''}><button class="bp-buy" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, busy || !a)}>전송</button></div>${mobile ? '' : '<i class="bd-rs" aria-hidden="true"></i>'}</div>`;

@@ -252,3 +252,23 @@ Alright, Freya. For now, let's just get the wiki articles moving. At this rate, 
 @@SECTION MAIN_CONTEXT.CUT
 …(이하 생략)
 @@END
+
+@@SECTION NW.ERR_EMPTY
+모델이 빈 응답을 보냈어요.
+@@END
+
+@@SECTION NW.ERR_UNCLOSED
+문서가 끝까지 오지 않았어요 (닫는 태그 없음). 응답 길이 한도에 걸렸을 수 있어요. 분량을 줄이거나 다시 시도해 주세요.
+@@END
+
+@@SECTION NW.ERR_FORMAT
+위키 형식(<lightboard-namuwiki>)이 아닌 응답이에요.
+@@END
+
+@@SECTION NW.ERR_NO_PARAGRAPH
+본문 문단([Paragraph])이 없는 응답이에요.
+@@END
+
+@@SECTION NW.ERR_TITLE_NOT_CANDIDATE
+후보에 없는 제목이에요: {title}
+@@END

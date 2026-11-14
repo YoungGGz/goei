@@ -358,6 +358,8 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
 export const signalStateNote = (): string => guideTxt('UpdaterExtra', 'SIGNAL_STATE');
 /** 추적 인물 검토 규칙 (tracking_review.rule) */
 export const trackingRule = (): string => guideTxt('UpdaterExtra', 'TRACKING_RULE');
+/** 지운 항목(remove)을 기록에 남길 때 본문 앞에 붙이는 말 (화면·다음 요청 자료에 같이 보임) */
+const resolvedPrefix = (): string => guideTxt('UpdaterExtra', 'ENTRY.RESOLVED');
 /** 고쳐 둔 갱신기 지침에 상점 절이 없을 때 덧붙이는 출력 칸 안내 (host/people.ts updaterSystem) */
 export const shopKeyLine = (): string => guideTxt('UpdaterExtra', 'SHOP_KEY');
 
@@ -452,14 +454,15 @@ export function parseUpdate(raw: string): UpdateResult {
   if (fence) t = fence[1].trim();
   const a = t.indexOf('{');
   const b = t.lastIndexOf('}');
-  if (a < 0 || b <= a) throw new Error('JSON 객체가 없어요');
+  // 오류 글은 다시 묻기 요청({reason})과 화면에 같이 간다: 지침 「갱신기(덧붙임)」 ERR.* 절
+  if (a < 0 || b <= a) throw new Error(guideTxt('UpdaterExtra', 'ERR.NO_JSON'));
   const v = JSON.parse(t.slice(a, b + 1)) as unknown;
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('JSON 객체가 아니에요');
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(guideTxt('UpdaterExtra', 'ERR.NOT_OBJECT'));
   const r = v as UpdateResult;
   for (const k of ['entries', 'cues', 'address', 'new_people', 'docs', 'suspicion', 'next_note', 'taste', 'openness', 'faction_cues', 'faction_stance', 'transactions', 'point_transactions', 'items', 'observations', 'axes_init', 'sexual_init', 'issues'] as const) {
     // null 은 빈 목록으로 받는다 (응답 전체를 버리지 않게, 전수검사 11-13). 글·객체는 그대로 오류
     if (r[k] === null) delete (r as Record<string, unknown>)[k];
-    if (r[k] !== undefined && !Array.isArray(r[k])) throw new Error(`${k}는 목록이어야 해요`);
+    if (r[k] !== undefined && !Array.isArray(r[k])) throw new Error(guideTxt('UpdaterExtra', 'ERR.NOT_LIST', { key: k }));
   }
   return r;
 }
@@ -732,7 +735,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       // 낱말 검사는 뺐다: 인용이 실제 메시지에 있으면 바로 해소 (전수검사 11-13, 사용자 12-1)
       // 삭제 = 빈 텍스트로 대체하는 항목 (대체 항목이 죽으면 이전 항목이 돌아온다)
       const seq = nextSeq(ev.anchor);
-      putEntry(store, who, slot, { id: entryId(who, slot, ev.anchor, seq, `-${target.id}`), text: `(해소) ${target.text}`.slice(0, 200), src: 'story', anchor: ev.anchor, seq, quote: e.quote, replaces: target.id, ...(target.target ? { target: target.target } : {}) });
+      putEntry(store, who, slot, { id: entryId(who, slot, ev.anchor, seq, `-${target.id}`), text: `${resolvedPrefix()} ${target.text}`.slice(0, 200), src: 'story', anchor: ev.anchor, seq, quote: e.quote, replaces: target.id, ...(target.target ? { target: target.target } : {}) });
       report.applied.entries++;
       continue;
     }
@@ -1136,7 +1139,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       continue;
     }
     const seq = nextSeq(ev.anchor);
-    const body = dop === 'remove' ? `(해소) ${cur.find((x) => x.id === replaces)!.text}`.slice(0, 200) : text;
+    const body = dop === 'remove' ? `${resolvedPrefix()} ${cur.find((x) => x.id === replaces)!.text}`.slice(0, 200) : text;
     if (putDoc(store, type, key, { id: entryId(`${type}:${key}`, 'doc', ev.anchor, seq, body), text: body, src: 'story', anchor: ev.anchor, seq, ...(norm(str(d.quote)).length >= 3 ? { quote: d.quote } : {}), ...(replaces ? { replaces } : {}), ...(d.date ? { date: plain(d.date, 20) } : {}), ...(d.place ? { place: plain(d.place, 40) } : {}), ...(Array.isArray(d.who) ? { who: d.who.map((w) => plain(w, 30)).filter(Boolean).slice(0, 8) } : {}) })) report.applied.docs++;
   }
 
@@ -1276,7 +1279,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         drop('wallet', t, '인용에 금액이 없음');
         continue;
       }
-      const memo = plain(t.memo, 30) || (amount < 0 ? '지출' : '수입');
+      const memo = plain(t.memo, 30) || guideTxt('UpdaterExtra', amount < 0 ? 'WALLET.MEMO.OUT' : 'WALLET.MEMO.IN');
       const key = `${ev.anchor}|${amount}|${memo}`;
       if (seen.has(key)) {
         drop('wallet', t, '같은 거래 중복');
@@ -1306,7 +1309,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         drop('points', t, '인용에 포인트가 없음');
         continue;
       }
-      const memo = plain(t.memo, 30) || (amount < 0 ? '사용' : '지급');
+      const memo = plain(t.memo, 30) || guideTxt('UpdaterExtra', amount < 0 ? 'POINTS.MEMO.OUT' : 'POINTS.MEMO.IN');
       const key = `${ev.anchor}|${amount}|${memo}`;
       if (seen.has(key)) {
         drop('points', t, '같은 거래 중복');

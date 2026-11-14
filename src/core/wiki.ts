@@ -319,14 +319,15 @@ const ARROW = /➡️|➡︎|➡/g;
 /** 응답에서 문서 블록만 꺼내고, 제목을 고정하고, 잘못된 링크 표시를 지운다 */
 export function acceptArticle(raw: string, title: string, canon: (t: string) => string): string {
   const text = raw.trim();
-  if (!text) throw new WikiError('모델이 빈 응답을 보냈어요.');
+  // 형식 오류 글(다시 묻기에 그대로 들어감)은 지침 「괴이위키」 NW.ERR_* 절
+  if (!text) throw new WikiError(guideTxt('Wiki', 'NW.ERR_EMPTY'));
   const m = /<lightboard-namuwiki[\s>][\s\S]*?<\/lightboard-namuwiki>/.exec(text);
   if (!m) {
-    if (/<lightboard-namuwiki[\s>]/.test(text)) throw new WikiError('문서가 끝까지 오지 않았어요 (닫는 태그 없음). 응답 길이 한도에 걸렸을 수 있어요. 분량을 줄이거나 다시 시도해 주세요.');
-    throw new WikiError('위키 형식(<lightboard-namuwiki>)이 아닌 응답이에요.');
+    if (/<lightboard-namuwiki[\s>]/.test(text)) throw new WikiError(guideTxt('Wiki', 'NW.ERR_UNCLOSED'));
+    throw new WikiError(guideTxt('Wiki', 'NW.ERR_FORMAT'));
   }
   let body = m[0];
-  if (!body.includes('[Paragraph]')) throw new WikiError('본문 문단([Paragraph])이 없는 응답이에요.');
+  if (!body.includes('[Paragraph]')) throw new WikiError(guideTxt('Wiki', 'NW.ERR_NO_PARAGRAPH'));
   body = body.replace(ARROW, '➡️').replace(/\{\{/g, '&#123;&#123;').replace(/\}\}/g, '&#125;&#125;');
   const safeTitle = title.replace(/"/g, '&quot;');
   body = body.replace(/^<lightboard-namuwiki([^>]*)>/, (_all, attrs: string) => {
@@ -633,6 +634,6 @@ export function acceptTitle(raw: string, candidates: string[]): string {
   }
   if (!title) title = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0].trim();
   const hit = candidates.find((c) => c === title) ?? candidates.find((c) => c.includes(title) || title.includes(c));
-  if (!hit) throw new WikiError(`후보에 없는 제목이에요: ${title.slice(0, 40)}`);
+  if (!hit) throw new WikiError(guideTxt('Wiki', 'NW.ERR_TITLE_NOT_CANDIDATE', { title: title.slice(0, 40) }));
   return hit;
 }

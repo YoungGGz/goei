@@ -109,7 +109,8 @@ function jsonOf(raw: string): Record<string, unknown> {
   if (fence) t = fence[1].trim();
   const a = t.indexOf('{');
   const b = t.lastIndexOf('}');
-  if (a < 0 || b <= a) throw new Error('JSON 객체가 없어요');
+  // 검증 오류 글은 고침 요청(REPAIR 절의 {error})과 진단 화면에 같이 간다: 지침 「Director」 ERR.* 절
+  if (a < 0 || b <= a) throw new Error(guideTxt('Director', 'ERR.NO_JSON'));
   return JSON.parse(t.slice(a, b + 1)) as Record<string, unknown>;
 }
 
@@ -120,7 +121,7 @@ export function parseDirectorAny(raw: string, people: string[], scene: boolean, 
   // 빈 need 는 없는 것으로 친다. need 와 notes 가 같이 오면 2차·검색 요청이 비었을 때 notes 를 쓴다 (전수검사 11-13)
   const hasNotes = Array.isArray(v.notes);
   if (Array.isArray(v.need) && v.need.length && !(hasNotes && !allowSearch)) {
-    if (!allowSearch) throw new Error('2차에서는 검색을 요청할 수 없어요');
+    if (!allowSearch) throw new Error(guideTxt('Director', 'ERR.SEARCH_IN_PASS2'));
     const need: DirectorSearch[] = [];
     for (const x of v.need as Record<string, unknown>[]) {
       const kind = KINDS.includes(x?.kind as SearchKind) ? (x.kind as SearchKind) : null;
@@ -130,9 +131,9 @@ export function parseDirectorAny(raw: string, people: string[], scene: boolean, 
       if (need.length >= SEARCH_MAX) break;
     }
     if (need.length) return { need };
-    if (!hasNotes) throw new Error('검색 요청이 비어 있어요');
+    if (!hasNotes) throw new Error(guideTxt('Director', 'ERR.EMPTY_NEED'));
   }
-  if (!Array.isArray(v.notes)) throw new Error('notes 목록이 없어요');
+  if (!Array.isArray(v.notes)) throw new Error(guideTxt('Director', 'ERR.NO_NOTES'));
   const out: DirectorNote[] = [];
   for (const n of v.notes as Record<string, unknown>[]) {
     const who = typeof n?.who === 'string' ? n.who : '';

@@ -276,3 +276,7 @@ Item {n} — {unit}: {genre} | VALUE TIER: {tier} ({desc}), price {price} | ROLE
 고가|rare company product — strong, regulated, limited|1000|2999|1
 최고가|top-grade company asset — life-saving or coveted|3000|9999|1
 @@END
+
+@@SECTION MALL_NAME
+백일몽 포인트몰
+@@END

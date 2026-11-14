@@ -216,15 +216,9 @@ export const AXES = ['relationalInitiative', 'expressionDirectness', 'emotionalE
 export type Axis = (typeof AXES)[number];
 export type Axes = Record<Axis, number>;
 export const AXIS_LABEL: Record<Axis, string> = { relationalInitiative: '관계 주도성', expressionDirectness: '표현 직접성', emotionalExpressiveness: '감정 표출성', guardedness: '경계 성향', impulsivity: '충동성', relationshipPersistence: '관계 지속성' };
-/** 0~20 / ~40 / ~60 / ~80 / ~100 띠 설명 (리수폿 원문). 본편 영어 이름·띠 글은 지침 「Main」 PEOPLE.AXIS_LABEL.<축> · PEOPLE.AXIS.<축>.<띠> 절 */
-export const AXIS_BANDS: Record<Axis, string[]> = {
-  relationalInitiative: ['관계를 거의 먼저 시작하지 않음', '상대가 이끌 때 주로 반응함', '상황에 따라 주도와 반응을 오감', '필요하면 먼저 다가가 관계를 이끔', '지속적으로 관계의 방향을 주도함'],
-  expressionDirectness: ['뜻을 거의 직접 말하지 않음', '돌려 말하거나 암시를 선호함', '상황에 따라 직접성과 완곡함을 조절함', '의도와 요구를 비교적 분명히 말함', '생각과 의도를 매우 직접적으로 표현함'],
-  emotionalExpressiveness: ['감정을 거의 겉으로 드러내지 않음', '감정 단서가 작고 제한적임', '상황에 따라 감정을 보이거나 감춤', '감정이 말과 행동에 자주 드러남', '감정을 매우 선명하고 즉각적으로 표출함'],
-  guardedness: ['타인을 쉽게 믿고 경계를 거의 세우지 않음', '초기 경계가 낮고 비교적 빨리 마음을 엶', '신뢰와 경계를 상황에 맞춰 조절함', '쉽게 속내를 보이지 않고 경계를 유지함', '강한 경계로 접근과 자기 공개를 엄격히 제한함'],
-  impulsivity: ['충동을 강하게 억제하고 숙고함', '대체로 생각한 뒤 행동함', '상황에 따라 숙고와 즉흥 행동이 섞임', '감정과 욕구에 따라 빠르게 행동함', '결과를 따지기 전에 매우 충동적으로 행동함'],
-  relationshipPersistence: ['관계를 쉽게 놓고 오래 유지하려 하지 않음', '갈등이나 거리가 생기면 물러나기 쉬움', '관계 가치에 따라 유지 여부를 판단함', '어려움이 있어도 관계를 오래 지키려 함', '관계를 매우 끈질기게 유지하고 회복하려 함'],
-};
+/** 0~20 / ~40 / ~60 / ~80 / ~100 띠 설명 (리수폿 원문, 한국어). 화면과 갱신기 자료(axes[].band)가 같이 쓴다: 지침 「갱신기(덧붙임)」 AXES.BAND.<축>.<띠> 절 (2026-11-15).
+ *  본편 영어 이름·띠 글은 지침 「Main」 PEOPLE.AXIS_LABEL.<축> · PEOPLE.AXIS.<축>.<띠> 절 */
+export const axisBandText = (axis: Axis, band: number): string => guideTxt('UpdaterExtra', `AXES.BAND.${axis}.${band}`);
 export const DEFAULT_AXES = (): Axes => ({ relationalInitiative: 50, expressionDirectness: 50, emotionalExpressiveness: 50, guardedness: 50, impulsivity: 50, relationshipPersistence: 50 });
 export const axisBand = (value: number): number => (value <= 20 ? 0 : value <= 40 ? 1 : value <= 60 ? 2 : value <= 80 ? 3 : 4);
 /** 감정 표출성 축 → 표현 정도 0~3 (옛 express) */
@@ -324,22 +318,24 @@ export interface PeopleStore {
 
 export const emptyStore = (): PeopleStore => ({ schema: 1, people: {}, factions: {}, docs: {}, log: [], folded: {}, read: {}, pending: {}, ignored: [] });
 
-/** 호감 8단계 (리수폿). 상한은 「이하」. 본편에 넣는 행동 글은 지침 「Main」 PEOPLE.AFFINITY.<번호> 절 */
+/** 호감 8단계 (리수폿). 상한은 「이하」. 단계 이름은 화면·본편·갱신기·Director 가 같이 쓴다: 지침 「Main」 PEOPLE.STAGE.<번호> 절 (2026-11-15).
+ *  본편에 넣는 행동 글은 지침 「Main」 PEOPLE.AFFINITY.<번호> 절 */
 export interface Stage {
   max: number;
-  label: string;
+  readonly label: string;
   /** 필드 대사 칸 */
   cell: 'hostile' | 'base' | 'warm' | 'close';
 }
+const affStage = (i: number, max: number, cell: Stage['cell']): Stage => ({ max, get label() { return guideTxt('Main', `PEOPLE.STAGE.${i}`); }, cell });
 export const STAGES: Stage[] = [
-  { max: -71, label: '극도의 적대', cell: 'hostile' },
-  { max: -31, label: '적대', cell: 'hostile' },
-  { max: -1, label: '혐오', cell: 'hostile' },
-  { max: 60, label: '무관심', cell: 'base' },
-  { max: 120, label: '인식', cell: 'warm' },
-  { max: 180, label: '관심', cell: 'warm' },
-  { max: 240, label: '끌림', cell: 'close' },
-  { max: 300, label: '애정', cell: 'close' },
+  affStage(0, -71, 'hostile'),
+  affStage(1, -31, 'hostile'),
+  affStage(2, -1, 'hostile'),
+  affStage(3, 60, 'base'),
+  affStage(4, 120, 'warm'),
+  affStage(5, 180, 'warm'),
+  affStage(6, 240, 'close'),
+  affStage(7, 300, 'close'),
 ];
 export function stageOf(value: number): Stage {
   for (const s of STAGES) if (value <= s.max) return s;
@@ -400,14 +396,15 @@ export const FACTION_MAX = 100;
 /** 구간 경계 (설정): [우호 하한, 호의 하한, 중립 하한, 경계 하한]. 그 아래는 적대 */
 export const FACTION_BOUNDS_DEFAULT: [number, number, number, number] = [61, 21, -20, -60];
 export type FactionStageId = 'friendly' | 'favorable' | 'neutral' | 'wary' | 'hostile';
-/** 본편 행동 글은 지침 「Main」 FACTION.STAGE.<id> 절 */
-export interface FactionStage { id: FactionStageId; label: string; mob: string }
+/** 본편 행동 글은 지침 「Main」 FACTION.STAGE.<id> 절. 단계 이름(label)은 화면·갱신기·본편이 같이 쓴다: 지침 「Main」 FACTION.LABEL.<id> 절 (2026-11-15) */
+export interface FactionStage { id: FactionStageId; readonly label: string; mob: string }
+const facStage = (id: FactionStageId, mob: string): FactionStage => ({ id, get label() { return guideTxt('Main', `FACTION.LABEL.${id}`); }, mob });
 export const FACTION_STAGES: Record<FactionStageId, FactionStage> = {
-  friendly: { id: 'friendly', label: '우호', mob: '반기고, 싸움에서 편들어 줌' },
-  favorable: { id: 'favorable', label: '호의', mob: '인사하고 길을 비켜 줌' },
-  neutral: { id: 'neutral', label: '중립', mob: '무시' },
-  wary: { id: 'wary', label: '경계', mob: '지켜봄. 자기 구역에서는 경고·쫓아냄' },
-  hostile: { id: 'hostile', label: '적대', mob: '보자마자 공격' },
+  friendly: facStage('friendly', '반기고, 싸움에서 편들어 줌'),
+  favorable: facStage('favorable', '인사하고 길을 비켜 줌'),
+  neutral: facStage('neutral', '무시'),
+  wary: facStage('wary', '지켜봄. 자기 구역에서는 경고·쫓아냄'),
+  hostile: facStage('hostile', '보자마자 공격'),
 };
 export function factionStage(value: number, bounds: readonly number[] = FACTION_BOUNDS_DEFAULT): FactionStage {
   const [a, b, c, d] = bounds;

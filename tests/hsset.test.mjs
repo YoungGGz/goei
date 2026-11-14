@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { homeshop, hslog, hsset, settings } from '../dist-test/core.mjs';
-const { hsSettings, HS_NUM, HS_KEY, HS_READ_DEFAULT, HS_FORMS_DEFAULT, HS_VAR, HS_AT_VAR, HS_ORDERS_VAR, HS_AUD_VAR } = homeshop;
+const { hsSettings, HS_NUM, HS_KEY, HS_READ_DEFAULT, hsFormsDefault, HS_VAR, HS_AT_VAR, HS_ORDERS_VAR, HS_AUD_VAR } = homeshop;
 const { HOMESHOP_SET, HS_PAIRS, HS_DEF_TEXT, hsRowVars, HS_TEL_KEY, HS_RETRY_KEY } = hsset;
 const rows = HOMESHOP_SET.groups.flatMap((g) => g.rows);
 
@@ -37,7 +37,7 @@ test('망상홈쇼핑 설정: 기본값·범위 (넘김 문서 2절)', () => {
   assert.deepEqual(s.read, ['고개 꺾기', '굳은 응시']);
   assert.equal(HS_READ_DEFAULT, '고개 꺾기, 굳은 응시');
   assert.deepEqual(HS_DEF_TEXT.read, [HS_KEY.read, HS_READ_DEFAULT, 200]);
-  assert.deepEqual(HS_DEF_TEXT.forms, [HS_KEY.forms, HS_FORMS_DEFAULT, 200]);
+  assert.deepEqual(HS_DEF_TEXT.forms, [HS_KEY.forms, hsFormsDefault(), 200]);
   // 줄의 조작 범위는 HS_NUM 그대로
   for (const r of rows) {
     if (r.ctl.t === 'num') assert.deepEqual([r.ctl.lo, r.ctl.hi, r.ctl.unit], [HS_NUM[r.key].lo, HS_NUM[r.key].hi, HS_NUM[r.key].unit], r.key);

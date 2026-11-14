@@ -118,3 +118,19 @@ Must not reveal: {text}
 @@SECTION MAIN_NOTE.UNCERTAIN
 Uncertain: {text}
 @@END
+
+@@SECTION ERR.NO_JSON
+JSON 객체가 없어요
+@@END
+
+@@SECTION ERR.SEARCH_IN_PASS2
+2차에서는 검색을 요청할 수 없어요
+@@END
+
+@@SECTION ERR.EMPTY_NEED
+검색 요청이 비어 있어요
+@@END
+
+@@SECTION ERR.NO_NOTES
+notes 목록이 없어요
+@@END

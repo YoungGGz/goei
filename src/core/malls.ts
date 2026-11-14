@@ -15,9 +15,10 @@ import { pointsOn } from './points';
 export type MallSite = 'cos' | 'bm';
 export const MALL_SITES: MallSite[] = ['cos', 'bm'];
 export const isMallSite = (v: unknown): v is MallSite => v === 'cos' || v === 'bm';
-export const MALL_NAME: Record<MallSite, string> = { cos: '우주 쇼핑몰', bm: '백일몽 포인트몰' };
-/** 진열·문의에서 「주인」 자리 (포인트몰은 운영자 없음) */
-export const MALL_OWNER: Record<MallSite, string> = { cos: '운영자', bm: '' };
+/** 쇼핑몰 이름 (지침 「우주 쇼핑몰」·「백일몽 포인트몰」의 MALL_NAME 절). 화면과 요청이 같은 절을 읽는다 (2026-11-15 사용자) */
+export const MALL_NAME: Record<MallSite, string> = { get cos() { return guideTxt('Cos', 'MALL_NAME'); }, get bm() { return guideTxt('Bm', 'MALL_NAME'); } };
+/** 진열·문의에서 「주인」 자리 (포인트몰은 운영자 없음). 우주몰은 지침 「우주 쇼핑몰」의 OWNER_NAME 절 */
+export const MALL_OWNER: Record<MallSite, string> = { get cos() { return guideTxt('Cos', 'OWNER_NAME'); }, bm: '' };
 export const MALL_GUIDE: Record<MallSite, GuideName> = { cos: 'Cos', bm: 'Bm' };
 /** 사이트 상태 (진열대·문의 대화). 상점 상태와 같은 꼴 */
 export const MALL_VAR: Record<MallSite, string> = { cos: '$cos_shop', bm: '$bm_shop' };
@@ -269,7 +270,7 @@ export function mallEvents(chat: Chat): string[] {
  *  포인트몰에 판 것은 그 줄의 「컨텍스트 포함」만 따른다(팔기 칸이 없다). 그 밖의 이름은 기본 상점의 「팔기」. 「…에 팖」이 아닌 기록(망상홈쇼핑 맞교환 등)은 거르지 않는다 */
 export function soldPasses(vars: Vars, place: string, plain: boolean): boolean {
   // 망상홈쇼핑 맞교환 줄도 망상홈쇼핑 「구매」 칸을 따른다 (전수검사 11-13)
-  if (!plain) return place.startsWith('망상홈쇼핑') ? hsBuyPasses(vars) : true;
+  if (!plain) return place.startsWith(guideTxt('Hs', 'CHANNEL_NAME')) || place === guideTxt('Hs', 'ORDER_BARTER_NOTE') ? hsBuyPasses(vars) : true;
   if (place === MALL_NAME.cos) return shopMain(vars, 'cos').has('ask');
   if (place === MALL_NAME.bm) return shopMain(vars, 'bm').on;
   return shopMain(vars, 'shop').has('sell');

@@ -155,7 +155,7 @@ export function addWalletEntry(w: Wallet, e: Omit<WalletEntry, 'id' | 'at'> & { 
 export function withFieldTrade(w: Wallet, anchor: string, amount: number, memo: string, id: string, where: { place?: string; time?: string } = {}, alive?: Set<string>): Wallet {
   const place = typeof where.place === 'string' ? where.place.trim().slice(0, 30) : '';
   const time = typeof where.time === 'string' ? where.time.trim().slice(0, 10) : '';
-  return addWalletEntry(w, { anchor, amount: Math.trunc(amount), memo: memo.trim() || '필드 거래', src: 'field', id, ...(place ? { place } : {}), ...(time ? { time } : {}) }, alive);
+  return addWalletEntry(w, { anchor, amount: Math.trunc(amount), memo: memo.trim() || guideTxt('Main', 'WALLET.MEMO.FIELD'), src: 'field', id, ...(place ? { place } : {}), ...(time ? { time } : {}) }, alive);
 }
 
 export function removeWalletEntry(w: Wallet, id: string): Wallet {
@@ -163,7 +163,7 @@ export function removeWalletEntry(w: Wallet, id: string): Wallet {
 }
 
 /** 잔고를 target 으로 맞추는 수동 조정 한 줄 */
-export function adjustWallet(w: Wallet, alive: Set<string>, target: number, memo = '잔고 수정'): Wallet {
+export function adjustWallet(w: Wallet, alive: Set<string>, target: number, memo = guideTxt('Main', 'WALLET.MEMO.ADJUST')): Wallet {
   const diff = Math.trunc(target) - walletBalance(w, alive);
   if (!diff) return w;
   return addWalletEntry(w, { anchor: '', amount: diff, memo, src: 'manual', id: `m_${Date.now().toString(36)}_${w.log.length}` }, alive);

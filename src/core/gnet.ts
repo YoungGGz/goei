@@ -216,7 +216,8 @@ export function mergeKeyFigures(state: Record<string, unknown> | undefined, rows
 
 export function userNick(state: Record<string, unknown> | undefined): string {
   const n = String(state?.[GN_NICK] ?? '').trim();
-  return n && n !== 'null' ? cut(n, 36) : '익명';
+  // 기본 닉네임은 지침 「요청 공통」 GNET.ANON_NICK 절 (화면과 요청이 같은 글)
+  return n && n !== 'null' ? cut(n, 36) : guideTxt('Common', 'GNET.ANON_NICK');
 }
 
 // ── 글자 수·토큰 ──
@@ -704,7 +705,8 @@ export function parseJsonPayload(raw: string): unknown {
         }
       }
     }
-    throw new GnetError('AI 응답을 JSON으로 읽지 못했어요.', raw);
+    // 형식 오류 글(다시 묻기에 그대로 들어감)은 지침 「요청 공통」 GNET.ERR_* 절
+    throw new GnetError(guideTxt('Common', 'GNET.ERR_JSON'), raw);
   }
 }
 
@@ -1011,10 +1013,10 @@ export function pushComments(p: GPost, rows: NewComment[], now: string): void {
 export const cleanTag = (v: unknown): string => cut(str(v).split(/\r?\n/)[0].replace(/[\[\]【】]/g, '').trim(), 12);
 
 export function parsePostDraft(value: unknown): { title: string; content: string; tag?: string } {
-  if (!isObj(value) || !isObj(value.post)) throw new GnetError('응답에 post.title과 post.content가 없어요.');
+  if (!isObj(value) || !isObj(value.post)) throw new GnetError(guideTxt('Common', 'GNET.ERR_POST_MISSING'));
   const title = str(value.post.title).split(/\r?\n/).map((l) => l.trim()).find(Boolean) ?? '';
   const content = str(value.post.content).trim();
-  if (!title || !content) throw new GnetError('게시글 제목이나 본문이 비어 있어요.');
+  if (!title || !content) throw new GnetError(guideTxt('Common', 'GNET.ERR_POST_EMPTY'));
   const tag = cleanTag(value.post.tag);
   return { title: trimTokens(title, LIMITS.title_tokens), content: trimTokens(content, LIMITS.post_tokens), ...(tag ? { tag } : {}) };
 }
@@ -1239,10 +1241,10 @@ export function parseDmBody(raw: string): string {
   try {
     value = parseJsonPayload(raw);
   } catch {
-    throw new GnetError('Expected {"body":"reply text"}.', raw);
+    throw new GnetError(guideTxt('Common', 'GNET.ERR_DM_BODY'), raw);
   }
   const body = isObj(value) ? stripForged(str(value.body)).trim() : '';
-  if (!body) throw new GnetError('Expected {"body":"reply text"} with a non-empty body.', raw);
+  if (!body) throw new GnetError(guideTxt('Common', 'GNET.ERR_DM_BODY_EMPTY'), raw);
   return trimTokens(body, LIMITS.dm_tokens);
 }
 

@@ -9,7 +9,7 @@ import { CONTEXT as GN_CONTEXT, GN_RAW, gnetSettings, mainContext, readGnet, use
 import { BOARD_SITES, boardView } from './core/boards';
 import { mainContextRules } from './core/gnetPrompt';
 import { ALWAYS_BOOKS, isVirtual, stripVirtual, withWorldLore } from './core/world/virtual';
-import { guidePrompt, RP_HEAD } from './core/guides';
+import { guidePrompt, guideTxt, RP_HEAD } from './core/guides';
 import { evaluate } from './core/cbs';
 import { shouldKeepSeed } from './core/request';
 import { messageText } from './core/refs';
@@ -451,7 +451,7 @@ async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }
   const me = playerAgent(char.globalLore, chat.scriptstate);
   const lastUser = [...messages].reverse().find((m) => m?.role === 'user');
   const input = typeof lastUser?.content === 'string' ? lastUser.content : '';
-  const user = me?.name || userInfo().name || '주인공';
+  const user = me?.name || userInfo().name || guideTxt('Common', 'REFS.USER_NAME');
   // 시트 원문은 로어 덩어리에 들어간 글과 같은 변환(장식 줄 떼기·같은 CBS 환경)으로 읽어야 split·record 모드가 요청에서 그 글을 찾아 뺄 수 있다
   // (bookText 는 @@dont_activate 줄을 남기고 {{user}}를 「주인공」으로 풀어 한 번도 맞지 않았다. QC 2026-10-28)
   const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userOrTag() };

@@ -309,3 +309,167 @@ Report `new` for things with a use in the story and for issued or bought gear wo
 @@SECTION ITEMS.SKIP
 Never report as `new`: {skip}
 @@END
+
+@@SECTION AXES.BAND.relationalInitiative.0
+관계를 거의 먼저 시작하지 않음
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.1
+상대가 이끌 때 주로 반응함
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.2
+상황에 따라 주도와 반응을 오감
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.3
+필요하면 먼저 다가가 관계를 이끔
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.4
+지속적으로 관계의 방향을 주도함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.0
+뜻을 거의 직접 말하지 않음
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.1
+돌려 말하거나 암시를 선호함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.2
+상황에 따라 직접성과 완곡함을 조절함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.3
+의도와 요구를 비교적 분명히 말함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.4
+생각과 의도를 매우 직접적으로 표현함
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.0
+감정을 거의 겉으로 드러내지 않음
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.1
+감정 단서가 작고 제한적임
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.2
+상황에 따라 감정을 보이거나 감춤
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.3
+감정이 말과 행동에 자주 드러남
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.4
+감정을 매우 선명하고 즉각적으로 표출함
+@@END
+
+@@SECTION AXES.BAND.guardedness.0
+타인을 쉽게 믿고 경계를 거의 세우지 않음
+@@END
+
+@@SECTION AXES.BAND.guardedness.1
+초기 경계가 낮고 비교적 빨리 마음을 엶
+@@END
+
+@@SECTION AXES.BAND.guardedness.2
+신뢰와 경계를 상황에 맞춰 조절함
+@@END
+
+@@SECTION AXES.BAND.guardedness.3
+쉽게 속내를 보이지 않고 경계를 유지함
+@@END
+
+@@SECTION AXES.BAND.guardedness.4
+강한 경계로 접근과 자기 공개를 엄격히 제한함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.0
+충동을 강하게 억제하고 숙고함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.1
+대체로 생각한 뒤 행동함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.2
+상황에 따라 숙고와 즉흥 행동이 섞임
+@@END
+
+@@SECTION AXES.BAND.impulsivity.3
+감정과 욕구에 따라 빠르게 행동함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.4
+결과를 따지기 전에 매우 충동적으로 행동함
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.0
+관계를 쉽게 놓고 오래 유지하려 하지 않음
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.1
+갈등이나 거리가 생기면 물러나기 쉬움
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.2
+관계 가치에 따라 유지 여부를 판단함
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.3
+어려움이 있어도 관계를 오래 지키려 함
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.4
+관계를 매우 끈질기게 유지하고 회복하려 함
+@@END
+
+@@SECTION ERR.NO_JSON
+JSON 객체가 없어요
+@@END
+
+@@SECTION ERR.NOT_OBJECT
+JSON 객체가 아니에요
+@@END
+
+@@SECTION ERR.NOT_LIST
+{key}는 목록이어야 해요
+@@END
+
+@@SECTION CONSOLIDATE.ERR.SLOTS
+slots 는 객체여야 해요
+@@END
+
+@@SECTION ENTRY.RESOLVED
+(해소)
+@@END
+
+@@SECTION HYPA.FACTS
+사실
+@@END
+
+@@SECTION HYPA.MEMORY
+기억
+@@END
+
+@@SECTION WALLET.MEMO.OUT
+지출
+@@END
+
+@@SECTION WALLET.MEMO.IN
+수입
+@@END
+
+@@SECTION POINTS.MEMO.OUT
+사용
+@@END
+
+@@SECTION POINTS.MEMO.IN
+지급
+@@END

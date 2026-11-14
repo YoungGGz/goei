@@ -14,8 +14,11 @@ declare const __HOMESHOP_PACK__: string | undefined;
 export const HOMESHOP_PACK: PackSpec = { name: 'goei-data-homeshop', label: '망상홈쇼핑 방송 그림', expect: expectOf(typeof __HOMESHOP_PACK__ === 'string' ? __HOMESHOP_PACK__ : undefined) };
 
 export const HS_SITE = 'hs';
-export const HS_NAME = '망상홈쇼핑';
-export const HS_HOST = '레드 프라이데이';
+/** 방송 이름·진행자 이름 (지침 「망상홈쇼핑」의 CHANNEL_NAME · HOST_NAME 절). 화면과 요청이 같은 절을 부를 때 읽는다 (2026-11-15 사용자) */
+export const hsName = (): string => guideTxt('Hs', 'CHANNEL_NAME');
+export const hsHost = (): string => guideTxt('Hs', 'HOST_NAME');
+/** 다른 화면(설정 표·호출 흐름)의 이름표와 호출 기록 이름: 기본 지침 파일의 CHANNEL_NAME 절 (모듈을 읽을 때 한 번). 고친 지침을 따르려면 hsName() */
+export const HS_NAME = guideTxt('Hs', 'CHANNEL_NAME');
 /** 편성 상태 (상품·큐시트·채팅·지금 부) */
 export const HS_VAR = '$hs_show';
 /** 「창을 열 때」 자동 호출: 마지막으로 편성을 받은 응답 */
@@ -158,7 +161,8 @@ export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: 
 export const HS_TEL_DEFAULT = '080-404-0000';
 /** 내 채팅을 읽는 동안 진행자 컷에서 대기와 번갈아 트는 동작 (이름은 영문·우리말 어느 쪽이든) */
 export const HS_READ_DEFAULT = '고개 꺾기, 굳은 응시';
-export const HS_FORMS_DEFAULT = '전화 출연, 엑스트라, 모델';
+/** 출연 형태 기본값 (지침 「망상홈쇼핑」의 FORMS_DEFAULT 절, 호출 CALL 절의 {form} 으로 간다) */
+export const hsFormsDefault = (): string => guideTxt('Hs', 'FORMS_DEFAULT');
 export type HsAuto = 'manual' | 'open';
 export type HsScale = 'auto' | 'fit' | '0.5' | '1' | '2';
 export interface HsRules {
@@ -269,7 +273,7 @@ export function hsSettings(vars: Vars): HsSettings {
     left: n(vars, 'left'),
     drop: { on: vars?.[HS_KEY.drop] !== '0', rate: n(vars, 'dropRate') / 100, fast: n(vars, 'dropFast') / 10, step: n(vars, 'dropStep'), soon: n(vars, 'soonAt'), end: pair(n(vars, 'endLo'), n(vars, 'endHi')) },
     call: pair(n(vars, 'callLo'), n(vars, 'callHi')),
-    forms: (() => { const f = String(vars?.[HS_KEY.forms] ?? '').split(/[,\n]/).map((x) => x.trim().slice(0, 30)).filter(Boolean); return f.length ? f : HS_FORMS_DEFAULT.split(',').map((x) => x.trim()); })(),
+    forms: (() => { const f = String(vars?.[HS_KEY.forms] ?? '').split(/[,\n]/).map((x) => x.trim().slice(0, 30)).filter(Boolean); return f.length ? f : hsFormsDefault().split(',').map((x) => x.trim()); })(),
     aud: vars?.[HS_KEY.aud] !== '0',
     peek: vars?.[HS_KEY.peek] !== '0',
     say: vars?.[HS_KEY.say] !== '0',
@@ -382,7 +386,7 @@ export function moodMap(pack: Pick<HsPack, 'cuts'> | null): Map<string, string> 
 }
 
 export class HsError extends ShopError {}
-const HS_IDENTITY: ShopIdentity = { sells: HS_NAME, never: '', prices: '' };
+const hsIdentity = (): ShopIdentity => ({ sells: hsName(), never: '', prices: '' });
 function block(raw: string, tag: string): string {
   const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}\\s*>`, 'i').exec(raw);
   return m ? m[1].trim() : '';
@@ -390,7 +394,7 @@ function block(raw: string, tag: string): string {
 export interface ShowReply { title: string; items: Omit<ShopItem, 'id'>[]; cues: HsCue[][]; chat: HsChatLine[]; chats: HsChatLine[][]; peeks: string[]; ops: HsOps }
 /** 편성 응답: <title> · <shelf>(상점 줄) · <cue>(「#n」 아래 그 상품의 큐 줄) · <chat>(「#n」 아래 그 상품 동안의 닉|말) */
 export function parseShow(raw: string, moods: Map<string, string>): ShowReply {
-  const shelf = parseShelf(raw, HS_IDENTITY);
+  const shelf = parseShelf(raw, hsIdentity());
   const cueText = block(raw, 'cue');
   if (!cueText) throw new HsError(guideTxt('Hs', 'ERR_NO_CUE'));
   const cues: HsCue[][] = [];

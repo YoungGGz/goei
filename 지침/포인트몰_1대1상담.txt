@@ -155,3 +155,7 @@ Output exactly one block and nothing else:
 @@SECTION ERR_NO_SAY
 응답에 <say> 블록(상담사 답)이 없어요.
 @@END
+
+@@SECTION SHOP_NAME
+백일몽
+@@END

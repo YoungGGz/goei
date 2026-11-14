@@ -3,7 +3,7 @@
 //   상점마다 따로 정하는 값(사용·자동 호출·모델·상품 수·값 기준)과 네 곳이 같이 쓰는 값(맥락 반영·챗로그 포함·참조 로어북·생각 단계·다양성 강화·지난 목록 피하기)은
 //   설정 → 상점(ui/famtable.ts shopTable)에 있다. 메인 요청에 붙이는 것($hs_main·$hs_main_kinds·$hs_main_tokens, core/hslog.ts)도 상점 페이지의 격자에 둔다.
 // 묶음과 차례는 여기 적힌 그대로 화면에 나온다 (ui/homeshop.ts homeshopSettingsPane 은 값만 잇는다).
-import { HS_FORMS_DEFAULT, HS_KEY, HS_NUM, HS_READ_DEFAULT, HS_TEL_DEFAULT } from '../homeshop';
+import { hsFormsDefault, HS_KEY, HS_NUM, HS_READ_DEFAULT, HS_TEL_DEFAULT } from '../homeshop';
 import { onOff, type SetCtl, type SetDef, type SetPage } from './types';
 
 const on = onOff('1');
@@ -23,7 +23,7 @@ export const HS_RETRY_KEY = '$hs_retry';
 /** 켬/끔 줄 */
 export const HS_FLAG: Record<string, string> = { net: HS_KEY.net, cut: HS_KEY.cut, bulb: HS_KEY.bulb, tear: HS_KEY.tear, scan: HS_KEY.scan, turn: HS_KEY.turn, lock: HS_KEY.lock, drop: HS_KEY.drop, aud: HS_KEY.aud, peek: HS_KEY.peek, say: HS_KEY.say, barter: HS_KEY.barter };
 /** 기본값이 든 글 줄: [변수, 기본값, 글자 수 상한] (core/deftext: 기본값과 같거나 비우면 저장하지 않는다) */
-export const HS_DEF_TEXT: Record<string, [string, string, number]> = { tel: [HS_TEL_KEY, HS_TEL_DEFAULT, 20], forms: [HS_KEY.forms, HS_FORMS_DEFAULT, 200], read: [HS_KEY.read, HS_READ_DEFAULT, 200] };
+export const HS_DEF_TEXT: Record<string, [string, string, number]> = { tel: [HS_TEL_KEY, HS_TEL_DEFAULT, 20], get forms(): [string, string, number] { return [HS_KEY.forms, hsFormsDefault(), 200]; }, read: [HS_KEY.read, HS_READ_DEFAULT, 200] };
 /** 그 밖의 줄 */
 export const HS_OTHER: Record<string, string> = { retry: HS_RETRY_KEY, clips: HS_KEY.clips, scalePc: HS_KEY.scalePc, scalePh: HS_KEY.scalePhone };
 /** 줄 하나가 적는 변수 이름들 */
@@ -89,7 +89,7 @@ export const HOMESHOP_SET: SetPage = {
       title: '컨텍스트 포함',
       rows: [
         row('call', '할부 호출 간격', mm('call'), '주문한 뒤 이만큼 턴이 지날 때마다 메인 요청에 출연 호출을 한 번 넘기고 1회 납부로 쳐요. 평소에는 메인 요청에 아무것도 보내지 않아요.'),
-        row('forms', '출연 형태', { t: 'text', ph: '', def: HS_FORMS_DEFAULT, max: 200 }, '호출 때 이 가운데 하나를 골라 넘겨요. 쉼표로 나눠요. 호출 글은 지침 → 망상홈쇼핑의 CALL 절에서 고쳐요.'),
+        row('forms', '출연 형태', { t: 'text', ph: '', get def() { return hsFormsDefault(); }, max: 200 }, '호출 때 이 가운데 하나를 골라 넘겨요. 쉼표로 나눠요. 호출 글은 지침 → 망상홈쇼핑의 CALL 절에서 고쳐요.'),
         row('aud', '방청 신청', on, '신청하면 다음 턴 메인 요청에 한 줄만 넘겨요. 글은 지침의 AUDIENCE 절에서 고쳐요.'),
       ],
     },

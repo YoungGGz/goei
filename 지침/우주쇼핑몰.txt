@@ -398,3 +398,11 @@ classical martial arts, sci-fi, fantasy, cyberpunk, steampunk, ancient, occult, 
 @@SECTION ASK_CHIP
 [{item}] {said}
 @@END
+
+@@SECTION MALL_NAME
+우주 쇼핑몰
+@@END
+
+@@SECTION OWNER_NAME
+운영자
+@@END

@@ -288,7 +288,7 @@ export function directory(lore: LoreEntry[] | undefined, chat: Chat): Directory 
         contacts.push(c);
       }
     } else {
-      c = { id: entry.id, name: entry.name, english: '', lore: '', group: '미분류', rank: '', department: '', note: entry.note ?? '', custom: true, tabs: ['T05'], terms: [entry.name, entry.note ?? ''], visible: visible.has('T05'), saved: true };
+      c = { id: entry.id, name: entry.name, english: '', lore: '', group: guideTxt('Phone', 'CONTACT.GROUP_CUSTOM'), rank: '', department: '', note: entry.note ?? '', custom: true, tabs: ['T05'], terms: [entry.name, entry.note ?? ''], visible: visible.has('T05'), saved: true };
       map.set(c.id, c);
       if (c.visible) contacts.push(c);
     }
@@ -380,10 +380,10 @@ export function readPhone(chat: Chat): PState {
   return st;
 }
 
-/** 이름을 정하지 않은 단톡방은 지금 남아 있는 사람 이름으로 부른다 */
+/** 이름을 정하지 않은 단톡방은 지금 남아 있는 사람 이름으로 부른다. 아무도 없을 때의 이름은 지침 「괴담톡」 ROOM.FALLBACK_* 절 */
 export function roomLabel(r: PRoom): string {
-  if (r.kind === 'group') return r.name || r.members.map((c) => r.people[c]?.name ?? c).join(', ') || '단톡방';
-  return r.people[r.members[0]]?.name ?? r.people[Object.keys(r.people)[0]]?.name ?? '대화';
+  if (r.kind === 'group') return r.name || r.members.map((c) => r.people[c]?.name ?? c).join(', ') || guideTxt('Phone', 'ROOM.FALLBACK_GROUP');
+  return r.people[r.members[0]]?.name ?? r.people[Object.keys(r.people)[0]]?.name ?? guideTxt('Phone', 'ROOM.FALLBACK_DM');
 }
 
 export function push(st: PState, r: PRoom, sender: string, text: string, time: string, kind: MsgKind = 'message'): PMsg {
@@ -397,7 +397,8 @@ export function push(st: PState, r: PRoom, sender: string, text: string, time: s
 export function membership(st: PState, r: PRoom, kind: 'invite' | 'exit', cid: string, time: string): void {
   const p = r.people[cid];
   if (!p) throw new PhoneError('참여자 정보를 찾지 못했어요.');
-  const m = push(st, r, 'system', `${p.name}님이 ${kind === 'invite' ? '초대되었습니다.' : '나갔습니다.'}`, time, kind);
+  // 알림 말풍선 글은 지침 「괴담톡」 SYSTEM.* 절 (저장되어 화면과 요청에 같이 쓰인다)
+  const m = push(st, r, 'system', kind === 'invite' ? guideTxt('Phone', 'SYSTEM.INVITED', { name: p.name }) : guideTxt('Phone', 'SYSTEM.EXITED', { name: p.name }), time, kind);
   m.participant = cid;
   if (kind === 'exit') r.members = r.members.filter((x) => x !== cid);
 }
@@ -557,12 +558,13 @@ export function decodeJson(raw: string): unknown {
     }
     if (text === before) break;
   }
-  if (!text) throw new PhoneError('모델 응답이 비어 있어요.', raw);
+  // 형식 오류 글(다시 묻기에 그대로 들어감)은 지침 「괴담톡」 ERR.* 절
+  if (!text) throw new PhoneError(guideTxt('Phone', 'ERR.EMPTY'), raw);
   if (!text.startsWith('{') && !text.startsWith('[')) {
     const brace = text.indexOf('{');
     const end = text.lastIndexOf('}');
     if (brace >= 0 && end > brace) text = text.slice(brace, end + 1);
-    else throw new PhoneError('JSON 대신 설명문이나 다른 형식이 왔어요.', raw);
+    else throw new PhoneError(guideTxt('Phone', 'ERR.NOT_JSON'), raw);
   }
   try {
     return JSON.parse(text);
@@ -581,7 +583,7 @@ export function decodeJson(raw: string): unknown {
     try {
       return JSON.parse(fixed.replace(/"((?:[^"\\]|\\.)*)"/g, (m) => m.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')));
     } catch (error) {
-      throw new PhoneError(`JSON 문법 오류예요. 응답이 중간에 끊겼을 수 있어요. (${(error as Error).message.slice(0, 120)})`, raw);
+      throw new PhoneError(guideTxt('Phone', 'ERR.JSON_SYNTAX', { detail: (error as Error).message.slice(0, 120) }), raw);
     }
   }
 }
@@ -696,7 +698,7 @@ function fail(msg: string): never {
 /** 미니톡 패치 → 대화 이벤트 (원본 eventsFromPatch + validateEvents).
  * 원본은 말풍선 하나만 틀려도 응답 전체를 버렸다. 여기서는 틀린 항목만 빼고, 남은 게 하나도 없을 때만 실패로 본다 */
 export function eventsFromPatch(patch: unknown, r: PRoom, allowTitle: boolean, dropped: string[] = [], cap = LIMITS.events): { events: PEvent[]; title?: string } {
-  if (!Array.isArray(patch)) fail('대화 변경 목록이 배열이 아니에요.');
+  if (!Array.isArray(patch)) fail(guideTxt('Phone', 'ERR.PATCH_NOT_ARRAY'));
   const events: PEvent[] = [];
   const before = dropped.length;
   let title: string | undefined;
@@ -711,31 +713,31 @@ export function eventsFromPatch(patch: unknown, r: PRoom, allowTitle: boolean, d
 
 /** 패치 항목 하나를 읽는다. 틀리면 이유를 돌려주고 아무것도 넣지 않는다 */
 function readOp(op: Record<string, unknown>, r: PRoom, allowTitle: boolean, events: PEvent[], setTitle: (t: string) => void): string | null {
-  if (!op || typeof op !== 'object') return '대화 변경 항목은 객체여야 해요.';
+  if (!op || typeof op !== 'object') return guideTxt('Phone', 'ERR.OP_NOT_OBJECT');
   if (op.op === 'replace' && op.path === '/name' && allowTitle) {
-    if (r.kind !== 'group' || typeof op.value !== 'string' || !op.value.trim() || [...op.value].length > LIMITS.room_name) return '대화방 이름 형식이 잘못됐어요.';
+    if (r.kind !== 'group' || typeof op.value !== 'string' || !op.value.trim() || [...op.value].length > LIMITS.room_name) return guideTxt('Phone', 'ERR.ROOM_NAME');
     setTitle(op.value.trim());
     return null;
   }
   const react = op.op === 'replace' && typeof op.path === 'string' ? /^\/messages\/(\d+)\/reactions$/.exec(op.path) : null;
   if (react) {
-    if (typeof op.value !== 'string') return '반응 형식이 잘못됐어요.';
+    if (typeof op.value !== 'string') return guideTxt('Phone', 'ERR.REACTION');
     events.push({ type: 'react', record: Number(react[1]), reactions: op.value });
     return null;
   }
-  if (op.op !== 'add' || op.path !== '/messages/-') return '기존 기록은 고치거나 지울 수 없어요. 새 메시지만 추가하세요.';
+  if (op.op !== 'add' || op.path !== '/messages/-') return guideTxt('Phone', 'ERR.ADD_ONLY');
   const m = op.value as Record<string, unknown>;
-  if (!m || typeof m !== 'object' || typeof m.content !== 'string' || typeof m.sender !== 'string' || typeof m.type !== 'string') return '메시지에는 content·sender·type 문자열이 필요해요.';
+  if (!m || typeof m !== 'object' || typeof m.content !== 'string' || typeof m.sender !== 'string' || typeof m.type !== 'string') return guideTxt('Phone', 'ERR.MESSAGE_FIELDS');
   if (m.type === 'text') events.push({ type: 'message', sender: m.sender, text: m.content, ...(typeof m.reactions === 'string' && m.reactions.trim() !== '-' ? { reactions: m.reactions } : {}) });
   else if (m.type === 'exit') {
-    if (m.sender !== '-') return '퇴장 형식이 잘못됐어요.';
+    if (m.sender !== '-') return guideTxt('Phone', 'ERR.EXIT');
     events.push({ type: 'exit', participant: m.content });
   } else if (m.type === 'skip') {
     events.push({ type: 'skip' });
   } else if (m.type === 'pause') {
-    if (m.sender !== '-') return '대기 형식이 잘못됐어요.';
+    if (m.sender !== '-') return guideTxt('Phone', 'ERR.PAUSE');
     if (!hiddenPause(m.content)) events.push({ type: 'pause', text: m.content });
-  } else return '괴담톡에서 지원하지 않는 메시지 유형이에요.';
+  } else return guideTxt('Phone', 'ERR.MESSAGE_TYPE');
   return null;
 }
 
@@ -755,7 +757,7 @@ export function keepValid(events: PEvent[], r: PRoom, dropped: string[] = [], ca
       continue;
     }
     if (out.length >= cap) {
-      dropped.push('한 번에 추가할 수 있는 말풍선 수를 넘었어요.');
+      dropped.push(guideTxt('Phone', 'ERR.TOO_MANY_BUBBLES'));
       break;
     }
     if (e.type === 'exit') active.delete(e.participant);
@@ -766,16 +768,16 @@ export function keepValid(events: PEvent[], r: PRoom, dropped: string[] = [], ca
 
 function eventProblem(e: PEvent, r: PRoom, active: Set<string>): string | null {
   if (e.type === 'message') {
-    if (!active.has(e.sender) || !e.text.trim()) return '참여하지 않은 인물의 메시지예요.';
-    if (r.kind !== 'dm' && /\[\[ATTACH:gift\]\]/i.test(e.text)) return '단톡방에서는 선물을 보낼 수 없어요.';
-    if (tokens(e.text) > LIMITS.reply_tokens) return `답장 한 개는 ${LIMITS.reply_tokens}토큰 이내여야 해요.`;
+    if (!active.has(e.sender) || !e.text.trim()) return guideTxt('Phone', 'ERR.NOT_MEMBER');
+    if (r.kind !== 'dm' && /\[\[ATTACH:gift\]\]/i.test(e.text)) return guideTxt('Phone', 'ERR.GROUP_GIFT');
+    if (tokens(e.text) > LIMITS.reply_tokens) return guideTxt('Phone', 'ERR.REPLY_TOKENS', { limit: LIMITS.reply_tokens });
   } else if (e.type === 'skip') return null;
   else if (e.type === 'react') {
-    if (!r.messages.some((m) => m.id === e.record && m.kind === 'message')) return '반응을 달 메시지를 찾지 못했어요.';
+    if (!r.messages.some((m) => m.id === e.record && m.kind === 'message')) return guideTxt('Phone', 'ERR.REACT_TARGET');
   } else if (e.type === 'pause') {
-    if (!e.text.trim()) return '대기 설명이 없어요.';
-    if (tokens(e.text) > LIMITS.pause_tokens) return `대기 설명은 ${LIMITS.pause_tokens}토큰 이내여야 해요.`;
-  } else if (r.kind !== 'group' || !active.has(e.participant)) return '퇴장할 수 없는 참여자예요.';
+    if (!e.text.trim()) return guideTxt('Phone', 'ERR.PAUSE_EMPTY');
+    if (tokens(e.text) > LIMITS.pause_tokens) return guideTxt('Phone', 'ERR.PAUSE_TOKENS', { limit: LIMITS.pause_tokens });
+  } else if (r.kind !== 'group' || !active.has(e.participant)) return guideTxt('Phone', 'ERR.EXIT_MEMBER');
   return null;
 }
 
@@ -790,7 +792,7 @@ export function parseReply(raw: string, r: PRoom, contactMode: boolean): { event
     if (Array.isArray(value)) patch = value;
     else if (value && typeof value === 'object' && contactMode && value.result && typeof value.result === 'object') patch = (value.result as Record<string, unknown>).patch;
     else if (value && typeof value === 'object' && Array.isArray((value as Record<string, unknown>).patch)) patch = (value as Record<string, unknown>).patch;
-    else throw new PhoneError('미니톡 응답의 <lb-minitalk-patch> 표식이 없어요.', raw);
+    else throw new PhoneError(guideTxt('Phone', 'ERR.NO_PATCH_TAG'), raw);
   }
   try {
     return eventsFromPatch(patch, r, r.pending?.action.type === 'invite_initial');
@@ -886,7 +888,8 @@ export function noticeChannel(chat: Chat): string | null {
   return isFactionCode(code) ? code : null;
 }
 export function noticeLabel(code: string, names: Record<string, string>): string {
-  return code === 'D00' ? '시민 공개 안내' : code === 'E00' ? '특수재난대응협회 안내' : names[code] ?? code;
+  // 공용 채널 이름은 지침 「괴담톡」 NOTICE_CHANNEL.* 절
+  return code === 'D00' ? guideTxt('Phone', 'NOTICE_CHANNEL.D00') : code === 'E00' ? guideTxt('Phone', 'NOTICE_CHANNEL.E00') : names[code] ?? code;
 }
 
 export interface AnnouncementCheck {
@@ -926,22 +929,22 @@ export interface NoticeRow {
 
 /** 틀린 공지만 빼고, 받을 수 있는 수를 넘으면 앞에서부터 그만큼만 */
 export function validateAnnouncements(rows: unknown, packet: AnnouncementCheck | null, dropped: string[] = []): NoticeRow[] {
-  if (rows != null && !Array.isArray(rows)) fail('공지 목록이 배열이 아니에요.');
+  if (rows != null && !Array.isArray(rows)) fail(guideTxt('Phone', 'ERR.NOTICES_NOT_ARRAY'));
   const out: NoticeRow[] = [];
   for (const row of (rows ?? []) as NoticeRow[]) {
     const why = noticeProblem(row);
     if (why) dropped.push(why);
-    else if (out.length >= (packet?.maxNew ?? 0)) dropped.push('한 번에 받을 공지 수를 넘었어요.');
+    else if (out.length >= (packet?.maxNew ?? 0)) dropped.push(guideTxt('Phone', 'ERR.TOO_MANY_NOTICES'));
     else out.push(row);
   }
   return out;
 }
 
 function noticeProblem(row: NoticeRow): string | null {
-  if (!row || typeof row.issuer !== 'string' || typeof row.category !== 'string' || typeof row.title !== 'string' || typeof row.text !== 'string') return '공지 형식이 잘못됐어요.';
-  if (!CATEGORIES.has(row.category)) return '공지 분류가 올바르지 않아요.';
-  if (!row.issuer.trim() || [...row.issuer].length > LIMITS.notice_issuer || !row.title.trim() || [...row.title].length > LIMITS.notice_title || !row.text.trim()) return '공지 발신처·제목·본문을 확인하세요.';
-  if (tokens(row.text) > LIMITS.notice_tokens) return `공지 한 개는 ${LIMITS.notice_tokens}토큰 이내여야 해요.`;
+  if (!row || typeof row.issuer !== 'string' || typeof row.category !== 'string' || typeof row.title !== 'string' || typeof row.text !== 'string') return guideTxt('Phone', 'ERR.NOTICE_FORMAT');
+  if (!CATEGORIES.has(row.category)) return guideTxt('Phone', 'ERR.NOTICE_CATEGORY');
+  if (!row.issuer.trim() || [...row.issuer].length > LIMITS.notice_issuer || !row.title.trim() || [...row.title].length > LIMITS.notice_title || !row.text.trim()) return guideTxt('Phone', 'ERR.NOTICE_FIELDS');
+  if (tokens(row.text) > LIMITS.notice_tokens) return guideTxt('Phone', 'ERR.NOTICE_TOKENS', { limit: LIMITS.notice_tokens });
   return null;
 }
 
@@ -980,32 +983,32 @@ export function invitationPacket(st: PState, candidates: string[], allowed: bool
 
 /** 틀린 초대만 빼고, 받을 수 있는 수를 넘으면 앞에서부터 그만큼만 */
 export function validateInvitations(rows: unknown, packet: InvitationCheck | null, st: PState, dir: Directory, dropped: string[] = [], cap = LIMITS.events): PRoom[] {
-  if (rows != null && !Array.isArray(rows)) fail('단톡방 초대 목록이 배열이 아니에요.');
+  if (rows != null && !Array.isArray(rows)) fail(guideTxt('Phone', 'ERR.INVITES_NOT_ARRAY'));
   const allowed = new Set(packet?.candidates ?? []);
   const sig = (m: string[]) => [...m].sort().join(',');
   const out: PRoom[] = [];
   const fresh = new Set<string>();
   for (const row of (rows ?? []) as Record<string, unknown>[]) {
     if (out.length >= (packet?.maxNew ?? 0)) {
-      dropped.push('한 번에 받을 단톡방 초대 수를 넘었어요.');
+      dropped.push(guideTxt('Phone', 'ERR.TOO_MANY_INVITES'));
       continue;
     }
     try {
-      if (!row || typeof row.inviter !== 'string' || !Array.isArray(row.members) || typeof row.name !== 'string' || !Array.isArray(row.patch)) fail('단톡방 초대 형식이 잘못됐어요.');
+      if (!row || typeof row.inviter !== 'string' || !Array.isArray(row.members) || typeof row.name !== 'string' || !Array.isArray(row.patch)) fail(guideTxt('Phone', 'ERR.INVITE_FORMAT'));
       const name = row.name.trim();
-      if (!name || [...name].length > LIMITS.room_name) fail('초대할 단톡방 이름이 길이 제한을 넘었어요.');
+      if (!name || [...name].length > LIMITS.room_name) fail(guideTxt('Phone', 'ERR.INVITE_NAME'));
       const members = row.members as string[];
-      if (members.length < 2 || members.length > LIMITS.members) fail('단톡방에는 NPC 2명 이상이 필요하고 최대 인원을 넘을 수 없어요.');
+      if (members.length < 2 || members.length > LIMITS.members) fail(guideTxt('Phone', 'ERR.INVITE_SIZE'));
       const people: Record<string, PPerson> = {};
       for (const cid of members) {
         const c = dir.map.get(cid);
-        if (typeof cid !== 'string' || !allowed.has(cid) || !c || people[cid]) fail('단톡방 초대에 허용되지 않거나 중복된 참여자가 있어요.');
+        if (typeof cid !== 'string' || !allowed.has(cid) || !c || people[cid]) fail(guideTxt('Phone', 'ERR.INVITE_MEMBER'));
         people[cid] = personOf(c);
       }
-      if (!people[row.inviter]) fail('초대한 인물은 단톡방 참여자여야 해요.');
+      if (!people[row.inviter]) fail(guideTxt('Phone', 'ERR.INVITE_INVITER'));
       const key = `${name}\0${sig(members)}`;
-      if (fresh.has(key)) fail('같은 단톡방 초대가 중복됐어요.');
-      for (const r of Object.values(st.rooms)) if (r.kind === 'group' && roomLabel(r).trim() === name && sig(r.members) === sig(members)) fail('같은 이름과 참여자의 단톡방이 이미 있어요.');
+      if (fresh.has(key)) fail(guideTxt('Phone', 'ERR.INVITE_DUP'));
+      for (const r of Object.values(st.rooms)) if (r.kind === 'group' && roomLabel(r).trim() === name && sig(r.members) === sig(members)) fail(guideTxt('Phone', 'ERR.INVITE_EXISTS'));
       const room: PRoom = { id: '', kind: 'group', name, members: [...members], people, messages: [], draft: '', unread: 0, inviter: row.inviter };
       (room as PRoom & { events?: PEvent[] }).events = eventsFromPatch(row.patch, room, false, dropped, cap).events;
       fresh.add(key);
@@ -1025,7 +1028,7 @@ export function commitInvitations(st: PState, rooms: PRoom[], time: string): num
     r.id = `g_${st.seq}`;
     st.rooms[r.id] = r;
     st.order.push(r.id);
-    const m = push(st, r, 'system', `${r.people[r.inviter!].name}님이 나를 단톡방에 초대했습니다.`, time, 'invite');
+    const m = push(st, r, 'system', guideTxt('Phone', 'SYSTEM.INVITED_ME', { name: r.people[r.inviter!].name }), time, 'invite');
     m.participant = 'me';
     m.inviter = r.inviter;
     const events = (r as PRoom & { events?: PEvent[] }).events ?? [];
@@ -1052,9 +1055,9 @@ export function parseRefresh(
   try {
     let value = decodeJson(raw) as Record<string, unknown>;
     if (contactMode && value && typeof value.result === 'object' && value.result) value = value.result as Record<string, unknown>;
-    if (!value || typeof value !== 'object' || Array.isArray(value)) fail('새로고침 형식이 올바르지 않아요.');
+    if (!value || typeof value !== 'object' || Array.isArray(value)) fail(guideTxt('Phone', 'ERR.REFRESH_FORMAT'));
     const updates = (value.updates ?? []) as Record<string, unknown>[];
-    if (!Array.isArray(updates)) fail('updates는 배열이어야 해요.');
+    if (!Array.isArray(updates)) fail(guideTxt('Phone', 'ERR.UPDATES_NOT_ARRAY'));
     // 틀린 방·공지·초대·말풍선은 그것만 빼고 나머지를 쓴다. 다 빠져서 남은 게 없을 때만 실패
     const dropped: string[] = [];
     const announcements = validateAnnouncements(value.announcements, announce, dropped);
@@ -1063,11 +1066,11 @@ export function parseRefresh(
     const out: RefreshResult['updates'] = [];
     for (const u of updates) {
       try {
-        if (!u || typeof u.room !== 'string' || !selected.has(u.room) || used.has(u.room)) fail('중복되거나 허용되지 않은 대화방이에요.');
+        if (!u || typeof u.room !== 'string' || !selected.has(u.room) || used.has(u.room)) fail(guideTxt('Phone', 'ERR.REFRESH_ROOM'));
         used.add(u.room);
         const r = selected.get(u.room)!;
         const { events } = eventsFromPatch(u.patch ?? [], r, false, dropped, cap);
-        if (events.length && receive.get(u.room) === false) fail('선톡 받기 설정이나 이번 확률 검사에서 허용하지 않은 방이에요.');
+        if (events.length && receive.get(u.room) === false) fail(guideTxt('Phone', 'ERR.REFRESH_NOT_ALLOWED'));
         out.push({ room: u.room, events });
       } catch (error) {
         dropped.push((error as Error).message);
@@ -1104,7 +1107,7 @@ export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules:
           order: m.id, related: roomHit || related(focus, [], m.text),
           data: {
             room: r.id, title: roomLabel(r), recipients: m.audience.map((c) => r.people[c]?.name ?? c), kind: m.kind,
-            sender: m.sender === 'me' ? '주인공' : m.sender === 'system' ? 'system' : r.people[m.sender]?.name ?? m.sender, text: describe(sitePicAsPhoto(m.text)), time: m.time, order: m.id,
+            sender: m.sender === 'me' ? guideTxt('Common', 'REFS.USER_NAME') : m.sender === 'system' ? 'system' : r.people[m.sender]?.name ?? m.sender, text: describe(sitePicAsPhoto(m.text)), time: m.time, order: m.id,
           },
         });
       }
@@ -1116,7 +1119,7 @@ export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules:
     for (const a of (HISTORY.contextNotices > 0 ? b.items.slice(-HISTORY.contextNotices) : [])) {
       items.push({
         order: a.order, related: true, free: true,
-        data: { kind: 'announcement', channel: a.channel, title: a.title, sender: a.issuer, text: a.text, time: a.time, order: a.order, recipients: ['주인공'], access },
+        data: { kind: 'announcement', channel: a.channel, title: a.title, sender: a.issuer, text: a.text, time: a.time, order: a.order, recipients: [guideTxt('Common', 'REFS.USER_NAME')], access },
       });
     }
   }

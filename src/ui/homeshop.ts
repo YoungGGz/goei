@@ -17,7 +17,7 @@ import { userTurns } from '../core/request';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, HS_HOST, HS_KEY, HS_NAME, HS_NUM, HsError, hsNumVars, hsSettings, hsVars, installments, liveOrders, moodMap, newOrder, orderOpened, ordersVars, paidOf, parseCue, parseShow, readAudience, readOrders, readShow, showVars, turnStep, type HsCue, type HsOrder, type HsScale, type HsSettings, type HsShow } from '../core/homeshop';
+import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, HS_NAME, hsName, HS_NUM, HsError, hsNumVars, hsSettings, hsVars, installments, liveOrders, moodMap, newOrder, orderOpened, ordersVars, paidOf, parseCue, parseShow, readAudience, readOrders, readShow, showVars, turnStep, type HsCue, type HsOrder, type HsScale, type HsSettings, type HsShow } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
 import { mountPlayer, playerCut, playerHold, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
@@ -89,7 +89,7 @@ const retryOf = (ctx: ChatContext) => { const n = Number(ctx.chat.scriptstate?.[
 
 /** 방송 요청에 넘기는 자료 묶음 (참고 자료·본편은 상점과 같은 길로 모은다) */
 function showSource(ctx: ChatContext, show: HsShow, s: HsSettings, fn: ShopFn = 'shelf') {
-  const st: ShopState = { ...emptyShop({ raw: '', shop: HS_NAME, owner: HS_HOST }, ''), loaded: true, identity: { sells: HS_NAME, never: '', prices: '무이자 N회' }, prev: show.prev.concat(show.parts.map((p) => p.item.name)).slice(-24) };
+  const st: ShopState = { ...emptyShop({ raw: '', shop: hsName(), owner: hsHost() }, ''), loaded: true, identity: { sells: hsName(), never: '', prices: guideTxt('Hs', 'IDENTITY_PRICES') }, prev: show.prev.concat(show.parts.map((p) => p.item.name)).slice(-24) };
   return shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: hsVars(ctx.chat.scriptstate) as typeof ctx.chat.scriptstate } }, st, s.shop, shopGive(ctx.chat.scriptstate, 'hs', fn));
 }
 /** 지침에 채우는 낱말 (컷·표정·화면 사건) */
@@ -326,7 +326,7 @@ async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
   let usedBarter = false;
   // 시청 기록: 주문 전에 본 것을 먼저 적고, 주문 줄은 아래 저장에 같이 적는다
   playerFlush();
-  const buyer = userInfo().name || '나';
+  const buyer = userInfo().name || guideTxt('Hs', 'SAY_ME_NICK');
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
     const show = readShow(chat.scriptstate);
     const part = show.loaded ? show.parts[show.at] : null;
@@ -379,7 +379,7 @@ async function openBox(ctx: ChatContext, env: HsEnv, boxId: string): Promise<voi
       ? addItemLog({ ...items, list: items.list.map((x) => (x.id === boxId ? { ...x, soldAt: anchor } : x)) }, { name: box.name, item: boxId, ...(box.icon ? { icon: box.icon } : {}), what: 'use', by: 'manual', anchor, note: '상자를 열었다' })
       : removeItem(items, boxId, 'use', 'manual', '', { note: '상자를 열었다' });
     const it = o.item;
-    items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: 'hs', anchor, paidWith: box.paidWith ?? HS_NAME });
+    items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: 'hs', anchor, paidWith: box.paidWith ?? hsName() });
     const orders = readOrders(chat.scriptstate).map((x) => (x.id === o.id ? { ...x, openKey: anchor } : x));
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(orders) } };
   });
@@ -481,7 +481,7 @@ function lineup(show: HsShow, s: HsSettings, col = false): string {
 function onAir(ctx: ChatContext, show: HsShow, s: HsSettings, mobile: boolean): string {
   const { part, ordered } = nowPart(ctx);
   const ended = show.loaded && show.at >= show.parts.length;
-  const bar = `<div class="hs-bar"><span class="hs-on${show.loaded && !ended ? '' : ' off'}">${show.loaded && !ended ? 'LIVE' : 'OFF'}</span><b>${esc(show.title || HS_NAME)}</b>${part ? `<span class="hs-pt">${show.at + 1}부 <i>/ ${show.parts.length}부</i></span><button class="hs-nx" data-action="hs-next">${show.at + 1 < show.parts.length ? '다음 상품 ▶' : '방송 마치기 ■'}</button>` : ''}</div>`;
+  const bar = `<div class="hs-bar"><span class="hs-on${show.loaded && !ended ? '' : ' off'}">${show.loaded && !ended ? 'LIVE' : 'OFF'}</span><b>${esc(show.title || hsName())}</b>${part ? `<span class="hs-pt">${show.at + 1}부 <i>/ ${show.parts.length}부</i></span><button class="hs-nx" data-action="hs-next">${show.at + 1 < show.parts.length ? '다음 상품 ▶' : '방송 마치기 ■'}</button>` : ''}</div>`;
   const tv = `<div class="hs-tv">${bar}<div class="hs-mount" data-hs-mount="stage"></div></div>`;
   const prod = part
     ? `<div class="hs-prod"><button class="hs-icon" data-action="hs-pop" data-value="peek" aria-label="상품 스티커 보기">${itemPic(part.item)}<span class="hs-stk" aria-hidden="true"></span></button>
@@ -617,7 +617,7 @@ export function homeshopSettingsPane(ctx: ChatContext): string {
     help: { clips: () => `동작이 나오는 때를 바꿔요. 한 줄에 「컷:동작=분류」로 적어요(예: B:웃음=드물게). 컷은 A(와이드)·B(바스트), 분류는 기본·가끔·대사·드물게·안씀. 비워 두면 아래 분류 그대로예요.<br>${clipHelp}` },
   };
   const body = defGroups(HOMESHOP_SET, wire);
-  return `<div class="ph-form"><header class="ph-room-head"><div class="ph-room-title"><b>${HS_NAME} 설정</b></div></header><div class="ph-form-body ps">${body}</div></div>`;
+  return `<div class="ph-form"><header class="ph-room-head"><div class="ph-room-title"><b>${esc(hsName())} 설정</b></div></header><div class="ph-form-body ps">${body}</div></div>`;
 }
 
 /** hs-cfg 「키=값」 · hs-num 「키=숫자」 · hs-text 「키=글」 · hs-retry */

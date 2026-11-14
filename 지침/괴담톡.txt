@@ -383,3 +383,195 @@ none: never met or talked with the owner before; the owner only saved this conta
 @@SECTION CALL
 {{user}} places a phone call to {target}.
 @@END
+
+@@SECTION ERR.EMPTY
+모델 응답이 비어 있어요.
+@@END
+
+@@SECTION ERR.NOT_JSON
+JSON 대신 설명문이나 다른 형식이 왔어요.
+@@END
+
+@@SECTION ERR.JSON_SYNTAX
+JSON 문법 오류예요. 응답이 중간에 끊겼을 수 있어요. ({detail})
+@@END
+
+@@SECTION ERR.PATCH_NOT_ARRAY
+대화 변경 목록이 배열이 아니에요.
+@@END
+
+@@SECTION ERR.OP_NOT_OBJECT
+대화 변경 항목은 객체여야 해요.
+@@END
+
+@@SECTION ERR.ROOM_NAME
+대화방 이름 형식이 잘못됐어요.
+@@END
+
+@@SECTION ERR.REACTION
+반응 형식이 잘못됐어요.
+@@END
+
+@@SECTION ERR.ADD_ONLY
+기존 기록은 고치거나 지울 수 없어요. 새 메시지만 추가하세요.
+@@END
+
+@@SECTION ERR.MESSAGE_FIELDS
+메시지에는 content·sender·type 문자열이 필요해요.
+@@END
+
+@@SECTION ERR.EXIT
+퇴장 형식이 잘못됐어요.
+@@END
+
+@@SECTION ERR.PAUSE
+대기 형식이 잘못됐어요.
+@@END
+
+@@SECTION ERR.MESSAGE_TYPE
+괴담톡에서 지원하지 않는 메시지 유형이에요.
+@@END
+
+@@SECTION ERR.TOO_MANY_BUBBLES
+한 번에 추가할 수 있는 말풍선 수를 넘었어요.
+@@END
+
+@@SECTION ERR.NOT_MEMBER
+참여하지 않은 인물의 메시지예요.
+@@END
+
+@@SECTION ERR.GROUP_GIFT
+단톡방에서는 선물을 보낼 수 없어요.
+@@END
+
+@@SECTION ERR.REPLY_TOKENS
+답장 한 개는 {limit}토큰 이내여야 해요.
+@@END
+
+@@SECTION ERR.REACT_TARGET
+반응을 달 메시지를 찾지 못했어요.
+@@END
+
+@@SECTION ERR.PAUSE_EMPTY
+대기 설명이 없어요.
+@@END
+
+@@SECTION ERR.PAUSE_TOKENS
+대기 설명은 {limit}토큰 이내여야 해요.
+@@END
+
+@@SECTION ERR.EXIT_MEMBER
+퇴장할 수 없는 참여자예요.
+@@END
+
+@@SECTION ERR.NO_PATCH_TAG
+미니톡 응답의 <lb-minitalk-patch> 표식이 없어요.
+@@END
+
+@@SECTION ERR.NOTICES_NOT_ARRAY
+공지 목록이 배열이 아니에요.
+@@END
+
+@@SECTION ERR.TOO_MANY_NOTICES
+한 번에 받을 공지 수를 넘었어요.
+@@END
+
+@@SECTION ERR.NOTICE_FORMAT
+공지 형식이 잘못됐어요.
+@@END
+
+@@SECTION ERR.NOTICE_CATEGORY
+공지 분류가 올바르지 않아요.
+@@END
+
+@@SECTION ERR.NOTICE_FIELDS
+공지 발신처·제목·본문을 확인하세요.
+@@END
+
+@@SECTION ERR.NOTICE_TOKENS
+공지 한 개는 {limit}토큰 이내여야 해요.
+@@END
+
+@@SECTION ERR.INVITES_NOT_ARRAY
+단톡방 초대 목록이 배열이 아니에요.
+@@END
+
+@@SECTION ERR.TOO_MANY_INVITES
+한 번에 받을 단톡방 초대 수를 넘었어요.
+@@END
+
+@@SECTION ERR.INVITE_FORMAT
+단톡방 초대 형식이 잘못됐어요.
+@@END
+
+@@SECTION ERR.INVITE_NAME
+초대할 단톡방 이름이 길이 제한을 넘었어요.
+@@END
+
+@@SECTION ERR.INVITE_SIZE
+단톡방에는 NPC 2명 이상이 필요하고 최대 인원을 넘을 수 없어요.
+@@END
+
+@@SECTION ERR.INVITE_MEMBER
+단톡방 초대에 허용되지 않거나 중복된 참여자가 있어요.
+@@END
+
+@@SECTION ERR.INVITE_INVITER
+초대한 인물은 단톡방 참여자여야 해요.
+@@END
+
+@@SECTION ERR.INVITE_DUP
+같은 단톡방 초대가 중복됐어요.
+@@END
+
+@@SECTION ERR.INVITE_EXISTS
+같은 이름과 참여자의 단톡방이 이미 있어요.
+@@END
+
+@@SECTION ERR.REFRESH_FORMAT
+새로고침 형식이 올바르지 않아요.
+@@END
+
+@@SECTION ERR.UPDATES_NOT_ARRAY
+updates는 배열이어야 해요.
+@@END
+
+@@SECTION ERR.REFRESH_ROOM
+중복되거나 허용되지 않은 대화방이에요.
+@@END
+
+@@SECTION ERR.REFRESH_NOT_ALLOWED
+선톡 받기 설정이나 이번 확률 검사에서 허용하지 않은 방이에요.
+@@END
+
+@@SECTION ROOM.FALLBACK_GROUP
+단톡방
+@@END
+
+@@SECTION ROOM.FALLBACK_DM
+대화
+@@END
+
+@@SECTION SYSTEM.INVITED
+{name}님이 초대되었습니다.
+@@END
+
+@@SECTION SYSTEM.EXITED
+{name}님이 나갔습니다.
+@@END
+
+@@SECTION SYSTEM.INVITED_ME
+{name}님이 나를 단톡방에 초대했습니다.
+@@END
+
+@@SECTION CONTACT.GROUP_CUSTOM
+미분류
+@@END
+
+@@SECTION NOTICE_CHANNEL.D00
+시민 공개 안내
+@@END
+
+@@SECTION NOTICE_CHANNEL.E00
+특수재난대응협회 안내
+@@END

@@ -3,7 +3,7 @@
 // 살아 있는 관찰 4개 이상·서로 다른 메시지 3개 이상·확신 평균 55 이상이면 「검토」로 띄우고, 사용자가 승인해야 축이 움직인다.
 // 관찰은 기준 메시지에 묶여 있어 다시 굴리기·삭제로 메시지가 사라지면 같이 죽는다 (항목과 같은 규칙).
 import { hash, isAlive, plain, type Liveness } from './store';
-import { AXES, AXIS_BANDS, AXIS_LABEL, CANDIDATE_READY, DEFAULT_AXES, EXPRESS_TO_AXIS, SEXUAL_CHARS, SEXUAL_READY, axisBand, expressOf, type Axes, type Axis, type Candidate, type CandidateDirection, type Observation, type Person, type SexualAxis } from './types';
+import { AXES, AXIS_LABEL, CANDIDATE_READY, DEFAULT_AXES, EXPRESS_TO_AXIS, SEXUAL_CHARS, SEXUAL_READY, axisBand, axisBandText, expressOf, type Axes, type Axis, type Candidate, type CandidateDirection, type Observation, type Person, type SexualAxis } from './types';
 import { SEXUAL_FIELD_OF, ensureSexual, isSexualAxis } from './sexual';
 import { guideTxt } from '../guides';
 
@@ -39,8 +39,8 @@ export function setAxes(p: Person, axes: Axes, from: Person['axesFrom']): void {
   p.express = expressOf(p.axes);
 }
 
-/** 갱신기 자료·화면용: 축마다 값과 띠 설명(한국어) */
-export const axesView = (raw: Axes | undefined) => { const axes = readAxes(raw); return AXES.map((a) => ({ axis: a, label: AXIS_LABEL[a], value: axes[a], band: AXIS_BANDS[a][axisBand(axes[a])] })); };
+/** 갱신기 자료·화면용: 축마다 값과 띠 설명(한국어, 지침 「갱신기(덧붙임)」 AXES.BAND.<축>.<띠> 절) */
+export const axesView = (raw: Axes | undefined) => { const axes = readAxes(raw); return AXES.map((a) => ({ axis: a, label: AXIS_LABEL[a], value: axes[a], band: axisBandText(a, axisBand(axes[a])) })); };
 /** 본편 주입용 (영어 한 줄들). 축 이름·띠 설명은 지침 「Main」 PEOPLE.AXIS_LABEL.<축> · PEOPLE.AXIS.<축>.<띠> 절에서 읽는다 (코드에 글 없음, 2026-11-14) */
 export const axesLinesEn = (raw: Axes | undefined): string[] => { const axes = readAxes(raw); return AXES.map((a) => { const b = axisBand(axes[a]); return `- ${guideTxt('Main', `PEOPLE.AXIS_LABEL.${a}`)} ${axes[a]}/100: ${guideTxt('Main', `PEOPLE.AXIS.${a}.${b}`)}`; }); };
 

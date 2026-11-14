@@ -309,7 +309,7 @@ export function dmPrompt(src: RefSource, st: GState, nick: string, latest: strin
   let task = `${fillVars(b.txt('DM.STORY_TIME'), { time: dateNow(src.chat) })}\n${fill(b.read('DM.REQUEST'), { NICK: nick, ORIGIN: anchor, HISTORY: JSON.stringify(lines) })}`;
   const pub = publicBoard(st, `${latest}\n${anchor}`, b.txt('PUBLIC.ACCESS'));
   if (pub) task += `\n${b.txt('DM.PUBLIC_HEAD')}\n${JSON.stringify(pub)}`;
-  const identity = { speaker: { role: 'npc_correspondent', handle: nick }, owner: { role: 'user', handle: userHandle, personaName: '주인공', referenceOnly: true } };
+  const identity = { speaker: { role: 'npc_correspondent', handle: nick }, owner: { role: 'user', handle: userHandle, personaName: guideTxt('Common', 'REFS.USER_NAME'), referenceOnly: true } };
   const about = /^## About the board\n[^\n]+/m.exec(b.read('LB'))?.[0] ?? '';
   return pack(src, b, 'dm', 'THOUGHTS.DM', [about, b.read('DM.GUIDELINE'), b.read('ATTACHMENTS')].filter(Boolean).join('\n\n'), b.read('DM.FORMAT'), task, factionNames, identity);
 }

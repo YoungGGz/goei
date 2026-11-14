@@ -189,3 +189,31 @@ Write all output in Japanese.
 @@SECTION REFS.STORY.CHAR
 [char]
 @@END
+
+@@SECTION GNET.ERR_JSON
+AI 응답을 JSON으로 읽지 못했어요.
+@@END
+
+@@SECTION GNET.ERR_POST_MISSING
+응답에 post.title과 post.content가 없어요.
+@@END
+
+@@SECTION GNET.ERR_POST_EMPTY
+게시글 제목이나 본문이 비어 있어요.
+@@END
+
+@@SECTION GNET.ERR_DM_BODY
+Expected {"body":"reply text"}.
+@@END
+
+@@SECTION GNET.ERR_DM_BODY_EMPTY
+Expected {"body":"reply text"} with a non-empty body.
+@@END
+
+@@SECTION GNET.ANON_NICK
+익명
+@@END
+
+@@SECTION USER_RULES.DEFAULT_TITLE
+규칙
+@@END

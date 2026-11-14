@@ -298,3 +298,19 @@ watched by the user on the broadcast
 @@SECTION LOG_PAY_WON
 {price}원
 @@END
+
+@@SECTION CHANNEL_NAME
+망상홈쇼핑
+@@END
+
+@@SECTION HOST_NAME
+레드 프라이데이
+@@END
+
+@@SECTION IDENTITY_PRICES
+무이자 N회
+@@END
+
+@@SECTION FORMS_DEFAULT
+전화 출연, 엑스트라, 모델
+@@END

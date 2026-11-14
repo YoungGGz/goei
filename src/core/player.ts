@@ -5,6 +5,7 @@ import { evaluate, type CbsEnv } from './cbs';
 import { stripDecorators } from './lore';
 import type { LoreEntry, ScriptState } from './types';
 import { readDirectory, type AgentRow } from './world/directory';
+import { guideTxt } from './guides';
 
 export const PLAYER_KEY = '$st_player';
 
@@ -49,7 +50,7 @@ export function playerBlock(lore: LoreEntry[] | undefined, agent: AgentRow, env:
 export function playerSource<T extends { char: { name?: string; globalLore?: LoreEntry[] }; chat: { scriptstate?: ScriptState }; persona?: string }>(src: T): T {
   const agent = playerAgent(src.char.globalLore, src.chat.scriptstate);
   if (!agent) return src;
-  return { ...src, persona: playerBlock(src.char.globalLore, agent, { vars: src.chat.scriptstate ?? {}, char: src.char.name, user: '주인공' }) };
+  return { ...src, persona: playerBlock(src.char.globalLore, agent, { vars: src.chat.scriptstate ?? {}, char: src.char.name, user: guideTxt('Common', 'REFS.USER_NAME') }) };
 }
 
 /**

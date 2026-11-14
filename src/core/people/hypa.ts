@@ -4,6 +4,7 @@
 // 2026-11-07 (전수검사 3 의 H·I): 원본 리수폿처럼 「최신순」이 아니라 **관련도 순위**로 고른다 — 이번 입력·최근 글·장면 인물 이름의 낱말이 든 요약에 가점,
 // 중요 표시(isImportant·favorite)는 맨 앞, 같은 글 중복 제거, 개수 상한 + 글자 상한. 하이파 플러스(플러그인 저장소 hypaplus_state_<char>_<chat>)도 읽는다.
 import type { Chat } from '../types';
+import { guideTxt } from '../guides';
 
 export interface HypaItem { source: 'hypa' | 'hypaplus'; text: string; favorite: boolean; index: number }
 export const HYPA_ITEM_CHARS = 4000;
@@ -43,7 +44,8 @@ export function nativeHypaItems(chat: Chat): HypaItem[] {
 
 /** 하이파 플러스 노드 한 줄 (원본 plusNodeText) */
 function plusNodeText(node: Record<string, unknown>): string {
-  const type = node?.type === 'facts' ? '사실' : '기억';
+  // 종류 이름은 갱신기·Director 자료(memory)에 간다: 지침 「갱신기(덧붙임)」 HYPA.FACTS · HYPA.MEMORY 절
+  const type = guideTxt('UpdaterExtra', node?.type === 'facts' ? 'HYPA.FACTS' : 'HYPA.MEMORY');
   const time = str(node?.time);
   const location = str(node?.location);
   const characters = Array.isArray(node?.characters) ? (node.characters as unknown[]).map(String).filter(Boolean) : [];

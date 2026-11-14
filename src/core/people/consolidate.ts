@@ -50,11 +50,12 @@ export function parseConsolidate(raw: string): ConsolidateResult {
   if (fence) t = fence[1].trim();
   const a = t.indexOf('{');
   const b = t.lastIndexOf('}');
-  if (a < 0 || b <= a) throw new Error('JSON 객체가 없어요');
+  // 오류 글은 다시 묻기 요청({reason})과 화면에 같이 간다: 지침 「갱신기(덧붙임)」 ERR.* · CONSOLIDATE.ERR.SLOTS 절
+  if (a < 0 || b <= a) throw new Error(guideTxt('UpdaterExtra', 'ERR.NO_JSON'));
   const v = JSON.parse(t.slice(a, b + 1)) as unknown;
-  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error('JSON 객체가 아니에요');
+  if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error(guideTxt('UpdaterExtra', 'ERR.NOT_OBJECT'));
   const r = v as ConsolidateResult;
-  if (r.slots !== undefined && (!r.slots || typeof r.slots !== 'object' || Array.isArray(r.slots))) throw new Error('slots 는 객체여야 해요');
+  if (r.slots !== undefined && (!r.slots || typeof r.slots !== 'object' || Array.isArray(r.slots))) throw new Error(guideTxt('UpdaterExtra', 'CONSOLIDATE.ERR.SLOTS'));
   return r;
 }
 

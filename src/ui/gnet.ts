@@ -10,6 +10,7 @@ import {
   readGnet, findAnyPost, archived, sourceFor, STORAGE_MAX, storyTurns, tokens, trimBoard,
   userNick, writeGnet, mergeKeyFigures, type GPost, type GSource, type GState, type IncomingOrigin, type IncomingPlan, gnetLabel } from '../core/gnet';
 import { commentPrompt, dmPrompt, POST_REFRESH_ACTION, postPrompt, refreshPrompt, retryMessages } from '../core/gnetPrompt';
+import { guideTxt } from '../core/guides';
 import { composeBody, describe, previewText, type UserKind } from '../core/attach';
 import { ICONS } from './icons';
 import { toast } from './toast';
@@ -1013,8 +1014,10 @@ export function gnetTab(base: ChatContext, env?: GnetEnv, site: BoardSite = 'gn'
   const job = jobs.get(chatKey(ctx));
   const busy = !!job;
   const mobile = narrow();
+  // 기본 닉네임은 요청과 같은 지침 글 (「요청 공통」 GNET.ANON_NICK 절)
+  const anon = guideTxt('Common', 'GNET.ANON_NICK');
   const nick = gnet.editNick
-    ? `<div class="gn-nickform"><input class="gx-search" name="gn-nick" data-enter="gn-nick-save" value="${esc(me === '익명' && !ctx.chat.scriptstate?.[GN_NICK] ? '' : me)}" placeholder="내 닉네임 (비우면 익명)" maxlength="36" aria-label="내 닉네임"><button class="gx-mini" data-action="gn-nick-save" data-take="gn-nick">저장</button></div>`
+    ? `<div class="gn-nickform"><input class="gx-search" name="gn-nick" data-enter="gn-nick-save" value="${esc(me === anon && !ctx.chat.scriptstate?.[GN_NICK] ? '' : me)}" placeholder="내 닉네임 (비우면 ${esc(anon)})" maxlength="36" aria-label="내 닉네임"><button class="gx-mini" data-action="gn-nick-save" data-take="gn-nick">저장</button></div>`
     : '';
   const fail = gnet.failure
     ? `<details class="nw-fail"><summary>최근 실패 원문</summary><p>${esc(gnet.failure.reason)}</p><textarea class="gx-search" rows="6" readonly>${esc(gnet.failure.raw)}</textarea></details>`

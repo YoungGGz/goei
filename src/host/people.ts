@@ -31,7 +31,7 @@ import { applyItemChanges, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, 
 import { ensureItemIcons, itemPictures } from './itemicons';
 import { getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
-import { guideSections } from '../core/guides';
+import { guideSections, guideTxt } from '../core/guides';
 
 /** Director 기본 지침(지침 탭 「Director」의 FACTS·SCENE 절)은 buildDirector 가 읽는다 */
 /** Router 기본 지침: 지침 탭 「Router」의 ROLE·RULES 절 */
@@ -710,7 +710,7 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
   }
   if ((settings.director === 'scene' || settings.director === 'facts') && Object.keys(store.people).length) {
     const me = playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
-    const { people } = peopleBlockFor(ctx.chat, { settings, store, sheetOf: sheetOf(ctx), temperOf, extraNames: extraNames(), input, user: me?.name || userInfo().name || '주인공', factionNames: factionNamesOf(ctx.char.globalLore) });
+    const { people } = peopleBlockFor(ctx.chat, { settings, store, sheetOf: sheetOf(ctx), temperOf, extraNames: extraNames(), input, user: me?.name || userInfo().name || guideTxt('Common', 'REFS.USER_NAME'), factionNames: factionNamesOf(ctx.char.globalLore) });
     const memory = await hypaMemory(ctx.chat, ctx.char, [input, ...people].join('\n'), settings, Math.min(settings.hypaCap, 6000)).catch(() => [] as string[]);
     const b = buildDirector(ctx.chat, store, people, input, settings, Object.fromEntries(people.map((n) => [n, valuesOf(n)])), memory);
     if (b) out.director = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];

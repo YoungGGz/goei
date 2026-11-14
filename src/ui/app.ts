@@ -77,6 +77,7 @@ import { invOn, itemStartOn } from '../core/items';
 import { adjustWallet, walletEditable, aliveAnchors, formatWon, parseWon, readWallet, removeWalletEntry, walletBalance, walletVars, WALLET_MAX, WALLET_START_DEFAULT } from '../core/wallet';
 import { walletHeadButton, walletList, walletUi as walletTabUi } from './wallet';
 import { parsePoints, pointsOn, pointsVars, readPoints } from '../core/points';
+import { guideTxt } from '../core/guides';
 import { applyRecordsNav, closeToastHtml, endedReport, holdToast, releaseToast, syncCloseToast, handleRecords, journalList, rec, recordsInput, recordsNav, recordsTab, resetRecords, type RecordsEnv } from './records';
 import { isPhone, PHONE_MQ } from './media';
 
@@ -1344,7 +1345,7 @@ async function handle(action: string, value?: string): Promise<void> {
       }
       const ctx = view.ctx;
       await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-        if (pts) return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(adjustWallet(readPoints(chat.scriptstate), aliveAnchors(chat), n, '포인트 수정')) } };
+        if (pts) return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(adjustWallet(readPoints(chat.scriptstate), aliveAnchors(chat), n, guideTxt('Main', 'WALLET.MEMO.POINTS_ADJUST'))) } };
         const w = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(adjustWallet(w, aliveAnchors(chat), n)) } };
       });
