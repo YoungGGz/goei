@@ -1,0 +1,1644 @@
+<!-- Main: 메인 요청에 플러그인이 붙이는 글 (직전 상태창·상태창 칸 규칙·소지품·잠긴 부록·인물 기록·세력표 머리말). {이름} 자리는 플러그인이 채웁니다. 절 구분 줄은 그대로 두세요. -->
+@@SECTION STATUS.NOTE
+This is the status line of the scene right before the next input; older status lines were removed from the history. Continue from it: advance the time, update the other fields, and output exactly one new [▣] line at the very end of your response.
+@@END
+
+@@SECTION STATUS.FIRST
+No status line yet: this is the first turn.
+Starting values: {starts}
+{fields}Treat them as the previous values (copy them unless the story changes them) and output exactly one new [▣] line at the very end of your response.
+@@END
+
+@@SECTION STATUS.RECENT_CASH
+Recent cash transactions (oldest first): {list}
+@@END
+
+@@SECTION STATUS.RECENT_POINT
+Recent Baekilmong point transactions (oldest first): {list}
+@@END
+
+@@SECTION STATUS.RULE.TARGET
+Anomaly = the exact Korean name of {{user}}'s current encounter, visit, or assigned target, including briefing and travel; otherwise `없음`.
+@@END
+
+@@SECTION STATUS.RULE.COMPANIONS
+Companions = the named individuals currently travelling together with {{user}}, most important first, exact Korean names as used in the story, separated by `,`. `없음` if none. Only people who are physically with {{user}} right now; do not list unnamed crowds or groups.
+@@END
+
+@@SECTION STATUS.RULE.DEPLOYED
+Deployed = `투입` only while {{user}} (or the party {{user}} leads) is physically inside an anomaly site on an operation. `없음` during briefing, preparation, travel to the site, and after leaving or being evacuated.
+@@END
+
+@@SECTION STATUS.RULE.IDENTITY
+Identity = {{user}}'s current organization and rank in Korean as `조직/직급` (e.g. `관리국/신입`, `가짜 관리국/대리`, `백일몽/사원`, `프리랜서/5급`, `민간인/-`). Copy it unchanged every turn unless the story actually changes it (promotion, transfer, defection).
+@@END
+
+@@SECTION STATUS.RULE.POINTS
+Points = {{user}}'s Baekilmong welfare points, digits only (e.g. `250`). A separate company scrip, never cash: points and won never convert. Every employee starts at 0 and holds only what the story has actually given (a stated grant, a per-grade clear reward, minus purchases). Copy it from `[Previous status]` and change it only by point amounts written in the story; never invent a balance that no sentence has granted.
+@@END
+
+@@SECTION STATUS.RULE.WALLET
+Balance = {{user}}'s current cash in won, digits only (e.g. `1230000`, no symbol or separators). Copy it from `[Previous status]` and change it only by amounts the story states explicitly. Whenever money changes hands in the scene, write the exact amount in the prose so the ledger can record it.
+@@END
+
+@@SECTION STATUS.RULE.ONE_LINE
+- Output exactly one [▣] at the very end of every response.
+@@END
+
+@@SECTION STATUS.RULE.FIELDS
+- Fields in order: {labels}. Never add, drop or reorder fields.
+@@END
+
+@@SECTION STATUS.RULE.PREVIOUS
+- The status line of the previous scene is provided in a `[Previous status]` block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.
+@@END
+
+@@SECTION INVENTORY.NOTE
+What the protagonist carries right now (name — state (effect) [equipped / uses left / condition]); nothing else is on hand. Equipped items are in hand or worn. Keep it in mind when you write what they do, and when "This turn" lists an event, handle it in this response: describe a used item taking effect (or failing), and if they carry more than the limit, let that show in the story — something is awkward to hold, dropped, left behind, or someone remarks on it. A broken item does not work. Never print this list back.
+@@END
+
+@@SECTION INVENTORY.RESUMED
+item tracking was switched off for a while and just came back on — this list may not match what happened in the story since; follow the story and treat the list as a starting point
+@@END
+
+@@SECTION INVENTORY.REALLY
+Really (what these actually do — decided by no one in advance, known to no one in the story; let it happen and show only what is experienced):
+@@END
+
+@@SECTION INVENTORY.REALLY_UNKNOWN
+- {name}: not even its seller knows{label_note} — decide what it really does now, then keep it the same from here on.
+@@END
+
+@@SECTION LORE.LOCKED
+[Locked appendix: 「{name}」] Hidden information about {parent} that no character knows yet. Unlock it when this happens in the story: {when}
+Do not invent, reveal, or hint at the hidden information before it is unlocked. In the one reply where the condition is clearly met, write [🔓|{name}] on its own line after the prose.
+@@END
+
+@@SECTION PEOPLE.KNOWLEDGE_RULE
+Do not have a character mention or act on a secret or fact they have not witnessed, learned, or otherwise demonstrably known. Never invent how they acquired information. Keep facts, beliefs, guesses, and misunderstandings distinct. A missing record does not prove ignorance: actual evidence in the conversation may establish knowledge.
+@@END
+
+@@SECTION PEOPLE.RULE
+Living records of the characters in this scene, kept by the system from what actually happened in this chat. They override the static character sheets where they differ. Treat them as background facts, not as events to narrate; never mention scores or these notes themselves. {knowledge_rule}
+@@END
+
+@@SECTION SEXUAL.POLICY
+sexual_context_only fields are inactive during ordinary conversation, work, dating, flirting, handholding, hugs, and light kisses. Use them only after a clear adult sexual proposition, sexual touching, sexually intended exposure, foreplay, mutually acknowledged imminent sexual activity, or ongoing sexual activity. Current consent and explicit boundaries always override them.
+@@END
+
+@@SECTION PEOPLE.EXPRESS_0
+Expression: almost never shown; appears only through actions and priorities, not words.
+@@END
+
+@@SECTION PEOPLE.EXPRESS_1
+Expression: restrained; small, deniable cues (pauses, gaze, delayed replies).
+@@END
+
+@@SECTION PEOPLE.EXPRESS_2
+Expression: visible but controlled.
+@@END
+
+@@SECTION PEOPLE.EXPRESS_3
+Expression: open and immediate.
+@@END
+
+@@SECTION PEOPLE.TASTE_NOTE
+A separate axis from the relationship above; it never grants closeness by itself.
+@@END
+
+@@SECTION PEOPLE.OPENNESS_NOTE
+Applies only inside intimate contexts that actually arise; an explicit current condition or the other participant's choice takes priority.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.0
+Extreme hostility. Keep the actual cause and constraints; the stage alone never compels a newly invented harmful act.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.1
+Hostility. Real distance or antagonism, expressed in this character's own manner.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.2
+Aversion. Evidence-grounded resentment or coldness; shorter answers, discretionary effort withheld.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.3
+Indifference. Base-personality politeness, small talk and work cooperation. No special favor, no forced coldness.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.4
+Recognition. Remembers personal details, notices absence, a little more willing to ask or answer.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.5
+Interest. Seeks shared time; offers reliable help, concern, explanation or appropriately personal worries.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.6
+Attraction. Makes time and space for this person; reveals more sincere concern, preferences or vulnerability.
+@@END
+
+@@SECTION PEOPLE.AFFINITY.7
+Affection. Deep care, voluntary support and emotional closeness, within this character's own personality.
+@@END
+
+@@SECTION PEOPLE.TASTE.-3
+strong aversion; ends or avoids contact
+@@END
+
+@@SECTION PEOPLE.TASTE.-2
+clear dislike; more friction and distance, less voluntary kindness
+@@END
+
+@@SECTION PEOPLE.TASTE.-1
+slightly grating or not to taste; responds only as needed
+@@END
+
+@@SECTION PEOPLE.TASTE.0
+no particular pull or aversion; treats as the relationship stands
+@@END
+
+@@SECTION PEOPLE.TASTE.1
+weakly drawn; pays a little more attention, remembers, keeps talking
+@@END
+
+@@SECTION PEOPLE.TASTE.2
+core tastes clearly match; asks first, spends more time and effort
+@@END
+
+@@SECTION PEOPLE.TASTE.3
+several core tastes strongly match; priorities of attention may shift
+@@END
+
+@@SECTION PEOPLE.OPENNESS.0
+must use contraception and says so as a prerequisite
+@@END
+
+@@SECTION PEOPLE.OPENNESS.1
+hesitant while still asking for contraception (hesitation is not abandoning the condition)
+@@END
+
+@@SECTION PEOPLE.OPENNESS.2
+believes non-use is acceptable on a "safe day" (an attitude; never compute a real safe date)
+@@END
+
+@@SECTION PEOPLE.OPENNESS.3
+pays little attention to checking or requesting contraception
+@@END
+
+@@SECTION PEOPLE.OPENNESS.4
+prefers non-use, distinct from mere indifference
+@@END
+
+@@SECTION PEOPLE.AXIS.relationalInitiative.0
+almost never initiates contact
+@@END
+
+@@SECTION PEOPLE.AXIS.relationalInitiative.1
+mostly responds when the other leads
+@@END
+
+@@SECTION PEOPLE.AXIS.relationalInitiative.2
+alternates between leading and responding
+@@END
+
+@@SECTION PEOPLE.AXIS.relationalInitiative.3
+approaches first when needed and steers the relationship
+@@END
+
+@@SECTION PEOPLE.AXIS.relationalInitiative.4
+steadily drives the direction of relationships
+@@END
+
+@@SECTION PEOPLE.AXIS.expressionDirectness.0
+almost never states intent directly
+@@END
+
+@@SECTION PEOPLE.AXIS.expressionDirectness.1
+prefers indirection and hints
+@@END
+
+@@SECTION PEOPLE.AXIS.expressionDirectness.2
+adjusts between direct and roundabout
+@@END
+
+@@SECTION PEOPLE.AXIS.expressionDirectness.3
+states intent and demands fairly plainly
+@@END
+
+@@SECTION PEOPLE.AXIS.expressionDirectness.4
+expresses thoughts and intent very directly
+@@END
+
+@@SECTION PEOPLE.AXIS.emotionalExpressiveness.0
+almost never shows emotion outwardly
+@@END
+
+@@SECTION PEOPLE.AXIS.emotionalExpressiveness.1
+small, limited emotional cues
+@@END
+
+@@SECTION PEOPLE.AXIS.emotionalExpressiveness.2
+shows or hides emotion depending on the situation
+@@END
+
+@@SECTION PEOPLE.AXIS.emotionalExpressiveness.3
+emotion often shows in words and actions
+@@END
+
+@@SECTION PEOPLE.AXIS.emotionalExpressiveness.4
+expresses emotion vividly and immediately
+@@END
+
+@@SECTION PEOPLE.AXIS.guardedness.0
+trusts easily, hardly any guard
+@@END
+
+@@SECTION PEOPLE.AXIS.guardedness.1
+low initial guard, opens up fairly fast
+@@END
+
+@@SECTION PEOPLE.AXIS.guardedness.2
+adjusts trust and guard to the situation
+@@END
+
+@@SECTION PEOPLE.AXIS.guardedness.3
+does not reveal inner thoughts easily, keeps guard
+@@END
+
+@@SECTION PEOPLE.AXIS.guardedness.4
+strong guard; strictly limits approach and self-disclosure
+@@END
+
+@@SECTION PEOPLE.AXIS.impulsivity.0
+strongly suppresses impulse and deliberates
+@@END
+
+@@SECTION PEOPLE.AXIS.impulsivity.1
+mostly thinks before acting
+@@END
+
+@@SECTION PEOPLE.AXIS.impulsivity.2
+mix of deliberation and spontaneous action
+@@END
+
+@@SECTION PEOPLE.AXIS.impulsivity.3
+acts quickly on feeling and desire
+@@END
+
+@@SECTION PEOPLE.AXIS.impulsivity.4
+acts very impulsively before weighing consequences
+@@END
+
+@@SECTION PEOPLE.AXIS.relationshipPersistence.0
+lets relationships go easily
+@@END
+
+@@SECTION PEOPLE.AXIS.relationshipPersistence.1
+tends to withdraw when conflict or distance appears
+@@END
+
+@@SECTION PEOPLE.AXIS.relationshipPersistence.2
+keeps or drops a relationship by its value
+@@END
+
+@@SECTION PEOPLE.AXIS.relationshipPersistence.3
+tries to keep relationships through difficulty
+@@END
+
+@@SECTION PEOPLE.AXIS.relationshipPersistence.4
+very persistent in keeping and repairing relationships
+@@END
+
+@@SECTION RHYTHM.HEAD
+## Scene rhythm (kept by the system; guidance, not content to narrate)
+@@END
+
+@@SECTION RHYTHM.CLOCK_HEAD
+Hook clock (counted by the system; never say turn numbers in the story):
+@@END
+
+@@SECTION RHYTHM.METHOD
+Previous staging method: {method} — do not use the same anticipation method in consecutive turns.
+@@END
+
+@@SECTION FACTION.INTRO
+This reference describes the world to the GM. Public labels, hidden affiliations, doctrine, and internal information are known to an NPC only through that NPC's actual access.
+@@END
+
+@@SECTION ROSTER.INTRO
+- Purpose: GM reference for consistent character introductions before individual lore is active.
+- Detail: Use active character lore for fuller characterization.
+@@END
+
+@@SECTION FACTION.RELATIONS_LEGEND
+How the row faction regards the column faction: H hostile, W wary, N neutral, F favorable, A allied, - self. Factions not in the table regard each other neutrally.
+@@END
+
+@@SECTION FACTION.HEAD
+## Factions → {user} (standing of each organization toward {user}, kept by the system; members act accordingly)
+@@END
+
+@@SECTION FACTION.STAGE.friendly
+Friendly. Members welcome {{user}}, share information freely and take {{user}}'s side in a fight.
+@@END
+
+@@SECTION FACTION.STAGE.favorable
+Favorable. Members greet {{user}}, make way and extend small favors.
+@@END
+
+@@SECTION FACTION.STAGE.neutral
+Neutral. Ordinary procedure; members take no special notice.
+@@END
+
+@@SECTION FACTION.STAGE.wary
+Wary. Members watch and verify; on their own ground they warn {{user}} off or expel; elsewhere they only observe.
+@@END
+
+@@SECTION FACTION.STAGE.hostile
+Hostile. Members attack {{user}} on sight, even outside their own ground.
+@@END
+
+@@SECTION RHYTHM.CLOCK.TURN
+Turn {turn} (confirmed replies). Active hooks: short {short}/{short_limit}, mid {mid}/{mid_limit}, long {long}/{long_limit}. New plant {plant}.
+@@END
+
+@@SECTION RHYTHM.CLOCK.ALLOWED
+allowed
+@@END
+
+@@SECTION RHYTHM.CLOCK.NOT_ALLOWED
+not allowed: {reason}
+@@END
+
+@@SECTION RHYTHM.CLOCK.HOOK
+- {key}: {stage}, {tier}, planted {age} turn(s) ago, last advance {since} turn(s) ago, payoff window {from}–{to}{mark}{extended}
+@@END
+
+@@SECTION RHYTHM.CLOCK.OVERDUE
+— OVERDUE
+@@END
+
+@@SECTION RHYTHM.CLOCK.IN_WINDOW
+— in window
+@@END
+
+@@SECTION RHYTHM.CLOCK.EXTENDED
+(extended)
+@@END
+
+@@SECTION RHYTHM.CLOCK.PRIORITY
+Priority: {items}
+@@END
+
+@@SECTION RHYTHM.BLOCK.GAP
+last plant {ago} turn(s) ago (need {need})
+@@END
+
+@@SECTION RHYTHM.BLOCK.LIMIT
+active limits reached
+@@END
+
+@@SECTION RHYTHM.BLOCK.OVERDUE
+handle the overdue flow first
+@@END
+
+@@SECTION RHYTHM.PRIORITY.OVERDUE
+overdue: {key} ({tier}, {age} turns since planting, window {from}–{to}{ext})
+@@END
+
+@@SECTION RHYTHM.PRIORITY.EXTENDED
+already extended
+@@END
+
+@@SECTION RHYTHM.PRIORITY.MAY_EXTEND
+may extend once with [ext]
+@@END
+
+@@SECTION RHYTHM.PRIORITY.PAYOFF
+payoff ready: {key}
+@@END
+
+@@SECTION RHYTHM.PRIORITY.ADVANCE
+advance due: {key} ({since} turns since last advance)
+@@END
+
+@@SECTION RHYTHM.PRIORITY.PLANT
+new plant allowed ({tiers})
+@@END
+
+@@SECTION PEOPLE.HEAD
+[People records]
+@@END
+
+@@SECTION PEOPLE.BLOCK.HEAD
+## {name} (living record · updated in this chat)
+@@END
+
+@@SECTION PEOPLE.BLOCK.IDENTITY
+Identity:
+@@END
+
+@@SECTION PEOPLE.BLOCK.PERSONALITY
+Personality:
+@@END
+
+@@SECTION PEOPLE.BLOCK.AXES
+Personality axes (baseline traits, not current feeling):
+@@END
+
+@@SECTION PEOPLE.BLOCK.PATTERNS
+Long-term changes:
+@@END
+
+@@SECTION PEOPLE.BLOCK.SEXUAL
+Sexual profile (policy: {policy})
+@@END
+
+@@SECTION PEOPLE.BLOCK.SEXUAL_POLICY
+Sexual profile (policy: {policy} — {policy_text})
+@@END
+
+@@SECTION PEOPLE.BLOCK.SEXUAL_DESIRE
+Sexual desire: {text}
+@@END
+
+@@SECTION PEOPLE.BLOCK.PARAPHILIA
+Paraphilia: {text}
+@@END
+
+@@SECTION PEOPLE.BLOCK.STATE
+Current state:
+@@END
+
+@@SECTION PEOPLE.BLOCK.KNOWS
+Knows:
+@@END
+
+@@SECTION PEOPLE.BLOCK.UNKNOWN
+Does not know (has not witnessed or been told):
+@@END
+
+@@SECTION PEOPLE.BLOCK.RELATION
+Relationship → {user}: {stage} ({behavior})
+@@END
+
+@@SECTION PEOPLE.BLOCK.RELATION_QUAL
+Relationship → {user}:
+@@END
+
+@@SECTION PEOPLE.BLOCK.TASTE
+First impression (taste) → {user}: {band} — {taste}. {note}
+@@END
+
+@@SECTION PEOPLE.BLOCK.OPENNESS
+Openness: {stage} ({value}/{max}) — contraception attitude: {contraception}. {note}
+@@END
+
+@@SECTION PEOPLE.BLOCK.OTHERS
+Relationships with others:
+@@END
+
+@@SECTION PEOPLE.BLOCK.ADDRESS
+Address → {user}: '{address}', {register}.
+@@END
+
+@@SECTION PEOPLE.BLOCK.SPEECH_USER
+Speech → {user}:
+@@END
+
+@@SECTION PEOPLE.BLOCK.SPEECH_OTHERS
+Speech toward others:
+@@END
+
+@@SECTION PEOPLE.BLOCK.BEHAVIOR
+Behavior:
+@@END
+
+@@SECTION PEOPLE.BLOCK.THREADS
+Open threads:
+@@END
+
+@@SECTION PEOPLE.BLOCK.SUSPICION
+Suspicion:
+@@END
+
+@@SECTION PEOPLE.BLOCK.SUSPICION_ABOUT
+about {target}
+@@END
+
+@@SECTION PEOPLE.BLOCK.HISTORY
+Recent (this chat):
+@@END
+
+@@SECTION PEOPLE.BLOCK.SCENE
+Now:
+@@END
+
+@@SECTION PEOPLE.BLOCK.NOTE
+Director note:
+@@END
+
+@@SECTION PEOPLE.BLOCK.MUST_NOT
+Must not reveal: {text}
+@@END
+
+@@SECTION PEOPLE.REGISTER.0
+formal (존댓말)
+@@END
+
+@@SECTION PEOPLE.REGISTER.1
+informal (반말)
+@@END
+
+@@SECTION PEOPLE.REGISTER.2
+mixed formal/informal
+@@END
+
+@@SECTION PEOPLE.REGISTER.3
+hage-che (archaic, superior-to-junior)
+@@END
+
+@@SECTION PEOPLE.REGISTER.4
+hao-che (archaic, dignified formal)
+@@END
+
+@@SECTION PEOPLE.REGISTER.OTHER
+mixed
+@@END
+
+@@SECTION PEOPLE.GROUP.AFFINITY
+Taste and appraisal
+@@END
+
+@@SECTION PEOPLE.GROUP.REGISTER
+Address and relationship stage
+@@END
+
+@@SECTION PEOPLE.GROUP.PERCEPTION
+Perception
+@@END
+
+@@SECTION PEOPLE.GROUP.OPENNESS
+Intimacy conditions
+@@END
+
+@@SECTION PEOPLE.GROUP.AFFINITY_QUAL
+Goodwill (qualitative; no score exists)
+@@END
+
+@@SECTION PEOPLE.GROUP.SUSPICION_QUAL
+Suspicion (qualitative; no score exists)
+@@END
+
+@@SECTION PEOPLE.GROUP.OPENNESS_QUAL
+Intimacy attitude (qualitative; no score exists)
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.profile
+Taste profile
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.values
+Values and biases
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.appraisal
+First impression (fixed)
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.current_appraisal
+Current appraisal
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.intent
+Intent
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.stance
+Stance
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.bind
+Constraint
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.private
+Unexpressed
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.approach
+Approach
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.surface_actual
+Surface vs purpose
+@@END
+
+@@SECTION PEOPLE.SLOT.register.context
+Address conditions
+@@END
+
+@@SECTION PEOPLE.SLOT.register.stage_assessment
+Relationship stage
+@@END
+
+@@SECTION PEOPLE.SLOT.register.knowledge_gap
+Last contact
+@@END
+
+@@SECTION PEOPLE.SLOT.register.restraint
+Restraint
+@@END
+
+@@SECTION PEOPLE.SLOT.perception.profile
+Observation tendency
+@@END
+
+@@SECTION PEOPLE.SLOT.perception.modifiers
+Current impairments
+@@END
+
+@@SECTION PEOPLE.SLOT.perception.channels
+Scene conditions
+@@END
+
+@@SECTION PEOPLE.SLOT.perception.reading
+Clues read
+@@END
+
+@@SECTION PEOPLE.SLOT.perception.secret
+Secrets held
+@@END
+
+@@SECTION PEOPLE.SLOT.openness.context
+Conditions
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.regard
+Goodwill
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.speech
+Speech
+@@END
+
+@@SECTION PEOPLE.SLOT.affinity.behavior
+Behavior
+@@END
+
+@@SECTION PEOPLE.SLOT.suspicion.concern
+Concern
+@@END
+
+@@SECTION PEOPLE.SLOT.suspicion.speech
+Speech
+@@END
+
+@@SECTION PEOPLE.SLOT.suspicion.behavior
+Behavior
+@@END
+
+@@SECTION PEOPLE.SLOT.openness.attitude
+Attitude
+@@END
+
+@@SECTION PEOPLE.SLOT.openness.speech
+Speech
+@@END
+
+@@SECTION PEOPLE.SLOT.openness.behavior
+Behavior
+@@END
+
+@@SECTION PEOPLE.AXIS_LABEL.relationalInitiative
+relational initiative
+@@END
+
+@@SECTION PEOPLE.AXIS_LABEL.expressionDirectness
+expression directness
+@@END
+
+@@SECTION PEOPLE.AXIS_LABEL.emotionalExpressiveness
+emotional expressiveness
+@@END
+
+@@SECTION PEOPLE.AXIS_LABEL.guardedness
+guardedness
+@@END
+
+@@SECTION PEOPLE.AXIS_LABEL.impulsivity
+impulsivity
+@@END
+
+@@SECTION PEOPLE.AXIS_LABEL.relationshipPersistence
+relationship persistence
+@@END
+
+@@SECTION PEOPLE.OPENNESS_STAGE.0
+Chaste
+@@END
+
+@@SECTION PEOPLE.OPENNESS_STAGE.1
+Shy
+@@END
+
+@@SECTION PEOPLE.OPENNESS_STAGE.2
+Open
+@@END
+
+@@SECTION PEOPLE.OPENNESS_STAGE.3
+Awakened
+@@END
+
+@@SECTION PEOPLE.OPENNESS_STAGE.4
+Indulgent
+@@END
+
+@@SECTION RHYTHM.DIRECTION
+Direction for this reply: {note}
+@@END
+
+@@SECTION FACTION.WHY
+(why: {note})
+@@END
+
+@@SECTION INVENTORY.SHOP.SOLD
+just sold {items} to the owner of {shop}
+@@END
+
+@@SECTION INVENTORY.SHOP.SOLD_ITEM_WON
+{name} ({price} won)
+@@END
+
+@@SECTION INVENTORY.SHOP.SOLD_ITEM_POINTS
+{name} ({price} Baekilmong points)
+@@END
+
+@@SECTION INVENTORY.SHOP.REFUSED
+was refused service and sent out of {shop} ("{line}")
+@@END
+
+@@SECTION INVENTORY.SHOP.TALKED
+talked with the owner of {shop} — {talk}
+@@END
+
+@@SECTION INVENTORY.SHOP.TALK_ME
+protagonist: "{text}"
+@@END
+
+@@SECTION INVENTORY.SHOP.TALK_OWNER
+owner: "{text}"
+@@END
+
+@@SECTION STATUS.RECENT_CASH_LINE
+{amount} won {memo}
+@@END
+
+@@SECTION MALL.ASK
+chatted by text with the operator on the {mall} website — {lines}
+@@END
+
+@@SECTION MALL.ORDER
+placed a custom order with {mall} for 「{item}」, paid {price} won in advance; it will be ready in about {hours} hours and has not arrived yet
+@@END
+
+@@SECTION MALL.READY
+the custom order 「{item}」 from {mall} is now finished and waiting; the protagonist was notified but has not collected it yet (it is collected on the website, not delivered into the scene by itself)
+@@END
+
+@@SECTION MALL.DESK
+chatted by text with a counselor on the {mall} 1:1 상담 — {lines}
+@@END
+
+@@SECTION MALL.LINE
+{who}: "{text}"
+@@END
+
+@@SECTION MALL.WHO.ME
+protagonist
+@@END
+
+@@SECTION MALL.WHO.OPERATOR
+operator
+@@END
+
+@@SECTION MALL.WHO.COUNSELOR
+counselor
+@@END
+
+@@SECTION MALL.PAID.POINTS
+{price} Baekilmong points at {mall}{extra}
+@@END
+
+@@SECTION MALL.PAID.BANK
+bank transfer to {mall}{extra}
+@@END
+
+@@SECTION MALL.PAID.EXTRA
++ {pay}
+@@END
+
+@@SECTION MALL.PAID.ORDER
+custom order from {mall}, paid in advance
+@@END
+
+@@SECTION MALL.MEMO.BUY
+{item} ({mall})
+@@END
+
+@@SECTION MALL.MEMO.SELL
+{item} ({mall} 매입)
+@@END
+
+@@SECTION MALL.MEMO.NOTE
+쪽지: {title} ({mall})
+@@END
+
+@@SECTION MALL.MEMO.ORDER
+맞춤 주문 선납: {item} ({mall})
+@@END
+
+@@SECTION MALL.NOTE.NAME
+쪽지: {title}
+@@END
+
+@@SECTION MALL.NOTE.DESC
+{mall} 운영자가 보낸 쪽지
+@@END
+
+@@SECTION STATUS.HEAD
+[Previous status]
+@@END
+
+@@SECTION STATUS.FIELDS_LINE
+Fields: {labels}
+@@END
+
+@@SECTION STATUS.START.WALLET
+Balance = {n}
+@@END
+
+@@SECTION STATUS.START.POINTS
+Points = {n}
+@@END
+
+@@SECTION STATUS.LABEL.DATE
+날짜
+@@END
+
+@@SECTION STATUS.LABEL.TIME
+시각
+@@END
+
+@@SECTION STATUS.LABEL.WEATHER
+날씨
+@@END
+
+@@SECTION STATUS.LABEL.TEMP
+기온
+@@END
+
+@@SECTION STATUS.LABEL.PLACE
+위치
+@@END
+
+@@SECTION STATUS.LABEL.TARGET
+목표
+@@END
+
+@@SECTION STATUS.LABEL.COMPANIONS
+동행
+@@END
+
+@@SECTION STATUS.LABEL.DEPLOYED
+투입
+@@END
+
+@@SECTION STATUS.LABEL.IDENTITY
+신분
+@@END
+
+@@SECTION STATUS.LABEL.WALLET
+잔고
+@@END
+
+@@SECTION STATUS.LABEL.POINTS
+포인트
+@@END
+
+@@SECTION STATUS.TOKEN.DATE
+YYYY.MM.DD
+@@END
+
+@@SECTION STATUS.TOKEN.TIME
+HH:MM AM/PM
+@@END
+
+@@SECTION STATUS.TOKEN.WEATHER
+weather
+@@END
+
+@@SECTION STATUS.TOKEN.TEMP
+temperature
+@@END
+
+@@SECTION STATUS.TOKEN.PLACE
+location
+@@END
+
+@@SECTION STATUS.TOKEN.TARGET
+anomaly
+@@END
+
+@@SECTION STATUS.TOKEN.COMPANIONS
+companions
+@@END
+
+@@SECTION STATUS.TOKEN.DEPLOYED
+deployed
+@@END
+
+@@SECTION STATUS.TOKEN.IDENTITY
+identity
+@@END
+
+@@SECTION STATUS.TOKEN.WALLET
+balance
+@@END
+
+@@SECTION STATUS.TOKEN.POINTS
+points
+@@END
+
+@@SECTION STATUS.SECTION_HEAD
+## Status
+@@END
+
+@@SECTION STATUS.FORMAT
+[▣|{tokens}]
+@@END
+
+@@SECTION STATUS.EXAMPLE.LINE
+[▣|{cells}]
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.HEAD
+- Example:
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.HEAD_TARGET
+- Example (no current anomaly):
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.HEAD
+- Example (inside an anomaly):
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.HEAD_COMPANIONS
+- Example (inside an anomaly with two companions):
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.DATE
+2025.01.01
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.TIME
+02:47 AM
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.WEATHER
+☀️
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.TEMP
+4°C
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.PLACE
+서울 종로구 거리
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.TARGET
+없음
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.COMPANIONS
+없음
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.DEPLOYED
+없음
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.IDENTITY
+관리국/신입
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.WALLET
+1230000
+@@END
+
+@@SECTION STATUS.EXAMPLE_A.POINTS
+0
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.DATE
+2025.01.01
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.TIME
+10:15 PM
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.WEATHER
+🌫️
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.TEMP
+9°C
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.PLACE
+명일 아파트 3층 복도
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.TARGET
+명일 아파트
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.COMPANIONS
+쟈알디,에일린
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.DEPLOYED
+투입
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.IDENTITY
+관리국/요원
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.WALLET
+1180000
+@@END
+
+@@SECTION STATUS.EXAMPLE_B.POINTS
+250
+@@END
+
+@@SECTION STATUS.EXAMPLE.IDENTITY_POINTS
+백일몽/사원
+@@END
+
+@@SECTION INVENTORY.HEAD
+[Inventory]
+@@END
+
+@@SECTION INVENTORY.OVER_LIMIT
+(over the limit)
+@@END
+
+@@SECTION INVENTORY.SHOP_HEAD
+[Shop]
+@@END
+
+@@SECTION INVENTORY.NOTHING
+- (nothing)
+@@END
+
+@@SECTION INVENTORY.WEIGHT
+Weight: {weight} kg / {carry} kg
+@@END
+
+@@SECTION INVENTORY.WEIGHT_OVER
+Weight: {weight} kg / {carry} kg ({over} kg over)
+@@END
+
+@@SECTION INVENTORY.CARRY_LIMIT
+Carry limit: {limit}
+@@END
+
+@@SECTION INVENTORY.LIMIT_DEFAULT
+one bag, pockets, and two hands
+@@END
+
+@@SECTION INVENTORY.RECENT
+Recently: {list}
+@@END
+
+@@SECTION INVENTORY.THIS_TURN
+This turn: {events}
+@@END
+
+@@SECTION INVENTORY.EVENT.USES
+uses {list}
+@@END
+
+@@SECTION INVENTORY.USE.USED_UP
+(used up after this)
+@@END
+
+@@SECTION INVENTORY.USE.LEFT
+({n} left after this)
+@@END
+
+@@SECTION INVENTORY.EVENT.BOUGHT
+just bought {list}
+@@END
+
+@@SECTION INVENTORY.EVENT.OVER_LIMIT
+carrying more than the limit
+@@END
+
+@@SECTION INVENTORY.EVENT.MERGED
+combined {name} into {other}
+@@END
+
+@@SECTION INVENTORY.EVENT.PUT_AWAY
+put {name} away (still carrying it)
+@@END
+
+@@SECTION INVENTORY.EVENT.TOOK_OFF
+took off {name} (still carrying it)
+@@END
+
+@@SECTION INVENTORY.EVENT.LEFT_AT
+left {name} at {place} — no longer carrying or wearing it
+@@END
+
+@@SECTION INVENTORY.EVENT.LEFT_BEHIND
+left {name} behind — no longer carrying or wearing it
+@@END
+
+@@SECTION INVENTORY.EVENT.GONE
+no longer has {name}
+@@END
+
+@@SECTION INVENTORY.EVENT.DROPPED
+threw {name} away — the protagonist discarded it on purpose and no longer has it
+@@END
+
+@@SECTION INVENTORY.EVENT.SOLD_TO
+just sold {name} to {place} and handed it over — the protagonist no longer has, carries or wears it
+@@END
+
+@@SECTION INVENTORY.EVENT.SOLD
+just sold {name} and handed it over — the protagonist no longer has, carries or wears it
+@@END
+
+@@SECTION INVENTORY.BOUGHT.PAID
+{name} (paid with {paid})
+@@END
+
+@@SECTION INVENTORY.BOUGHT.PAID_WON
+{name} (paid with {paid} + {price} won)
+@@END
+
+@@SECTION INVENTORY.TAG.IN_HAND
+in hand
+@@END
+
+@@SECTION INVENTORY.TAG.WORN
+worn
+@@END
+
+@@SECTION INVENTORY.TAG.USED_UP
+used up
+@@END
+
+@@SECTION INVENTORY.TAG.USES_LEFT
+{n} uses left
+@@END
+
+@@SECTION INVENTORY.TAG.USE_LEFT
+{n} use left
+@@END
+
+@@SECTION INVENTORY.TAG.DAMAGED
+damaged
+@@END
+
+@@SECTION INVENTORY.TAG.BROKEN
+broken, cannot be used
+@@END
+
+@@SECTION INVENTORY.LINE.READS
+— reads: "{text}"
+@@END
+
+@@SECTION INVENTORY.REALLY_LINE
+- {name}: {truth}
+@@END
+
+@@SECTION INVENTORY.REALLY_LINE_LABEL
+- {name}: {truth} (the label says 「{effect}」)
+@@END
+
+@@SECTION INVENTORY.REALLY_UNKNOWN_LABEL
+(the label says 「{effect}」 and may be false)
+@@END
+
+@@SECTION INVENTORY.LOG.GET
+got {name}
+@@END
+
+@@SECTION INVENTORY.LOG.USE
+used {name}
+@@END
+
+@@SECTION INVENTORY.LOG.DROP
+dropped {name}
+@@END
+
+@@SECTION INVENTORY.LOG.GONE
+lost {name}
+@@END
+
+@@SECTION INVENTORY.LOG.DESTROY
+destroyed {name}
+@@END
+
+@@SECTION INVENTORY.LOG.MERGE
+combined into {name}
+@@END
+
+@@SECTION INVENTORY.LOG.SELL
+sold {name}
+@@END
+
+@@SECTION INVENTORY.LOG.LEFT
+left behind {name}
+@@END
+
+@@SECTION INVENTORY.LOG.OFF
+took off {name}
+@@END
+
+@@SECTION INVENTORY.LOG.PUT_AWAY
+put {name} away
+@@END
+
+@@SECTION INVENTORY.LOG.USED_UP
+used up {name}
+@@END
+
+@@SECTION WORLD.FIELD.agent.age
+Age
+@@END
+
+@@SECTION WORLD.FIELD.agent.gender
+Gender
+@@END
+
+@@SECTION WORLD.FIELD.agent.organization
+Organization
+@@END
+
+@@SECTION WORLD.FIELD.agent.department_en
+Department
+@@END
+
+@@SECTION WORLD.FIELD.agent.role
+Role
+@@END
+
+@@SECTION WORLD.FIELD.agent.physique
+Physique
+@@END
+
+@@SECTION WORLD.FIELD.agent.appearance
+Appearance
+@@END
+
+@@SECTION WORLD.FIELD.agent.outfit
+Outfit
+@@END
+
+@@SECTION WORLD.FIELD.agent.character
+Character
+@@END
+
+@@SECTION WORLD.FIELD.agent.voice
+Voice
+@@END
+
+@@SECTION WORLD.FIELD.agent.background
+Background
+@@END
+
+@@SECTION WORLD.FIELD.agent.abilities
+Abilities
+@@END
+
+@@SECTION WORLD.FIELD.org.intro
+Identity
+@@END
+
+@@SECTION WORLD.FIELD.org.doctrine
+Doctrine
+@@END
+
+@@SECTION WORLD.FIELD.org.hq
+Headquarters and Sites
+@@END
+
+@@SECTION WORLD.FIELD.org.structure
+Structure
+@@END
+
+@@SECTION WORLD.FIELD.org.hierarchy
+Hierarchy
+@@END
+
+@@SECTION WORLD.FIELD.org.recruitment
+Recruitment
+@@END
+
+@@SECTION WORLD.FIELD.org.assets
+Core Assets and Traits
+@@END
+
+@@SECTION WORLD.FIELD.org.personnel
+Personnel
+@@END
+
+@@SECTION WORLD.FIELD.anomaly.identity
+Identity
+@@END
+
+@@SECTION WORLD.FIELD.anomaly.entry
+Entry Conditions
+@@END
+
+@@SECTION WORLD.FIELD.anomaly.space
+Structure
+@@END
+
+@@SECTION WORLD.FIELD.anomaly.rules
+Rules
+@@END
+
+@@SECTION WORLD.FIELD.anomaly.entities
+Sub-Entities
+@@END
+
+@@SECTION WORLD.FIELD.anomaly.survival
+Survival and Clear
+@@END
+
+@@SECTION WORLD.FIELD.anomaly.notes
+Notes
+@@END
+
+@@SECTION WORLD.FIELD.site.identity
+Identity
+@@END
+
+@@SECTION WORLD.FIELD.site.access
+Access
+@@END
+
+@@SECTION WORLD.FIELD.site.location
+Location and Appearance
+@@END
+
+@@SECTION WORLD.FIELD.site.environment
+Environment
+@@END
+
+@@SECTION WORLD.FIELD.site.rules
+Rules and Trade
+@@END
+
+@@SECTION WORLD.FIELD.site.keeper
+Keeper
+@@END
+
+@@SECTION WORLD.AGENT.HEAD
+### Character - {name}
+@@END
+
+@@SECTION WORLD.AGENT.IDENTITY
+#### Identity
+@@END
+
+@@SECTION WORLD.AGENT.APPEARANCE
+#### Appearance
+@@END
+
+@@SECTION WORLD.ANOMALY.HEAD
+### Instructions for the Implementation of the Anomaly - {title}
+@@END
+
+@@SECTION WORLD.ANOMALY.HEAD_RAW
+### Instructions for the Implementation of {title}
+@@END
+
+@@SECTION WORLD.ORG.CODE
+[Affiliation code: {code}]
+@@END
+
+@@SECTION WORLD.ANOMALY.NOTE
+[Simulation-only] This entry defines anomaly mechanics, labels, and survival guidance for simulation control, not an in-world script, briefing, or known lore. No character has prior information about it. Never have a character speak, explain, hint at, or present this entry as guidance.
+@@END
+
+@@SECTION WORLD.FACTION.HEAD
+## Faction
+@@END
+
+@@SECTION WORLD.FACTION.RELATIONS_HEAD
+## Faction Relations
+@@END
+
+@@SECTION WORLD.FACTION.TABLE_HEAD
+| viewer \ target | {cols} |
+@@END
+
+@@SECTION WORLD.FACTION.NOTES
+Notes:
+@@END
+
+@@SECTION WORLD.FACTION.DOCTRINE_HEAD
+## Faction Doctrine and Relations
+@@END
+
+@@SECTION WORLD.FACTION.MARK.hostile
+H
+@@END
+
+@@SECTION WORLD.FACTION.MARK.wary
+W
+@@END
+
+@@SECTION WORLD.FACTION.MARK.neutral
+N
+@@END
+
+@@SECTION WORLD.FACTION.MARK.favorable
+F
+@@END
+
+@@SECTION WORLD.FACTION.MARK.friendly
+A
+@@END
+
+@@SECTION WORLD.FACTION.MARK.self
+-
+@@END
+
+@@SECTION WORLD.ROSTER.HEAD
+## Roster
+@@END
+
+@@SECTION WORLD.FACTION.TYPE.org
+Organization: runs operations, has internal notices and its own agents.
+@@END
+
+@@SECTION WORLD.FACTION.TYPE.civilian
+Civilian-type: no operations; members only visit and move around.
+@@END
+
+@@SECTION WORLD.FACTION.TYPE.freelancer
+Freelancer-type: members take contracted missions.
+@@END
+
+@@SECTION WORLD.FACTION.EXTRA_DESC
+A faction the protagonist can belong to. See the 「{org}」 entry.
+@@END
+
+@@SECTION WORLD.REPORT.AN.NEW
+NEW [AN|{loc}|{name}|활성|<등급>|<배치>|<상황>]
+@@END
+
+@@SECTION WORLD.REPORT.AN.LINE
+[AN|{loc}|{name}|{state}|{grade}|{deploy}|{situation}]
+@@END
+
+@@SECTION WORLD.REPORT.IN.NEW
+NEW [IN|{loc}|{name}|진행|<배치>|<상황>]
+@@END
+
+@@SECTION WORLD.REPORT.IN.LINE
+[IN|{loc}|{name}|{state}|{deploy}|{situation}]
+@@END
+
+@@SECTION WORLD.REPORT.MS.NEW
+NEW [MS|{loc}|{name}|출현|<방문자>|<상황>]
+@@END
+
+@@SECTION WORLD.REPORT.MS.LINE
+[MS|{loc}|{name}|{state}|{visitors}|{situation}]
+@@END
+
+@@SECTION WORLD.REPORT.AG.NEW
+NEW [AG|{id}|<상태>|<상황>]
+@@END
+
+@@SECTION WORLD.REPORT.AG.LINE
+[AG|{id}|{state}|{situation}]
+@@END
+
+@@SECTION WORLD.REPORT.AG.CODE
+- code: {list}
+@@END
+
+@@SECTION WORLD.REPORT.AG.CODE_NONE
+- code: none
+@@END
+
+@@SECTION WORLD.REPORT.AGE
+{h}시간 {m}분 전
+@@END
+
+@@SECTION WORLD.REPORT.DUE
+유지 기한 {time}
+@@END
+
+@@SECTION WORLD.REPORT.UNNAMED
+<발생지점>
+@@END
+
+@@SECTION WORLD.REPORT.REGION
+<발생 지역: 시도와 시군구>
+@@END
+
+@@SECTION WORLD.REPORT.SITUATION
+<상황>
+@@END
+
+@@SECTION PEOPLE.STAGE.0
+극도의 적대
+@@END
+
+@@SECTION PEOPLE.STAGE.1
+적대
+@@END
+
+@@SECTION PEOPLE.STAGE.2
+혐오
+@@END
+
+@@SECTION PEOPLE.STAGE.3
+무관심
+@@END
+
+@@SECTION PEOPLE.STAGE.4
+인식
+@@END
+
+@@SECTION PEOPLE.STAGE.5
+관심
+@@END
+
+@@SECTION PEOPLE.STAGE.6
+끌림
+@@END
+
+@@SECTION PEOPLE.STAGE.7
+애정
+@@END
+
+@@SECTION FACTION.LABEL.friendly
+우호
+@@END
+
+@@SECTION FACTION.LABEL.favorable
+호의
+@@END
+
+@@SECTION FACTION.LABEL.neutral
+중립
+@@END
+
+@@SECTION FACTION.LABEL.wary
+경계
+@@END
+
+@@SECTION FACTION.LABEL.hostile
+적대
+@@END
+
+@@SECTION WALLET.MEMO.ADJUST
+잔고 수정
+@@END
+
+@@SECTION WALLET.MEMO.POINTS_ADJUST
+포인트 수정
+@@END
+
+@@SECTION WALLET.MEMO.FIELD
+필드 거래
+@@END
+
+@@SECTION INVENTORY.SHOP.PAID_POINTS
+{price} Baekilmong points{extra}
+@@END
+
+@@SECTION STATUS.RECENT_POINT_LINE
+{amount} p {memo}
+@@END
+
+@@SECTION WORLD.AFFILIATION_UNKNOWN
+미등록
+@@END

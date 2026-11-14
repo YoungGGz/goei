@@ -1,0 +1,639 @@
+// 괴담위키: 원본 Namuwiki 모듈과 같은 저장 형식·프롬프트·검사 규칙.
+// 문서는 채팅 로어북 "WIKI｜제목" 항목(키 없음, 비활성)에 meta + <lightboard-namuwiki> 본문으로 둔다.
+import { advNum, advOn, genSettings, refToggles } from './advanced';
+import { related, type Focus } from './focus';
+import { tokens, trimTokens } from './gnet';
+import { trimPrevious, trimRelated, trimSecondary, trimTurns } from './budget';
+import { craftMessages, craftSettings, memoTexts, type CraftMessage } from './craft';
+import { GUIDE_LABEL, guideTxt } from './guides';
+import { collectRefs, factionCodesToNames, hasBook, limitRefs, policySections, recentTurns, refText, storyText, type RefSource } from './refs';
+import type { Chat, LoreEntry } from './types';
+import { buildRegistry, resolveName, type Registry } from './world/registry';
+
+export const WIKI_PREFIX = 'WIKI｜';
+export type WikiMode = 'expand' | 'faithful';
+export type WikiLength = 'short' | 'standard' | 'detailed';
+
+export interface WikiSettings {
+  mode: WikiMode;
+  model: 'main' | 'aux';
+  length: WikiLength;
+  refreshPrevious: boolean;
+  chatTurns: number;
+  referenceCount: number;
+  /** 주석: 번호에 올리면 뜨는 창 / 본문 안에 펼치기 (라이트보드 나무위키, 2026-11-06) */
+  footnotes: 'pop' | 'inline';
+  /** 그림: 끔 / 정보칸만 / 본문까지 (라이트보드 나무위키, 2026-11-06) */
+  images: 'off' | 'infobox' | 'body';
+  /** 자동 작성: 끔 / 창을 열 때 / 매 턴 (라이트보드 나무위키, 2026-11-06) */
+  auto: '0' | 'open' | 'turn';
+  autoTitle: 'model' | 'input';
+  autoQuery: string;
+}
+
+/** 원본 Settings 로어북 기본값 */
+export const WIKI_DEFAULTS: WikiSettings = {
+  mode: 'expand', model: 'main', length: 'detailed', refreshPrevious: true, chatTurns: 8, referenceCount: 20,
+  footnotes: 'pop', images: 'infobox', auto: '0', autoTitle: 'model', autoQuery: '',
+};
+
+export function wikiSettings(state: Record<string, unknown> | undefined): WikiSettings {
+  const s = state ?? {};
+  const pick = <T extends string>(key: string, allowed: readonly T[], def: T): T => (allowed.includes(s[key] as T) ? (s[key] as T) : def);
+  return {
+    ...WIKI_DEFAULTS,
+    mode: pick('$nw_mode', ['expand', 'faithful'] as const, WIKI_DEFAULTS.mode),
+    model: pick('$nw_model', ['main', 'aux'] as const, WIKI_DEFAULTS.model),
+    length: pick('$nw_length', ['short', 'standard', 'detailed'] as const, WIKI_DEFAULTS.length),
+    refreshPrevious: s['$nw_refresh_previous'] !== '0',
+    chatTurns: advNum(s, 'nw', 'turns'),
+    referenceCount: advNum(s, 'nw', 'ref_count'),
+    footnotes: pick('$nw_footnotes', ['pop', 'inline'] as const, WIKI_DEFAULTS.footnotes),
+    images: pick('$nw_images', ['off', 'infobox', 'body'] as const, WIKI_DEFAULTS.images),
+    auto: pick('$nw_auto', ['0', 'open', 'turn'] as const, WIKI_DEFAULTS.auto),
+    autoTitle: pick('$nw_auto_title', ['model', 'input'] as const, WIKI_DEFAULTS.autoTitle),
+    autoQuery: String(s['$nw_auto_query'] ?? '').trim().slice(0, 80),
+  };
+}
+
+export interface WikiMeta {
+  title: string;
+  mode: WikiMode;
+  model: string;
+  created: number;
+  length: WikiLength;
+  sources: string[];
+  primarySources: string[];
+  writingRequest: string;
+  docRequest?: string;
+  direct: boolean;
+}
+
+export interface WikiDoc {
+  title: string;
+  meta: WikiMeta | null;
+  body: string;
+  /** 카드에 미리 넣어 둔 기본 문서 (채팅에 같은 제목이 없을 때만) */
+  base?: boolean;
+}
+
+export class WikiError extends Error {}
+
+// ── 제목 ──
+
+export function validTitle(t: string): boolean {
+  return !!t.trim() && [...t].length <= 300 && !/[\r\n<>]/.test(t) && !t.includes('{{') && !t.includes('}}') && !t.startsWith(WIKI_PREFIX);
+}
+
+const QUALIFIERS = new Set(['기업', '회사', '기관', '조직', '인물', '장소']);
+
+function exactTopic(r: Registry, src: RefSource, title: string): [string, boolean] {
+  const entries = resolveName(r, title);
+  const names = [...new Map(entries.filter((e) => e.lore).map((e) => [e.lore.toLowerCase(), e.lore])).values()];
+  if (names.length === 1) return [names[0], true];
+  if (entries.length) return [title, true];
+  if (hasBook(src, title)) return [title, true];
+  return [title, false];
+}
+
+/** 별칭을 정식 이름으로 ("Sora Land" → "소라 랜드"), "(기업)" 같은 꼬리말은 떼고 다시 찾는다 */
+export function canonicalTitle(r: Registry, src: RefSource, title: string): { title: string; known: boolean } {
+  const t = title.trim();
+  const [name, known] = exactTopic(r, src, t);
+  if (known) return { title: name, known };
+  const m = /^(.*?)\s*\(([^()]*)\)$/.exec(t);
+  if (m && QUALIFIERS.has(m[2].trim())) {
+    const [n2, k2] = exactTopic(r, src, m[1].trim());
+    if (k2) return { title: n2, known: true };
+  }
+  return { title: t, known: false };
+}
+
+// ── 저장 ──
+
+function localLore(chat: Chat): LoreEntry[] {
+  return Array.isArray(chat.localLore) ? (chat.localLore as LoreEntry[]) : [];
+}
+
+export function parseDocContent(title: string, content: string): WikiDoc | null {
+  const body = /<lightboard-namuwiki[\s>][\s\S]*?<\/lightboard-namuwiki>/.exec(content)?.[0];
+  if (!body) return null;
+  let meta: WikiMeta | null = null;
+  const m = /<!--NW_META:([\s\S]*?)-->/.exec(content);
+  if (m) {
+    try {
+      meta = JSON.parse(m[1].replace(/-\\u002d/g, '--')) as WikiMeta;
+    } catch {
+      meta = null;
+    }
+  }
+  return { title, meta, body };
+}
+
+function docsIn(entries: LoreEntry[]): WikiDoc[] {
+  const out: WikiDoc[] = [];
+  const seen = new Set<string>();
+  for (const e of entries) {
+    const name = String(e.comment ?? '');
+    if (!name.startsWith(WIKI_PREFIX)) continue;
+    const title = name.slice(WIKI_PREFIX.length);
+    if (seen.has(title)) continue;
+    const doc = parseDocContent(title, String(e.content ?? ''));
+    if (doc) {
+      seen.add(title);
+      out.push(doc);
+    }
+  }
+  return out;
+}
+
+// 카드 기본 문서 묶음: 카드 무게를 줄이려고 {제목: 본문} JSON을 gzip+base64로 줄여 로어북 항목 하나에 담는다 (tools/build_lite_card.py add_wiki_base)
+export const WIKI_PACK_HEAD = 'GOEIWIKI1:';
+let pack: { src: string; docs: WikiDoc[] } | null = null;
+/** 플러그인 저장소에 받아 둔 묶음 (2026-10-27: 카드 대신 release/wiki-base 에서 받는다, host/install.ts). 카드에 묶음이 있으면 카드 것이 먼저 */
+let stored: string | null = null;
+export function setStoredWikiPack(text: string | null): void {
+  stored = text && text.startsWith(WIKI_PACK_HEAD) ? text : null;
+}
+export const storedWikiPack = () => stored;
+
+function packEntry(lore: LoreEntry[]): string | null {
+  for (const e of lore) {
+    const c = e?.content;
+    if (typeof c === 'string' && c.startsWith(WIKI_PACK_HEAD)) return c;
+  }
+  return stored;
+}
+
+/** 기본 문서 묶음을 풀어 둔다 (창을 열 때 한 번). 같은 묶음이면 다시 풀지 않는다. 풀 수 없는 환경이면 묶음 없이 지나간다 */
+export async function prepareBaseDocs(lore: unknown): Promise<void> {
+  if (!Array.isArray(lore)) return;
+  const src = packEntry(lore as LoreEntry[]);
+  if (!src || pack?.src === src || typeof DecompressionStream === 'undefined') return;
+  const bin = atob(src.slice(WIKI_PACK_HEAD.length));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const text = await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  const map = JSON.parse(text) as Record<string, string>;
+  const docs: WikiDoc[] = [];
+  for (const [title, body] of Object.entries(map)) {
+    const doc = typeof body === 'string' ? parseDocContent(title, body) : null;
+    if (doc) docs.push(doc);
+  }
+  pack = { src, docs };
+}
+
+// 카드 기본 문서는 크고(수백 개) 거의 안 바뀌므로 카드 로어북마다 한 번만 읽는다
+const baseCache = new WeakMap<object, WikiDoc[]>();
+export function baseDocs(lore: unknown): WikiDoc[] {
+  if (!Array.isArray(lore)) return [];
+  let docs = baseCache.get(lore);
+  if (!docs) {
+    const src = packEntry(lore as LoreEntry[]);
+    const ready = !src || pack?.src === src;
+    const loose = docsIn(lore as LoreEntry[]);
+    const have = new Set(loose.map((d) => d.title));
+    const packed = src && pack?.src === src ? pack.docs.filter((d) => !have.has(d.title)) : [];
+    docs = [...loose, ...packed].map((d) => ({ ...d, base: true }));
+    if (ready) baseCache.set(lore, docs); // 묶음을 아직 안 풀었으면 저장하지 않고 다음에 다시 본다
+  }
+  return docs;
+}
+
+/** 저장된 문서 목록: 채팅 문서(처음 만든 순서) 다음에 카드 기본 문서. 같은 제목은 채팅 문서가 이긴다 */
+export function listDocs(chat: Chat, lore?: unknown): WikiDoc[] {
+  const mine = docsIn(localLore(chat));
+  if (lore === undefined) return mine;
+  const have = new Set(mine.map((d) => d.title));
+  return [...mine, ...baseDocs(lore).filter((d) => !have.has(d.title))];
+}
+
+export function findDoc(chat: Chat, title: string, lore?: unknown): WikiDoc | null {
+  return listDocs(chat, lore).find((d) => d.title === title) ?? null;
+}
+
+export function docContent(meta: WikiMeta, body: string): string {
+  const json = JSON.stringify(meta).replace(/--/g, '-\\u002d');
+  return `[NW_PRIVATE_BEGIN]\n<!--NW_META:${json}-->\n${body}\n[NW_PRIVATE_END]`;
+}
+
+/** 같은 제목이 있으면 바꾸고, 없으면 뒤에 붙인다 */
+export function saveDoc(chat: Chat, meta: WikiMeta, body: string): Chat {
+  const lore = localLore(chat).slice();
+  const name = WIKI_PREFIX + meta.title;
+  const content = docContent(meta, body);
+  const i = lore.findIndex((e) => e.comment === name);
+  const entry: LoreEntry = {
+    key: '', secondkey: '', comment: name, content, mode: 'normal', insertorder: 0, alwaysActive: false, selective: false, useRegex: false,
+  };
+  if (i >= 0) lore[i] = { ...lore[i], ...entry };
+  else lore.push(entry);
+  return { ...chat, localLore: lore };
+}
+
+export function deleteDoc(chat: Chat, title: string): Chat {
+  return { ...chat, localLore: localLore(chat).filter((e) => e.comment !== WIKI_PREFIX + title) };
+}
+
+// ── 프롬프트 ──
+
+const REQUIRED = ['NW.GUIDE', 'NW.EXPAND', 'NW.FAITHFUL', 'NW.LENGTH_SHORT', 'NW.LENGTH_STANDARD', 'NW.LENGTH_DETAILED', 'NW.LINKS_OPEN', 'NW.FORMAT'];
+
+export interface WikiRequest {
+  title: string;
+  /** 링크로 들어온 하위 문서가 물려받는 원본 자료 이름 */
+  inherited: string[];
+  previous: string | null;
+  writingRequest: string;
+  /** 이 문서에만 덧붙이는 지침 (작성·다시 쓰기 화면에서 적음) */
+  docRequest?: string;
+  direct: boolean;
+  /** 본문에 넣을 수 있는 그림 (에셋 이름·한글 이름). 참고 자료에 나온 것만 골라 보낸다 */
+  images?: { name: string; label: string; subject?: boolean }[];
+  /** 정보칸 인물 그림으로 고를 수 있는 표정 (그 인물의 그림이 있는 것만) */
+  moods?: string[];
+}
+
+export interface WikiPrompt {
+  messages: CraftMessage[];
+  sources: string[];
+  primarySources: string[];
+}
+
+export function wikiPrompt(src: RefSource, req: WikiRequest, s: WikiSettings, factionNames: Record<string, string>, registry?: Registry): WikiPrompt {
+  const sec = policySections(src.char.globalLore, 'Wiki');
+  for (const k of REQUIRED) if (!sec[k]) throw new WikiError(`${GUIDE_LABEL.Wiki} 지침의 ${k} 섹션이 없어요.`);
+  const r = registry ?? buildRegistry(src.char.globalLore);
+  const n = trimTurns(s.chatTurns);
+  const story = n ? storyText(recentTurns(src.chat, n, genSettings(src.chat.scriptstate).userMessages)) : '';
+  const primary = [req.title, ...(hasBook(src, req.title) ? [] : req.inherited)];
+  const t = refToggles(src.chat.scriptstate, 'nw');
+  const rows = limitRefs(
+    collectRefs(src, {
+      scope: 'wiki', primaryNames: primary, text: `${req.title}\n${req.writingRequest}\n${req.docRequest ?? ''}\n${story}`, registry: r, description: t.description, authors: t.authors,
+      persona: t.persona, active: t.active, related: t.related && !trimRelated(), secondary: t.secondary && !trimSecondary(),
+    }),
+    s.referenceCount,
+  );
+  const previous = trimPrevious() ? null : req.previous;
+  const lengthKey = { short: 'NW.LENGTH_SHORT', standard: 'NW.LENGTH_STANDARD', detailed: 'NW.LENGTH_DETAILED' }[s.length];
+  const system = [sec['NW.GUIDE'], sec[s.mode === 'faithful' ? 'NW.FAITHFUL' : 'NW.EXPAND'], sec[lengthKey], sec['NW.LINKS_OPEN'], sec['NW.FORMAT']];
+  if (story && sec['NW.HISTORY']) system.push(sec['NW.HISTORY']);
+  if (previous && sec['NW.PREVIOUS']) system.push(sec['NW.PREVIOUS']);
+  // 본문 그림·정보칸 표정 (라이트보드 나무위키 W3, 2026-11-06). 참고 자료나 제목에 나온 그림만, 30장까지
+  const pool = `${req.title}\n${refText(rows)}\n${story}`;
+  // 주제 그림은 표시(subject)로 가린다. 표시가 없는 옛 호출만 첫 항목을 주제로 본다 (전수검사 11-13)
+  const images = (req.images ?? []).filter((x, i) => (x.subject ?? i === 0) || (x.label && pool.includes(x.label))).slice(0, 30);
+  if (images.length && sec['NW.IMAGES']) system.push(sec['NW.IMAGES'].replace('__NW_IMAGES__', images.map((x) => guideTxt('Wiki', 'NW.IMAGES_ITEM', { name: x.name, label: x.label })).join('\n')));
+  if (req.moods?.length && sec['NW.PORTRAIT']) system.push(sec['NW.PORTRAIT'].replace('__NW_MOODS__', req.moods.join(', ')));
+  const language = genSettings(src.chat.scriptstate).language;
+  if (language) system.push(language);
+  // 머리말은 지침 「괴이위키」 NW.HEAD_* 절 (2026-11-14 사용자: 모델에 가는 글은 지침 파일로)
+  let user = `${guideTxt('Wiki', 'NW.HEAD_TITLE', { title: req.title })}\n\n${guideTxt('Wiki', 'NW.HEAD_REFS')}\n${refText(rows)}`;
+  if (story) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_STORY')}\n${story}`;
+  if (previous) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_PREVIOUS')}\n${innerBody(previous)}`;
+  if (req.writingRequest.trim()) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_REQUEST_ALL')}\n${req.writingRequest.trim()}`;
+  if (req.docRequest?.trim()) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_REQUEST_DOC')}\n${req.docRequest.trim()}`;
+  const sources = [...new Set(rows.flatMap((x) => x.sources))];
+  const primarySources = [...new Set(rows.filter((x) => x.kind === 'primary').flatMap((x) => x.sources))];
+  const messages: CraftMessage[] = [
+    { role: 'system', content: factionCodesToNames(system.join('\n'), factionNames) },
+    { role: 'user', content: factionCodesToNames(user, factionNames) },
+  ];
+  const read = (k: string) => (sec[k] ?? '').replace(/<!--[\s\S]*?-->/g, '').trim();
+  return {
+    messages: craftMessages(messages, craftSettings(src.chat.scriptstate, 'nw'), { thoughts: read('THOUGHTS'), memo: memoTexts(read) }),
+    sources,
+    primarySources,
+  };
+}
+
+export function innerBody(body: string): string {
+  return body.replace(/^<lightboard-namuwiki[^>]*>\s*/, '').replace(/\s*<\/lightboard-namuwiki>\s*$/, '');
+}
+
+// ── 응답 검사·정리 ──
+
+const ARROW = /➡️|➡︎|➡/g;
+
+/** 응답에서 문서 블록만 꺼내고, 제목을 고정하고, 잘못된 링크 표시를 지운다 */
+export function acceptArticle(raw: string, title: string, canon: (t: string) => string): string {
+  const text = raw.trim();
+  // 형식 오류 글(다시 묻기에 그대로 들어감)은 지침 「괴이위키」 NW.ERR_* 절
+  if (!text) throw new WikiError(guideTxt('Wiki', 'NW.ERR_EMPTY'));
+  const m = /<lightboard-namuwiki[\s>][\s\S]*?<\/lightboard-namuwiki>/.exec(text);
+  if (!m) {
+    if (/<lightboard-namuwiki[\s>]/.test(text)) throw new WikiError(guideTxt('Wiki', 'NW.ERR_UNCLOSED'));
+    throw new WikiError(guideTxt('Wiki', 'NW.ERR_FORMAT'));
+  }
+  let body = m[0];
+  if (!body.includes('[Paragraph]')) throw new WikiError(guideTxt('Wiki', 'NW.ERR_NO_PARAGRAPH'));
+  body = body.replace(ARROW, '➡️').replace(/\{\{/g, '&#123;&#123;').replace(/\}\}/g, '&#125;&#125;');
+  const safeTitle = title.replace(/"/g, '&quot;');
+  body = body.replace(/^<lightboard-namuwiki([^>]*)>/, (_all, attrs: string) => {
+    const rest = attrs.replace(/\sdoc_title="[^"]*"/, '');
+    return `<lightboard-namuwiki doc_title="${safeTitle}"${rest}>`;
+  });
+  return reviewLinks(body, title, canon);
+}
+
+/** 원본 reviewLinks: 빈 것, 자기 자신, 중복, 괄호·막대가 든 링크는 표시만 지우고 글은 남긴다 */
+export function reviewLinks(body: string, title: string, canon: (t: string) => string): string {
+  const seen = new Set<string>();
+  const self = canon(title);
+  const fix = (line: string, set: Set<string>) => line.replace(/➡️([^➡\n]{0,120}?)➡️/g, (_all, label: string) => {
+    const t = label.trim();
+    if (!t || /[[\]|]/.test(t) || !validTitle(t)) return label;
+    const c = canon(t);
+    if (c === self || set.has(c)) return label;
+    set.add(c);
+    return `➡️${t}➡️`;
+  });
+  // 분류 표는 탐색용이라 본문과 겹쳐도 링크를 둔다. 표 안에서만 중복을 지운다 (전수검사 11-13)
+  return body.split('\n').map((line) => fix(line, line.startsWith('[CategoryTable]') ? new Set<string>() : seen)).join('\n');
+}
+
+// ── 화면 ──
+
+export interface RenderOptions {
+  /** 저장된 문서가 있는 링크인지 */
+  saved: (title: string) => boolean;
+  canon: (title: string) => string;
+  /** 정보 상자 맨 위에 넣을 사진 주소 (그 항목의 카드 에셋) */
+  photo?: string | null;
+  /** 탈출법·금기 같은 정답 문단을 접어 둔다 (클리어 전 괴이 문서) */
+  fold?: boolean;
+  /** 본문 [Image] 블록의 에셋 이름 → 주소. 없거나 아직 읽는 중이면 null (그 그림은 건너뛴다) */
+  image?: (name: string) => string | null;
+  /** 주석을 본문 안에 펼친다 */
+  inlineNotes?: boolean;
+}
+
+/** 여는 태그의 portrait_mood (정보칸 인물 그림 표정). 없으면 '' */
+export function portraitMood(body: string): string {
+  const open = /^<lightboard-namuwiki[^>]*>/.exec(body)?.[0] ?? '';
+  const m = attrs(open).portrait_mood ?? '';
+  return /^[a-z][a-z ]{0,20}$/i.test(m) ? m.trim().toLowerCase() : '';
+}
+
+/** 접어 둘 정답 문단 제목 (나무위키 스포일러 접기처럼 누르면 펼친다) */
+export const SPOILER_HEADING = /탈출|출구|금기|공략|해법|해결|클리어|생환|대처|수칙|정답|파훼|봉인|퇴치|살아남|빠져나|규칙|격리 ?(?:방법|절차)|약점/;
+
+const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+/** 모델이 이미 바꿔 둔 &#123; 같은 것은 살린다 */
+const escText = (s: string) => esc(s.replace(/&#12[35];/g, (m) => (m === '&#123;' ? '{' : '}')));
+
+function attrs(open: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of open.matchAll(/([\w]+)="([^"]*)"/g)) out[m[1]] = m[2].replace(/&quot;/g, '"');
+  return out;
+}
+
+/** 중괄호 밖의 | 로 나누기 */
+function splitFields(s: string, sep = '|'): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let cur = '';
+  for (const ch of s) {
+    if (ch === '{') depth++;
+    if (ch === '}') depth = Math.max(0, depth - 1);
+    if (ch === sep && depth === 0) {
+      out.push(cur);
+      cur = '';
+    } else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function field(f: string): [string, string] {
+  const i = f.indexOf(':');
+  return i < 0 ? ['', f.trim()] : [f.slice(0, i).trim(), f.slice(i + 1).trim()];
+}
+
+export function renderArticle(body: string, o: RenderOptions): { html: string; title: string; related: string[]; recent: string[]; headings: string[] } {
+  const open = /^<lightboard-namuwiki[^>]*>/.exec(body)?.[0] ?? '';
+  const a = attrs(open);
+  const color = /^#[0-9a-fA-F]{3,8}$/.test(a.main_color ?? '') ? a.main_color : '#27685b';
+  const notes: string[] = [];
+  const inline = (s: string) =>
+    escText(s)
+      .replace(/➡️([^➡]+?)➡️/g, (_all, t: string) => {
+        const raw = t.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+        const c = o.canon(raw);
+        return `<button class="nw-link${o.saved(c) ? ' on' : ''}" data-action="wiki-open" data-value="${esc(c)}">${t}</button>`;
+      })
+      .replace(/❗([^❗]+?)❗/g, '<b>$1</b>')
+      .replace(/\*\*([^*]+?)\*\*/g, '<b>$1</b>')
+      .replace(/✂️([^✂]+?)✂️/g, '<s>$1</s>')
+      .replace(/📌([^📌]+?)📌/gu, (_all, t: string) => {
+        if (o.inlineNotes) return `<span class="nw-fn-in">(${t})</span>`;
+        notes.push(t);
+        return `<sup class="nw-fn" data-fn="${notes.length}" role="button" tabindex="0">[${notes.length}]</sup>`;
+      });
+  const lines = innerBody(body).split('\n');
+  type Block = { tag: string; text: string };
+  const blocks: Block[] = [];
+  for (const line of lines) {
+    const m = /^\s*\[(\w+)\](.*)$/.exec(line);
+    if (m) blocks.push({ tag: m[1], text: m[2] });
+    else if (line.trim() && blocks.length) blocks[blocks.length - 1].text += `\n${line}`;
+    else if (line.trim()) blocks.push({ tag: 'Paragraph', text: line });
+  }
+  const headings: { level: number; title: string; id: string }[] = [];
+  let h1 = 0;
+  let h2 = 0;
+  for (const b of blocks) {
+    if (b.tag !== 'Heading') continue;
+    const f = Object.fromEntries(splitFields(b.text).map(field));
+    const level = f.Level === '2' ? 2 : 1;
+    if (level === 1) {
+      h1++;
+      h2 = 0;
+    } else h2++;
+    headings.push({ level, title: f.Title ?? '', id: level === 1 ? `${h1}` : `${h1}.${h2}` });
+  }
+  let hi = 0;
+  let list: string[] = [];
+  const out: string[] = [];
+  const flushList = () => {
+    if (list.length) out.push(`<ul class="nw-list">${list.map((x) => `<li>${x}</li>`).join('')}</ul>`);
+    list = [];
+  };
+  // 접는 중인 문단: 그 제목 수준과 시작 위치. 같거나 높은 제목이 나오면 닫는다
+  let spoil: { level: number; at: number } | null = null;
+  const hidden = new Set<number>();
+  const closeSpoil = () => {
+    if (!spoil) return;
+    const inner = out.splice(spoil.at).join('');
+    if (inner) out.push(`<details class="nw-spoil"><summary>스포일러 · 눌러서 보기</summary><div class="nw-spoil-in">${inner}</div></details>`);
+    spoil = null;
+  };
+  for (const b of blocks) {
+    if (b.tag !== 'List') flushList();
+    if (b.tag === 'Heading' && spoil && (headings[hi]?.level ?? 1) <= spoil.level) closeSpoil();
+    const n0 = notes.length;
+    switch (b.tag) {
+      case 'Infobox': {
+        const fields = splitFields(b.text).map(field);
+        const head = fields.find(([k]) => k === 'Title')?.[1] ?? a.doc_title ?? '';
+        const rows = fields.filter(([k]) => k !== 'Title' && k);
+        out.push(`<table class="nw-infobox" style="--nw:${color}"><tr><th colspan="2">${inline(head)}</th></tr>${o.photo ? `<tr><td colspan="2" class="nw-ibphoto"><img src="${esc(o.photo)}" alt=""></td></tr>` : ''}${rows.map(([k, v]) => `<tr><td>${inline(k)}</td><td>${inline(v)}</td></tr>`).join('')}</table>`);
+        break;
+      }
+      case 'Toc':
+        if (headings.length) out.push(`<nav class="nw-toc"><b>목차</b>${headings.map((h) => `<a class="l${h.level}" data-action="wiki-jump" data-value="nw-h-${h.id}"><span class="no">${h.id}.</span> ${inline(h.title)}</a>`).join('')}</nav>`);
+        break;
+      case 'Heading': {
+        const h = headings[hi++];
+        if (h) out.push(`<h${h.level + 2} class="nw-h" id="nw-h-${h.id}" style="--nw:${color}"><span>${h.id}.</span> ${inline(h.title)}</h${h.level + 2}>`);
+        if (h && o.fold && !spoil && SPOILER_HEADING.test(h.title)) spoil = { level: h.level, at: out.length };
+        break;
+      }
+      case 'List':
+        list.push(inline(b.text.trim()));
+        break;
+      case 'Image': {
+        const f = Object.fromEntries(splitFields(b.text).map(field));
+        const url = f.Name && o.image ? o.image(f.Name.trim()) : null;
+        if (url) out.push(`<figure class="nw-fig"><img src="${esc(url)}" alt="${esc(f.Caption ?? '')}" loading="lazy">${f.Caption ? `<figcaption>${inline(f.Caption)}</figcaption>` : ''}</figure>`);
+        break;
+      }
+      case 'Quote': {
+        const parts = splitFields(b.text);
+        const src = parts.slice(1).map(field).find(([k]) => k === 'Source')?.[1];
+        out.push(`<blockquote class="nw-quote">${inline(parts[0])}${src ? `<cite>— ${inline(src)}</cite>` : ''}</blockquote>`);
+        break;
+      }
+      case 'Table':
+      case 'CategoryTable': {
+        const fields = splitFields(b.text).map(field);
+        const cap = fields.find(([k]) => k === 'Caption')?.[1];
+        const c2 = fields.find(([k]) => k === 'Color')?.[1];
+        const tc = /^#[0-9a-fA-F]{3,8}$/.test(c2 ?? '') ? c2 : color;
+        const head = fields.find(([k]) => k === 'Head')?.[1];
+        const rows = fields.filter(([k]) => k === 'Row' || k === 'RowHead');
+        const cells = (v: string, tagName: string) => v.split(';;').map((x) => `<${tagName}>${inline(x.trim())}</${tagName}>`).join('');
+        // RowHead 는 왼쪽 첫 칸만 머리 칸 (원본 렌더러와 같게, 전수검사 11-13)
+        const rowHead = (v: string) => v.split(';;').map((x, i) => { const t = i ? 'td' : 'th'; return `<${t}>${inline(x.trim())}</${t}>`; }).join('');
+        out.push(`<table class="nw-table${b.tag === 'CategoryTable' ? ' cat' : ''}" style="--nw:${tc}">${cap ? `<caption>${inline(cap)}</caption>` : ''}${head ? `<tr>${cells(head, 'th')}</tr>` : ''}${rows.map(([k, v]) => `<tr>${k === 'RowHead' ? rowHead(v) : cells(v, 'td')}</tr>`).join('')}</table>`);
+        break;
+      }
+      default:
+        if (b.text.trim()) out.push(`<p class="nw-p">${inline(b.text.trim()).replace(/\n/g, '<br>')}</p>`);
+    }
+    // 접은 문단 속 각주는 아래 각주 목록에서도 가린다
+    if (spoil) for (let i = n0; i < notes.length; i++) hidden.add(i);
+  }
+  flushList();
+  closeSpoil();
+  if (notes.length) out.push(`<ol class="nw-notes">${notes.map((n, i) => `<li data-fn="${i + 1}">${hidden.has(i) ? `<details class="nw-spoil fn"><summary>스포일러</summary><span class="nw-fn-t">${n}</span></details>` : n}</li>`).join('')}</ol>`);
+  const links = (keys: string[]) => keys.map((k) => a[k]).filter((t): t is string => !!t && validTitle(t)).map((t) => o.canon(t));
+  return { html: out.join(''), title: a.doc_title || '', related: links(['related1', 'related2', 'related3']), recent: links(['recent1', 'recent2', 'recent3']), headings: headings.map((h) => h.title) };
+}
+
+// ── 본편 요청에 넣는 문서 (원본 RC.wikiContext, v0.16.27) ──
+// 이 채팅에서 쓴 문서를 최근에 만든 것부터 정한 개수만큼. 카드 기본 문서는 넣지 않는다 (원본도 저장 문서만).
+
+export const NW_CONTEXT = '$nw_context';
+/** 본편에 넣는 위키 문서를 자를 때 남아야 하는 최소 토큰 (이보다 적으면 그 문서는 뺀다) */
+const WIKI_CTX_MIN_TRIM = 500;
+export const wikiContextOn = (state: Record<string, unknown> | undefined): boolean => String(state?.[NW_CONTEXT] ?? '') === '1';
+
+export function wikiMainContext(chat: Chat, rules: string, focus?: Focus | null, capOverride?: number): string {
+  const s = chat.scriptstate;
+  const count = advNum(s, 'nw', 'ctx_count');
+  const cap = capOverride ?? advNum(s, 'nw', 'ctx_tokens');
+  // 본편에 나온 문서만 (v0.16.27): 제목이나 그 항목의 다른 이름이 최근 본편에 나온 문서. 끄면 원본처럼 최근에 쓴 문서부터
+  // 로어북 있는 문서는 본편에 그 로어북이 이미 들어가니 기본은 뺀다. 로어북 없이 창작한 문서는 위키가 유일한 출처라 기본은 넣는다.
+  // 로어북 있는 주제도 창작으로 내용이 바뀔 수 있어 칩으로 따로 켤 수 있게 했다 (사용자 결정)
+  const onlyMentioned = advOn(s, 'nw', 'ctx_focus');
+  const withLore = advOn(s, 'nw', 'ctx_lore');
+  const created = advOn(s, 'nw', 'ctx_created');
+  // 링크로 쓴 하위 문서는 부모 원본을 물려받으니, 원본에 자기 제목이 있을 때만 로어북 있는 문서로 본다 (전수검사 11-13)
+  const ownLore = (d: WikiDoc) => (d.meta?.primarySources ?? []).some((x) => x.trim().toLowerCase() === d.title.trim().toLowerCase());
+  const docs = listDocs(chat)
+    .filter((d) => (ownLore(d) ? withLore : created))
+    .filter((d) => !onlyMentioned || related(focus, [d.title]) || !!focus?.terms.includes(d.title))
+    .map((d, i) => ({ d, at: Number(d.meta?.created) || 0, i }))
+    .sort((a, b) => b.at - a.at || b.i - a.i);
+  const kept: { kind: string; title: string; mode: string; content: string }[] = [];
+  const payload = () => `[MODULE_CONTEXT_BEGIN]\n${rules}\n${JSON.stringify({ feature: 'wiki', records: kept })}\n[MODULE_CONTEXT_END]`;
+  // 상한을 넘는 문서는 빼고 다음 문서로 빈자리를 채운다. 남은 몫이 충분하면 긴 문서는 그만큼 잘라 넣는다 (전수검사 11-13, 사용자 결정)
+  const CUT = `\n${guideTxt('Wiki', 'MAIN_CONTEXT.CUT')}`;
+  for (const { d } of docs) {
+    if (kept.length >= count) break;
+    const rec = { kind: 'wiki_reference', title: d.title, mode: d.meta?.mode ?? 'unknown', content: innerBody(d.body) };
+    kept.unshift(rec);
+    if (cap <= 0 || tokens(payload()) <= cap) continue;
+    const full = rec.content;
+    rec.content = '';
+    let room = cap - tokens(payload()) - tokens(CUT);
+    while (room >= WIKI_CTX_MIN_TRIM) {
+      rec.content = trimTokens(full, room) + CUT;
+      const over = tokens(payload()) - cap;
+      if (over <= 0) break;
+      room -= over;
+    }
+    if (room < WIKI_CTX_MIN_TRIM) { kept.shift(); continue; }
+    break;
+  }
+  return kept.length ? payload() : '';
+}
+
+export function wikiContextRules(lore: LoreEntry[] | undefined): string | null {
+  return policySections(lore, 'Wiki').MAIN_CONTEXT?.trim() || null;
+}
+
+/** 문서 첫 문단을 짧게 (상황판 카드·커스텀 목록 설명). 꾸밈표는 걷어 내고 각주·지운 글은 뺀다 */
+export function docSummary(body: string, max = 150): string {
+  const para = /^\[Paragraph\](.+)$/m.exec(body)?.[1] ?? '';
+  const text = para
+    .replace(/📌[^📌]*?📌/gu, '')
+    .replace(/✂️[^✂]*?✂️/g, '')
+    .replace(/➡️([^➡]+?)➡️/g, '$1')
+    .replace(/❗([^❗]+?)❗/g, '$1')
+    .replace(/\*\*([^*]+?)\*\*/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if ([...text].length <= max) return text;
+  // 문장 끝에서 자를 수 있으면 거기서
+  const cut = [...text].slice(0, max).join('');
+  const end = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('다. '), cut.lastIndexOf('.'));
+  return end > max * 0.5 ? cut.slice(0, end + 1) : `${cut}…`;
+}
+
+// ── 자동 작성 제목 고르기 (라이트보드 나무위키 W2, 2026-11-06) ──
+/** 후보 중 이번 이야기에 맞는 문서 제목 하나를 고르는 요청. 응답은 {"title":"…"} */
+export function wikiTitlePrompt(src: RefSource, candidates: string[], written: string[], names: Record<string, string>): CraftMessage[] {
+  const sec = policySections(src.char.globalLore, 'Wiki');
+  const rule = sec['NW.AUTO_TITLE'];
+  if (!rule) throw new WikiError(`${GUIDE_LABEL.Wiki} 지침의 NW.AUTO_TITLE 섹션이 없어요.`);
+  const n = trimTurns(wikiSettings(src.chat.scriptstate).chatTurns);
+  const story = n ? storyText(recentTurns(src.chat, n, genSettings(src.chat.scriptstate).userMessages)) : '';
+  // 머리말·목록 줄 꼴은 지침 「괴이위키」 NW.TITLE_* 절
+  const item = (t: string) => guideTxt('Wiki', 'NW.TITLE_ITEM', { title: t });
+  let user = `${guideTxt('Wiki', 'NW.TITLE_HEAD_CANDIDATES')}\n${candidates.map(item).join('\n')}`;
+  if (written.length) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_WRITTEN')}\n${written.map(item).join('\n')}`;
+  if (story) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_STORY')}\n${story}`;
+  return [
+    { role: 'system', content: factionCodesToNames(rule, names) },
+    { role: 'user', content: factionCodesToNames(user, names) },
+  ];
+}
+
+/** 제목 응답 읽기. 후보에 있는 제목만 받는다 */
+export function acceptTitle(raw: string, candidates: string[]): string {
+  const text = raw.replace(/<(think|thoughts|lb-process)\b[^>]*>[\s\S]*?<\/\1>/gi, '').trim();
+  const m = /\{[\s\S]*\}/.exec(text);
+  let title = '';
+  try {
+    title = String((JSON.parse(m?.[0] ?? '{}') as { title?: unknown }).title ?? '').trim();
+  } catch {
+    title = '';
+  }
+  if (!title) title = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0].trim();
+  const hit = candidates.find((c) => c === title) ?? candidates.find((c) => c.includes(title) || title.includes(c));
+  if (!hit) throw new WikiError(guideTxt('Wiki', 'NW.ERR_TITLE_NOT_CANDIDATE', { title: title.slice(0, 40) }));
+  return hit;
+}

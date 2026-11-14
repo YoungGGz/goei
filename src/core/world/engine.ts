@@ -1,0 +1,891 @@
+// 상황판 엔진: 괴이(AN)·사건(IN)·미스틱 사이트(MS)·요원(AG) 상태를 하나의 JSON으로 들고,
+// 모델 출력 태그를 반영하고, 새 발생을 추첨하고, 로어북에 넣을 브리핑을 만든다.
+// 원본 Lua의 WG.*, parseAnomalies, parseIncidents, parseMysticSite, agParse, spawnAndBrief와 같은 규칙.
+// Risu API를 부르지 않는 순수 로직이라 rng를 넣어 그대로 검사할 수 있다.
+import { BUILTIN } from '../factions';
+import { guideTxt } from '../guides';
+import type { FactionCode } from '../types';
+import { type Catalog, factionNames, presetCanon } from './catalog';
+import { landmarkLoc, locName, POOL, regionMatch, SEALED_LOC, uniqueRegion } from './geo';
+import {
+  type AgState,
+  scanAffiliation,
+  scanAgents,
+  scanAnomalies,
+  scanIncidents,
+  scanMysticSites,
+  scanStatus,
+} from './tags';
+
+export type Origin = 'auto' | 'model' | 'manual';
+
+/** 상황 글이 바뀐 시점 하나 (보고서 「경과」 재료. 2026-10-29 추가, 옛 상태엔 없다) */
+export interface TrailStep {
+  /** 세계 분 (모르면 null) */
+  m: number | null;
+  /** 회차 */
+  e: number;
+  /** ≤160자 */
+  text: string;
+}
+/** 항목당 경과 상한. 넘치면 둘째(첫 발견 글 다음)부터 지운다 */
+export const TRAIL_CAP = 24;
+export const TRAIL_TEXT_MAX = 160;
+
+/** 진행 중 항목이 공통으로 더 가지는 칸 (일지·보고서용) */
+interface Tracked {
+  /** 상황 글의 변천 (바뀔 때만 쌓인다) */
+  trail?: TrailStep[];
+  /** 상태창 목표 칸이 이 항목이었던 턴이 있음 (「내가 출동」 근거) */
+  touched?: boolean;
+  /** 활성이 된 응답의 메시지 열쇠 (output.ts 가 적는다. 엔진은 메시지 번호를 모른다) */
+  startKey?: string;
+}
+
+export interface AnEntry extends Tracked {
+  loc: string;
+  name: string;
+  state: '발생대기' | '활성';
+  grade: string;
+  deploy: string;
+  kind: 'preset' | 'random';
+  origin: Origin;
+  presetName: string;
+  since: number | null;
+  born: number | null;
+  /** 유저가 지금 탐사 중이면 자동 종료하지 않는다 */
+  exploring: boolean;
+  /** 현장 상황 (2026-10-21 추가. 옛 상태엔 없다) */
+  situation?: string;
+}
+
+export interface InEntry extends Tracked {
+  loc: string;
+  name: string;
+  state: '발생대기' | '진행';
+  situation: string;
+  /** 투입 인원 (2026-10-21 추가. 옛 상태엔 없다) */
+  deploy?: string;
+  kind: 'landmark' | 'random';
+  origin: Origin;
+  since: number | null;
+  born: number | null;
+}
+
+export interface MsEntry extends Tracked {
+  loc: string;
+  name: string;
+  state: '발생대기' | '출현';
+  visitors: string;
+  /** 현장 상황 (2026-10-21 추가. 옛 상태엔 없다) */
+  situation?: string;
+  origin: Origin;
+  since: number | null;
+  born: number | null;
+}
+
+export interface AgentRecord {
+  st: AgState | '미정';
+  situation: string;
+  since: number | null;
+  /** 사망 상태로 지난 응답 수 */
+  dead: number;
+  /** 모델 태그로 상태를 받은 적이 있는지 (태그가 없던 요원의 '미정'은 편성 가능) */
+  tagged?: boolean;
+}
+
+export interface WorldState {
+  v: 1;
+  /** 발생 추첨 회차. 막 끝난 괴이가 곧바로 다시 뽑히지 않게 하는 데 쓴다 */
+  epoch: number;
+  /** 상태창 시각(분). 경과 시간과 자동 종료에 쓴다 */
+  minute: number | null;
+  an: AnEntry[];
+  inc: InEntry[];
+  ms: MsEntry[];
+  agents: Record<string, AgentRecord>;
+  retired: string[];
+  /** 이번 응답에서 결번을 채운 예비 인원 */
+  promoted: string[];
+  blocks: Record<string, number>;
+  skip: { an?: string; in?: string; ms?: string };
+  /** 커스텀 임무로 요청했지만 아직 모델 태그로 등록되지 않은 대상 */
+  pending: { an?: string; ms?: string; in?: string };
+  /** 커스텀 임무 등록 결과 안내 */
+  notice: string;
+  /** 막 끝난 상황. 이름 막기(blocks)와 같은 동안만 상황판에 흐리게 남긴다 (2026-10-20 사용자) */
+  ended: EndedEntry[];
+  /** 이 채팅에서 클리어한 괴이 이름 (위키 정답 문단을 처음부터 펼친다) */
+  cleared?: string[];
+  /** 캐릭터로 플레이: 유저가 연기하는 요원 코드. 요원 명단(AG 태그·요원 칸·편성)에서 뺀다 */
+  player?: string;
+  /** 이번 반영에서 끝난 항목 (응답 한 번 동안만. 저장할 때는 뺀다 — serializeWorld). 일지·보고서는 엔진 밖에서 만든다 */
+  closed?: ClosedEvent[];
+}
+
+export type CloseCause = 'model' | 'ttl' | 'manual';
+/** 막 끝난 항목 하나: 종료 직전 모습 그대로 (경과·투입·상황 포함) */
+export interface ClosedEvent {
+  kind: 'an' | 'in' | 'ms';
+  entry: AnEntry | InEntry | MsEntry;
+  cause: CloseCause;
+  /** 종료 시점 세계 분·회차 */
+  minute: number | null;
+  epoch: number;
+  /** 괴이 「클리어」 태그로 끝남 */
+  cleared?: boolean;
+}
+
+export interface EndedEntry {
+  kind: 'an' | 'in' | 'ms';
+  name: string;
+  loc: string;
+  grade?: string;
+  /** 이 회차까지 보인다 (blocks 값과 같음) */
+  until: number;
+}
+
+export interface WorldSettings {
+  extra_cap: number;
+  extra_ms_cap: number;
+  extra_in_cap: number;
+  preset_cap: number;
+  preset_p: number;
+  random_cap: number;
+  random_p: number;
+  incident_cap: number;
+  incident_p: number;
+  mystic_cap: number;
+  mystic_p: number;
+  preset_expire: number;
+  random_expire: number;
+  incident_expire: number;
+  mystic_expire: number;
+  preset_ttl: number;
+  random_ttl: number;
+  incident_ttl: number;
+  mystic_ttl: number;
+  landmark_share: number;
+  agent_limit: number;
+}
+
+/** 원본 WG.spec 기본값 */
+export const DEFAULT_SETTINGS: WorldSettings = {
+  extra_cap: 3,
+  extra_ms_cap: 3,
+  extra_in_cap: 3,
+  preset_cap: 2,
+  preset_p: 100,
+  random_cap: 1,
+  random_p: 100,
+  incident_cap: 1,
+  incident_p: 50,
+  mystic_cap: 1,
+  mystic_p: 100,
+  preset_expire: 1,
+  random_expire: 1,
+  incident_expire: 1,
+  mystic_expire: 1,
+  preset_ttl: 48,
+  random_ttl: 48,
+  incident_ttl: 12,
+  mystic_ttl: 24,
+  landmark_share: 50,
+  agent_limit: 12,
+};
+
+export type Rng = () => number;
+
+export function emptyWorld(): WorldState {
+  return { v: 1, epoch: 0, minute: null, an: [], inc: [], ms: [], agents: {}, retired: [], promoted: [], blocks: {}, skip: {}, pending: {}, notice: '', ended: [] };
+}
+
+export function parseWorld(raw: unknown): WorldState {
+  if (typeof raw !== 'string' || !raw) return emptyWorld();
+  try {
+    const w = JSON.parse(raw) as WorldState;
+    if (w && w.v === 1 && Array.isArray(w.an) && Array.isArray(w.inc) && Array.isArray(w.ms)) {
+      // closed 는 응답 한 번 동안만 쓰는 칸이라 저장값에 섞여 있어도 버린다
+      const out: WorldState = { ...emptyWorld(), ...w, pending: { ...(w.pending ?? {}) }, ended: Array.isArray(w.ended) ? w.ended : [] };
+      delete out.closed;
+      return out;
+    }
+  } catch {
+    /* 깨진 값은 새로 시작 */
+  }
+  return emptyWorld();
+}
+
+/** 저장용 JSON: 응답 한 번 동안만 쓰는 closed 는 뺀다 */
+export function serializeWorld(w: WorldState): string {
+  const rest: WorldState = { ...w };
+  delete rest.closed;
+  return JSON.stringify(rest);
+}
+
+export function validName(n: unknown): n is string {
+  return (
+    typeof n === 'string' &&
+    n.trim() !== '' &&
+    /[\p{L}\p{N}]/u.test(n) &&
+    !/^\s*[[{]/.test(n) &&
+    !n.includes('\n') &&
+    !['content', 'comment', 'name', 'null'].includes(n)
+  );
+}
+
+// ── 공통 ──
+
+function occupied(w: WorldState): Set<string> {
+  return new Set([...w.an, ...w.inc, ...w.ms].map((e) => e.loc));
+}
+
+function pick<T>(list: T[], rng: Rng): T | undefined {
+  return list.length ? list[Math.floor(rng() * list.length)] : undefined;
+}
+
+function place(w: WorldState, skip: string | undefined, rng: Rng): string | undefined {
+  const taken = occupied(w);
+  return pick(POOL.filter((l) => !taken.has(l) && l !== skip), rng);
+}
+
+function block(w: WorldState, group: string, name: string) {
+  if (name) w.blocks[`${group}:${name}`] = w.epoch + 1;
+}
+
+function blocked(w: WorldState, group: string, name: string): boolean {
+  return (w.blocks[`${group}:${name}`] ?? -1) >= w.epoch;
+}
+
+function remember(w: WorldState, kind: EndedEntry['kind'], e: { name: string; loc: string; state: string }, grade?: string) {
+  // 발생 예정이던 것은 시작도 안 했으니 남기지 않는다
+  if (e.state === '발생대기') return;
+  w.ended = [...(w.ended ?? []).filter((x) => !(x.kind === kind && x.name === e.name && x.loc === e.loc)), { kind, name: e.name, loc: e.loc, ...(grade ? { grade } : {}), until: w.epoch + 1 }];
+}
+/** 끝난 항목을 이번 응답의 closed 에 적는다 (remember 와 같은 규칙: 발생대기는 시작도 안 했으니 빼고). 일지·보고서 조립은 엔진 밖 */
+function close(w: WorldState, kind: ClosedEvent['kind'], e: AnEntry | InEntry | MsEntry, cause: CloseCause, cleared?: boolean, minute: number | null = w.minute) {
+  if (e.state === '발생대기') return;
+  (w.closed ??= []).push({ kind, entry: structuredClone(e), cause, minute, epoch: w.epoch, ...(cleared ? { cleared: true } : {}) });
+}
+/** 상황 글이 바뀌었을 때만 경과에 한 줄 (같은 글 반복·빈 글은 안 쌓는다). 상한을 넘으면 첫 발견 글은 두고 둘째부터 지운다 */
+function pushTrail(w: WorldState, e: Tracked, text: string) {
+  const t = text.trim().slice(0, TRAIL_TEXT_MAX);
+  if (!t) return;
+  const trail = (e.trail ??= []);
+  if (trail.length && trail[trail.length - 1].text === t) return;
+  trail.push({ m: w.minute, e: w.epoch, text: t });
+  while (trail.length > TRAIL_CAP) trail.splice(1, 1);
+}
+/** 종료 태그의 상황 칸: 있으면 항목의 상황 글과 경과 마지막 줄로 (closed 스냅숏의 「결과」가 종료 글이 되게). 비어 있으면 그대로 */
+function closingText(w: WorldState, e: Tracked & { situation?: string }, situation: string | undefined, c: Catalog, faction: string) {
+  if (!situation) return;
+  const text = codesToNames(situation, c, faction);
+  if (!text.trim()) return;
+  e.situation = text;
+  pushTrail(w, e, text);
+}
+function endAn(w: WorldState, e: AnEntry, cause: CloseCause = 'model', cleared = false, minute: number | null = w.minute) {
+  remember(w, 'an', e, e.grade);
+  close(w, 'an', e, cause, cleared, minute);
+  block(w, 'an', e.name);
+  w.skip.an = e.loc;
+  w.an = w.an.filter((x) => x !== e);
+}
+function endIn(w: WorldState, e: InEntry, cause: CloseCause = 'model', minute: number | null = w.minute) {
+  remember(w, 'in', e);
+  close(w, 'in', e, cause, undefined, minute);
+  block(w, 'in', e.name);
+  w.skip.in = e.loc;
+  w.inc = w.inc.filter((x) => x !== e);
+}
+function endMs(w: WorldState, e: MsEntry, cause: CloseCause = 'model', minute: number | null = w.minute) {
+  remember(w, 'ms', e);
+  close(w, 'ms', e, cause, undefined, minute);
+  block(w, 'ms', e.name);
+  w.skip.ms = e.loc;
+  w.ms = w.ms.filter((x) => x !== e);
+}
+
+// ── 발생 추첨 ──
+
+function spawnAn(w: WorldState, c: Catalog, s: WorldSettings, preset: boolean, rng: Rng) {
+  const group = preset ? 'preset' : 'random';
+  const n = w.an.filter((e) => e.origin === 'auto' && e.kind === group).length;
+  if (n >= s[`${group}_cap`] || !(rng() * 100 < s[`${group}_p`])) return;
+  let name = '';
+  if (preset) {
+    const active = new Set(w.an.map((e) => e.presetName || presetCanon(c, e.name)));
+    const choice = pick(c.anomalies.filter((a) => !active.has(a.name) && a.name !== w.pending.an && !blocked(w, 'an', a.name)), rng);
+    if (!choice) return;
+    name = choice.name;
+  }
+  const loc = place(w, w.skip.an, rng);
+  if (!loc) return;
+  w.an.push({
+    loc, name, state: '발생대기', grade: '', deploy: '', kind: group, origin: 'auto',
+    presetName: name, since: null, born: w.minute, exploring: false,
+  });
+  w.skip.an = undefined;
+}
+
+function spawnIncident(w: WorldState, c: Catalog, s: WorldSettings, rng: Rng) {
+  const n = w.inc.filter((e) => e.origin === 'auto').length;
+  if (n >= s.incident_cap || !(rng() * 100 < s.incident_p)) return;
+  const taken = occupied(w);
+  const allowed = c.landmarks.filter((lm) => {
+    const l = landmarkLoc(lm.sido, lm.gu);
+    return l && l !== SEALED_LOC && !taken.has(l) && l !== w.skip.in && lm.name !== w.pending.in && !w.inc.some((e) => e.name === lm.name) && !blocked(w, 'in', lm.name);
+  });
+  const isLandmark = rng() * 100 < s.landmark_share;
+  let loc: string | undefined;
+  let name = '';
+  if (isLandmark) {
+    const lm = pick(allowed, rng);
+    if (!lm) return;
+    loc = landmarkLoc(lm.sido, lm.gu) ?? undefined;
+    name = lm.name;
+  } else {
+    loc = place(w, w.skip.in, rng);
+  }
+  if (!loc) return;
+  w.inc.push({ loc, name, state: '발생대기', situation: '', kind: isLandmark ? 'landmark' : 'random', origin: 'auto', since: null, born: w.minute });
+  w.skip.in = undefined;
+}
+
+function spawnMystic(w: WorldState, c: Catalog, s: WorldSettings, rng: Rng) {
+  const n = w.ms.filter((e) => e.origin === 'auto').length;
+  if (n >= s.mystic_cap || !(rng() * 100 < s.mystic_p)) return;
+  const active = new Set(w.ms.map((e) => e.name));
+  const site = pick(c.mysticSites.filter((m) => !active.has(m.name) && m.name !== w.pending.ms && !blocked(w, 'ms', m.name)), rng);
+  if (!site) return;
+  const loc = place(w, w.skip.ms, rng);
+  if (!loc) return;
+  w.ms.push({ loc, name: site.name, state: '발생대기', visitors: '', origin: 'auto', since: null, born: w.minute });
+  w.skip.ms = undefined;
+}
+
+/** RP 유지 시간이 지난 항목을 끝낸다. 유저가 탐사 중인 괴이는 남긴다.
+ *  종료 시각은 유지 시간이 다한 그 시각(born + ttl)이지 지금 응답의 시각이 아니다 (2026-11-05 사용자: 일주일을 건너뛰면
+ *  모든 사건의 종료 시각·소요가 새 응답 시각으로 찍혔다). 빠진 시각 자료(born 없음)면 지금 시각 */
+export function expire(w: WorldState, s: WorldSettings) {
+  const now = w.minute;
+  if (now === null) return;
+  const due = (e: { born: number | null; since: number | null }, group: 'preset' | 'random' | 'incident' | 'mystic'): number | null => {
+    if (e.born === null) e.born = e.since ?? now;
+    const hours = s[`${group}_ttl`];
+    if (!(s[`${group}_expire`] === 1 && hours > 0 && now - e.born >= hours * 60)) return null;
+    return Math.min(now, e.born + hours * 60);
+  };
+  for (const e of [...w.an]) {
+    const m = e.exploring ? null : due(e, e.kind);
+    if (m !== null) endAn(w, e, 'ttl', false, m);
+  }
+  for (const e of [...w.inc]) {
+    const m = due(e, 'incident');
+    if (m !== null) endIn(w, e, 'ttl', m);
+  }
+  for (const e of [...w.ms]) {
+    const m = due(e, 'mystic');
+    if (m !== null) endMs(w, e, 'ttl', m);
+  }
+}
+
+/** 응답 한 번마다 한 번: 회차를 올리고, 오래된 항목을 끝내고, 네 그룹을 무작위 순서로 한 번씩 추첨 */
+export function tick(w: WorldState, c: Catalog, s: WorldSettings, rng: Rng) {
+  w.epoch += 1;
+  w.ended = (w.ended ?? []).filter((e) => e.until >= w.epoch);
+  // 지난 회차의 이름 막기는 더 뜻이 없으니 지운다 (안 지우면 채팅 저장값이 계속 커졌다) (전수검사 11-13)
+  for (const k of Object.keys(w.blocks ?? {})) if (w.blocks[k] < w.epoch) delete w.blocks[k];
+  expire(w, s);
+  const groups = ['preset', 'random', 'incident', 'mystic'];
+  for (let i = groups.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [groups[i], groups[j]] = [groups[j], groups[i]];
+  }
+  for (const g of groups) {
+    if (g === 'preset') spawnAn(w, c, s, true, rng);
+    else if (g === 'random') spawnAn(w, c, s, false, rng);
+    else if (g === 'incident') spawnIncident(w, c, s, rng);
+    else spawnMystic(w, c, s, rng);
+  }
+}
+
+// ── 요원 ──
+
+/** 이 소속에서 보이는 요원 (결번 제외, 상한까지) */
+export function rosterFor(w: WorldState, c: Catalog, faction: string, limit: number) {
+  return c.people.filter((p) => p.rosterFor.includes(faction as FactionCode) && !w.retired.includes(p.id) && p.id !== w.player).slice(0, limit);
+}
+
+function agentRecord(w: WorldState, code: string): AgentRecord {
+  w.agents[code] ??= { st: '미정', situation: '', since: null, dead: 0 };
+  return w.agents[code];
+}
+
+/** 문장 속 P001·A00 같은 코드를 이름으로 */
+export function codesToNames(text: string, c: Catalog, faction: string): string {
+  if (!/[A-Z]+\d+/.test(text)) return text;
+  const people = new Map(c.people.map((p) => [p.id, p.name]));
+  const factions = factionNames(c, faction);
+  return text.replace(/(?<![\w])([A-Z]+\d+)(?![\w])/g, (code) => factions[code] ?? people.get(code) ?? code);
+}
+
+function applyAgents(w: WorldState, c: Catalog, s: WorldSettings, faction: string, text: string) {
+  const roster = rosterFor(w, c, faction, s.agent_limit);
+  for (const t of scanAgents(text)) {
+    // 코드(P001·p-001·「쟈알디(P001)」)를 먼저, 없으면 이름·영문명으로 찾는다
+    // 새 요원 코드(P39611)처럼 숫자가 셋보다 길어도 다 읽는다 (전수검사 11-13)
+    const key = (/[A-Z]-?\d{3,}/i.exec(t.who)?.[0] ?? t.who).replace(/-/g, '').toUpperCase();
+    const who = t.who.trim().toLowerCase();
+    const p = roster.find((r) => r.id === key) ?? roster.find((r) => r.name === t.who.trim() || (!!r.english && r.english.toLowerCase() === who));
+    if (!p) continue;
+    const rec = agentRecord(w, p.id);
+    if (rec.st !== t.state || rec.since === null) rec.since = w.minute;
+    rec.st = t.state;
+    rec.tagged = true;
+    rec.situation = t.situation ? codesToNames(t.situation, c, faction) : '';
+  }
+}
+
+/** 사망 상태로 refill번 응답이 지나면 결번 처리하고 다음 예비 인원을 올린다 */
+function refillAgents(w: WorldState, c: Catalog, s: WorldSettings, faction: string) {
+  w.promoted = [];
+  const before = rosterFor(w, c, faction, s.agent_limit).map((p) => p.id);
+  let retired = false;
+  for (const code of before) {
+    const rec = agentRecord(w, code);
+    if (rec.st === '사망') {
+      rec.dead += 1;
+      if (rec.dead >= c.refill) {
+        rec.dead = 0;
+        w.retired.push(code);
+        retired = true;
+      }
+    } else rec.dead = 0;
+  }
+  if (!retired) return;
+  for (const p of rosterFor(w, c, faction, s.agent_limit)) {
+    if (!before.includes(p.id)) w.promoted.push(`${p.id}(${p.name})`);
+  }
+}
+
+// ── 모델 태그 반영 ──
+
+function matchAn(w: WorldState, region: string, name: string): AnEntry | undefined {
+  let best: AnEntry | undefined;
+  let score = 0;
+  let tied = false;
+  const r = region.trim().replace(/\s+/g, '');
+  for (const e of w.an) {
+    const ln = locName(e.loc);
+    if (!regionMatch(region, ln)) continue;
+    let points = r === ln.replace(/\s+/g, '') ? 10 : 1;
+    if (name && (name === e.name || name === e.presetName)) points += 100;
+    if (points > score) {
+      best = e;
+      score = points;
+      tied = false;
+    } else if (points === score) tied = true;
+  }
+  return tied ? undefined : best;
+}
+
+/** 지역 이름에 맞는 첫 loc (커스텀 임무 등록용, 원본과 같이 첫 일치) */
+function firstRegion(region: string): string | null {
+  for (const loc of POOL) if (regionMatch(region, locName(loc))) return loc;
+  return null;
+}
+
+function applyAnomalies(w: WorldState, c: Catalog, s: WorldSettings, faction: string, text: string) {
+  const pending = w.pending.an;
+  let handled = false;
+  const tags = scanAnomalies(text);
+  // 이 응답에서 제 이름으로 불린 항목: 같은 지역의 다른 이름 태그가 덮거나 끝내지 못하게 한다 (전수검사 11-13)
+  const named = new Set<AnEntry>();
+  for (const t of tags) {
+    const key = presetCanon(c, t.name) ?? t.name;
+    if (!validName(key)) continue;
+    for (const x of w.an) if ((x.name === key || x.presetName === key) && regionMatch(t.region, locName(x.loc))) named.add(x);
+  }
+  for (const t of tags) {
+    const canon = presetCanon(c, t.name);
+    const manualIncoming = !!pending && canon === pending;
+    let e: AnEntry | undefined;
+    // 이미 등록된 수동·모델 프리셋은 이름으로 먼저 찾는다 (같은 지역의 다른 괴이를 잘못 고치지 않게)
+    const existing = canon ? w.an.find((x) => x.origin !== 'auto' && presetCanon(c, x.name || x.presetName) === canon) : undefined;
+    if (existing) {
+      if (regionMatch(t.region, locName(existing.loc))) {
+        e = existing;
+        if (manualIncoming) handled = true;
+      }
+    } else if (manualIncoming) {
+      handled = true;
+      const extra = w.an.filter((x) => x.origin !== 'auto').length;
+      const active = w.an.some((x) => x.presetName === canon || presetCanon(c, x.name) === canon);
+      if (t.state !== '활성' || extra >= s.extra_cap || active) {
+        w.notice = '등록 실패: 추가 발생 여유분이 가득 찼거나 프리셋이 이미 발생 중이에요.';
+      } else {
+        const loc = firstRegion(t.region);
+        if (!loc) w.notice = '등록 실패: 모델이 적은 지역을 지도에서 찾을 수 없어요. 다시 요청해 주세요.';
+        else if (occupied(w).has(loc)) w.notice = '등록 실패: 모델이 고른 지역에 다른 괴이·사건이 있어요. 다시 요청해 주세요.';
+        else {
+          e = {
+            loc, name: canon, state: '발생대기', grade: '', deploy: '', kind: 'preset', origin: 'manual',
+            presetName: canon, since: null, born: w.minute, exploring: false,
+          };
+          w.an.push(e);
+          w.notice = `커스텀 임무 등록: ${canon}`;
+        }
+      }
+    } else {
+      e = matchAn(w, t.region, canon ?? t.name);
+      const key = canon ?? t.name;
+      if (e && named.has(e) && key !== e.name && key !== e.presetName) continue; // 지역만 맞은 다른 이름 태그는 버린다 (전수검사 11-13)
+      if (!e && t.state === '활성' && validName(t.name) && !w.an.some((x) => x.name === t.name)) {
+        // 모델이 스스로 낸 괴이는 추가 여유분 안에서만 받는다 (요청 대기 중인 커스텀 임무 몫은 남김)
+        const extra = w.an.filter((x) => x.origin !== 'auto').length + (pending ? 1 : 0);
+        const presetActive = canon && w.an.some((x) => x.presetName === canon || presetCanon(c, x.name) === canon);
+        const loc = uniqueRegion(t.region);
+        if (extra < s.extra_cap && !presetActive && loc && !occupied(w).has(loc)) {
+          e = {
+            loc, name: '', state: '발생대기', grade: '', deploy: '', kind: canon ? 'preset' : 'random', origin: 'model',
+            presetName: canon ?? '', since: null, born: w.minute, exploring: false,
+          };
+          w.an.push(e);
+        }
+      }
+    }
+    if (!e) continue;
+    if (t.state !== '활성') {
+      if (t.state === '클리어') {
+        const names = [e.presetName, e.name, t.name].filter((n): n is string => validName(n));
+        w.cleared = [...new Set([...(w.cleared ?? []), ...names])].slice(-200);
+      }
+      // 종료 태그(격리·소멸·클리어)에 적힌 상황 글은 보고서 「결과」(마지막 상황 글)가 된다 — 끝내기 전에 경과에 넣는다 (사용자 결정 2026-10-29)
+      const end = takeEndAt(w, e, t.situation, e.exploring ? null : dueAt(e, e.kind, s));
+      closingText(w, e, end.text, c, faction);
+      endAn(w, e, 'model', t.state === '클리어', end.minute);
+      continue;
+    }
+    if (e.kind === 'preset' && validName(e.presetName)) e.name = e.presetName;
+    else if (validName(t.name)) e.name = t.name;
+    if (t.deploy) e.deploy = t.deploy;
+    if (e.state !== '활성' || e.since === null) e.since = w.minute;
+    e.state = '활성';
+    if (t.grade) e.grade = t.grade;
+    // 상황 칸이 없는 옛 카드 지침이면 비워 둔다 (그때는 위키 요약이 대신 보인다)
+    if (t.situation) {
+      e.situation = codesToNames(t.situation, c, faction);
+      pushTrail(w, e, e.situation);
+    }
+  }
+  if (pending && handled) w.pending.an = undefined;
+  else if (pending) w.notice = `${pending}: 발생 태그를 기다리는 중이에요. 다음 응답에서 다시 안내해요.`;
+}
+
+function applyIncidents(w: WorldState, c: Catalog, s: WorldSettings, faction: string, text: string) {
+  for (const t of scanIncidents(text)) {
+    if (!validName(t.name)) continue;
+    const lm = c.landmarks.find((l) => l.name === t.name);
+    // 시군구 없는 거점은 응답이 적은 지역으로 (그 시도 안에서만)
+    const loc = lm && lm.gu ? landmarkLoc(lm.sido, lm.gu) : uniqueRegion(t.region);
+    if (lm && !lm.gu && loc && !loc.startsWith(`${lm.sido}-`)) continue;
+    if (!loc || loc === SEALED_LOC || !regionMatch(t.region, locName(loc))) continue;
+    let e = w.inc.find((x) => x.name === t.name);
+    if (e && e.loc !== loc) continue;
+    if (!e) {
+      if (t.state !== '진행') continue;
+      // 이름이 아직 없는 자동 사건이 이 자리에서 첫 이름을 받는 경우
+      if (!lm) e = w.inc.find((x) => x.loc === loc && x.state === '발생대기' && x.kind === 'random' && !x.name);
+      if (e) e.name = t.name;
+      else {
+        const pending = w.pending.in;
+        const reserved = pending && pending !== t.name && !w.inc.some((x) => x.name === pending) ? 1 : 0;
+        const extra = w.inc.filter((x) => x.origin !== 'auto').length + reserved;
+        if (extra >= s.extra_in_cap || blocked(w, 'in', t.name)) continue;
+        if (!lm && occupied(w).has(loc)) continue;
+        const origin: Origin = pending === t.name ? 'manual' : 'model';
+        e = { loc, name: t.name, state: '발생대기', situation: '', kind: lm ? 'landmark' : 'random', origin, since: null, born: w.minute };
+        w.inc.push(e);
+      }
+    }
+    if (w.pending.in === t.name) w.pending.in = undefined;
+    if (t.state === '종료') {
+      const end = takeEndAt(w, e, t.situation, dueAt(e, 'incident', s));
+      closingText(w, e, end.text, c, faction);
+      endIn(w, e, 'model', end.minute);
+      continue;
+    }
+    e.situation = t.situation ? codesToNames(t.situation, c, faction) : '';
+    if (e.situation) pushTrail(w, e, e.situation);
+    if (t.deploy) e.deploy = t.deploy;
+    if (e.state !== '진행' || e.since === null) e.since = w.minute;
+    e.state = '진행';
+  }
+}
+
+function applyMysticSites(w: WorldState, c: Catalog, s: WorldSettings, faction: string, text: string) {
+  for (const t of scanMysticSites(text)) {
+    let e = w.ms.find((x) => x.name === t.name);
+    if (e) {
+      if (!regionMatch(t.region, locName(e.loc))) continue;
+    } else {
+      if (t.state !== '출현' || !c.mysticSites.some((m) => m.name === t.name)) continue;
+      const pending = w.pending.ms;
+      const reserved = pending && pending !== t.name && !w.ms.some((x) => x.name === pending) ? 1 : 0;
+      const extra = w.ms.filter((x) => x.origin !== 'auto').length + reserved;
+      const loc = uniqueRegion(t.region);
+      if (extra >= s.extra_ms_cap || !loc || occupied(w).has(loc)) continue;
+      e = { loc, name: t.name, state: '발생대기', visitors: '', origin: pending === t.name ? 'manual' : 'model', since: null, born: w.minute };
+      w.ms.push(e);
+    }
+    if (w.pending.ms === t.name) w.pending.ms = undefined;
+    if (t.state === '소실') {
+      const end = takeEndAt(w, e, t.situation, dueAt(e, 'mystic', s));
+      closingText(w, e, end.text, c, faction);
+      endMs(w, e, 'model', end.minute);
+      continue;
+    }
+    e.visitors = t.visitors || '없음';
+    if (t.situation) {
+      e.situation = codesToNames(t.situation, c, faction);
+      pushTrail(w, e, e.situation);
+    }
+    if (e.since === null) e.since = w.minute;
+    e.state = '출현';
+  }
+}
+
+/** 상태창 마지막 칸(지금 다루는 괴이)으로 탐사 중 표시. 상태창이 없거나 이름이 안 맞으면 그대로 둔다 */
+function applyExploration(w: WorldState, target: string | null) {
+  if (target === null) return;
+  // 목표 칸이 가리킨 항목은 「내가 출동」 근거로 남긴다 (괴이·사건·특수 모두, 종료까지 유지)
+  if (target !== '') for (const e of [...w.an, ...w.inc, ...w.ms]) if (e.name.trim() === target) e.touched = true;
+  const matched = target === '' ? [] : w.an.filter((e) => e.name.trim() === target);
+  if (target !== '' && matched.length === 0) return;
+  for (const e of w.an) e.exploring = matched.includes(e);
+}
+
+export interface OutputResult {
+  world: WorldState;
+  /** [AC]로 소속이 바뀌었으면 새 소속 코드 */
+  faction: FactionCode | null;
+}
+
+/** 모델 응답 한 번을 반영한다. 원본 editOutput 순서와 같다 */
+export function applyOutput(prev: WorldState, c: Catalog, s: WorldSettings, faction: string, text: string, rng: Rng): OutputResult {
+  const w: WorldState = structuredClone(prev);
+  w.notice = '';
+  w.closed = [];
+  const status = scanStatus(text);
+  if (status.minute !== null) w.minute = status.minute;
+
+  let newFaction: FactionCode | null = null;
+  const ac = scanAffiliation(text);
+  if (ac && (c.affiliations ? ac in c.affiliations : BUILTIN.includes(ac)) && ac !== faction) {
+    applyAgents(w, c, s, faction, text); // 바뀌기 전 명단 기준으로 먼저 반영
+    newFaction = ac as FactionCode;
+  }
+  const now = newFaction ?? faction;
+
+  applyAnomalies(w, c, s, now, text);
+  applyIncidents(w, c, s, now, text);
+  applyMysticSites(w, c, s, now, text);
+  applyExploration(w, status.target);
+  tick(w, c, s, rng);
+
+  if (!newFaction) applyAgents(w, c, s, now, text);
+  refillAgents(w, c, s, now);
+  return { world: w, faction: newFaction };
+}
+
+/** START 직후 첫 추첨 (원본: 첫 입력 때 한 번) */
+export function bootstrap(c: Catalog, s: WorldSettings, rng: Rng, player = ''): WorldState {
+  const w = emptyWorld();
+  if (player) w.player = player;
+  tick(w, c, s, rng);
+  return w;
+}
+
+// ── 브리핑 (로어북 🏷️Tag 의 {{getvar::an_report}} 등) ──
+// 보고 줄 모양·자리 글은 지침 「메인 요청에 붙는 글」 WORLD.REPORT.* 절 (2026-11-14 사용자: 모델에 가는 글은 전부 지침 파일에)
+const rg = (name: string, vars?: Record<string, string | number>) => guideTxt('Main', `WORLD.REPORT.${name}`, vars);
+
+/** 절대 분 → 「MM.DD HH:MM」 (상태창과 같은 UTC 기준) */
+function clock(minute: number): string {
+  const d = new Date(minute * 60000);
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${p2(d.getUTCMonth() + 1)}.${p2(d.getUTCDate())} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;
+}
+/** 유지 기한(발생 + RP 유지 시간) 표시. 자동 종료가 켜진 묶음만. 모델이 이 시각을 넘기는 응답에서 스스로 끝내도록 (2026-11-05 사용자) */
+function dueMeta(e: { born: number | null }, group: 'preset' | 'random' | 'incident' | 'mystic', s: WorldSettings): string {
+  const hours = s[`${group}_ttl`];
+  if (e.born === null || s[`${group}_expire`] !== 1 || !(hours > 0)) return '';
+  return ` {${rg('DUE', { time: clock(e.born + hours * 60) })}}`;
+}
+/** 유지 기한 시각(분). 자동 종료가 꺼진 묶음이면 null (전수검사 11-13) */
+function dueAt(e: { born: number | null }, group: 'preset' | 'random' | 'incident' | 'mystic', s: WorldSettings): number | null {
+  const hours = s[`${group}_ttl`];
+  return e.born === null || s[`${group}_expire`] !== 1 || !(hours > 0) ? null : e.born + hours * 60;
+}
+const END_AT = /\(\s*종료\s*(\d{1,2})\s*\.\s*(\d{1,2})\s+(\d{1,2})\s*:\s*(\d{2})\s*\)/u;
+/** 종료 태그 상황 칸 끝의 「(종료 MM.DD HH:MM)」: 모델이 고른 실제 종료 시각. 발생~지금 사이면 그 시각, 아니면 기한이 지났으면 기한, 안 지났으면 지금 (전수검사 11-13). 글에서는 지운다 (2026-11-05 사용자: 종료 시각을 현재로 찍지 말고 합리적으로) */
+function takeEndAt(w: WorldState, e: { born: number | null; since: number | null }, situation: string | undefined, due: number | null): { text: string | undefined; minute: number | null } {
+  const fallback = w.minute !== null && due !== null && due < w.minute ? due : w.minute;
+  const m = situation ? END_AT.exec(situation) : null;
+  if (!m || w.minute === null) return { text: situation, minute: fallback };
+  const text = situation!.replace(END_AT, '').replace(/\s{2,}/g, ' ').trim();
+  const now = w.minute;
+  const year = new Date(now * 60000).getUTCFullYear();
+  const lo = e.born ?? e.since;
+  let minute: number | null = null;
+  for (const y of [year, year - 1]) {
+    const ms = Date.UTC(y, Number(m[1]) - 1, Number(m[2]), Number(m[3]), Number(m[4]));
+    const cand = Math.floor(ms / 60000);
+    if (!Number.isFinite(cand) || cand > now) continue;
+    if (lo !== null && cand < lo) continue;
+    minute = cand;
+    break;
+  }
+  return { text, minute: minute ?? fallback };
+}
+
+function age(w: WorldState, since: number | null): string {
+  if (w.minute === null || since === null) return '';
+  const mins = Math.max(0, w.minute - since);
+  return ` {${rg('AGE', { h: Math.floor(mins / 60), m: mins % 60 })}}`;
+}
+
+export interface Reports {
+  an: string;
+  in: string;
+  ms: string;
+  ag: string;
+}
+
+export function reports(w: WorldState, c: Catalog, s: WorldSettings, faction: string): Reports {
+  const an = w.an.map((e) => {
+    const ln = locName(e.loc);
+    if (e.state === '발생대기') return rg('AN.NEW', { loc: ln, name: e.name || rg('UNNAMED') });
+    return `${rg('AN.LINE', { loc: ln, name: e.name, state: e.state, grade: e.grade, deploy: e.deploy || '없음', situation: e.situation || rg('SITUATION') })}${age(w, e.since)}${dueMeta(e, e.kind, s)}`;
+  });
+  const inc = w.inc.map((e) => {
+    const ln = locName(e.loc);
+    if (e.state === '발생대기') return rg('IN.NEW', { loc: ln, name: e.name || rg('UNNAMED') });
+    return `${rg('IN.LINE', { loc: ln, name: e.name, state: e.state, deploy: e.deploy || '없음', situation: String(e.situation) })}${age(w, e.since)}${dueMeta(e, 'incident', s)}`;
+  });
+  const ms = w.ms.map((e) => {
+    const ln = locName(e.loc);
+    if (e.state === '발생대기') return rg('MS.NEW', { loc: ln, name: e.name });
+    return `${rg('MS.LINE', { loc: ln, name: e.name, state: e.state, visitors: e.visitors || '없음', situation: e.situation || rg('SITUATION') })}${age(w, e.since)}${dueMeta(e, 'mystic', s)}`;
+  });
+  if (w.pending.an && !w.an.some((e) => e.presetName === w.pending.an || e.name === w.pending.an)) {
+    an.push(rg('AN.NEW', { loc: rg('REGION'), name: w.pending.an }));
+  }
+  if (w.pending.in && !w.inc.some((e) => e.name === w.pending.in)) {
+    const lm = c.landmarks.find((l) => l.name === w.pending.in);
+    const loc = lm && landmarkLoc(lm.sido, lm.gu);
+    inc.push(rg('IN.NEW', { loc: loc ? locName(loc) : rg('REGION'), name: w.pending.in }));
+  }
+  if (w.pending.ms && !w.ms.some((e) => e.name === w.pending.ms)) {
+    ms.push(rg('MS.NEW', { loc: rg('REGION'), name: w.pending.ms }));
+  }
+  const lines: string[] = [];
+  const map: string[] = [];
+  for (const p of rosterFor(w, c, faction, s.agent_limit)) {
+    const rec = w.agents[p.id];
+    // 영문명이 비면 빈 괄호 없이 이름만 (전수검사 11-13)
+    map.push(`${p.id} ${p.name && p.english && p.name !== p.english ? `${p.name} (${p.english})` : p.name || p.english}`);
+    if (!rec || rec.st === '미정') lines.push(rg('AG.NEW', { id: p.id }));
+    else lines.push(`${rg('AG.LINE', { id: p.id, state: rec.st, situation: String(rec.situation) })}${age(w, rec.since)}`);
+  }
+  lines.sort();
+  map.sort();
+  const ag = [...lines, ...(lines.length ? [''] : []), map.length ? rg('AG.CODE', { list: map.join(' | ') }) : rg('AG.CODE_NONE')].join('\n');
+  return { an: an.join('\n'), in: inc.join('\n'), ms: ms.join('\n'), ag };
+}
+
+// ── 유저 조작 (지도·커스텀 임무 창) ──
+
+export type EventKind = 'an' | 'in' | 'ms';
+
+export interface WorldEvent {
+  kind: EventKind;
+  index: number;
+  loc: string;
+  name: string;
+  /** 같은 대상인지 확인하는 값 (창을 연 사이 바뀌었으면 조작을 막는다) */
+  key: string;
+  grade: string;
+  people: string;
+  report: string;
+}
+
+/** 지도에 표시하는 진행 중 상황 (발생 예정은 제외, 원본 M.records와 같음) */
+export function activeEvents(w: WorldState): WorldEvent[] {
+  const out: WorldEvent[] = [];
+  const key = (kind: string, e: { loc: string; name: string; born: number | null }) => `${kind}|${e.loc}|${e.name}|${e.born ?? ''}`;
+  w.an.forEach((e, index) => {
+    if (e.state === '활성') out.push({ kind: 'an', index, loc: e.loc, name: e.name || '이름 미확인', key: key('an', e), grade: e.grade, people: e.deploy, report: e.situation ?? '' });
+  });
+  w.inc.forEach((e, index) => {
+    if (e.state === '진행') out.push({ kind: 'in', index, loc: e.loc, name: e.name || '이름 미확인', key: key('in', e), grade: '', people: e.deploy ?? '', report: e.situation });
+  });
+  w.ms.forEach((e, index) => {
+    if (e.state === '출현') out.push({ kind: 'ms', index, loc: e.loc, name: e.name, key: key('ms', e), grade: '', people: e.visitors, report: e.situation ?? '' });
+  });
+  return out.sort((a, b) => a.loc.localeCompare(b.loc) || a.kind.localeCompare(b.kind));
+}
+
+/** 상황판에 흐리게 남길 막 끝난 상황. 같은 이름이 다시 진행 중이면 뺀다 */
+export function endedShown(w: WorldState): EndedEntry[] {
+  const live = (k: EndedEntry['kind'], name: string) => (k === 'an' ? w.an : k === 'in' ? w.inc : w.ms).some((e) => e.name === name && e.state !== '발생대기');
+  return (w.ended ?? []).filter((e) => e.until >= w.epoch && !(e.name && live(e.kind, e.name)));
+}
+
+/** 유저가 상황을 끝낸다 (원본 상황 종료 버튼). 대상이 바뀌었으면 false */
+export function endEvent(w: WorldState, key: string): boolean {
+  const ev = activeEvents(w).find((e) => e.key === key);
+  if (!ev) return false;
+  if (ev.kind === 'an') endAn(w, w.an[ev.index], 'manual');
+  else if (ev.kind === 'in') endIn(w, w.inc[ev.index], 'manual');
+  else endMs(w, w.ms[ev.index], 'manual');
+  return true;
+}
+
+export type MissionKind = 'an' | 'ms' | 'lm';
+
+/** 커스텀 임무 요청을 걸어 둔다. 안 되면 이유를 돌려준다 */
+export function requestMission(w: WorldState, c: Catalog, s: WorldSettings, kind: MissionKind, name: string): string | null {
+  if (kind === 'an') {
+    if (!c.anomalies.some((a) => a.name === name)) return '목록에 없는 괴이예요.';
+    if (w.an.some((e) => e.presetName === name || presetCanon(c, e.name) === name)) return '이미 발생 중인 괴이예요.';
+    if (w.an.filter((e) => e.origin !== 'auto').length >= s.extra_cap) return '추가 발생 여유분이 가득 찼어요. 기존 괴이를 끝낸 뒤 다시 요청해 주세요.';
+    w.pending.an = name;
+  } else if (kind === 'ms') {
+    if (!c.mysticSites.some((m) => m.name === name)) return '목록에 없는 특수예요.';
+    if (!w.ms.some((e) => e.name === name) && w.ms.filter((e) => e.origin !== 'auto').length >= s.extra_ms_cap) return '특수 추가 여유분이 가득 찼어요.';
+    w.pending.ms = name;
+  } else {
+    if (!c.landmarks.some((l) => l.name === name)) return '목록에 없는 거점이에요.';
+    if (!w.inc.some((e) => e.name === name) && w.inc.filter((e) => e.origin !== 'auto').length >= s.extra_in_cap) return '사건 추가 여유분이 가득 찼어요.';
+    w.pending.in = name;
+  }
+  w.notice = `요청 대기: ${name} (다음 응답에서 등록돼요)`;
+  return null;
+}
+
+/** 걸어 둔 커스텀 임무 요청을 지운다 */
+export function cancelMission(w: WorldState, kind: EventKind): void {
+  w.pending[kind] = undefined;
+  w.notice = '';
+}
+
+/** 편성할 수 없는 요원 상태 (원본 lock) */
+export const LOCKED_STATES = ['작전투입', '실종', '사망', '미정'];
+
+/** 원본과 같이 태그로 받은 상태만 잠근다. 아직 태그가 없던 요원은 편성할 수 있다 */
+export function agentLocked(rec: AgentRecord | undefined): boolean {
+  if (!rec || !LOCKED_STATES.includes(rec.st)) return false;
+  return rec.st !== '미정' || rec.tagged === true;
+}

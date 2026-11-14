@@ -1,0 +1,131 @@
+// 서사 리듬 턴 계산 (리수폿 H, 2026-11-06 사용자 결정): 훅 규모별 회수 범위·새 훅 간격·동시 상한·한 번 연장을 코드가 센다.
+// 턴 = 확정된 응답(char 메시지) 수. 훅의 심은 턴·마지막 진전 턴은 문서 항목의 기준 메시지에서 읽는다.
+import type { Chat } from '../types';
+import { liveEntries, type Liveness } from './store';
+import { RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, type PeopleStore } from './types';
+import { guideTxt } from '../guides';
+
+export type HookTier = (typeof RHYTHM_HOOK_TIERS)[number];
+export type HookStage = (typeof RHYTHM_HOOK_STAGES)[number];
+/** 규모별 회수 검토 범위 (심은 뒤 몇 턴), 한 번 연장 턴, 동시 상한 (리수폿 원문) */
+export const HOOK_WINDOW: Record<HookTier, [number, number]> = { short: [2, 7], mid: [7, 14], long: [20, 50] };
+export const HOOK_EXTEND: Record<HookTier, number> = { short: 3, mid: 5, long: 10 };
+export const HOOK_LIMIT: Record<HookTier, number> = { short: 2, mid: 2, long: 1 };
+export const HOOK_PLANT_GAP = 3;
+const ACTIVE: HookStage[] = ['seeded', 'hinted', 'escalated', 'payoff_ready'];
+
+export interface HookClock {
+  key: string;
+  tier: HookTier;
+  stage: HookStage;
+  /** 심은 턴·마지막 진전 턴·지금까지 턴 수 */
+  planted: number;
+  last: number;
+  age: number;
+  sinceLast: number;
+  /** 회수 검토 범위 (연장 포함) */
+  window: [number, number];
+  extended: boolean;
+  /** 범위 안 (회수·진전을 검토할 때) / 범위를 넘김 */
+  due: boolean;
+  overdue: boolean;
+}
+export interface RhythmClock {
+  turn: number;
+  hooks: HookClock[];
+  active: Record<HookTier, number>;
+  lastPlant: number | null;
+  plantAllowed: boolean;
+  plantBlocked: string;
+  /** 우선순위: 넘긴 흐름 → 준비된 회수 → 진전 때가 된 것 → 새 훅 */
+  priority: string[];
+  /** 직전 장면 기록의 연출 방법 (`[method:…]`, 원본 anticipation 6종). 연속 턴에 같은 방법 금지를 코드가 알려 준다 (2026-11-07 J) */
+  lastMethod: string | null;
+}
+/** 기대 쌓기 연출 방법 (원본 rhythm.pulse.choices.anticipation) */
+export const RHYTHM_METHODS = ['proximity', 'external_delay', 'restraint', 'seed', 'interruption', 'chosen_delay', 'none'] as const;
+export function parseSceneMethod(text: string): string | null {
+  const m = /\[method:([a-z_]+)\]/.exec(text);
+  return m && (RHYTHM_METHODS as readonly string[]).includes(m[1]) ? m[1] : null;
+}
+
+/** 메시지 위치까지의 확정 응답 수 (턴) */
+export function turnAt(chat: Chat, idx: number): number {
+  const list = Array.isArray(chat.message) ? chat.message : [];
+  let n = 0;
+  for (let i = 0; i <= Math.min(idx, list.length - 1); i++) if (list[i].role === 'char') n++;
+  return n;
+}
+
+export function parseHookHead(text: string): { stage: HookStage; tier: HookTier; ext: boolean } | null {
+  const m = /^\[stage:([a-z_]+)\]\s*\[tier:([a-z]+)\](\s*\[ext\])?/.exec(text);
+  if (!m || !(RHYTHM_HOOK_STAGES as readonly string[]).includes(m[1]) || !(RHYTHM_HOOK_TIERS as readonly string[]).includes(m[2])) return null;
+  return { stage: m[1] as HookStage, tier: m[2] as HookTier, ext: !!m[3] };
+}
+
+/** 지금 턴 기준의 훅 시계. upto = 마지막 확정 메시지 위치 (없으면 끝) */
+export function rhythmClock(store: PeopleStore, chat: Chat, live: Liveness, upto?: number): RhythmClock {
+  const list = Array.isArray(chat.message) ? chat.message : [];
+  const end = upto ?? list.length - 1;
+  const turn = turnAt(chat, end);
+  const hooks: HookClock[] = [];
+  const active: Record<HookTier, number> = { short: 0, mid: 0, long: 0 };
+  let lastPlant: number | null = null;
+  for (const d of Object.values(store.docs)) {
+    if (d.type !== 'rhythm' || !d.key.startsWith('hook:')) continue;
+    const es = liveEntries(d.entries, live).filter((e) => (live.at.get(e.anchor) ?? -1) <= end);
+    if (!es.length) continue;
+    const head = parseHookHead(es[es.length - 1].text);
+    if (!head) continue;
+    // 심은 턴 = 대체 사슬 맨 처음 항목의 턴. 진전(upsert)마다 시계가 0으로 돌아가던 것 고침 (전수검사 11-13)
+    const byId = new Map(d.entries.map((e) => [e.id, e]));
+    const rootPos = (e: (typeof es)[number]): number => {
+      let min = live.at.get(e.anchor) ?? 0;
+      const seen = new Set<string>([e.id]);
+      for (let r = e.replaces ? byId.get(e.replaces) : undefined; r && !seen.has(r.id); r = r.replaces ? byId.get(r.replaces) : undefined) {
+        seen.add(r.id);
+        const pos = live.at.get(r.anchor);
+        if (!r.void && !r.folded && pos !== undefined) min = Math.min(min, pos);
+      }
+      return min;
+    };
+    const planted = turnAt(chat, Math.min(...es.map(rootPos)));
+    const last = turnAt(chat, live.at.get(es[es.length - 1].anchor) ?? 0);
+    lastPlant = lastPlant === null ? planted : Math.max(lastPlant, planted);
+    const [lo, hi0] = HOOK_WINDOW[head.tier];
+    const hi = hi0 + (head.ext ? HOOK_EXTEND[head.tier] : 0);
+    const age = turn - planted;
+    const isActive = ACTIVE.includes(head.stage);
+    if (isActive) active[head.tier]++;
+    hooks.push({ key: d.key, tier: head.tier, stage: head.stage, planted, last, age, sinceLast: turn - last, window: [lo, hi], extended: head.ext, due: isActive && age >= lo && age <= hi, overdue: isActive && age > hi });
+  }
+  const gapOk = lastPlant === null || turn - lastPlant >= HOOK_PLANT_GAP;
+  const room = (RHYTHM_HOOK_TIERS as readonly HookTier[]).filter((t) => active[t] < HOOK_LIMIT[t]);
+  const overdue = hooks.filter((h) => h.overdue);
+  const plantAllowed = gapOk && room.length > 0 && !overdue.length;
+  // 막힘 사유·우선순위 글은 지침 「Main」 RHYTHM.BLOCK.*·RHYTHM.PRIORITY.* 절
+  const plantBlocked = !gapOk ? guideTxt('Main', 'RHYTHM.BLOCK.GAP', { ago: turn - (lastPlant ?? 0), need: HOOK_PLANT_GAP }) : !room.length ? guideTxt('Main', 'RHYTHM.BLOCK.LIMIT') : overdue.length ? guideTxt('Main', 'RHYTHM.BLOCK.OVERDUE') : '';
+  const priority: string[] = [];
+  const byNeglect = (a: HookClock, b: HookClock) => b.sinceLast - a.sinceLast;
+  for (const h of [...overdue].sort(byNeglect)) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.OVERDUE', { key: h.key, tier: h.tier, age: h.age, from: h.window[0], to: h.window[1], ext: `, ${guideTxt('Main', h.extended ? 'RHYTHM.PRIORITY.EXTENDED' : 'RHYTHM.PRIORITY.MAY_EXTEND')}` }));
+  for (const h of hooks.filter((h) => h.stage === 'payoff_ready' && !h.overdue).sort(byNeglect)) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.PAYOFF', { key: h.key }));
+  for (const h of hooks.filter((h) => h.due && h.stage !== 'payoff_ready' && (h.tier !== 'long' || h.sinceLast >= 5)).sort(byNeglect)) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.ADVANCE', { key: h.key, since: h.sinceLast }));
+  if (plantAllowed) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.PLANT', { tiers: room.join('/') }));
+  // 직전 장면 기록의 연출 방법 (end 까지의 살아 있는 scene 항목 중 마지막)
+  const sceneDoc = Object.values(store.docs).find((d) => d.type === 'rhythm' && d.key === 'scene');
+  const scenes = sceneDoc ? liveEntries(sceneDoc.entries, live).filter((e) => (live.at.get(e.anchor) ?? -1) <= end) : [];
+  const lastMethod = scenes.length ? parseSceneMethod(scenes[scenes.length - 1].text) : null;
+  return { turn, hooks, active, lastPlant, plantAllowed, plantBlocked, priority, lastMethod };
+}
+
+/** 지침·본편용 영어 요약 줄 */
+export function rhythmClockLines(c: RhythmClock): string[] {
+  // 줄 꼴은 지침 「Main」 RHYTHM.CLOCK.* 절
+  const plant = c.plantAllowed ? guideTxt('Main', 'RHYTHM.CLOCK.ALLOWED') : guideTxt('Main', 'RHYTHM.CLOCK.NOT_ALLOWED', { reason: c.plantBlocked });
+  const out = [guideTxt('Main', 'RHYTHM.CLOCK.TURN', { turn: c.turn, short: c.active.short, short_limit: HOOK_LIMIT.short, mid: c.active.mid, mid_limit: HOOK_LIMIT.mid, long: c.active.long, long_limit: HOOK_LIMIT.long, plant })];
+  for (const h of c.hooks) if (ACTIVE.includes(h.stage)) out.push(guideTxt('Main', 'RHYTHM.CLOCK.HOOK', { key: h.key, stage: h.stage, tier: h.tier, age: h.age, since: h.sinceLast, from: h.window[0], to: h.window[1], mark: h.overdue ? ` ${guideTxt('Main', 'RHYTHM.CLOCK.OVERDUE')}` : h.due ? ` ${guideTxt('Main', 'RHYTHM.CLOCK.IN_WINDOW')}` : '', extended: h.extended ? ` ${guideTxt('Main', 'RHYTHM.CLOCK.EXTENDED')}` : '' }));
+  if (c.priority.length) out.push(guideTxt('Main', 'RHYTHM.CLOCK.PRIORITY', { items: c.priority.join(' · ') }));
+  // 글은 지침 「Main」 RHYTHM.METHOD 절 (전수검사 11-13)
+  if (c.lastMethod && c.lastMethod !== 'none') out.push(guideTxt('Main', 'RHYTHM.METHOD', { method: c.lastMethod }));
+  return out;
+}

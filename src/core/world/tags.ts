@@ -1,0 +1,260 @@
+import { findStatusTags, statusMinute } from './status';
+// 모델 출력의 상황판 태그 읽기/지우기. 원본 Lua의 scanAnomalies, scanIncidents, scanMysticSites,
+// agParse, stripAnAgMeta, envToEnd, parseWorldMinute와 같은 규칙.
+export type AnState = '활성' | '소멸' | '격리' | '클리어';
+
+export interface AnTag {
+  region: string;
+  name: string;
+  state: AnState;
+  grade: string;
+  deploy: string;
+  /** 현장 상황 (v0.16.35부터 꼬리 칸. 옛 태그엔 없다) */
+  situation: string;
+}
+export interface InTag {
+  region: string;
+  name: string;
+  state: '진행' | '종료';
+  /** 투입 인원 (v0.16.36부터 상태 뒤 칸. 옛 태그엔 없다) */
+  deploy: string;
+  situation: string;
+}
+export interface MsTag {
+  region: string;
+  name: string;
+  state: '출현' | '소실';
+  visitors: string;
+  /** 현장 상황 (v0.16.35부터 꼬리 칸. 옛 태그엔 없다) */
+  situation: string;
+}
+export interface AgTag {
+  who: string;
+  state: AgState;
+  situation: string;
+}
+
+export const AG_STATES = ['휴게', '내근', '외근', '작전투입', '비번', '부상', '실종', '격리', '사망'] as const;
+export type AgState = (typeof AG_STATES)[number];
+
+const AG_ALIAS: Record<string, AgState> = {
+  대기: '휴게', 작전중: '작전투입', standby: '휴게', idle: '휴게', waiting: '휴게', available: '휴게', pending: '휴게', ready: '휴게',
+  deployed: '작전투입', active: '작전투입', operating: '작전투입', 'on mission': '작전투입', engaged: '작전투입', 'in operation': '작전투입',
+  injured: '부상', wounded: '부상', hurt: '부상', dead: '사망', kia: '사망', deceased: '사망', killed: '사망', missing: '실종', mia: '실종', lost: '실종',
+  quarantine: '격리', quarantined: '격리', isolated: '격리', contaminated: '격리', 'off duty': '비번', offduty: '비번', 'on leave': '비번', leave: '비번', resting: '비번',
+};
+
+const AN_LABELS = ['슬롯', '지역', '발생지점', '위치', '이름', '괴이명', '괴이', '명칭', '배치', '작전현황', '작전', '상태', '위협등급', '등급'];
+
+/** "배치: P001" 같은 라벨 붙은 값에서 라벨 떼기 */
+export function stripLabel(v: string | undefined): string {
+  let s = (v ?? '').trim();
+  for (const lb of AN_LABELS) {
+    const m = new RegExp(`^${lb}\\s*[:：]\\s*`).exec(s);
+    if (m) {
+      s = s.slice(m[0].length).trim();
+      break;
+    }
+  }
+  return s;
+}
+
+export function normGrade(v: string | undefined): string {
+  const s = stripLabel(v).toUpperCase();
+  // 따로 떨어진 등급 글자 먼저 (Grade B → B, B급 → B). 없을 때만 남은 첫 글자 (전수검사 11-13)
+  const alone = /(?:^|[^A-Z])([FEDCBAS])(?![A-Z])/.exec(s);
+  return alone ? alone[1] : s.replace(/[^FEDCBAS]/g, '').charAt(0);
+}
+
+export function normAnState(v: string | undefined): AnState {
+  const s = stripLabel(v);
+  const low = s.toLowerCase();
+  if (s.includes('소멸') || low.includes('fade') || low.includes('vanish')) return '소멸';
+  if (s.includes('격리') || low.includes('contain') || low.includes('isolate')) return '격리';
+  if (s.includes('클리어') || low.includes('clear') || low.includes('resolve')) return '클리어';
+  return '활성';
+}
+
+export function normAgState(v: string | undefined): AgState | null {
+  // 「상태: 휴게」처럼 라벨을 붙여도 (전수검사 11-13)
+  const s = stripLabel(v);
+  if ((AG_STATES as readonly string[]).includes(s)) return s as AgState;
+  const hit = AG_ALIAS[s] ?? AG_ALIAS[s.toLowerCase().replace(/\s+/g, ' ')];
+  if (hit) return hit;
+  // 「작전 투입」「휴게 (On-duty break)」「외근 중」「사망.」처럼 지침 글을 베끼거나 띄어 쓴 값
+  const bare = s.replace(/[(（][^)）]*[)）]/g, '').replace(/[\s.。!]/g, '').replace(/중$/, '');
+  if ((AG_STATES as readonly string[]).includes(bare)) return bare as AgState;
+  return AG_ALIAS[bare] ?? null;
+}
+
+function fields(text: string, kind: string): string[][] {
+  const out: string[][] = [];
+  // 한 줄 안에서만: 닫는 ]가 빠진 줄이 다음 태그 줄과 합쳐지지 않게 (전수검사 11-13)
+  const re = new RegExp(`\\[${kind}\\s*\\|([^\\]\\r\\n]*)\\]`, 'g');
+  for (const m of text.matchAll(re)) out.push(m[1].split('|').map((s) => s.trim()));
+  return out;
+}
+
+/** 요청 NEW 줄의 <발생지점>·<배치> 같은 안 채운 자리표 (전수검사 11-13) */
+const SLOT = /^<[^<>]*>$/;
+const unslot = (v: string) => (SLOT.test(v.trim()) ? '' : v);
+
+/** 앞의 슬롯 번호는 건너뛴다. 지역 뒤로 이름|상태|등급|배치, 그다음이 상황 (2026-10-21: 상황 칸 추가, 옛 다섯 칸 태그도 읽는다) */
+export function scanAnomalies(text: string): AnTag[] {
+  return fields(text, 'AN').flatMap((f) => {
+    const slot = /^\d+$/.test(f[0] ?? '') && f.length >= 6 ? 1 : 0;
+    const region = f[slot] ?? '';
+    const r = f.slice(slot + 1);
+    if (r.length < 4 || !region) return [];
+    const name = stripLabel(r[0]);
+    // 이름·지역이 자리표 그대로면 안 채운 줄이라 건너뛰고(발생대기 유지), 배치·상황 자리표는 빈 값으로 (전수검사 11-13)
+    if (SLOT.test(name) || SLOT.test(region)) return [];
+    return [{ region, name, state: normAnState(r[1]), grade: normGrade(r[2]), deploy: unslot(stripLabel(r[3])), situation: stripLabel(r.slice(4).map(unslot).join(' ')) }];
+  });
+}
+
+/** 상태 칸을 찾아 그 앞을 이름, 뒤를 차례로 읽는다 (IN: 상황, MS: 방문자|상황) */
+function scanSites<S extends string>(text: string, kind: string, states: readonly S[]) {
+  return fields(text, kind).flatMap((f) => {
+    // 「출현 (Appeared)」처럼 괄호 설명을 붙여도, 「진행 중」「종료됨」처럼 써도 상태로 본다 (전수검사 11-13)
+    const bare = (v: string) => stripLabel(v).replace(/\s*[(（][^)）]*[)）]\s*/g, '').replace(/[\s.。!]/g, '').replace(/(?:중|됨)$/, '').trim();
+    const i = f.findIndex((v, k) => k >= 2 && (states as readonly string[]).includes(bare(v)));
+    if (i < 0) return [];
+    let region = f[0] ?? '';
+    if (/^\d+$/.test(region) && i >= 3) region = f[1] ?? '';
+    const name = stripLabel(f[i - 1]);
+    // 이름·지역이 자리표 그대로면 건너뛰고, 배치·방문자·상황 자리표는 빈 값으로 (전수검사 11-13)
+    if (SLOT.test(name) || SLOT.test(region)) return [];
+    return [{ region, name, state: bare(f[i]) as S, rest: f.slice(i + 1).map((v) => unslot(stripLabel(v))) }];
+  });
+}
+
+/** 요원 코드 목록이나 「없음」뿐인 칸 (배치 칸으로 본다). 새 요원 코드(P39611)도 코드로 (전수검사 11-13) */
+const DEPLOY_ONLY = /^(?:없음|none|-|[A-Z]\d{3,}(?:\s*[,/·]\s*[A-Z]\d{3,})*)$/i;
+
+/** 상태 뒤로 배치|상황 (2026-10-21 배치 칸 추가). 칸이 하나뿐이면 옛 태그라 상황으로 읽는다 (코드·없음뿐이면 상황을 빼먹은 새 태그) */
+export function scanIncidents(text: string): InTag[] {
+  return scanSites(text, 'IN', ['진행', '종료'] as const).map(({ rest, ...t }) =>
+    rest.length >= 2 ? { ...t, deploy: rest[0], situation: rest.slice(1).join(' ') }
+      : DEPLOY_ONLY.test(rest[0] ?? '') ? { ...t, deploy: rest[0], situation: '' } : { ...t, deploy: '', situation: rest.join(' ') });
+}
+
+export function scanMysticSites(text: string): MsTag[] {
+  return scanSites(text, 'MS', ['출현', '소실'] as const).map(({ rest, ...t }) => ({ ...t, visitors: rest[0] ?? '', situation: rest.slice(1).join(' ') }));
+}
+
+export function scanAgents(text: string): AgTag[] {
+  return fields(text, 'AG').flatMap((f) => {
+    const state = normAgState(f[1]);
+    return f[0] && state ? [{ who: f[0], state, situation: f[2] ?? '' }] : [];
+  });
+}
+
+/** [AC|code] 소속 변경 */
+export function scanAffiliation(text: string): string | null {
+  const m = /\[AC\s*\|\s*(\w+)\s*\]/.exec(text);
+  return m ? m[1].toUpperCase() : null;
+}
+
+/** 상태창 [▣|YYYY.MM.DD|HH:MM AM|날씨|기온|위치|괴이] */
+export interface StatusLine {
+  minute: number | null;
+  /** 지금 다루는 괴이 이름. '없음'이면 빈 문자열, 상태창이 없거나 형식이 다르면 null */
+  target: string | null;
+}
+
+export function scanStatus(text: string): StatusLine {
+  // 상태창은 너그럽게 읽는다 (status.ts). 태그가 둘 이상이면 목표는 정하지 않는다
+  const tags = findStatusTags(text);
+  const first = tags[0];
+  // 시각 칸을 못 읽었으면 그날 0시로 돌리지 않는다 (전수검사 11-13)
+  const minute = first && first.time ? statusMinute(first.date, first.time) : null;
+  const target = tags.length === 1 && (first.target || first.hasTarget) ? first.target : null;
+  return { minute, target };
+}
+
+/** 마지막 상태창 [▣|날짜|시각|날씨|기온|위치|괴이]의 칸들 (간이 상태창 표시용) */
+export interface StatusFields { date: string; time: string; weather: string; temp: string; place: string; target: string; companions: string[]; deployed: boolean | null }
+
+export function lastStatusFields(texts: string[]): StatusFields | null {
+  for (let i = texts.length - 1; i >= 0; i--) {
+    const all = findStatusTags(texts[i] ?? '');
+    if (!all.length) continue;
+    const t = all[all.length - 1];
+    return { date: t.date, time: t.time, weather: t.weather, temp: t.temp, place: t.place, target: t.target, companions: t.companions, deployed: t.deployed };
+  }
+  return null;
+}
+
+export function hasWorldTags(text: string): boolean {
+  return /\[(?:AN|IN|MS|AG)\s*\||\[AC\s*\|/.test(text);
+}
+
+// {N시간 N분 전} 경과 표시와 {유지 기한 MM.DD HH:MM} 기한 표시 (둘 다 플러그인이 요청에 붙이는 메타, 모델이 따라 적으면 지운다)
+const AGE_META = /\{\s*(?:\d+\s*시간\s+\d+\s*분\s*전|유지\s*기한[^}]*)\s*\}/;
+const MARKERS = ['USER 관여 상태', 'RP 시간 제한', 'USER 관여 상태 규칙', 'USER 탐험 상태 규칙', '탐험 추적', '자동 종료'];
+
+/** 태그를 지우고 빈 줄만 남은 ``` 코드 상자 쌍을 버린다 (여는·닫는 울타리를 짝지어 본다) (전수검사 11-13) */
+function dropEmptyFences(lines: string[]): string[] {
+  const out: string[] = [];
+  let open = -1;
+  for (const l of lines) {
+    if (!/^\s*```/.test(l)) {
+      out.push(l);
+      continue;
+    }
+    if (open < 0) {
+      open = out.length;
+      out.push(l);
+    } else {
+      if (out.slice(open + 1).every((x) => !x.trim())) out.length = open;
+      else out.push(l);
+      open = -1;
+    }
+  }
+  return out;
+}
+
+/**
+ * 저장·표시용 본문: 상황판 태그와 {N시간 N분 전} 메타, [AC] 줄을 지우고 일반 본문은 남긴다.
+ * 상태창 [▣] 줄은 본문 맨 끝으로 옮긴다 (원본 envToEnd).
+ */
+export function cleanOutput(text: string): string {
+  const lines = text.split('\n');
+  const keep: string[] = [];
+  let prev: string | null = null;
+  let prevHadTag = false;
+  let anyTag = false;
+  const ageOnly = (l: string | null) => l !== null && new RegExp(`^\\s*${AGE_META.source}\\s*$`).test(l);
+  for (const raw of lines) {
+    let line = raw;
+    if (MARKERS.some((m) => new RegExp(`^\\s*[-*]?\\s*\\[${m}\\]`).test(line))) line = '';
+    if (prevHadTag) line = line.replace(new RegExp(`^\\s*${AGE_META.source}\\s*`), '');
+    let count = 0;
+    // [AC|…]도 줄 어디에 있든 태그만 지운다 (전수검사 11-13)
+    line = line.replace(/\[(?:AN|IN|MS|AG|AC)\s*\|[^\]]*\]/g, () => {
+      count++;
+      return '';
+    });
+    const hadTag = count > 0;
+    if (hadTag) anyTag = true;
+    if (prev !== null && !(hadTag && ageOnly(prev))) keep.push(prev);
+    if (hadTag) line = line.replace(new RegExp(AGE_META.source, 'g'), '');
+    // 태그를 지우고 「NEW」·글머리표만 남은 줄은 버린다 (전수검사 11-13)
+    if (hadTag && /^\s*(?:NEW\b)?\s*[-*•]?\s*(?:NEW\b)?\s*$/i.test(line)) line = '';
+    prev = line;
+    prevHadTag = hadTag;
+  }
+  if (prev !== null) keep.push(prev);
+  const envs: string[] = [];
+  const body = keep.filter((l) => {
+    if (/^\s*[[【［]\s*▣\s*[|｜]/.test(l)) {
+      envs.push(l.trim());
+      return false;
+    }
+    return !/^\s*\[◎\s*\|/.test(l);
+  });
+  let s = (anyTag ? dropEmptyFences(body) : body).join('\n').replace(/\n\s*\n\s*\n+/g, '\n\n').trim();
+  if (envs.length) s = (s ? `${s}\n` : '') + envs.join('\n');
+  return s;
+}

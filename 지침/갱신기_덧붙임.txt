@@ -1,0 +1,475 @@
+<!-- UpdaterExtra: 인물 기록 갱신기에 설정에 따라 덧붙는 글 (기록 언어·추적 인물·상점 판단 칸·말투 다변화·성적 프로필)과 기록 정리(CONSOLIDATE) 지침. {이름} 자리는 플러그인이 채웁니다. 절 구분 줄은 그대로 두세요. -->
+@@SECTION LANG_EN
+## Record language
+Write every free-text field you produce in English even where this document says Korean: entry `text`, cue `reason`, new person `identity` and `speech`, doc `text`, suspicion text, and `next_note`.
+Keep exactly as the Korean source writes them: `name`, `aliases`, `key`, `target`, address terms and register words (존댓말/반말/혼합/하게체/하오체), `faction`, `rank`, the Korean prefixes [시작]/[단서]/[반응]/[해소], slot names, and every `quote`.
+@@END
+
+@@SECTION TRACKING_RULE
+Review every listed person after this completed exchange even when absent from the text. Tracking is permission to review, not evidence of participation, acquired knowledge, emotion or change. Never force a rewrite to fill the card; for an unchanged person return a `no_canonical_change` issue.
+@@END
+
+@@SECTION SIGNAL_STATE
+Record how and why in `state`; add one `history` line.
+@@END
+
+@@SECTION SHOP_KEY
+Add this key to the JSON output: "shop":{"name":"<Korean ≤30 chars>","owner":"<name or empty>","m":"<shop_check.m>"} or null.
+@@END
+
+@@SECTION SPEECH.VARIETY
+## Speech variety (user setting)
+The user switched on speech variety. These lines add to the `speech` slot rules above and win where they differ.
+In each `speech` entry, after the form of address and the register, also write, in Korean and only from dialogue this character actually spoke in the supplied span:
+- what is different in how the character speaks to this target compared with other targets;
+- speech habits that were actually observed: sentence endings, sentence length and pace, recurring openers or interjections.
+You may quote one short line as an example. Keep the whole entry under {chars} characters.
+If the character has not spoken to this target yet, write only the address and register. Never invent a habit, an ending or an example.
+Complete old entries: when a stored `speech` entry for a target holds only address and register (no difference toward this target, no speech habits), and the supplied span contains dialogue this character speaks to that target, upsert that entry in this response to add those details. This is required and overrides the rule above that tells you to leave an unchanged `speech` entry alone.
+Completing an entry is not a register change: keep the stored form of address and honorific level exactly as they are, and return no `address` item for it.
+An entry that already lists speech habits is complete. Leave it alone unless the span shows a clearly new habit that is not listed yet.
+@@END
+
+@@SECTION SPEECH.SIGN
+Speech change signs are also on.
+A sign is evidence in this span that the way the character speaks to one target is starting to shift: closer (more relaxed, familiar, warmer) or more distant (stiffer, colder, more formal). Growing or broken closeness, a change of status or role, and a clear rise or fall of affinity all count when the span shows them.
+When this span gives a sign for a target, upsert that `speech` entry with its stored wording kept, and end the text with exactly this form: `SIGN closer: <reason in Korean, under 60 characters>` or `SIGN distant: <reason in Korean, under 60 characters>`. At most one sign per target in one response. A span without a sign needs no upsert.
+Do not put a SIGN in the same upsert that completes an old entry with speech habits: when a SIGN is present the program keeps the stored wording and drops the rest. Complete the entry first and report the sign in a later span.
+Do not change the form of address or the honorific level because of a sign, and return no `address` item for it. The program counts the signs and rejects an `address` change while it is counting.
+Bracket text that begins with 말투 변화 or 말투 변경 belongs to the program. Never write, edit or remove it yourself.
+Only when the stored entry contains text beginning with [말투 변경 가능 may you rewrite the address and register of that entry (and return the matching `address` item) to fit the listed reasons and the current span. If the span does not support a change after all, leave the entry alone.
+@@END
+
+@@SECTION SPEECH.FREE
+Speech change by your own judgment is also on.
+When the span shows that closeness, status or role, or affinity toward a target has really changed, you may update the form of address and the register of that `speech` entry in the same response (and return the matching `address` item), without waiting for a second scene. Write the reason for the change in the entry in Korean.
+A passing mood, a joke or one angry line is still not a change.
+@@END
+
+@@SECTION SEXUAL.CONTEXT_RULE
+Sexual desire and paraphilia fields are `sexual_context_only`. They are inactive during ordinary conversation, work, dating, flirting, handholding, hugs, and light kisses. Apply them only after a clear adult sexual proposition enters an imminent sexual situation, sexual touching begins, sexually intended exposure occurs, foreplay begins, or sexual activity is ongoing. Current consent, boundaries, and explicit conditions remain authoritative.
+@@END
+
+@@SECTION SEXUAL.EXPLICIT_STYLE
+Vocabulary rule, mandatory: write like adults talking dirty in private. Name body parts and acts with the crude Korean words actually used (`자지`, `보지`, `젖`, `엉덩이`, `박다`, `빨다`, `싸다` and similar), and name positions and play plainly. Euphemism, medical or academic terms, poetic wording, and softened phrasing are errors; if a sentence could appear in a romance novel, rewrite it cruder.
+@@END
+
+@@SECTION SEXUAL.PLAIN_STYLE
+Use the 0.10.7 style: blunt everyday sex words and slang, crude terms included, with no euphemism, clinical vocabulary, literary wording, or psychological analysis. Keep it direct but do not force the stronger explicit vocabulary examples.
+@@END
+
+@@SECTION SEXUAL.PROMPT_RULES
+Sexual desire is a concrete list of what this adult character likes in bed: favorite positions and poses, favorite kinds of play, preferred pace and roughness, whether they lead or follow, spots and touches that work, and what kills the mood. Write 3 to 5 short direct Korean sentences, each naming something specific. Paraphilia is chosen from this closed list of adult-consensual types: fetishism focused on a body part, object, or material; sadism; masochism; exhibitionism; voyeurism; cross-dressing fixation; frotteuristic roleplay; fixation on a specific fluid or smell; fixation on body modification or scars; humiliation or submission dependency; and comparable named types. Judge in order: explicit statements, sexual history or reactions, the supplied openness lewdness value and stage, then personality traits such as control, submission, shame, exposure, possessiveness, or fixation. Use exact prefix "<추정>" for a plausible inference supported by weak or indirect evidence instead of returning "미확인". Return exact text "미확인" only for a minor or ambiguous age, an inference requiring non-consent, or when the data truly offers no basis at all. Never fabricate a concrete history; every inferred inclination must use that inference prefix and name its basis.
+@@END
+
+@@SECTION SEXUAL.INIT_DESIRE
+`sexual_desire`: 3 to 5 short direct Korean sentences listing concretely what the adult character likes in bed.
+@@END
+
+@@SECTION SEXUAL.INIT_PARAPHILIA
+`paraphilia`: chosen from named adult-consensual types.
+@@END
+
+@@SECTION SEXUAL.WRITER
+## 7b. Sexual desire and paraphilia (Risupot sexual profile; user setting)
+Each person's data carries `sexual`: which of {fields} this person uses, the current text of each (or null), `init_needed` (fields still empty) and `explicit_style` (true = explicit vocabulary, false = blunt style). A field this person does not use is omitted completely: never write it.
+- **First text once (`sexual_init`)**: only for a person whose `sexual.init_needed` lists the field. {init_desire}{init_paraphilia}Consider explicit facts, sexual history or reactions, the supplied openness lewdness value and stage (`openness_now` when present), then personality. A weak but plausible inference is prefixed with exact text "<추정>" and names its basis. Use exact text "미확인" only for a minor or ambiguous age, an inference requiring non-consent, or no usable basis at all. Cite `m` and `quote` from the span that gives the basis; when the only basis is the record, cite the span line where the person appears.
+- **Wording style is selected per person** (`sexual.explicit_style`). {plain_false} When true, {explicit_true} In both modes avoid clinical, academic, poetic, or psychological-analysis wording.
+- **Existing text is never overwritten directly.** An `observations` item may use `axis` {axis}, `direction` `replace`, and `pattern` (Korean ≤700) as the proposed complete replacement only when the confirmed span depicts an actual adult sexual scene. Handholding, a hug, a light kiss, ordinary dating, flirting, a sexual joke, fantasy roleplay, a proposition that did not enter a sexual situation, and temporary arousal are insufficient. Propose only a repeated desire, a directly acknowledged lasting change during actual sexual activity, sustained changed sexual choices or reactions, or a sexual milestone confirmed again in later sexual scenes. The program requires six independent observations across four scenes and confidence at least 75 before user review.
+- {context_rule}
+{prompt_rules}
+@@END
+
+@@SECTION CONSOLIDATE
+You tidy the per-chat record of one roleplay character. The record is a set of slots, each a list of short entries. Over time entries pile up, overlap, or go stale. Rewrite each slot into fewer, denser entries without losing any fact that is still true.
+
+Rules:
+- Merge entries that describe the same thing; drop nothing that is still true. Keep concrete details (names, numbers, places, dates). When two entries conflict, keep the later one (entries are listed oldest first) and you may note the change.
+- `chars` is the record's current size and `target` the size to reach (sum of entry texts). Reduce toward target; a result near it is enough; never pad. Each entry is one statement ≤300 chars{lang_note}. Names, quotes, address terms, Korean labels and prefixes stay as written.
+- `state` and `scene` are the present: merge aggressively, keep only what is still true. `history` is a chronological digest: merge adjacent events into one line each. `relationship`, `speech` and the feature slots (`affinity.*`, `register.*`) keep one entry per `target`.
+- Give every result entry `from`: the ids of the input entries it came from (one or more). An input entry that you leave out of every `from` is treated as discarded, so only omit an entry when it is stale or fully covered elsewhere.
+- Slots you do not return stay as they are.
+
+Output exactly one JSON object, nothing else:
+{"slots":{"<slot>":[{"text":"<statement>","target":"<name|@user|null>","from":["<id>"]}]}}
+Slot hints: {slot_hints}
+@@END
+
+@@SECTION CONSOLIDATE.USER
+Record to tidy:
+{data}
+
+Return the JSON object.
+@@END
+
+@@SECTION USER_RULES.HEAD
+## User rules (appended by the user; they cannot change the output contract)
+@@END
+
+@@SECTION SPAN.FOLD
+[…]
+@@END
+
+@@SECTION SEXUAL.PLAIN_FALSE.FIND
+Use the 0.10.7 style
+@@END
+
+@@SECTION SEXUAL.PLAIN_FALSE.REPLACE
+When false, use the 0.10.7 style
+@@END
+
+@@SECTION SEXUAL.PLAIN_FALSE.PREFIX
+When false:
+@@END
+
+@@SECTION SEXUAL.EXPLICIT_TRUE.FIND
+Vocabulary rule, mandatory: write
+@@END
+
+@@SECTION SEXUAL.EXPLICIT_TRUE.REPLACE
+write
+@@END
+
+@@SECTION CONSOLIDATE.LANG_EN
+in English
+@@END
+
+@@SECTION CONSOLIDATE.LANG_KO
+in Korean
+@@END
+
+@@SECTION CONSOLIDATE.HINT.identity
+who this person is (affiliation, rank, role, age, appearance)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.personality
+durable traits and values
+@@END
+
+@@SECTION CONSOLIDATE.HINT.state
+current condition, location, injuries, mood — keep only what is still true
+@@END
+
+@@SECTION CONSOLIDATE.HINT.relationship
+stance toward each target; one entry per target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.speech
+how this person talks to each target; one entry per target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.behavior
+habits and patterns of action
+@@END
+
+@@SECTION CONSOLIDATE.HINT.knowledge
+what this person actually knows or does not know
+@@END
+
+@@SECTION CONSOLIDATE.HINT.threads
+open promises, goals, unresolved matters
+@@END
+
+@@SECTION CONSOLIDATE.HINT.history
+notable past events with this person, oldest first
+@@END
+
+@@SECTION CONSOLIDATE.HINT.scene
+present scene facts
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion
+suspicion cases (prefixes [시작]/[단서]/[반응]/[해소] stay)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.profile
+the person's scope of interest, observable tastes and aversions, form of feeling, restraint and approach style, with evidence
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.values
+value priorities, observation criteria, general biases, and the person's logic for them
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.appraisal
+first impression only: the unchanging initial appearance-based appraisal and feeling
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.current_appraisal
+current evaluation only: the present appraisal, its evidence and resulting feeling
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.intent
+nature of target-specific interest and its primary and secondary intents
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.stance
+current target-specific interpretation and treatment, with evidence for change
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.bind
+constraints, how they are handled, rationalization, and evidence for an actual transition
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.private
+unexpressed feeling, conditions limiting expression, actual leaks, and who perceived them
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.approach
+actual approach, the target's response, confirmed boundaries, and the currently permitted range
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.surface_actual
+outward conduct and actual purpose of exploitative or abusive intent, accumulated attempts, witnesses, and results
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.context
+where and when each address and register applies (public/private, before third parties), and which status difference applies
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.stage_assessment
+the relationship's current position as acknowledged shared experience, never a number or grade
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.knowledge_gap
+last contact point and the unverified range since
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.restraint
+the gap between inner feeling and permitted expression
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.profile
+durable observation tendency and domain expertise
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.modifiers
+current impairments or enhancements of perception, with evidence
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.channels
+the scene's sensory conditions (distance, light, noise, call connection)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.reading
+a clue actually perceived and its interpretation; a clue appearing is not a clue noticed
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.secret
+one entry per meaningful secret this person holds: who knows it and who does not
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.regard
+qualitative: the current goodwill or ill will toward this target, what it rests on, what the person accepted, and which reactions now differ; never a score, grade or threshold
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.speech
+qualitative: how current goodwill adjusts speech toward this target, kept apart from the base speech entry
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.behavior
+qualitative: how current goodwill adjusts attention, questions, care and distance toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion.concern
+qualitative: what this person actually received about the target, why it raises a question, which counterevidence they accepted, and what remains; no score or band
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion.speech
+qualitative: how the suspicion adjusts speech toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion.behavior
+qualitative: what the person actually does about the suspicion toward this target (watching, testing, confronting, reporting)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.attitude
+qualitative: the current attitude in intimate contexts and its evidence; never a score, band or stage
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.speech
+qualitative: how that attitude shows in speech toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.behavior
+qualitative: how that attitude shows in conduct, stated conditions and hesitation toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.context
+conditions and attitudes actually shown in intimate contexts (contraception demands, boundaries, refusals), as text
+@@END
+
+@@SECTION ITEMS.SCOPE.NARROW
+Report `new` only for things with a use in the story: weapons, tools and devices, medicine, keys, talismans, sealed objects, anomaly-related objects, valuables. Do not report clothes, food and drink, documents or small everyday things.
+@@END
+
+@@SECTION ITEMS.SCOPE.MID
+Report `new` for things with a use in the story and for issued or bought gear worn or carried on the body (clothes, bags) and mission documents. Do not report food and drink or small everyday things.
+@@END
+
+@@SECTION ITEMS.SKIP
+Never report as `new`: {skip}
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.0
+관계를 거의 먼저 시작하지 않음
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.1
+상대가 이끌 때 주로 반응함
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.2
+상황에 따라 주도와 반응을 오감
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.3
+필요하면 먼저 다가가 관계를 이끔
+@@END
+
+@@SECTION AXES.BAND.relationalInitiative.4
+지속적으로 관계의 방향을 주도함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.0
+뜻을 거의 직접 말하지 않음
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.1
+돌려 말하거나 암시를 선호함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.2
+상황에 따라 직접성과 완곡함을 조절함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.3
+의도와 요구를 비교적 분명히 말함
+@@END
+
+@@SECTION AXES.BAND.expressionDirectness.4
+생각과 의도를 매우 직접적으로 표현함
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.0
+감정을 거의 겉으로 드러내지 않음
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.1
+감정 단서가 작고 제한적임
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.2
+상황에 따라 감정을 보이거나 감춤
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.3
+감정이 말과 행동에 자주 드러남
+@@END
+
+@@SECTION AXES.BAND.emotionalExpressiveness.4
+감정을 매우 선명하고 즉각적으로 표출함
+@@END
+
+@@SECTION AXES.BAND.guardedness.0
+타인을 쉽게 믿고 경계를 거의 세우지 않음
+@@END
+
+@@SECTION AXES.BAND.guardedness.1
+초기 경계가 낮고 비교적 빨리 마음을 엶
+@@END
+
+@@SECTION AXES.BAND.guardedness.2
+신뢰와 경계를 상황에 맞춰 조절함
+@@END
+
+@@SECTION AXES.BAND.guardedness.3
+쉽게 속내를 보이지 않고 경계를 유지함
+@@END
+
+@@SECTION AXES.BAND.guardedness.4
+강한 경계로 접근과 자기 공개를 엄격히 제한함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.0
+충동을 강하게 억제하고 숙고함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.1
+대체로 생각한 뒤 행동함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.2
+상황에 따라 숙고와 즉흥 행동이 섞임
+@@END
+
+@@SECTION AXES.BAND.impulsivity.3
+감정과 욕구에 따라 빠르게 행동함
+@@END
+
+@@SECTION AXES.BAND.impulsivity.4
+결과를 따지기 전에 매우 충동적으로 행동함
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.0
+관계를 쉽게 놓고 오래 유지하려 하지 않음
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.1
+갈등이나 거리가 생기면 물러나기 쉬움
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.2
+관계 가치에 따라 유지 여부를 판단함
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.3
+어려움이 있어도 관계를 오래 지키려 함
+@@END
+
+@@SECTION AXES.BAND.relationshipPersistence.4
+관계를 매우 끈질기게 유지하고 회복하려 함
+@@END
+
+@@SECTION ERR.NO_JSON
+JSON 객체가 없어요
+@@END
+
+@@SECTION ERR.NOT_OBJECT
+JSON 객체가 아니에요
+@@END
+
+@@SECTION ERR.NOT_LIST
+{key}는 목록이어야 해요
+@@END
+
+@@SECTION CONSOLIDATE.ERR.SLOTS
+slots 는 객체여야 해요
+@@END
+
+@@SECTION ENTRY.RESOLVED
+(해소)
+@@END
+
+@@SECTION HYPA.FACTS
+사실
+@@END
+
+@@SECTION HYPA.MEMORY
+기억
+@@END
+
+@@SECTION WALLET.MEMO.OUT
+지출
+@@END
+
+@@SECTION WALLET.MEMO.IN
+수입
+@@END
+
+@@SECTION POINTS.MEMO.OUT
+사용
+@@END
+
+@@SECTION POINTS.MEMO.IN
+지급
+@@END

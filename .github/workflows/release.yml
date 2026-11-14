@@ -1,0 +1,88 @@
+# main 의 package.json 판이 아직 릴리스되지 않은 판이면 빌드해서 두 곳에 올린다.
+#  ① release 브랜치: 플러그인이 받는 파일(시작기·본체 조각·자료 팩·카드 업데이트·사진). 매번 새로 덮어써서 옛 조각이 쌓이지 않는다.
+#     플러그인이 받는 주소 = https://raw.githubusercontent.com/leepc25/goei/release (package.json goei.updateBase)
+#  ② Releases: 처음 설치용 zip·카드·플러그인·본체.
+# GitHub는 릴리스 파일 이름의 한글을 지우므로 파일 이름은 영문, 화면에 보이는 이름(라벨)은 한글로 둔다.
+name: release
+on:
+  push:
+    branches: [main]
+    paths: ['package.json', '.github/workflows/release.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 판 확인
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ] && gh release view "$tag" >/dev/null 2>&1; then
+            echo "이미 릴리스된 판 ($tag): 건너뜀"
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+          # main 에 올라온 것만으로는 릴리스하지 않는다: 판 번호가 바뀐 push 만 (릴리스는 사용자가 「릴리스해」라고 할 때 판을 올려 합친다)
+          before="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            git fetch --depth=1 origin "$before" >/dev/null 2>&1 || true
+            prev=$(git show "$before:package.json" 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).version)}catch{console.log('')}})")
+            if [ -z "$prev" ] || [ "v$prev" = "$tag" ]; then
+              echo "판 번호가 바뀌지 않음 (앞: ${prev:-없음}, 지금: $tag): 건너뜀"
+              echo "skip=1" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.v.outputs.skip != '1'
+        with:
+          node-version: 22
+      - if: steps.v.outputs.skip != '1'
+        run: npm ci
+      - name: '빌드 (npm run release:prep 과 같은 순서: 빌드 → 카드 → 빌드 → release/ 로 복사)'
+        if: steps.v.outputs.skip != '1'
+        run: node scripts/release-prep.mjs --skip-tests --no-fixture
+      - name: release 브랜치에 올리기
+        if: steps.v.outputs.skip != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          rm -rf site && mkdir site && cp -r release/. site/ && rm -f site/*.charx
+          cd site
+          git init -q -b release
+          git add -A
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -q -m "$TAG"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" release
+      - name: 묶기
+        if: steps.v.outputs.skip != '1'
+        env:
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          rm -rf out && mkdir -p out/pack
+          cp dist/goei-plugin.js dist/goei-body.js dist/goei-data-world.txt out/
+          cp release/괴이_ANOMALY.charx out/goei-anomaly.charx
+          cp out/goei-plugin.js out/goei-body.js out/goei-data-world.txt out/pack/ && cp out/goei-anomaly.charx "out/pack/괴이_ANOMALY.charx"
+          (cd out/pack && zip -q "../goei-anomaly-${TAG}.zip" goei-plugin.js goei-body.js goei-data-world.txt 괴이_ANOMALY.charx)
+      - name: 릴리스
+        if: steps.v.outputs.skip != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          files=("out/goei-anomaly-${TAG}.zip#괴이_ANOMALY_${TAG}.zip (플러그인+카드)" "out/goei-plugin.js#goei-plugin.js (플러그인)" "out/goei-body.js#goei-body.js (본체, 못 받을 때 파일로 넣기)" "out/goei-data-world.txt#goei-data-world.txt (세계 자료, 못 받을 때 파일로 넣기)" "out/goei-anomaly.charx#괴이_ANOMALY.charx (카드)")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            for a in $(gh release view "$TAG" --json assets -q '.assets[].name'); do gh release delete-asset "$TAG" "$a" -y; done
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" "${files[@]}" \
+              --title "괴이 ː ANOMALY ${TAG}" --prerelease \
+              --notes "처음 설치: zip을 받아 goei-plugin.js를 Risu 설정 → 플러그인에 추가하고, 괴이_ANOMALY.charx를 캐릭터로 가져오세요. 본체(goei-body.js)와 세계 자료(goei-data-world.txt)는 괴이 카드를 처음 열 때 자동으로 받고, 받지 못하면 뜨는 창에서 zip의 그 두 파일을 차례로 넣으면 됩니다. 그다음부터는 플러그인 탭과 창의 설정 → 업데이트에서 갱신됩니다."
+          fi

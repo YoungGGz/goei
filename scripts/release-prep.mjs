@@ -1,0 +1,132 @@
+// 릴리스 준비 (전수점검 §11-8, 2026-11-06): 손으로 하던 ①판 올림 → ②빌드(카드 빌드가 쓰는 dist-test/core.mjs 용) → ③카드·release 부속 → ②빌드(카드 빌드가 팩 원료를 다시 쓰므로 그 뒤) → ④release 복사 → ⑤형 검사·단위 시험을
+// 한 번에 돌리고, 남은 절차(브라우저 시험·PR·릴리스)를 체크리스트로 보여 준다. main 반영·릴리스는 하지 않는다 (사용자가 「릴리스해」라고 할 때만).
+//
+// 사용법: npm run release:prep -- [옵션]
+//   --bump patch|minor|major   package.json 판을 올린다 (package-lock.json 도 같이). 기본: 올리지 않음
+//   --version x.y.z            판을 이 값으로
+//   --no-card                  카드 빌드(③)를 건너뛴다
+//   --skip-tests               ⑤를 건너뛴다
+//   --no-fixture               ④-3 시험 카드를 만들지 않는다 (GitHub Actions 릴리스용)
+//   --dry                      무엇을 할지만 보이고 아무것도 바꾸지 않는다
+// release/ 는 빌드 결과(저장소에 올리지 않음). 매번 비우고 새로 만든다. 실제 배포는 GitHub Actions(.github/workflows/release.yml)가 같은 순서로 빌드해 release 브랜치에 올린다.
+import { spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const opt = { bump: '', version: '', card: true, tests: true, fixture: true, dry: false };
+{
+  const a = process.argv.slice(2);
+  for (let i = 0; i < a.length; i++) {
+    const k = a[i], v = () => { if (i + 1 >= a.length) throw new Error(`${k} 뒤에 값이 없어요`); return a[++i]; };
+    if (k === '--bump') opt.bump = v();
+    else if (k === '--version') opt.version = v();
+    else if (k === '--no-card') opt.card = false;
+    else if (k === '--skip-tests') opt.tests = false;
+    else if (k === '--no-fixture') opt.fixture = false;
+    else if (k === '--dry') opt.dry = true;
+    else if (k === '-h' || k === '--help') { console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//')).map((l) => l.slice(3)).join('\n')); process.exit(0); }
+    else throw new Error(`모르는 옵션: ${k}`);
+  }
+  if (opt.bump && !['patch', 'minor', 'major'].includes(opt.bump)) throw new Error('--bump 는 patch|minor|major');
+  if (opt.version && !/^\d+\.\d+\.\d+$/.test(opt.version)) throw new Error('--version 은 x.y.z');
+}
+const log = (...s) => console.log(`[release:prep] ${s.join(' ')}`);
+function run(cmd, args, label) {
+  log(`${label}: ${cmd} ${args.join(' ')}`);
+  if (opt.dry) return;
+  const r = spawnSync(cmd, args, { cwd: ROOT, stdio: 'inherit', env: process.env });
+  if (r.status !== 0) { console.error(`[release:prep] ✗ ${label} 실패 (exit ${r.status ?? r.signal}). 여기서 멈춤.`); process.exit(1); }
+}
+
+// ① 판
+const pkgPath = resolve(ROOT, 'package.json');
+const pkg = JSON.parse(readFileSync(pkgPath, 'utf8'));
+const before = pkg.version;
+let version = before;
+if (opt.version) version = opt.version;
+else if (opt.bump) {
+  const [ma, mi, pa] = before.split('.').map(Number);
+  version = opt.bump === 'major' ? `${ma + 1}.0.0` : opt.bump === 'minor' ? `${ma}.${mi + 1}.0` : `${ma}.${mi}.${pa + 1}`;
+}
+if (version !== before) {
+  log(`① 판 ${before} → ${version}`);
+  if (!opt.dry) {
+    writeFileSync(pkgPath, readFileSync(pkgPath, 'utf8').replace(`"version": "${before}"`, `"version": "${version}"`));
+    const lockPath = resolve(ROOT, 'package-lock.json');
+    if (existsSync(lockPath)) {
+      // 맨 위 두 곳("version", packages[""].version)만. 의존성 판은 건드리지 않는다
+      const lock = readFileSync(lockPath, 'utf8');
+      let n = 0;
+      writeFileSync(lockPath, lock.replace(/"version": "[^"]+"/g, (m) => (n++ < 2 ? `"version": "${version}"` : m)));
+    }
+  }
+} else log(`① 판 그대로 ${version} (--bump 또는 --version 으로 올릴 수 있음)`);
+
+// ③ 카드 + release 부속 (card-update.* · version.json · wiki-base.* · icon.webp · pic/). release/ 는 비우고 새로 만든다
+if (!opt.dry) rmSync(resolve(ROOT, 'release'), { recursive: true, force: true });
+if (!opt.dry) mkdirSync(resolve(ROOT, 'release'), { recursive: true });
+if (opt.card) {
+  const src = '카드/원본_봇카드.jpeg';
+  if (!existsSync(resolve(ROOT, src))) { console.error(`[release:prep] ✗ ${src} 가 없어요 (카드 원본은 저장소에 있어야 함).`); process.exit(1); }
+  // 카드 빌드는 scripts/migrate-lore.mjs 로 dist-test/core.mjs(빌드가 만드는 파일, git 에 없음)를 불러 카드 명부를 만든다.
+  // 그래서 카드 앞에서도 한 번 빌드한다 — 없으면 새 클론에서 바로 실패하고, 옛 것이 남아 있으면 옛 코드로 명부를 만든다
+  run('npm', ['run', 'build'], '② 빌드');
+  run('python3', ['tools/build_lite_card.py', src, 'release/괴이_ANOMALY.charx'], '③ 카드 빌드');
+} else log('③ 카드 빌드 건너뜀 (--no-card)');
+
+// ② 빌드 — 카드 빌드(③) 뒤에 돌린다. 카드 빌드가 팩의 원료(src/data/install/*.json · src/data/world/greetings.json)를 다시 쓰므로,
+// 먼저 빌드하면 ④ 가 옛 자료로 만든 본체·팩을 release 에 복사한다 (재검토 11-14 loader#10). 카드 빌드는 dist 는 읽지 않지만 dist-test/core.mjs 는 읽는다(위 ③ 앞의 빌드)
+run('npm', ['run', 'build'], '② 빌드');
+
+// ④ dist → release (시작기·본체 조각·자료 팩·토크나이저 조각)
+{
+  const dist = resolve(ROOT, 'dist');
+  const files = readdirSync(dist).filter((f) => /^(goei-plugin\.js|goei-body\.(json|\d+\.txt)|goei-data-(world|install|items|looks|homeshop)\.(json|\d+\.txt)|tok-o200k\.(json|\d+\.txt))$/.test(f));
+  log(`④ dist → release 복사 ${files.length}개`);
+  if (!opt.dry) for (const f of files) copyFileSync(resolve(dist, f), resolve(ROOT, 'release', f));
+}
+
+if (opt.fixture) {
+// ④-2 옛 시험 카드(.scratch/fixture)는 옆으로 치운다 — 판이 바뀐 뒤 옛 카드로 브라우저 시험을 돌리면 「판 맞춤」 경고로 실패한다 (2026-11-06 v0.20.9 때 30분 날림)
+{
+  const fx = resolve(ROOT, '.scratch/fixture');
+  if (existsSync(fx)) {
+    const old = resolve(ROOT, `.scratch/fixture_old_${Date.now()}`);
+    log(`④-2 옛 시험 카드 치움 .scratch/fixture → ${old.replace(ROOT + '/', '')} (④-3 에서 새 판으로 다시 만든다)`);
+    if (!opt.dry) renameSync(fx, old);
+  }
+}
+
+// ④-3 시험 카드를 새 판으로 만든다 — 다시 만들던 브라우저 시험 실행기(test-browser.mjs)는 목록 폐기로 멈춰, 치우기만 하고 아무도 만들지 않았다 (전수검사 11-13)
+{
+  const dir = resolve(ROOT, '.scratch/fixture');
+  const target = resolve(dir, 'fixture.json');
+  if (!opt.dry) mkdirSync(dir, { recursive: true });
+  const charx = resolve(dir, 'lite.charx');
+  run('python3', ['tools/build_lite_card.py', '카드/원본_봇카드.jpeg', charx], '④-3 시험 카드: 경량 카드');
+  try {
+    run('python3', ['tests/make_fixture.py', charx, target], '④-3 시험 카드: fixture');
+  } finally {
+    // 중간 파일(93MB)만 지운다 — test-browser.mjs 와 같은 동작
+    if (!opt.dry && existsSync(charx)) unlinkSync(charx);
+  }
+}
+
+}
+
+// ⑤ 시험
+if (opt.tests) {
+  run('npm', ['run', 'typecheck'], '⑤ 형 검사');
+  run('npm', ['test'], '⑤ 단위 시험');
+} else log('⑤ 시험 건너뜀 (--skip-tests)');
+
+// 남은 절차
+console.log(`
+[release:prep] 끝. 판 ${version}${opt.dry ? ' (dry: 아무것도 바꾸지 않음)' : ''}
+남은 절차:
+  ○ 이번에 고친 화면의 화면 시험만 한 번: node tests/<화면>-browser.mjs  (고친 화면은 PC·폰 크기로 직접 열어 확인)
+  ○ 커밋 → push → 사용자가 「합쳐」면 PR. 「릴리스해」면 main 에 머지
+  ○ main 의 package.json 판이 새 판이면 GitHub Actions(release.yml)가 빌드해 release 브랜치와 Releases 에 올린다 → 끝나면 사용자에게 알림
+`);

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+dist-test/
+__pycache__/
+# 빌드 결과 (npm run release:prep 이 만든다. 배포는 Actions 가 release 브랜치에 올린다)
+release/
+out/
+.scratch/
+

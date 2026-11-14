@@ -1,0 +1,250 @@
+// 가계부 (2026-10-27 설계안 8절): 잔고의 진실은 플러그인 장부. 상태창 10번째 칸(잔고)은 모델이 베껴 쓰는 자리이고,
+// `[Previous status]` 의 잔고 칸을 매 턴 장부 값으로 덮어써 모델 오차를 바로잡는다.
+// 장부는 채팅 변수 `$st_wallet` (JSON): 시작 잔고 + 거래 목록. 거래는 기준 메시지(anchor)가 채팅에 남아 있을 때만 산다 (다시 굴리기·삭제 대응).
+import type { Chat } from './types';
+import { messageKey } from './people/store';
+import { findStatusTags } from './world/status';
+import { guideTxt } from './guides';
+
+export const WALLET_VAR = '$st_wallet';
+/** 새 채팅 시작 잔고 기본값 (사용자 2026-10-27: 14만 원). 설정에서 바꾸고, 채팅마다 장부 시작값·지금 잔고도 고칠 수 있다 */
+export const WALLET_START_DEFAULT = 140_000;
+
+export interface WalletEntry {
+  id: string;
+  /** 기준 메시지 키 (messageKey). 수동 조정은 빈 문자열 (늘 산다) */
+  anchor: string;
+  /** 원 단위, 들어오면 +, 나가면 − */
+  amount: number;
+  /** 무엇에 (한국어 ≤30) */
+  memo: string;
+  /** story 본문(갱신기·상태창 맞춤) · manual 직접 · field 필드 거래 · store 상점 구입 */
+  src: 'story' | 'manual' | 'field' | 'store';
+  quote?: string;
+  /** 필드 거래: 장면 이름·필드 시각 (게임이 넘김) */
+  place?: string;
+  time?: string;
+  at: string;
+}
+
+export interface Wallet {
+  start: number;
+  log: WalletEntry[];
+}
+
+export const WALLET_MAX = 1_000_000_000_000;
+
+/** 잔고 직접 수정 (2026-10-27 사용자: 기본 끔. 컨텍스트가 쌓이면 이유 없이 바뀐 잔고가 모델을 헷갈리게 한다).
+ * 켜면 가계부의 잔고 고치기·거래 지우기, 진행 중 채팅의 시작 잔고 바꾸기가 열린다. 채팅 변수 '1' = 켬 (새 채팅 기본값은 prefs.vars) */
+export const WALLET_EDIT_VAR = '$st_wallet_edit';
+/** 상태창 잔고 따르기 (기본 켬): 모델이 상태창 잔고 칸을 바꾸면 장부를 그 값에 맞춘다(차이 한 줄). 끄면 장부 값만 믿고 다음 요청의 [Previous status] 를 장부로 덮는다 */
+export const WALLET_SYNC_VAR = '$st_wallet_sync';
+export const walletSyncOn = (vars: Record<string, unknown> | undefined) => vars?.[WALLET_SYNC_VAR] !== '0';
+/** 거래 읽는 기준: strict(기본, 금액이 적힌 문장만) · loose(밥값·택시비처럼 금액이 안 적힌 거래도 어림해 받기) */
+export const WALLET_LOOSE_VAR = '$st_wallet_loose';
+export const walletLoose = (vars: Record<string, unknown> | undefined) => vars?.[WALLET_LOOSE_VAR] === '1';
+/** 최근 거래 넘기기: 본편 요청의 [Previous status] 아래에 최근 거래 N줄 (0~10, 기본 0) */
+export const WALLET_RECENT_VAR = '$st_wallet_recent';
+export const WALLET_RECENT_MAX = 10;
+export const walletRecentN = (vars: Record<string, unknown> | undefined): number => {
+  const n = Number(vars?.[WALLET_RECENT_VAR]);
+  return Number.isInteger(n) && n >= 0 ? Math.min(WALLET_RECENT_MAX, n) : 0;
+};
+/** 살아 있는 최근 거래 n줄 (영어 한 줄: 「-30,000 won 택시」, 지침 「메인 요청에 붙는 글」의 STATUS.RECENT_CASH_LINE 절). 상태창 맞춤 줄은 뺀다 */
+export function recentWalletLines(w: Wallet, alive: Set<string>, n: number): string[] {
+  if (n <= 0) return [];
+  return liveWallet(w, alive).filter((e) => e.memo !== WALLET_SYNC_MEMO).slice(-n).map((e) => guideTxt('Main', 'STATUS.RECENT_CASH_LINE', { amount: `${e.amount > 0 ? '+' : ''}${e.amount.toLocaleString('en-US')}`, memo: e.memo }));
+}
+export const walletEditable = (vars: Record<string, unknown> | undefined) => vars?.[WALLET_EDIT_VAR] === '1';
+/** 이야기가 시작됐나 (유저 메시지가 하나라도 있으면): 그 뒤로는 수정이 꺼져 있으면 시작 잔고도 못 바꾼다 */
+export const walletStarted = (chat: Chat) => (chat.message ?? []).some((m) => (m as { role?: string }).role === 'user');
+
+const isEntry = (e: unknown): e is WalletEntry => {
+  const x = e as WalletEntry;
+  return !!x && typeof x === 'object' && typeof x.id === 'string' && typeof x.anchor === 'string' && Number.isSafeInteger(x.amount) && typeof x.memo === 'string' && (x.src === 'story' || x.src === 'manual' || x.src === 'field' || x.src === 'store');
+};
+
+/** 장부 읽기. 없거나 깨졌으면 시작 잔고 defaultStart 의 빈 장부 */
+export function readWallet(vars: Record<string, unknown> | undefined, defaultStart = 0): Wallet {
+  const raw = vars?.[WALLET_VAR];
+  const empty: Wallet = { start: defaultStart, log: [] };
+  if (typeof raw !== 'string' || !raw.trim()) return empty;
+  try {
+    const o = JSON.parse(raw) as Partial<Wallet>;
+    if (!o || typeof o !== 'object') return empty;
+    return { start: Number.isSafeInteger(o.start) ? (o.start as number) : defaultStart, log: Array.isArray(o.log) ? o.log.filter(isEntry) : [] };
+  } catch {
+    return empty;
+  }
+}
+
+export const walletVars = (w: Wallet): Record<string, string> => ({ [WALLET_VAR]: JSON.stringify(w) });
+
+/** 채팅에 남아 있는 메시지 키 (이 키를 기준으로 하는 거래만 산다) */
+export function aliveAnchors(chat: Chat): Set<string> {
+  return new Set((chat.message ?? []).map((m, i) => messageKey(m, i)));
+}
+
+/** 살아 있는 거래 (수동 조정은 늘) */
+export function liveWallet(w: Wallet, alive: Set<string>): WalletEntry[] {
+  return w.log.filter((e) => !e.anchor || alive.has(e.anchor));
+}
+
+/** 지금 잔고 */
+export function walletBalance(w: Wallet, alive: Set<string>): number {
+  return liveWallet(w, alive).reduce((n, e) => n + e.amount, w.start);
+}
+
+const hash = (text: string) => {
+  let h = 2166136261;
+  for (const ch of text) {
+    h ^= ch.codePointAt(0)!;
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(36);
+};
+
+export const walletEntryId = (anchor: string, amount: number, memo: string) => `w_${hash(`${anchor}|${amount}|${memo}`)}`;
+
+/** 새 거래 id: 같은 id 가 가계부에 이미 있으면(지운·다시 굴린 응답의 죽은 거래 포함) 응답 키를 붙여 새로 만든다.
+ *  안 그러면 addWalletEntry 가 같은 id 를 보고 아무것도 안 넣어 돈이 안 나간다 (릴리스 점검 11-09: 다시 주문하면 공짜) */
+export function freshWalletId(w: Wallet, base: string, anchor: string): string {
+  const used = (id: string) => w.log.some((x) => x.id === id);
+  if (!used(base)) return base;
+  const b = anchor ? `${base}_${anchor}` : base;
+  if (!used(b)) return b;
+  let i = 2;
+  while (used(`${b}_${i}`)) i++;
+  return `${b}_${i}`;
+}
+/** 거래 정리 (전수검사 11-13): 400줄을 넘으면 오래된 것부터 ① 기준 응답이 사라진 거래 → ② 살아 있는 거래는 금액을 start 에 합친 뒤 뺀다 (잔고가 그대로).
+ *  예전엔 뒤 400줄만 남겨 살아 있는 옛 거래가 잘리면 잔고가 바뀌었다. 방금 넣은 마지막 줄은 빼지 않고, alive 를 모르면 자르지 않는다 */
+function compactWallet(w: Wallet, alive?: Set<string>): Wallet {
+  let over = w.log.length - 400;
+  if (over <= 0 || !alive) return w;
+  const drop = new Set<WalletEntry>();
+  let start = w.start;
+  const old = w.log.slice(0, -1);
+  for (const e of old) {
+    if (over <= 0) break;
+    if (e.anchor && !alive.has(e.anchor)) {
+      drop.add(e);
+      over--;
+    }
+  }
+  for (const e of old) {
+    if (over <= 0) break;
+    if (drop.has(e)) continue;
+    start += e.amount;
+    drop.add(e);
+    over--;
+  }
+  return drop.size ? { ...w, start, log: w.log.filter((e) => !drop.has(e)) } : w;
+}
+
+/** 거래 더하기 (같은 id 가 있으면 그대로). 금액 0·범위 밖은 무시. alive(살아 있는 응답 키)를 주면 400줄을 넘을 때 정리한다 */
+export function addWalletEntry(w: Wallet, e: Omit<WalletEntry, 'id' | 'at'> & { id?: string; at?: string }, alive?: Set<string>): Wallet {
+  if (!Number.isSafeInteger(e.amount) || e.amount === 0 || Math.abs(e.amount) > WALLET_MAX) return w;
+  const id = e.id ?? walletEntryId(e.anchor, e.amount, e.memo);
+  if (w.log.some((x) => x.id === id)) return w;
+  return compactWallet({ ...w, log: [...w.log, { ...e, id, memo: e.memo.slice(0, 30), at: e.at ?? new Date().toISOString() }] }, alive);
+}
+
+/** 필드 거래 (게임 다리, 출처 field). 기준 메시지는 필드 사건·막간과 같은 자리(들어갈 때의 마지막 메시지)라 그 메시지를 다시 굴리면 같이 빠진다.
+ * 같은 물건을 두 번 사도 따로 적히게 id 는 부르는 쪽이 매번 새로 준다. alive(살아 있는 응답 키)를 주면 addWalletEntry 처럼 400줄을 넘을 때 정리한다 (전수검사 11-13) */
+export function withFieldTrade(w: Wallet, anchor: string, amount: number, memo: string, id: string, where: { place?: string; time?: string } = {}, alive?: Set<string>): Wallet {
+  const place = typeof where.place === 'string' ? where.place.trim().slice(0, 30) : '';
+  const time = typeof where.time === 'string' ? where.time.trim().slice(0, 10) : '';
+  return addWalletEntry(w, { anchor, amount: Math.trunc(amount), memo: memo.trim() || guideTxt('Main', 'WALLET.MEMO.FIELD'), src: 'field', id, ...(place ? { place } : {}), ...(time ? { time } : {}) }, alive);
+}
+
+export function removeWalletEntry(w: Wallet, id: string): Wallet {
+  return { ...w, log: w.log.filter((e) => e.id !== id) };
+}
+
+/** 잔고를 target 으로 맞추는 수동 조정 한 줄 */
+export function adjustWallet(w: Wallet, alive: Set<string>, target: number, memo = guideTxt('Main', 'WALLET.MEMO.ADJUST')): Wallet {
+  const diff = Math.trunc(target) - walletBalance(w, alive);
+  if (!diff) return w;
+  return addWalletEntry(w, { anchor: '', amount: diff, memo, src: 'manual', id: `m_${Date.now().toString(36)}_${w.log.length}` }, alive);
+}
+
+/** 상태창 잔고 맞춤 거래의 메모 (아래 syncWalletToStatus) */
+export const WALLET_SYNC_MEMO = '상태창 잔고';
+const syncId = (anchor: string) => `s_${anchor}`;
+
+/** 마지막 응답의 상태창 잔고 칸에 장부를 맞춘다 (2026-11-05 사용자: 모델이 잔고 칸을 바꾸면 상태창은 바로 바뀌는데
+ * 머리 잔고·가계부는 그대로였다 — 장부는 갱신기가 금액이 적힌 문장을 읽을 때만 바뀌었기 때문).
+ * 차이를 그 응답 기준(anchor) 거래 한 줄로 적는다. 응답마다 id 가 하나라 다시 굴리기·갱신기 뒤에 다시 부르면 그 줄만 바뀌고,
+ * 갱신기가 같은 거래를 제대로 읽어 적으면 차이가 0이 되어 빠진다. 바뀐 게 없으면 null */
+export function syncWalletToStatus(w: Wallet, chat: Chat): Wallet | null {
+  const msgs = chat.message ?? [];
+  let anchor = '';
+  let target: number | null = null;
+  // 마지막 응답의 상태창만 본다 (11-08 전수점검): 마지막 응답에 잔고 칸이 없을 때 지난 응답까지 거슬러 올라가 그 값으로 다시 맞추면,
+  // 그 뒤에 적힌 거래(상점에서 산 것 등)가 「상태창 잔고」 줄로 되돌려졌다. 칸이 없으면 이미 적힌 맞춤 줄을 그대로 둔다
+  let i = msgs.length - 1;
+  while (i >= 0 && msgs[i].role === 'user') i--;
+  if (i >= 0) {
+    const m = msgs[i];
+    const tags = findStatusTags(typeof m.data === 'string' ? m.data : '');
+    for (let k = tags.length - 1; k >= 0; k--) {
+      const n = tags[k].wallet ? Number(tags[k].wallet) : NaN;
+      if (Number.isSafeInteger(n) && Math.abs(n) <= WALLET_MAX) {
+        target = n;
+        anchor = messageKey(m, i);
+        break;
+      }
+    }
+  }
+  if (target === null) return null;
+  const id = syncId(anchor);
+  const base = removeWalletEntry(w, id);
+  const alive = aliveAnchors(chat);
+  // 응답 뒤에 한 직접 수정(수동 줄)은 상태창이 쓰인 다음 일이라 셈에서 뺀다 (전수검사 11-13: 갱신기가 끝날 때 되돌려졌다)
+  const t = typeof msgs[i].time === 'number' ? (msgs[i].time as number) : NaN;
+  const later = (e: WalletEntry) => e.src === 'manual' && Number.isFinite(t) && Date.parse(e.at) > t;
+  // 모델이 잔고 칸을 바꾸지 않았으면(직전 [Previous status] 로 넘긴 값 그대로) 맞추지 않는다 — 갱신기가 읽은 지출이 맞춤 줄로 되돌려지지 않게 (전수검사 11-13, 설정 도움말 「바꿨을 때」)
+  const prior = { ...base, log: base.log.filter((e) => e.anchor !== anchor && !later(e)) };
+  if (target === walletBalance(prior, alive)) return JSON.stringify(base) === JSON.stringify(w) ? null : base;
+  // 그 응답 뒤 상점에서 사고판 거래(같은 응답에 묶인 store 줄)는 상태창이 쓰인 다음 일이라 맞춤 셈에서 뺀다 —
+  // 갱신기가 늦게 끝나 다시 맞출 때 방금 산 값이 「상태창 잔고」 줄로 되돌려지지 않게
+  const before = { ...base, log: base.log.filter((e) => !(e.src === 'store' && e.anchor === anchor) && !later(e)) };
+  const diff = target - walletBalance(before, alive);
+  const next = diff === 0 ? base : addWalletEntry(base, { id, anchor, amount: diff, memo: WALLET_SYNC_MEMO, src: 'story' }, alive);
+  return JSON.stringify(next) === JSON.stringify(w) ? null : next;
+}
+
+/** 「₩ 1,230,000」. 음수는 「−₩ 5,000」 */
+export function formatWon(n: number): string {
+  const abs = Math.abs(Math.trunc(n)).toLocaleString('en-US');
+  return `${n < 0 ? '−' : ''}₩ ${abs}`;
+}
+
+/** 변화 표기 「+50,000」「−5,000」. 0이면 빈 문자열 */
+export function formatDelta(n: number): string {
+  if (!n) return '';
+  return `${n > 0 ? '+' : '−'}${Math.abs(Math.trunc(n)).toLocaleString('en-US')}`;
+}
+
+/** 「3만 원」「50,000원」「₩1,200」「12만5천원」 → 원 단위 정수. 못 읽으면 null */
+export function parseWon(text: string): number | null {
+  const t = String(text ?? '').replace(/\s+/g, '');
+  if (!t) return null;
+  const sign = /^[-−]/.test(t) ? -1 : 1;
+  const body = t.replace(/^[-−+]/, '').replace(/^₩/, '').replace(/(원|won|KRW)$/i, '');
+  if (/^\d[\d,]*$/.test(body)) {
+    const n = Number(body.replace(/,/g, ''));
+    return Number.isSafeInteger(n) ? sign * n : null;
+  }
+  // 한국어 단위: 억·만·천·백
+  const m = /^(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)만)?(?:(\d+)천)?(?:(\d+)백)?(\d+)?$/.exec(body.replace(/,/g, ''));
+  if (!m || m.slice(1).every((x) => x === undefined)) return null;
+  const n = Math.round((Number(m[1] ?? 0) * 1e8) + (Number(m[2] ?? 0) * 1e4) + Number(m[3] ?? 0) * 1000 + Number(m[4] ?? 0) * 100 + Number(m[5] ?? 0));
+  return Number.isSafeInteger(n) && n > 0 ? sign * n : null;
+}
+
+/** 글에 금액이 적혀 있나 (갱신기 거래 검사: 인용에 숫자 금액이 있어야) */
+export function mentionsAmount(text: string): boolean {
+  return /(₩\s*\d|\d[\d,]*\s*(?:원|won|KRW)|\d+\s*(?:억|만|천)\s*(?:원)?)/i.test(text);
+}

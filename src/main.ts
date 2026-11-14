@@ -1,0 +1,263 @@
+// 시작기: Risu는 켜진 플러그인을 모든 봇에서 읽으므로, 플러그인 파일에는 이 작은 시작기만 둔다.
+// 괴이 카드를 열었을 때만 본체(src/body.ts → goei-body.js)를 꺼내 실행한다. 본체는 한 번 받아 pluginStorage에 두고
+// 플러그인을 업데이트해 판이 달라지면 다시 받는다. 다른 봇에서는 카드 확인과 표식 검사 말고는 아무것도 하지 않는다.
+import { BODY_KEY, BodyError, bodyVersion, fetchBody, runBody, type Body } from './loader/body';
+import { isGoeiCard } from './loader/card';
+import { closePanel, showPanel } from './loader/panel';
+
+const VERSION: string = typeof __PLUGIN_VERSION__ === 'string' ? __PLUGIN_VERSION__ : '';
+declare const __PLUGIN_VERSION__: string | undefined;
+const WATCH_MS = 1000;
+
+/** 이 봇 메시지·요청에만 있는 표식 (시드, 이동·전화 지시문, 시작 카드, 상태창) */
+// %%GOEI_SCENE%% = 플러그인이 넣은 첫 장면 (core/dispatch SCENE_MARK). 빠져 있어서 본체가 뜨기 전 Risu가 그린 첫 장면의 그림 태그가 원문으로 남았다 (사용자 11-07)
+const MARKS = ['%%SEED%%', '%%SCENE_CARD:', '%%PHONE_CALL:', '%%GOEI_UNSENT%%', '%%GOEI_START%%', '%%GOEI_SCENE%%', 'data-goei="landing"', 'ANOMALY SIMULATION', '[▣'];
+const ours = (t: unknown) => typeof t === 'string' && MARKS.some((m) => t.includes(m));
+
+let body: Body | null = null;
+let loading: Promise<Body | null> | null = null;
+/** 지금 돌고 있는 본체 시작 (start 가 한 번에 하나만 돌게) */
+let starting: Promise<Body | null> | null = null;
+let stopped = false;
+/** 받기에 실패한 때. 메시지마다 다시 받으려 하지 않게, 카드를 다시 열거나 1분이 지나야 다시 시도한다 */
+let failedAt = 0;
+
+/** 마지막으로 본체를 시작하지 못한 까닭 (받기 창에 보인다) */
+let startError = '';
+/** 본체 코드 자체가 실행되지 않았나 (깨진 글·판 불일치). 본체는 돌았는데 시작 중에 실패한 것과 구분해, 깨진 코드만 저장소에서 지운다 */
+let codeBroken = false;
+/** 본체와 주고받는 고리 (개선 나1, host/datapanel.ts): 본체가 세계 자료 받기 창을 띄웠으면(__goeiBodyPanel) 시작기 창은 띄우지 않고(떠 있던 것은 거둠),
+ *  그 창에서 다시 받기·파일 넣기에 성공하면 본체가 __goeiRelaunch 로 다시 띄워 달라고 한다 */
+const link = globalThis as { __goeiBodyPanel?: boolean; __goeiRelaunch?: () => void };
+link.__goeiRelaunch = () => {
+  if (!body && !stopped) void ensure(true);
+};
+
+/** 저장해 둔 본체를 읽고, 없거나 판이 다르면 받는다. 받지 못하면 받기 창을 띄우고 null */
+async function load(prompt: boolean): Promise<Body | null> {
+  let code: string | null = null;
+  let fromStore = false;
+  // 어디서 시간이 가는지 콘솔에 남긴다 (v0.21.0 첫 시작 1분, 사용자 11-07)
+  const t0 = Date.now();
+  const lap = (what: string) => console.log(`[goei] 시작 ${what}: ${((Date.now() - t0) / 1000).toFixed(1)}초`);
+  try {
+    const saved: unknown = await risuai.pluginStorage.getItem(BODY_KEY);
+    if (typeof saved === 'string' && bodyVersion(saved) === VERSION) (code = saved), (fromStore = true);
+  } catch {
+    // 아래에서 받는다
+  }
+  lap(fromStore ? '저장된 본체 읽음' : '저장된 본체 없음(받는다)');
+  if (!code) {
+    try {
+      code = await fetchBody(VERSION);
+    } catch (error) {
+      console.log(`[goei] 본체를 받지 못했어요: ${error instanceof Error ? error.message : String(error)}`);
+      failedAt = Date.now();
+      if (prompt) showPanel(VERSION, install);
+      return null;
+    }
+    lap('본체 받음');
+    // 받는 동안 받기 창(install)이 이미 본체를 켰으면 그것을 쓴다
+    if (body) return body;
+    await save(code);
+    lap('본체 저장');
+  }
+  const b = await start(code, prompt);
+  lap(b ? '본체 켜짐' : '본체 시작 실패');
+  if (!b) {
+    failedAt = Date.now();
+    // 저장해 둔 본체가 깨져 있으면(판은 맞는데 실행이 안 됨) 지워서 다음에 다시 받게 한다. 그냥 두면 플러그인 판이 바뀔 때까지 영영 안 뜬다
+    if (fromStore && codeBroken) await risuai.pluginStorage.removeItem(BODY_KEY).catch(() => {});
+    if (prompt && !link.__goeiBodyPanel) showPanel(VERSION, install, `본체를 시작하지 못했어요: ${startError}`);
+  }
+  return b;
+}
+
+/** 저장소에 둔다. 저장이 안 돼도(용량 초과 등) 이번에는 받은 본체로 그냥 돈다 */
+async function save(code: string): Promise<void> {
+  try {
+    await risuai.pluginStorage.setItem(BODY_KEY, code);
+  } catch (error) {
+    console.log(`[goei] 본체를 저장하지 못했어요 (다음에 다시 받아요): ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/** 본체 시작은 한 번에 하나만: 받기 창의 install 과 조용한 재시도(load)가 겹쳐도 본체가 두 번 켜지지 않게 (loader#9).
+ *  이미 켜졌으면 그 본체를, 앞선 시작이 돌고 있으면 그것을 기다려 성공하면 그 본체를 쓰고, 실패했으면 내 코드로 이어서 시도한다 */
+async function start(code: string, prompt: boolean): Promise<Body | null> {
+  while (starting) {
+    const b = await starting;
+    if (b) return b;
+  }
+  if (body) return body;
+  const p = startOnce(code, prompt);
+  starting = p;
+  try {
+    return await p;
+  } finally {
+    if (starting === p) starting = null;
+  }
+}
+
+/** prompt: 카드 열기·단추처럼 사용자가 시킨 시작인지 — 본체는 세계 자료 받기 창을 이때만 다시 띄운다 (닫은 창이 표시·요청마다 되살아나지 않게) */
+async function startOnce(code: string, prompt: boolean): Promise<Body | null> {
+  codeBroken = false;
+  let api: ReturnType<typeof runBody>;
+  try {
+    api = runBody(code, VERSION);
+  } catch (error) {
+    codeBroken = true;
+    startError = error instanceof Error ? error.message : String(error);
+    console.log(`[goei] 본체를 실행하지 못했어요: ${startError}`);
+    return null;
+  }
+  try {
+    body = await api.start({ prompt });
+    return body;
+  } catch (error) {
+    startError = error instanceof Error ? error.message : String(error);
+    console.log(`[goei] 본체를 시작하지 못했어요: ${startError}`);
+    return null;
+  }
+}
+
+/** 받기 창에서 받았거나 파일로 넣은 본체. 시작하지 못하면 창은 그대로 두고 까닭을 던진다.
+ *  본체가 세계 자료 받기 창을 띄웠으면(파일로 넣은 본체가 자료를 못 받음) 그 창이 안내를 이어받으므로 이 창은 컨테이너를 숨기지 않고 거둔다 (두 창이 겹치지 않게) */
+async function install(code: string): Promise<void> {
+  await save(code);
+  loading = start(code, true).then((b) => {
+    if (!b) loading = null;
+    return b;
+  });
+  const b = await loading;
+  if (!b) {
+    failedAt = Date.now();
+    if (codeBroken) await risuai.pluginStorage.removeItem(BODY_KEY).catch(() => {});
+    if (link.__goeiBodyPanel) {
+      closePanel(true);
+      return;
+    }
+    throw new BodyError(`본체를 시작하지 못했어요: ${startError}`);
+  }
+  closePanel();
+}
+
+/** 본체가 필요할 때 한 번만 불러온다. 실패하면 다음에 다시 시도 */
+function ensure(prompt = false): Promise<Body | null> {
+  if (body) return Promise.resolve(body);
+  if (!prompt && !loading && Date.now() - failedAt < 60_000) return Promise.resolve(null);
+  loading ??= load(prompt).then((b) => {
+    if (!b) loading = null;
+    return b;
+  });
+  return loading;
+}
+
+async function onBeforeRequest<M>(messages: M[], type: string): Promise<M[]> {
+  let b = body;
+  if (!b) {
+    if (type !== 'model' || !Array.isArray(messages) || !messages.some((m) => ours((m as { content?: unknown })?.content))) return messages;
+    b = await ensure();
+    if (!b) return messages;
+  }
+  try {
+    return (await b.beforeRequest(messages as never, type)) as M[];
+  } catch (error) {
+    // 본체가 통째로 던져도 요청은 막지 않는다: 본체의 sanitize 로 플러그인 표식만 지워 보내고(없으면 원문), 까닭은 로그로 (QC 개선 나3)
+    console.log(`[goei] 요청 처리기 실패(표식만 지우고 보냄): ${error instanceof Error ? error.message : String(error)}`);
+    try {
+      return typeof b.sanitize === 'function' ? (b.sanitize(messages as never) as M[]) : messages;
+    } catch {
+      return messages;
+    }
+  }
+}
+
+async function onOutput(arg: Parameters<Body['output']>[0]): Promise<void> {
+  const b = body ?? (loading ? await loading : null);
+  if (b) await b.output(arg);
+}
+
+/** 보낼 글: 본체가 떠 있을 때만 (로어북 고르기). 다른 봇에서는 그대로 */
+async function onInput(text: string): Promise<string> {
+  return body ? body.input(text) : text;
+}
+
+async function onDisplay(text: string): Promise<string> {
+  if (!body && !ours(text)) return text;
+  try {
+    const b = body ?? (await ensure());
+    return b ? await b.display(text) : text;
+  } catch (error) {
+    // 그리기가 실패해도 메시지는 원문으로 보이게 (처리기 예외가 Risu 메시지 그리기를 막지 않게)
+    console.log(`[goei] 메시지 그리기 실패: ${error instanceof Error ? error.message : String(error)}`);
+    return text;
+  }
+}
+
+/** 괴이 카드를 열면 본체를 꺼낸다. 본체가 뜨면 감시는 본체가 맡는다 */
+function watch(): void {
+  let last = -2;
+  const tick = async () => {
+    if (stopped || body) return;
+    try {
+      const idx = await risuai.getCurrentCharacterIndex();
+      if (idx !== last) {
+        last = idx;
+        if (Number.isInteger(idx) && idx >= 0 && isGoeiCard(await risuai.getCharacterFromIndex(idx))) await ensure(true);
+      }
+    } catch {
+      // 다음 차례에 다시
+    }
+    if (!stopped && !body) setTimeout(() => void tick(), WATCH_MS);
+  };
+  void tick();
+}
+
+// 리수 햄버거 메뉴 단추 모양: 옆 단추(Risu lucide 선 아이콘)와 같은 흰 선 유령 (사용자 2026-11-08: 이모지 👻는 톤이 안 맞음, 조금 크게).
+// Risu는 20×20 칸에 넣으므로 overflow=visible 로 칸 밖까지 그려 옆 아이콘 크기에 맞춘다
+const MENU_GHOST =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="2.73 3.25 18 18" width="20" height="20" overflow="visible" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5C7.8 2.5 5.5 5.2 5.5 8.8V10.3L3.9 9.1C2.2 7.9 .6 10.1 2 11.5L5.5 15C5.8 19.5 9.3 22 13.7 22C18.1 22 21 19.6 22 16.8C19.4 18.3 17.5 17.8 17.5 15.5V15L21 11.5C22.4 10.1 20.8 7.9 19.1 9.1L17.5 10.3V8.5C17.5 5 15.1 2.5 11.5 2.5Z"/><g fill="currentColor" stroke="none"><ellipse cx="9" cy="9.2" rx="1.4" ry="1.9"/><ellipse cx="14" cy="9.2" rx="1.4" ry="1.9"/><ellipse cx="11.5" cy="13.6" rx="1.1" ry="1.6"/></g></svg>';
+
+// 깡통봇 설치 (설계안 9절): 아무 봇에서나 햄버거 메뉴의 「괴이: ANOMALY 설치·점검」 으로 본체를 꺼내 설치 화면을 연다.
+// 괴이 카드에서는 같은 단추가 점검 화면을 연다
+void risuai
+  .registerButton({ name: '괴이: ANOMALY 설치·점검', icon: MENU_GHOST, iconType: 'html', location: 'hamburger', id: 'goei-plugin-install' }, () => {
+    void ensure(true).then((b) => b?.install());
+  })
+  .catch((error: unknown) => console.log(`[goei] 설치 단추를 두지 못했어요: ${error instanceof Error ? error.message : String(error)}`));
+
+// 선택지용사처럼 필요한 권한을 처음에 한 번에 묻는다 (업데이트하면 Risu가 권한을 다시 묻는데,
+// 기능을 하나씩 켜는 도중에 묻지 않게)
+for (const permission of ['replacer', 'mainDom', 'sendChat']) {
+  try {
+    await risuai.requestPluginPermission(permission);
+  } catch {
+    /* 옛 Risu에는 없을 수 있다. 그러면 기능을 켤 때 Risu가 묻는다 */
+  }
+}
+// 처리기는 하나씩 건다: 하나가 거부·실패해도(권한 거부 등) 나머지와 감시는 켠다 (QC 2026-10-28: 예전엔 첫 실패에서 시작기 전체가 멈췄다)
+const hook = async (what: string, f: () => Promise<unknown>): Promise<void> => {
+  try {
+    await f();
+  } catch (error) {
+    console.log(`[goei] ${what} 처리기를 걸지 못했어요: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+await hook('요청', () => risuai.addRisuReplacer('beforeRequest', onBeforeRequest));
+await hook('응답', () => risuai.addRisuChatListener('output', onOutput));
+await hook('표시', () => risuai.addRisuScriptHandler('display', onDisplay));
+// 입력 처리기가 없는 옛 Risu: 로어북은 응답 뒤·요청 직전에만 고른다
+await hook('입력', () => risuai.addRisuScriptHandler('input', onInput));
+watch();
+
+await hook('종료', () => risuai.onUnload(async () => {
+  stopped = true;
+  delete link.__goeiRelaunch;
+  await body?.unload().catch(() => {});
+  // 하나가 실패해도 나머지는 뗀다
+  await risuai.removeRisuReplacer('beforeRequest', onBeforeRequest).catch(() => {});
+  await risuai.removeRisuChatListener('output', onOutput).catch(() => {});
+  await risuai.removeRisuScriptHandler('display', onDisplay).catch(() => {});
+  await risuai.removeRisuScriptHandler('input', onInput).catch(() => {});
+}));

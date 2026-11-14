@@ -1,0 +1,207 @@
+// 카드에 들어 있는 이미지(지도 map01~map18)를 플러그인 창에서 쓸 수 있는 blob URL로 바꾼다.
+// 캐릭터 에셋은 char.additionalAssets = [이름, 저장 경로, 확장자]. 한 번 읽은 것은 캐릭터별로 기억한다.
+import { setAssetCheck } from '../core/sitepics';
+import type { CharacterSnapshot } from './risu';
+
+const MIME: Record<string, string> = { avif: 'image/avif', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+const cache = new Map<string, Promise<string | null>>();
+
+export function toBytes(data: unknown): Uint8Array | null {
+  if (data instanceof Uint8Array) return data;
+  if (data instanceof ArrayBuffer) return new Uint8Array(data);
+  if (Array.isArray(data)) return new Uint8Array(data as number[]);
+  if (data && typeof data === 'object') {
+    // 직렬화 경계를 넘으며 {0:..,1:..} 꼴이 된 경우
+    const values = Object.values(data as Record<string, unknown>);
+    if (values.length && values.every((v) => typeof v === 'number')) return new Uint8Array(values as number[]);
+  }
+  return null;
+}
+
+async function load(path: string, ext: string): Promise<string | null> {
+  try {
+    const data: unknown = await risuai.readImage(path);
+    if (typeof data === 'string') return data.startsWith('data:') || data.startsWith('blob:') || data.startsWith('http') ? data : null;
+    const bytes = toBytes(data);
+    if (!bytes?.length) return null;
+    return URL.createObjectURL(new Blob([bytes as BlobPart], { type: MIME[ext.toLowerCase()] ?? 'application/octet-stream' }));
+  } catch (error) {
+    console.log(`[goei] 이미지를 읽지 못했어요 (${path}): ${error instanceof Error ? error.message : String(error)}`);
+    return null;
+  }
+}
+
+type Row = [string, string, string?];
+const isRow = (a: unknown): a is Row => Array.isArray(a) && typeof a[0] === 'string' && typeof a[1] === 'string';
+
+// 표정 세트(「이름_default」 등)는 따로 까는 에셋 모듈이나 카드 에셋에 들어 있다. 창을 열 때 지금 카드 → 모듈 순으로 에셋 목록을 읽어 둔다
+let modRows: Row[] = [];
+let modVer = 0;
+let modBusy: Promise<boolean> | null = null;
+/** 모듈 에셋 목록을 다시 읽는다. 바뀌었으면 true (창을 열 때 한 번, 기다리지 않고 부른다) */
+export function loadModuleAssets(): Promise<boolean> {
+  modBusy ??= (async () => {
+    let rows: Row[] = [];
+    try {
+      const idx = await risuai.getCurrentCharacterIndex();
+      const char = Number.isInteger(idx) && idx >= 0 ? ((await risuai.getCharacterFromIndex(idx)) as CharacterSnapshot | null) : null;
+      rows = ((char?.additionalAssets ?? []) as unknown[]).filter(isRow);
+    } catch {
+      /* 카드를 못 읽으면 모듈만 */
+    }
+    try {
+      const db = await risuai.getDatabase(['modules', 'enabledModules']);
+      const on = new Set(db?.enabledModules ?? []);
+      const mods = [...(db?.modules ?? [])].sort((a, b) => Number(on.has(b.id)) - Number(on.has(a.id)));
+      rows = rows.concat(mods.flatMap((m) => (Array.isArray(m.assets) ? m.assets.filter(isRow) : [])));
+    } catch {
+      /* 권한이 없거나 못 읽으면 카드 에셋만 쓴다 */
+    }
+    const changed = JSON.stringify(rows) !== JSON.stringify(modRows);
+    if (changed) (modRows = rows), modVer++;
+    return changed;
+  })().finally(() => {
+    modBusy = null;
+  });
+  return modBusy;
+}
+
+/** 모듈 에셋 목록을 언제 읽었는지 (목록 캐시 무효화용) */
+export const moduleAssetStamp = () => modVer;
+
+// 모듈 에셋은 수천 장이라 이름 → 줄 색인을 둔다 (그대로·소문자). 목록이 바뀌면 다시 만든다
+let modIndex: { exact: Map<string, Row>; lower: Map<string, Row> } | null = null;
+let modIndexVer = -1;
+function modRow(name: string): Row | undefined {
+  if (!modIndex || modIndexVer !== modVer) {
+    modIndex = { exact: new Map(), lower: new Map() };
+    for (const r of modRows) {
+      if (!modIndex.exact.has(r[0])) modIndex.exact.set(r[0], r);
+      if (!modIndex.lower.has(r[0].toLowerCase())) modIndex.lower.set(r[0].toLowerCase(), r);
+    }
+    modIndexVer = modVer;
+  }
+  return modIndex.exact.get(name) ?? modIndex.lower.get(name.toLowerCase());
+}
+
+/** 채팅 속 이미지 태그용: 모듈 에셋에 그 이름이 있으면 실제 이름. 목록을 아직 못 읽었으면 pick 없음(태그를 그대로 믿는다) */
+export function modulePicker(): ((name: string) => string | null) | undefined {
+  if (!modRows.length) return undefined;
+  return (name) => modRow(name)?.[0] ?? null;
+}
+
+/** 카드 에셋 → 모듈 에셋 순으로 그 이름(대소문자 무시)의 줄 */
+function findRow(char: CharacterSnapshot, name: string): Row | undefined {
+  const lower = name.toLowerCase();
+  const card = ((char.additionalAssets ?? []) as unknown[]).filter(isRow);
+  return card.find((a) => a[0] === name) ?? card.find((a) => a[0].toLowerCase() === lower) ?? modRow(name);
+}
+
+/** 사진으로 고를 수 있는 에셋 이름 (카드 → 모듈, 지도 그림 빼고) */
+export function assetNames(char: CharacterSnapshot): string[] {
+  const card = ((char.additionalAssets ?? []) as unknown[]).filter(isRow);
+  return [...new Set([...card, ...modRows].map((r) => r[0]))].filter((n) => !/^map\d+$/i.test(n));
+}
+
+/** 사진을 찾을 재료 (괴이·특수·요원·조직 공통): 명부에서 고른 얼굴·대표 사진과 영문명 */
+export interface PicSource {
+  face?: string;
+  photo?: string;
+  english?: string;
+  /** 대표 사진에서 얼굴로 자를 틀 「가로,세로,크기」 (%) */
+  crop?: string;
+  /** 사진이 하나도 없을 때 쓸 공용 그림 후보 (좋은 순서, core/sharedpics) */
+  shared?: string[];
+}
+
+/** 얼굴 틀을 따로 맞추지 않은 요원: 카우보이샷의 위쪽 가운데 */
+export const DEFAULT_CROP = '50,16,44';
+
+/** 카드에 든 요원 기본 그림(영문명_default, assets/agents)마다 맞춘 얼굴 틀. 없으면 DEFAULT_CROP (2026-10-19 그림을 보고 맞춤, Aileen은 2026-10-22 새 그림) */
+export const AGENT_CROPS: Record<string, string> = {
+  'Aestheticism': '53,18,40',
+  'Aileen': '43,21,46',
+  'Baek Sa-heon': '50,18,44',
+  'Cha Yeo-jin': '54,18,44',
+  'Cho Seong-choon': '48,18,44',
+  'Do Pil-heon': '48,16,44',
+  'Go Young-eun': '46,16,44',
+  'Jang Heo-un': '52,18,44',
+  'Jay': '53,16,44',
+  'Jyaldi': '56,18,44',
+  'Kwak Je-gang': '56,19,44',
+  'Kyuras': '49,19,44',
+  'Lee Do-hyeong': '61,16,44',
+  'Ma Deok-hee': '49,19,44',
+  'Mun Hye-ran': '46,18,44',
+  'Secriem': '54,16,44',
+  'Seo Yun-ji': '46,18,44',
+  'Spangdal': '52,18,44',
+};
+
+/** 명부에서 맞춘 틀 → 그 요원 그림의 틀 → 기본 틀 */
+export const personCrop = (p: PicSource) => parseCrop(p.crop) ?? parseCrop((!p.photo && AGENT_CROPS[p.english ?? '']) || DEFAULT_CROP)!;
+
+/** 「가로,세로,크기」(%) → 틀 중심(가로·세로)과 한 변(그림 너비 대비). 잘못된 값은 null */
+export function parseCrop(s: string | undefined): [number, number, number] | null {
+  const n = String(s ?? '').split(',').map(Number);
+  if (n.length !== 3 || n.some((x) => !Number.isFinite(x))) return null;
+  const c = (x: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, x));
+  return [c(n[0], 0, 100), c(n[1], 0, 100), c(n[2], 5, 100)];
+}
+
+/** 사진 이름 「이름#가로,세로,크기」 → 에셋 이름과 자를 틀 */
+export function splitPic(pic: string): { name: string; crop: [number, number, number] | null; tall?: number } {
+  const at = pic.lastIndexOf('#');
+  // 「~비율」을 붙이면 같은 틀 위·폭 그대로 아래로만 늘려 자른다 (세로/가로 비율, 상점 주인 칸 11-07)
+  const [cut, t] = at > 0 ? pic.slice(at + 1).split('~') : ['', ''];
+  const crop = at > 0 ? parseCrop(cut) : null;
+  const tall = Number(t);
+  return crop ? { name: pic.slice(0, at), crop, ...(tall > 1 && tall <= 4 ? { tall } : {}) } : { name: pic, crop: null };
+}
+
+/** 대표 사진 (위키 문서 정보표·시작 화면 세력 카드·ID카드 배경): 고른 대표 → 「영문명_default」 → 「영문명」 */
+export function mainPic(char: CharacterSnapshot, p: PicSource): string {
+  const en = p.english ?? '';
+  if (p.photo) return p.photo;
+  if (en && hasAsset(char, `${en}_default`)) return `${en}_default`;
+  if (en && hasAsset(char, en)) return en;
+  return p.shared?.find((n) => hasAsset(char, n)) ?? '';
+}
+
+/**
+ * 얼굴 사진 (요원 카드·명부 목록·위키 목록·괴담톡): 고른 얼굴 → 「영문명」 → 대표 사진에서 얼굴 틀만큼 자른 것.
+ * 틀은 명부에서 맞춘 값, 없으면 사람(요원)만 기본 틀. 사람이 아니면 대표 사진을 그대로 쓴다
+ */
+export function facePic(char: CharacterSnapshot, p: PicSource, person = false): string {
+  if (p.face) return p.face;
+  // 요원: 기본 그림(영문명_default)이 있으면 옛 작은 얼굴 그림보다 그 그림의 얼굴을 쓴다 (2026-10-19 사용자: 기본 그림을 카드에 넣고 얼굴을 맞춤)
+  const en = p.english ?? '';
+  if (person && !p.photo && en && hasAsset(char, `${en}_default`)) return `${en}_default#${personCrop(p).join(',')}`;
+  if (en && hasAsset(char, en)) return en;
+  const main = mainPic(char, p);
+  const crop = person ? personCrop(p) : parseCrop(p.crop);
+  return main && crop ? `${main}#${crop.join(',')}` : main;
+}
+
+/** 그 이름의 에셋이 카드나 에셋 모듈에 있는지 */
+export const hasAsset = (char: CharacterSnapshot, name: string): boolean => !!name && !!findRow(char, splitPic(name).name);
+
+/** 이름으로 캐릭터(없으면 에셋 모듈) 에셋 URL. 없거나 못 읽으면 null */
+export function assetUrl(char: CharacterSnapshot, name: string): Promise<string | null> {
+  const row = findRow(char, name);
+  if (!row) return Promise.resolve(null);
+  const key = `${String(char.chaId ?? char.name ?? '')}|${row[1]}`;
+  let hit = cache.get(key);
+  if (!hit) {
+    hit = load(row[1], String(row[2] ?? row[1].split('.').pop() ?? ''));
+    cache.set(key, hit);
+    void hit.then((url) => {
+      if (!url) cache.delete(key); // 실패는 다음에 다시 시도
+    });
+  }
+  return hit;
+}
+
+// 에셋 사진 보내기(core/sitepics): 목록에 그림이 있는 것만 넣게
+setAssetCheck(hasAsset);
