@@ -146,7 +146,7 @@ export function rulesFor(name: GuideName): string {
   if (!(RULE_TARGETS as string[]).includes(name)) return '';
   const hit = userRules.filter((r) => r.on && r.text.trim() && r.to.includes(name as RuleTarget));
   if (!hit.length) return '';
-  return `## User Rules\n${hit.map((r) => `### ${r.title.trim() || '규칙'}\n${r.text.trim()}`).join('\n\n')}`;
+  return `${guideTxt('Common', 'USER_RULES.HEAD')}\n${hit.map((r) => guideTxt('Common', 'USER_RULES.ITEM', { title: r.title.trim() || '규칙', text: r.text.trim() })).join('\n\n')}`;
 }
 
 /** 요청에 쓰는 지침 글: 고친 글(또는 기본) + 내가 추가한 규칙. 편집 창은 guideText(규칙 없는 글)를 쓴다 */
@@ -209,6 +209,22 @@ const BLANK_DEFAULT: Partial<Record<GuideName, RegExp>> = {
 /** 이 지침의 이 절을 비우면 요청에 기본 글이 쓰이나 (편집 화면 표시용) */
 export const blankUsesDefault = (name: GuideName, section: string): boolean =>
   BLANK_DEFAULT_ALL.includes(name) || !!BLANK_DEFAULT[name]?.test(section.trim());
+/** 기본 지침 파일(지침/*.txt)의 절 글 (앞뒤 빈칸 뺌). 없으면 null */
+const defCache = new Map<GuideName, Record<string, string>>();
+export function guideDefaultSec(name: GuideName, section: string): string | null {
+  let secs = defCache.get(name);
+  if (!secs) {
+    secs = {};
+    for (const m of DEFAULTS[name].matchAll(/@@SECTION ([^\n]+)\n([\s\S]*?)\n@@END/g)) secs[m[1].trim()] = m[2];
+    defCache.set(name, secs);
+  }
+  return secs[section]?.trim() || null;
+}
+/** 지침 절 글 (2026-11-14 사용자: 코드에 박힌 모델 글을 전부 지침 파일로). 고친 글의 절 → 없거나 비었으면 기본 파일(지침/*.txt)의 절. 코드에는 글을 두지 않는다 */
+export function guideTxt(name: GuideName, section: string, vars?: Record<string, string | number>): string {
+  const t = guideSec(name, section) ?? guideDefaultSec(name, section) ?? '';
+  return vars ? fillVars(t, vars) : t;
+}
 /** 지침 절이 있으면 그 글(자리 채움), 없으면 코드에 남긴 옛 글 */
 export function guideOr(name: GuideName, section: string, fallback: string | (() => string), vars?: Record<string, string | number>): string {
   const t = guideSec(name, section);

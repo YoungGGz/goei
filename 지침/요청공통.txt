@@ -76,3 +76,12 @@ Write all output in English.
 @@SECTION LANGUAGE.JA
 Write all output in Japanese.
 @@END
+
+@@SECTION USER_RULES.HEAD
+## User Rules
+@@END
+
+@@SECTION USER_RULES.ITEM
+### {title}
+{text}
+@@END
