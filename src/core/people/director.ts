@@ -7,7 +7,7 @@ import { listDocs } from '../wiki';
 import { addressOf, affinityView } from './affinity';
 import { axesLinesEn } from './axes';
 import { temperOf } from './base';
-import { knowledgeRule, personBlock, unknownTo } from './inject';
+import { personBlock, unknownTo } from './inject';
 import { liveChanges, liveEntries, liveness, plain, hash } from './store';
 import { rhythmClock, rhythmClockLines } from './rhythm';
 import { speechVarietyBlock } from './speech';
@@ -198,8 +198,8 @@ export function runSearches(searches: DirectorSearch[], src: { chat: Chat; lore?
 export function directorBlock(notes: DirectorNote[], user: string): string {
   if (!notes.length) return '';
   const lines = notes.map((n) => [guideTxt('Director', 'MAIN_NOTE.ITEM', { who: n.who, now: n.now }), n.react ? `  ${guideTxt('Director', 'MAIN_NOTE.REACT', { react: n.react })}` : '', ...n.mustNot.map((m) => `  ${guideTxt('Director', 'MAIN_NOTE.MUST_NOT', { text: m })}`), ...(n.uncertain ?? []).map((u) => `  ${guideTxt('Director', 'MAIN_NOTE.UNCERTAIN', { text: u })}`)].filter(Boolean).join('\n'));
-  // 머리말은 지침 「Director」 MAIN_NOTE 절
-  const head = guideTxt('Director', 'MAIN_NOTE', { user, knowledge_rule: knowledgeRule() });
+  // 머리말은 지침 「Director」 MAIN_NOTE 절. 지식 경계 규칙은 같이 들어가는 인물 기록 머리말(PEOPLE.RULE)에만 (전수검사 11-13 가-13, 사용자 승인)
+  const head = guideTxt('Director', 'MAIN_NOTE', { user });
   return `${guideTxt('Director', 'MAIN_NOTE.HEAD')}\n${head}\n${lines.join('\n')}`;
 }
 
