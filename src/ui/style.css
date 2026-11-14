@@ -2196,7 +2196,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-body .gx-opcnt em i { display: inline; width: auto; height: auto; border-radius: 0; background: none; font: 700 17px/1 var(--mono); color: var(--c); }
 .gx-oppin:not(.sel) em { opacity: .85; font-size: 12px; }
 
-/* 2026-10-20 사용자 지적 반영: OSD 한 줄, 투입은 글자 줄(이름 바로 아래), 지도는 보기를 꽉 채우고 고른 상황을 가운데로 */
+/* 2026-10-20 사용자 결정: OSD 한 줄, 투입은 글자 줄(이름 바로 아래), 지도는 보기를 꽉 채우고 고른 상황을 가운데로 */
 .gx-oposd { flex-wrap: nowrap; align-items: center; gap: 10px; }
 .gx-oposd .cam { flex: 1 1 auto; flex-basis: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gx-oposd .ts { flex: none; }
@@ -3609,7 +3609,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .gw-flow-body .gw-copy.gx-mini.icon:hover { border-color: var(--mint); color: var(--text); } /* 카드 바탕(초록·회색)이 비치게 (2026-11-10 사용자: 배경색이 뒤 톤과 안 맞음) */
 .gw-flow-body .gw-copy svg { width: 13px; height: 13px; }
 .gw-flow-tools { justify-content: flex-start; }
-/* 설정 묶음 안의 접이식 칸(로어북 확인 등)은 위 줄과 띄운다 (11-07 사용자: 「로어북 보내기」와 「로어북 확인」이 딱 붙어 있다고 여러 번 지적) */
+/* 설정 묶음 안의 접이식 칸(로어북 확인 등)은 위 줄과 띄운다 (11-07 사용자 결정: 「로어북 보내기」와 「로어북 확인」이 붙어 보이지 않게) */
 .ps-group > .ps-rows + .ps-adv { margin-top: 14px; }
 
 /* 접이식 칸 제목 줄 (2026-11-07 사용자: 접는 건 좋은데 눈에 띄어야 한다 — 흐릿한 글자 한 줄이면 안 보인다). 채운 띠 + 왼쪽 강조 줄 + 또렷한 제목 + 강조색 화살표 */

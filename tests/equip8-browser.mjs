@@ -277,7 +277,7 @@ if (PART.includes('sell')) {
       return { out, lap, lapCell, lapAv, hscroll: body ? body.scrollWidth > body.clientWidth + 1 : null, zone: zone ? Math.round(zone.width) : null };
     });
     if (fit.out || fit.lap || fit.lapCell || fit.lapAv || fit.hscroll || m.over) bad(`[sell/${name}] 넘침·겹침 ${JSON.stringify(fit)} over=${m.over}`);
-    // 장착 띠와 소지품 구획이 서로 다른 테두리 상자, 사이가 떨어져 있고, 장착 칸과 물건 카드 크기가 다름 (2026-11-12 사용자: 「장착칸이랑 아이템칸이랑 구분도 없냐」)
+    // 장착 띠와 소지품 구획이 서로 다른 테두리 상자, 사이가 떨어져 있고, 장착 칸과 물건 카드 크기가 다름 (2026-11-12 사용자 결정: 장착 칸과 물건 칸을 구분)
     const sep = await page.evaluate(() => {
       const R = (e) => { const r = e.getBoundingClientRect(); return { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height), b: Math.round(r.bottom) }; };
       const band = document.querySelector('.sh-pick .it-eqbox.sell'), zone = document.querySelector('.sh-pick .sh-mine');
