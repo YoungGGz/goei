@@ -1,0 +1,186 @@
+// 세계 편집 창 「설치 · 점검」 (설계안 9절): 깡통봇에 플러그인 카드 요소를 심고, 없어진 것을 알려 주고 다시 만든다.
+import { setRow } from '../setrow';
+import { installSummary, type InstallState } from '../../core/install';
+import { checkInstall, installIcon, installLoreAndGreetings, installPictures, installTokenizer, installWikiPack, restoreIcon } from '../../host/install';
+import type { ChatContext } from '../../host/risu';
+import { notifyInstalled } from '../../host/hooks';
+import { BRAND } from '../brand';
+import { updateGroup } from '../update';
+
+const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+const mb = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1e3))}KB`);
+
+type Step = '' | 'all' | 'icon' | 'icon-back';
+
+export const instUi = {
+  state: null as InstallState | null,
+  iconPrev: '',
+  /** 「이전 아이콘으로」 되돌린 봇: 전체 단추가 아이콘을 건드리지 않는다 (사용자 11-14 D-2) */
+  iconDeclined: false,
+  /** 받아 둔 위키 기본 문서가 옛 판: 점검표 글이 「없음」이 아니라 「새 판 있음」 (사용자 11-14 D-3) */
+  wikiOld: false,
+  /** 마지막으로 점검한 캐릭터 */
+  forChar: -1,
+  /** 점검 진행 중 (화면이 다시 그려질 때 두 번 점검하지 않게) */
+  pending: false,
+  busy: '' as Step,
+  /** 로어북·인사말을 심을 때 봇 이름도 BRAND.name 으로 (기본: 아직 괴이 카드가 아닌 봇이면 켬) */
+  setName: false,
+  progress: '',
+  notice: '',
+  info: '',
+};
+
+/** 점검. 설치 자료(goei-data-install)가 아직 없으면 먼저 받는다 — 진행 글은 instUi.progress 로 화면에 (render 가 있으면 다시 그린다) */
+export async function refreshInstall(ctx: ChatContext, render?: () => void): Promise<void> {
+  try {
+    const r = await checkInstall(ctx.charIndex, (t) => {
+      instUi.progress = t;
+      render?.();
+    });
+    if (instUi.forChar !== ctx.charIndex) instUi.setName = !r.state.goei;
+    instUi.state = r.state;
+    instUi.iconPrev = r.iconPrev;
+    instUi.iconDeclined = r.iconDeclined;
+    instUi.wikiOld = r.wikiOld;
+    instUi.forChar = ctx.charIndex;
+  } catch (error) {
+    // 설치 자료를 못 받았거나(네트워크) 캐릭터를 못 읽음: 화면에 까닭과 「다시 점검」. 이 캐릭터는 점검한 것으로 치워야
+    // 페이지가 다시 그려질 때마다 점검(받기 실패)을 되풀이하지 않는다 — 다시 점검은 단추(ed-inst-recheck)로만
+    instUi.state = null;
+    instUi.forChar = ctx.charIndex;
+    instUi.notice = `점검하지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+  } finally {
+    instUi.progress = '';
+  }
+}
+
+const mark = (b: boolean) => (b ? '<span class="gw-inst-ok">✓ 있음</span>' : '<span class="gw-inst-no">✗ 없음</span>');
+
+/** 점검표: 다른 설정 페이지와 같은 줄 모양 (이름·설명 왼쪽, 상태 오른쪽) */
+function statusList(s: InstallState): string {
+  const li = (ok: boolean, label: string, note: string) => setRow(label, mark(ok), note);
+  const loreOk = s.settingsFolder && s.directory && s.manifest;
+  const pics = s.pictures;
+  return `<section class="ps-group"><h3>점검</h3><div class="ps-rows gw-inst-list">
+    ${li(loreOk, '카드 로어북', loreOk ? '⚙️설정 폴더 · 명부 · Plugin manifest' : [!s.settingsFolder && '⚙️설정 폴더', !s.directory && '명부(Directory)', !s.manifest && 'Plugin manifest'].filter(Boolean).join(' · ') + ' 없음')}
+    ${li(s.loreSettings, '로어북 설정', s.loreSettings ? '봇 설정 사용' : '글로벌 설정 사용 중')}
+    ${li(s.firstMessage, '첫 메시지', s.firstMessage ? '시작 안내' : '시작 안내가 아님 (안내판이 안 떠요)')}
+    ${li(s.greetings.ok, '인사말', s.greetings.ok ? `${s.greetings.total}개` : `${s.greetings.total - s.greetings.missing.length}/${s.greetings.total}개`)}
+    ${li(!pics.missing.length, '카드 사진', pics.missing.length ? `${pics.total - pics.missing.length}/${pics.total}장 (약 ${mb(pics.bytes)} 받아야 함)` : `${pics.total}장`)}
+    ${li(s.icon, '아이콘', s.icon ? '플러그인 아이콘이 메인' : '다른 아이콘')}
+    ${!s.wikiPack && instUi.wikiOld ? setRow('위키 기본 문서', '<span class="gw-inst-no">새 판 있음</span>', '새 판 있음 (다시 받기, 약 1MB)') : li(s.wikiPack, '위키 기본 문서', s.wikiPack ? '저장소에 있음 (이 기기 공통)' : '없음 (약 1MB)')}
+    ${li(s.tokenizer, '토크나이저 (o200k_base)', s.tokenizer ? '저장소에 있음 (이 기기 공통). 토큰 수를 정확히 세요' : '없음 (약 2MB). 받기 전엔 토큰 수가 어림값')}
+  </div></section>`;
+}
+
+export function installPage(ctx: ChatContext): string {
+  const s = instUi.state;
+  const busy = !!instUi.busy;
+  if (!s || instUi.forChar !== ctx.charIndex) {
+    // 점검 전: 설치 자료 받는 진행 글, 또는 실패 까닭 + 다시 점검 (설치 자료 받기 실패는 여기로 온다)
+    const failed = !instUi.pending && instUi.notice;
+    return `<div class="gw-page gw-install-pre"><header class="gw-head"><h2>설치 · 업데이트</h2>${failed ? `<div class="gw-head-act"><button class="gx-mini primary" data-action="ed-inst-recheck">다시 점검</button></div>` : ''}</header>
+      ${failed ? `<div class="gx-err" role="alert">${esc(instUi.notice)}</div>` : `<p class="gx-muted">${esc(instUi.progress || '점검하는 중…')}</p>`}</div>`;
+  }
+  const missing = installSummary(s);
+  const allDone = s.goei && !missing.length && (s.icon || instUi.iconDeclined) && s.tokenizer;
+  const name = String(ctx.char.name ?? '이 캐릭터');
+  const head = s.goei
+    ? missing.length
+      ? `${esc(name)}: 빠진 것 ${missing.length}개. 오른쪽 단추 하나로 전부 채워요.`
+      : `${esc(name)}: 모두 갖춰져 있어요.`
+    : `${esc(name)}는 아직 ${esc(BRAND.name)} 카드가 아니에요. 오른쪽 단추 하나로 설정 폴더·명부·첫 메시지·인사말·로어북 설정·사진·아이콘·위키 기본 문서·토크나이저를 전부 심어요.`;
+  const main = busy
+    ? `<button class="gx-mini primary" disabled>${esc(instUi.progress || '설치하는 중…')}</button>`
+    : allDone
+      ? `<button class="gx-mini" data-action="ed-inst-all">다시 점검·맞추기</button>`
+      : `<button class="gx-mini primary" data-action="ed-inst-all">${s.goei ? '빠진 것 전부 채우기' : `${esc(BRAND.name)} 설치`}</button>`;
+  return `<div class="gw-page gw-set gw-install"><header class="gw-head"><h2>설치 · 업데이트</h2><div class="gw-head-act">${main}</div>
+      <p class="gx-muted">${head} 기존 로어북·인사말·에셋은 그대로 두고 덧붙여요. 원래 첫 메시지는 추가 인사말 끝으로 옮겨요. 사진은 받다 끊겨도 받은 만큼 저장되니 다시 누르면 이어서 받아요.</p></header>
+    ${instUi.notice ? `<div class="gx-err" role="alert">${esc(instUi.notice)}</div>` : ''}
+    ${instUi.info ? `<p class="gx-hint">${esc(instUi.info)}</p>` : ''}
+    <div class="gx-settings gw-setbody">
+    ${updateGroup(ctx)}
+    ${statusList(s)}
+    <section class="ps-group"><h3>세부 선택</h3><div class="ps-rows">
+      <div class="ps-row"><div class="ps-label"><b>봇 이름</b><small>설치할 때 봇 이름을 「${esc(BRAND.name)}」로 바꿀지. 지금 이름: ${esc(name)}</small></div><div class="ps-ctl"><div class="gx-segs gx-segs-sm"><button class="gx-seg${instUi.setName ? ' on' : ''}" data-action="ed-inst-name" aria-pressed="${instUi.setName}" ${busy || instUi.setName ? 'disabled' : ''}>바꿈</button><button class="gx-seg${instUi.setName ? '' : ' on'}" data-action="ed-inst-name" aria-pressed="${!instUi.setName}" ${busy || !instUi.setName ? 'disabled' : ''}>그대로</button></div></div></div>
+      ${instUi.iconPrev ? `<div class="ps-row"><div class="ps-label"><b>이전 아이콘</b><small>설치 전 아이콘으로 되돌려요 (아이콘 목록에는 둘 다 남아요).</small></div><div class="ps-ctl"><button class="gx-mini" data-action="ed-inst-icon-back" ${busy ? 'disabled' : ''}>이전 아이콘으로</button></div></div>` : ''}
+      ${instUi.iconDeclined && !s.icon ? `<div class="ps-row"><div class="ps-label"><b>아이콘</b></div><div class="ps-ctl"><button class="gx-mini" data-action="ed-inst-icon" ${busy ? 'disabled' : ''}>플러그인 아이콘으로</button></div></div>` : ''}
+    </div></section>
+    <p class="ps-note">설치 뒤 새 채팅을 열면 시작 화면이 떠요. 받은 위키 문서·토크나이저는 「점검 → 저장·불러오기」의 저장소 사용량에서 지울 수 있어요.</p>
+    </div>
+  </div>`;
+}
+
+type Env = { render: () => void; refresh: () => Promise<void> };
+
+/** ed-inst-* 동작. 처리했으면 true */
+export async function installAction(action: string, ctx: ChatContext, env: Env): Promise<boolean> {
+  if (!action.startsWith('ed-inst-')) return false;
+  if (instUi.busy) return true;
+  if (action === 'ed-inst-name') {
+    instUi.setName = !instUi.setName;
+    env.render();
+    return true;
+  }
+  if (action === 'ed-inst-recheck') {
+    // 다시 점검: 이 캐릭터를 아직 점검하지 않은 상태로 돌리면 페이지가 다시 그려질 때 점검(설치 자료 받기 포함)을 다시 한다 (editor/index.ts)
+    instUi.forChar = -1;
+    instUi.state = null;
+    instUi.notice = '';
+    env.render();
+    return true;
+  }
+  const step = action.slice(8) as Step;
+  if (step !== 'all' && step !== 'icon' && step !== 'icon-back') return true;
+  instUi.busy = step;
+  instUi.notice = '';
+  instUi.info = '';
+  instUi.progress = '';
+  env.render();
+  const progress = (t: string) => {
+    instUi.progress = t;
+    env.render();
+  };
+  const done: string[] = [];
+  const failed: string[] = [];
+  const run = async (label: string, f: () => Promise<string | null>) => {
+    try {
+      const r = await f();
+      if (r) done.push(r);
+    } catch (error) {
+      failed.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+  const s = instUi.state;
+  if (step === 'all') {
+    // 한 단계가 실패해도 다음 단계로 간다. 끝에 된 것·안 된 것을 한꺼번에 보여 준다
+    await run('로어북·인사말', async () => {
+      progress('로어북·첫 메시지·인사말 심는 중…');
+      await installLoreAndGreetings(ctx.charIndex, instUi.setName ? { name: BRAND.name } : {});
+      return instUi.setName ? '로어북·인사말·봇 이름' : '로어북·인사말';
+    });
+    notifyInstalled();
+    await run('사진', async () => {
+      const n = await installPictures(ctx.charIndex, progress);
+      return n ? `사진 ${n}장` : null;
+    });
+    if (!s?.icon && !instUi.iconDeclined) await run('아이콘', async () => (await installIcon(ctx.charIndex, progress), '아이콘'));
+    if (!s?.wikiPack) await run('위키 기본 문서', async () => (await installWikiPack(progress), '위키 기본 문서'));
+    if (!s?.tokenizer) await run('토크나이저', async () => (await installTokenizer(progress), '토크나이저'));
+  } else if (step === 'icon') {
+    await run('아이콘', async () => (await installIcon(ctx.charIndex, progress), '아이콘'));
+  } else if (step === 'icon-back') {
+    await run('이전 아이콘', async () => ((await restoreIcon(ctx.charIndex)) ? '이전 아이콘' : null));
+  }
+  if (done.length) instUi.info = `${done.join(' · ')} — 끝났어요.`;
+  else if (!failed.length) instUi.info = '바꿀 것이 없었어요.';
+  if (failed.length) instUi.notice = `안 된 것 — ${failed.join(' / ')}. 다시 누르면 안 된 것만 이어서 해요.`;
+  instUi.busy = '';
+  instUi.progress = '';
+  await env.refresh();
+  await refreshInstall(ctx);
+  env.render();
+  return true;
+}

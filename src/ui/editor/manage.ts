@@ -1,0 +1,444 @@
+// 점검 탭: 설정 내보내기(기기 설정 내보내기·가져오기, 저장소 사용량), 상태 점검, 요청 기록(진단 묶음 내려받기·최근 실패·인물 기록 갱신 기록).
+// 설치·점검과 업데이트는 각각 install.ts / ui/update.ts.
+import { setRow } from '../setrow';
+import { chatSettingVars, getPrefs, isChatSettingVar } from '../../core/settings';
+import { savePrefs } from '../../host/prefs';
+import { isGoeiLore } from '../../core/install';
+import { cardVersion, compareVersions, PLUGIN_VERSION, UPDATE_BASE } from '../../core/update';
+import { tokenizerName } from '../../core/tokenizer';
+import { storedWikiPack } from '../../core/wiki';
+import { advValue } from '../../core/advanced';
+import { checkWikiPackOld, dropTokenizer, dropWikiPack, installTokenizer, installWikiPack, wikiPackOld } from '../../host/install';
+import { clearDiag, loadDiag, type DiagRun } from '../../host/people';
+import { peopleDiagPane } from '../people';
+import { clearTrace, loadTrace, onTraceChange } from '../../host/trace';
+import { tracePage, traceUi } from './trace';
+import { ensureFlow } from './flow';
+import { flowPage, flowView } from './flowpage';
+import { updateCharacterLore, updateChat, type ChatContext } from '../../host/risu';
+import { readDirectoryData, withDirectory, type DirectoryData } from '../../core/world/directory';
+import { boardFailures, clearBoardFailures } from '../gnet';
+import { phone } from '../phone';
+import { wiki } from '../wiki';
+
+import { copyText } from '../copy';
+import { ICONS } from '../icons';
+import { mainDefaultsConfirm } from '../settings';
+
+const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+
+const kb = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}MB` : n >= 1e3 ? `${Math.round(n / 1e3)}KB` : `${n}B`);
+
+export type ManageNode = 'manage:backup' | 'manage:diag' | 'manage:log' | 'manage:trace' | 'manage:flow' | 'manage:people';
+export const isManageNode = (n: string): n is ManageNode => n === 'manage:backup' || n === 'manage:diag' || n === 'manage:log' || n === 'manage:trace' || n === 'manage:flow' || n === 'manage:people';
+
+
+/** 저장소 항목: [키, 이름, 설명, 지우기 동작] */
+const STORE: [string, string, string, string?][] = [
+  ['goei:prefs', '기기 설정', '화면·이미지·지침 고친 글·추가 규칙·새 채팅 기본값'],
+  ['goei:wikibase', '위키 기본 문서', '카드에서 뺀 기본 문서 묶음. 지우면 설치·점검에서 다시 받아요', 'man-drop-wiki'],
+  ['goei:tok-o200k', '토크나이저', 'o200k_base 순위표. 지우면 토큰 수가 어림값이 돼요', 'man-drop-tok'],
+  ['goei-people-diag', '인물 기록 실행 기록', '최근 갱신의 입력·출력 원문', 'man-drop-diag'],
+  ['goei:body', '플러그인 본체', '괴이 카드를 열 때 받아 둔 goei-body.js. 플러그인 판이 바뀌면 다시 받아요'],
+  ['goei:data-world', '세계 자료', '요원·조직·괴이·파밍·부록 기본 기록과 세력 관계 기본값. 본체가 뜰 때 받아 두고, 플러그인 판이 바뀌면 다시 받아요'],
+  ['goei:data-install', '설치 자료', '인사말·카드 사진 목록·기본 명부·아이콘 정보. 설치·점검을 처음 열 때 받아 두고, 플러그인 판이 바뀌면 다시 받아요'],
+];
+
+async function sizeOf(key: string): Promise<number> {
+  try {
+    const raw: unknown = await risuai.pluginStorage.getItem(key);
+    return typeof raw === 'string' ? raw.length : raw ? JSON.stringify(raw).length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export const manUi = {
+  sizes: null as Record<string, number> | null,
+  /** 올린 파일 이름 (가져오기) */
+  importName: '',
+  pending: false,
+  importText: '',
+  confirm: '' as '' | 'import' | 'drop-wiki' | 'drop-tok' | 'drop-diag',
+  info: '',
+  notice: '',
+  diag: null as DiagRun[] | null,
+  /** 상태 점검의 「받기」 진행 중인 것과 진행 글 (2026-11-06 사용자 승인, 전수점검 9-9) */
+  getting: '' as '' | 'tok' | 'wiki',
+  progress: '',
+  /** 내보내기에 지금 채팅의 설정 값($st_·$wg_·기능 설정 변수)도 넣을지 (2026-11-06 사용자, 전수점검 남은 것 5). 시작 전에는 칸 자체가 없다 */
+  withChat: false,
+};
+/** 점검 페이지를 다시 그리는 손잡이 (받기 진행 글을 띄울 때) */
+let rerender: (() => void) | null = null;
+/** 마지막으로 그린 점검 페이지가 「상태 점검」인가 (뒤에서 끝난 새 판 확인이 다른 페이지를 다시 그리지 않게) */
+let diagOpen = false;
+
+async function refresh(): Promise<void> {
+  const sizes: Record<string, number> = {};
+  for (const [key] of STORE) {
+    sizes[key] = await sizeOf(key);
+  }
+  manUi.sizes = sizes;
+  try {
+    manUi.diag = await loadDiag();
+  } catch {
+    manUi.diag = [];
+  }
+  try {
+    traceUi.turns = await loadTrace();
+  } catch {
+    traceUi.turns = [];
+  }
+}
+
+/** 처음 열 때 저장소 크기·기록을 읽고 다시 그린다 */
+let traceWatch = false;
+export function ensureManage(render: () => void): void {
+  rerender = render;
+  if (!traceWatch) {
+    traceWatch = true;
+    // 호출이 끝날 때마다 열려 있는 「호출 기록」 페이지만 다시 읽어 그린다 (다른 페이지에서 글을 쓰는 중이면 건드리지 않음)
+    onTraceChange(() => {
+      if (!document.querySelector('[data-action="man-drop-trace"], [data-action="man-drop-trace-yes"]')) return;
+      void loadTrace().then((t) => {
+        traceUi.turns = t;
+        rerender?.();
+      }).catch(() => {});
+    });
+  }
+  if (manUi.sizes || manUi.pending) return;
+  manUi.pending = true;
+  void refresh().finally(() => {
+    manUi.pending = false;
+    render();
+  });
+}
+
+const row = (label: string, ctl: string, help = '') => setRow(label, ctl, help);
+const badge = (ok: boolean | null, text: string) => `<span class="gw-state${ok === null ? ' off' : ok ? '' : ' bad'}">${esc(text)}</span>`;
+const head = (crumb: string, title: string, desc: string, act = '') =>
+  `<header class="gw-head"><h2>${esc(title)}${crumb ? `<small>${esc(crumb)}</small>` : ''}</h2>${act ? `<div class="gw-head-act">${act}</div>` : ''}<p class="gx-muted">${esc(desc)}</p>${manUi.notice ? `<div class="gx-err" role="alert">${esc(manUi.notice)}</div>` : ''}${manUi.info ? `<p class="gx-hint">${esc(manUi.info)}</p>` : ''}</header>`;
+
+/** 내보낼 글: 기기 설정 전부 + 카드 명부(세계 편집: 요원·조직·괴이·파밍·부록·세력 관계·명부)를 「directory」로 (2026-11-05 사용자) */
+function exportJson(ctx: ChatContext, withChat = false): string {
+  const directory = readDirectoryData(ctx.char.globalLore ?? []);
+  const chat = withChat ? { vars: chatSettingVars(ctx.chat.scriptstate) } : null;
+  return JSON.stringify({ ...getPrefs(), ...(directory ? { directory } : {}), ...(chat ? { chat } : {}) }, null, 2);
+}
+
+/** 진단 묶음 (2026-11-06 사용자 「넣어」): 제보 한 번에 재현할 수 있게 판·설정·최근 실패 원문·인물 기록 갱신 최근 10회를 JSON 하나로.
+ *  대화 본문은 넣지 않는다. 설정 내보내기(exportJson)와 요청 기록 페이지가 각각 보여 주던 것을 한데 묶은 것 */
+function diagBundle(ctx: ChatContext, canChat: boolean): string {
+  const lore = ctx.char.globalLore;
+  const fail = (f: { reason: string; raw: string } | null) => (f ? { reason: f.reason, raw: f.raw } : null);
+  const runs = (manUi.diag ?? []).slice(0, 10).map((r) => ({ at: r.at, reason: r.reason, model: r.model, people: r.people, ms: r.ms, ok: r.ok, ...(r.stage ? { stage: r.stage } : {}), ...(r.error ? { error: r.error } : {}) }));
+  return JSON.stringify({
+    kind: 'goei-diag',
+    at: new Date().toISOString(),
+    plugin: PLUGIN_VERSION,
+    card: isGoeiLore(lore) ? cardVersion(lore) : null,
+    tokenizer: tokenizerName() || null,
+    wikiPack: !!storedWikiPack(),
+    chat: canChat ? { messages: Array.isArray(ctx.chat.message) ? ctx.chat.message.length : 0, vars: chatSettingVars(ctx.chat.scriptstate) } : null,
+    prefs: getPrefs(),
+    // 네 게시판 실패를 사이트와 함께 모두 적는다 (전수검사 11-13)
+    failures: { gnet: boardFailures().map((f) => ({ site: f.site, reason: f.reason, raw: f.raw })), phone: fail(phone.failure), wiki: fail(wiki.failure) },
+    peopleRuns: runs,
+  }, null, 2);
+}
+
+/** 글을 파일로 내려받기 (설정 내보내기·진단 묶음 공용) */
+function downloadJson(name: string, json: string): void {
+  const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+function backupPage(ctx: ChatContext, canChat: boolean): string {
+  const withChat = canChat && manUi.withChat;
+  const json = exportJson(ctx, withChat);
+  const chatN = canChat ? Object.keys(chatSettingVars(ctx.chat.scriptstate)).length : 0;
+  const sizes = manUi.sizes;
+  const store = STORE.map(([key, label, help, drop]) => {
+    const n = sizes?.[key] ?? 0;
+    const ctl = `<span class="gw-tokens">${sizes ? (n ? kb(n) : '없음') : '…'}</span>${drop && n ? (manUi.confirm === drop.slice(4) ? `<button class="gx-mini danger" data-action="${drop}-yes">정말 지우기</button><button class="gx-mini" data-action="man-no">취소</button>` : `<button class="gx-mini" data-action="${drop}">${ICONS.trash}지우기</button>`) : ''}`;
+    return row(label, ctl, help);
+  }).join('');
+  const importRows = `<div class="ps-row"><div class="ps-label"><b>가져오기</b><small>내보낸 JSON을 붙여 넣거나 파일을 올리고 「적용」을 누르세요. 지금 기기 설정(과 세계 편집)을 통째로 바꿔요.</small></div>
+      <div class="ps-ctl"><label class="gx-mini gw-file">${ICONS.refresh}파일 올리기<input type="file" accept=".json,application/json" data-change="man-import-file" hidden></label>${manUi.importName ? `<span class="gx-muted">${esc(manUi.importName)}</span>` : ''}</div>
+      <textarea data-input="man-import-text" rows="4" placeholder="여기에 붙여 넣기 { … }">${esc(manUi.importText)}</textarea></div>
+    <div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="man-import" ${manUi.importText.trim() ? '' : 'disabled'}>적용</button></div>`;
+  // 기본값 셋 (2026-11-08 사용자): 모든 설정은 바로 저장되고, 기본값 저장·불러오기·초기화는 여기 한 곳. 셋 다 누르면 확인 팝업
+  const defRow = (label: string, help: string, what: 'save' | 'load' | 'reset', btn: string, off = false) =>
+    row(label, `<button class="gx-mini${what === 'reset' ? ' danger' : ''}" data-action="set-bar" data-value="${what}" ${off ? 'disabled' : ''}>${btn}</button>`, help);
+  const defaults = `<section class="ps-group"><h3>기본값</h3><div class="ps-rows">
+      ${defRow('기본값으로 저장', '지금 설정을 기본값으로 저장해요. 앞으로 새로 시작하는 모든 채팅이 이 값으로 시작해요. 덮어쓴 기본값은 되돌릴 수 없어요.', 'save', '기본값으로 저장')}
+      ${defRow('기본값 불러오기', canChat ? '저장해 둔 기본값을 지금 채팅에 가져와요.' : '채팅을 시작한 뒤에 쓸 수 있어요. 새 채팅은 기본값으로 시작해요.', 'load', '불러오기', !canChat)}
+      ${defRow('초기화', '지금 채팅의 설정과 저장해 둔 기본값, 고친 지침, 고친 세계(카드 명부)를 플러그인 원래 값으로 되돌려요. 상황판 켜기·끄기와 추가 규칙은 그대로 둬요.', 'reset', '초기화', !canChat)}
+    </div></section>${mainDefaultsConfirm(ctx)}`;
+  return `<div class="gw-page gw-set">${head('', '저장·불러오기', '설정은 고치는 즉시 저장돼요. 여기서는 기본값을 저장·불러오기·초기화하고, 설정을 글(JSON)로 내보내고 가져와요.')}
+    <div class="gx-settings gw-setbody">
+    ${defaults}
+    <section class="ps-group"><h3>내보내기·가져오기</h3><p class="ps-note">들어가는 것: 화면·이미지 설정, 기본값(상황판·괴이 발생·괴담넷·괴담톡·위키·인물·일지·가계부·상태창 칸·생성 공통), 고친 지침·추가 규칙·이미지 지침, 그리고 이 카드의 세계 편집(요원·조직·괴이·파밍·부록·세력 관계·명부). 바꾸지 않아 원래 값 그대로인 항목은 적지 않아요. 채팅 안에 든 기록(상황판·인물 기록·일지)은 Risu 채팅 백업에 들어 있어요.</p><div class="ps-rows">
+      <div class="ps-row"><div class="ps-label"><b>내보내기</b><small>위 설정 전부를 JSON 글 하나로. 복사해서 메모장 같은 곳에 두세요. 바꾸지 않은 항목은 기본값이라 적히지 않아요.</small></div>
+        <div class="ps-ctl"><span class="gw-tokens">${kb(json.length)}</span><button class="gx-mini" data-action="man-copy">${ICONS.pen}복사</button><button class="gx-mini" data-action="man-download">내려받기</button></div></div>
+      ${canChat ? `<div class="ps-row"><div class="ps-label"><b>지금 채팅 값도 넣기</b><small>이 채팅에서 바꾼 설정 값(상황판·괴이 발생·괴담넷·괴담톡·위키·인물·일지·가계부·생성 공통) ${chatN}개를 「chat」으로 같이 넣어요. 가져올 때 채팅이 열려 있으면 그 채팅에 적혀요. 기록(상황판 내용·인물 기록·일지)은 안 들어가요.</small></div>
+        <div class="ps-ctl"><label class="pp-check"><input type="checkbox" data-change="man-with-chat" ${withChat ? 'checked' : ''}> 넣기</label></div></div>` : ''}
+      ${importRows}
+    </div></section>
+    <section class="ps-group"><h3>저장소 사용량 <small>이 기기 플러그인 저장소에 있는 것</small></h3><div class="ps-rows">${store}</div></section>
+    </div></div>`;
+}
+
+/** 상태 점검 줄의 「받기」 단추: 이미 있으면 없음, 받는 중이면 진행 글 */
+function getBtn(what: 'tok' | 'wiki', label: string, has: boolean): string {
+  if (has) return '';
+  if (manUi.getting === what) return `<span class="gx-muted gw-getting">${esc(manUi.progress || '받는 중…')}</span>`;
+  return `<button class="gx-mini" data-action="man-get-${what}" ${manUi.getting ? 'disabled' : ''}>${ICONS.refresh}${esc(label)}</button>`;
+}
+
+function diagPage(ctx: ChatContext, canChat: boolean): string {
+  const lore = ctx.char.globalLore;
+  const goei = isGoeiLore(lore);
+  const ver = cardVersion(lore);
+  const mode = String(advValue(ctx.chat.scriptstate, 'gen', 'lore_mode') ?? 'plugin');
+  const msgs = Array.isArray(ctx.chat.message) ? ctx.chat.message.length : 0;
+  const tok = tokenizerName();
+  // 받아 둔 위키 기본 문서가 옛 판이면 설치·점검과 같은 말 「새 판 있음」 + 받기 단추 (사용자 11-14 19:26 물음 1). 확인은 뒤에서 한 번만, 끝나면 다시 그린다
+  const wikiOld = wikiPackOld();
+  if (!wikiOld) void checkWikiPackOld().then((old) => old && wikiPackOld() && diagOpen && rerender?.());
+  const rows = [
+    row('카드', badge(goei, goei ? '괴이 카드' : '괴이 카드 아님'), goei ? `카드 ${ver === '0' ? '이전 판' : `v${ver}`} · 명부·매니페스트 있음` : '설치 · 점검에서 심으면 괴이 카드가 돼요'),
+    row('플러그인', badge(true, `v${PLUGIN_VERSION}`), UPDATE_BASE ? '' : '업데이트를 받을 수 없는 빌드'), // 주소 글은 보여 주지 않는다 (2026-11-13 사용자)
+    // 카드 판 ≠ 플러그인 판이면 빨간 줄 (2026-11-06 사용자, 전수점검 남은 것 4): 카드가 낡았으면 업데이트 페이지로, 카드가 더 새면 플러그인을 받으라고
+    ...(goei && compareVersions(ver, PLUGIN_VERSION) !== 0 ? [row('판 맞춤', badge(false, compareVersions(ver, PLUGIN_VERSION) < 0 ? '카드가 낡음' : '플러그인이 낡음'), compareVersions(ver, PLUGIN_VERSION) < 0
+      ? `카드 ${ver === '0' ? '이전 판' : `v${ver}`}, 플러그인 v${PLUGIN_VERSION}. 새 기능·지침이 카드에 없을 수 있어요. 업데이트에서 카드를 플러그인 판으로 올리세요. <button class="gx-mini" data-action="ed-node" data-value="set:update">${ICONS.refresh}업데이트로</button>`
+      : `카드 v${ver}, 플러그인 v${PLUGIN_VERSION}. 플러그인을 새 판으로 받으세요.`)] : []),
+    row('채팅', badge(canChat, canChat ? '진행 중' : '시작 전'), canChat ? `메시지 ${msgs}개 · 이 채팅 값으로 동작해요` : '시작 화면이에요. 설정은 새 채팅 기본값으로 저장돼요'),
+    // 없으면 빨간 배지 옆에 바로 받는 단추와, 안 받으면 뭐가 다른지 한 줄 (2026-11-06 사용자 승인, 전수점검 9-9)
+    row('토크나이저', badge(!!tok, tok || '어림값') + getBtn('tok', '받기 (약 2MB)', !!tok), tok ? '토큰 수를 정확히 세요' : '안 받으면 토큰 수를 어림으로 세요. 받으면 정확해져요. 기능 차이는 없어요.'),
+    row('위키 기본 문서', badge(!!storedWikiPack() && !wikiOld, wikiOld ? '새 판 있음' : storedWikiPack() ? '있음' : '없음') + getBtn('wiki', '받기 (약 1MB)', !!storedWikiPack() && !wikiOld), storedWikiPack() ? '카드에서 뺀 기본 문서 묶음 (이 기기 저장소)' : '안 받으면 위키 기본 문서(괴이·장소 설명)가 비어 있어요. 받으면 위키 탭에서 바로 읽을 수 있어요.'),
+    row('로어북 보내기', badge(null, mode === 'risu' ? 'Risu가 직접' : '플러그인이 고름'), '설정 → 호출 → 로어북 호출 → 로어북 보내기'),
+  ].join('');
+  // 게시판 실패는 네 사이트 모두, 사이트 이름으로 (연어 마켓 실패가 「괴담넷」으로 나왔다, 전수검사 11-13)
+  const fails = [...boardFailures().map((f) => `${f.name}: ${f.reason}`), phone.failure ? `괴담톡: ${phone.failure.reason}` : '', wiki.failure ? `위키: ${wiki.failure.reason}` : ''].filter(Boolean);
+  return `<div class="gw-page gw-set">${head('', '상태 점검', '플러그인·카드·저장소가 지금 어떤 상태인지. 문제가 있으면 어디서 고치는지 적어 뒀어요.')}
+    <div class="gx-settings gw-setbody">
+    <section class="ps-group"><h3>현재 상태</h3><div class="ps-rows">${rows}${row('최근 실패', fails.length ? badge(false, `${fails.length}건`) : badge(true, '없음'), fails.length ? '「실패 기록」에서 원문을 볼 수 있어요' : '괴담넷·괴담톡·위키 요청이 실패한 적이 없어요')}</div></section>
+    </div></div>`;
+}
+
+function logPage(ctx: ChatContext, canChat: boolean): string {
+  const fail = (name: string, f: { reason: string; raw: string } | null) =>
+    f ? `<div class="ps-row"><div class="ps-label"><b>${esc(name)}</b><small>${esc(f.reason)}</small></div><textarea readonly rows="4">${esc(f.raw)}</textarea></div>` : '';
+  const fails = boardFailures().map((f) => fail(f.name, f)).join('') + fail('괴담톡', phone.failure) + fail('위키', wiki.failure);
+  const bundle = diagBundle(ctx, canChat);
+  return `<div class="gw-page gw-set">${head('', '실패 기록', '괴담넷·괴담톡·위키 요청이 실패했을 때 모델이 보낸 원문이에요. 인물 기록 갱신의 결과는 「인물 기록 점검」에 있어요.')}
+    <div class="gx-settings gw-setbody">
+    <section class="ps-group"><h3>진단 묶음</h3><div class="ps-rows">${row('내려받기', `<span class="gw-tokens">${kb(bundle.length)}</span><button class="gx-mini" data-action="man-diag-download">${ICONS.list}파일 하나로</button>`, '판 번호·설정·최근 실패 원문·인물 기록 갱신 10회를 JSON 하나로. 대화 본문은 안 들어가요. 문제를 알릴 때 이 파일만 보내면 돼요.')}</div></section>
+    <section class="ps-group"><h3>최근 실패 <small>창을 닫아도 이 세션 동안 남아요</small></h3><div class="ps-rows">${fails || '<p class="ps-note">실패한 요청이 없어요.</p>'}${fails ? `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="man-clear-fail">지우기</button></div>` : ''}</div></section>
+    </div></div>`;
+}
+
+/** 가져오기 확인 팝업 (2026-11-08 사용자: 저장·불러오기의 확인은 전부 팝업) */
+export function manageConfirmPopup(): string {
+  if (manUi.confirm !== 'import') return '';
+  return `<div class="gw-confirm"><div class="gw-confirm-box"><p>가져온 설정으로 지금 기기 설정(과 세계 편집)을 통째로 덮어쓸까요? 덮어쓴 설정은 되돌릴 수 없어요.</p><div class="gx-row-btns"><button class="gx-mini danger" data-action="man-import-yes">적용</button><button class="gx-mini" data-action="man-no">취소</button></div></div></div>`;
+}
+
+export function managePage(ctx: ChatContext, node: ManageNode, canChat: boolean): string {
+  diagOpen = node === 'manage:diag';
+  if (node === 'manage:backup') return backupPage(ctx, canChat);
+  if (node === 'manage:diag') return diagPage(ctx, canChat);
+  if (node === 'manage:people') {
+    return `<div class="gw-page gw-set">${head('', '인물 기록 점검', '인물 기록 갱신을 지금 돌려 보고, 최근 갱신의 입력 크기·결과·실패 이유를 봐요.')}
+    <div class="gx-settings gw-setbody"><div class="ps pp-set">${peopleDiagPane(ctx, canChat)}</div></div></div>`;
+  }
+  if (node === 'manage:flow') {
+    // 시작 전에는 새 채팅이 받을 값으로 센다 (flowpage.ts flowView)
+    ensureFlow(flowView(ctx, canChat).ctx, () => rerender?.());
+    return flowPage(ctx, head, canChat);
+  }
+  if (node === 'manage:trace') {
+    const confirm = traceUi.confirm
+      ? `<button class="gx-mini danger" data-action="man-drop-trace-yes">정말 지우기</button><button class="gx-mini" data-action="man-no">취소</button>`
+      : `<button class="gx-mini" data-action="man-drop-trace">${ICONS.trash}기록 지우기</button>`;
+    return tracePage(head, confirm);
+  }
+  return logPage(ctx, canChat);
+}
+
+export function manageInput(name: string, value: string): boolean {
+  if (name !== 'man-import-text') return false;
+  manUi.importText = value;
+  manUi.importName = '';
+  return true;
+}
+
+/** 가져오기 「파일 올리기」: 고른 JSON 파일을 읽어 붙여넣기 글칸에 넣는다 (2026-11-05 사용자: 붙여넣기와 파일 둘 다) */
+export async function manageFile(el: HTMLInputElement): Promise<boolean> {
+  if (el.dataset.change !== 'man-import-file') return false;
+  const f = el.files?.[0];
+  if (!f) return true;
+  try {
+    manUi.importText = await f.text();
+    manUi.importName = f.name;
+    manUi.notice = '';
+  } catch (error) {
+    manUi.notice = `파일을 읽지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  el.value = '';
+  return true;
+}
+
+export async function manageAction(action: string, root: HTMLElement | null, ctx: ChatContext | null = null, canChat = true, value = ''): Promise<boolean> {
+  if (!action.startsWith('man-')) return false;
+  manUi.notice = '';
+  manUi.info = '';
+  switch (action) {
+    case 'man-no':
+      manUi.confirm = '';
+      traceUi.confirm = false;
+      return true;
+    case 'man-trace-toggle':
+      if (traceUi.open.has(value)) traceUi.open.delete(value);
+      else traceUi.open.add(value);
+      return true;
+    case 'man-drop-trace':
+      traceUi.confirm = true;
+      return true;
+    case 'man-drop-trace-yes':
+      traceUi.confirm = false;
+      await clearTrace();
+      traceUi.turns = [];
+      traceUi.open.clear();
+      manUi.info = '호출 기록을 지웠어요.';
+      return true;
+    case 'man-with-chat':
+      manUi.withChat = !manUi.withChat;
+      return true;
+    case 'man-copy': {
+      if (!ctx) return true;
+      const json = exportJson(ctx, manUi.withChat && !!canChat);
+      const ok = await copyText(json);
+      manUi.info = ok ? `복사했어요 (${kb(json.length)}).` : '이 환경에서는 복사가 막혀 있어요. 「내려받기」로 파일로 받으세요.';
+      return true;
+    }
+    case 'man-download': {
+      try {
+        const json = ctx ? exportJson(ctx, manUi.withChat && !!canChat) : JSON.stringify(getPrefs(), null, 2);
+        downloadJson(`goei-settings-${new Date().toISOString().slice(0, 10)}.json`, json);
+        manUi.info = '내려받기를 시작했어요. 안 되면 「복사」로 글을 옮기세요.';
+      } catch (error) {
+        manUi.notice = `내려받지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      return true;
+    }
+    case 'man-diag-download': {
+      if (!ctx) return true;
+      try {
+        downloadJson(`goei-diag-${new Date().toISOString().slice(0, 10)}.json`, diagBundle(ctx, !!canChat));
+        manUi.info = '진단 묶음 내려받기를 시작했어요. 제보할 때 이 파일 하나를 보내면 돼요.';
+      } catch (error) {
+        manUi.notice = `내려받지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      return true;
+    }
+    case 'man-import':
+      manUi.confirm = 'import';
+      return true;
+    case 'man-import-yes': {
+      manUi.confirm = '';
+      try {
+        const parsed = JSON.parse(manUi.importText) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('설정 JSON 이 아니에요.');
+        // 세계 편집(명부)이 들어 있으면 카드 로어북 Directory 에 적는다 (2026-11-05 사용자)
+        const { directory, chat, ...prefs } = parsed as { directory?: unknown; chat?: unknown } & Record<string, unknown>;
+        let wrote = '';
+        if (directory && typeof directory === 'object' && !Array.isArray(directory)) {
+          if (!ctx) throw new Error('세계 편집을 적을 카드가 없어요.');
+          await updateCharacterLore(ctx.charIndex, (lore) => withDirectory(lore, directory as DirectoryData));
+          wrote = ' 세계 편집(명부)도 카드에 적었어요.';
+        }
+        // 「chat」(지금 채팅 값)은 채팅이 열려 있을 때만 그 채팅 변수에 적는다. 설정 변수가 아닌 열쇠는 버린다 (2026-11-06 사용자, 전수점검 남은 것 5)
+        const cv = chat && typeof chat === 'object' && !Array.isArray(chat) ? (chat as { vars?: unknown }).vars : null;
+        if (cv && typeof cv === 'object' && !Array.isArray(cv)) {
+          const vars = Object.entries(cv as Record<string, unknown>).filter(([k, v]) => isChatSettingVar(k) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'));
+          if (ctx && canChat && vars.length) {
+            await updateChat(ctx.charIndex, ctx.chatIndex, (c) => {
+              c.scriptstate ??= {};
+              for (const [k, v] of vars) c.scriptstate[k] = String(v);
+              return c;
+            });
+            wrote += ` 채팅 값 ${vars.length}개도 이 채팅에 적었어요.`;
+          } else if (vars.length) wrote += ' 채팅 값은 시작 전이라 적지 않았어요.';
+        }
+        await savePrefs(() => prefs as unknown as ReturnType<typeof getPrefs>);
+        manUi.importText = '';
+        manUi.importName = '';
+        manUi.sizes = null;
+        manUi.info = `설정을 가져왔어요.${wrote} 창을 닫았다 열면 전부 반영돼요.`;
+      } catch (error) {
+        manUi.notice = `가져오지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      return true;
+    }
+    case 'man-get-tok':
+    case 'man-get-wiki': {
+      // 상태 점검에서 바로 받기 (설치 페이지와 같은 함수). 진행 글은 그 줄에 띄우고, 끝나면 배지가 바뀐다
+      if (manUi.getting) return true;
+      const what = action === 'man-get-tok' ? 'tok' : 'wiki';
+      manUi.getting = what;
+      manUi.progress = '';
+      rerender?.();
+      const progress = (t: string) => {
+        manUi.progress = t;
+        rerender?.();
+      };
+      try {
+        if (what === 'tok') await installTokenizer(progress);
+        else await installWikiPack(progress);
+        manUi.info = what === 'tok' ? '토크나이저를 받았어요. 이제 토큰 수를 정확히 세요.' : '위키 기본 문서를 받았어요. 위키 탭에서 읽을 수 있어요.';
+      } catch (error) {
+        manUi.notice = `${what === 'tok' ? '토크나이저' : '위키 기본 문서'}를 받지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      manUi.getting = '';
+      manUi.progress = '';
+      manUi.sizes = null; // 저장소 사용량 다시 읽기
+      return true;
+    }
+    case 'man-drop-wiki':
+    case 'man-drop-tok':
+    case 'man-drop-diag':
+      manUi.confirm = action.slice(4) as typeof manUi.confirm;
+      return true;
+    case 'man-drop-wiki-yes':
+      manUi.confirm = '';
+      await dropWikiPack();
+      manUi.info = '위키 기본 문서를 지웠어요.';
+      manUi.sizes = null;
+      return true;
+    case 'man-drop-tok-yes':
+      manUi.confirm = '';
+      await dropTokenizer();
+      manUi.info = '토크나이저를 지웠어요. 토큰 수는 어림값이에요.';
+      manUi.sizes = null;
+      return true;
+    case 'man-drop-diag-yes':
+      manUi.confirm = '';
+      await clearDiag();
+      manUi.info = '인물 기록 실행 기록을 지웠어요.';
+      manUi.sizes = null;
+      return true;
+    case 'man-clear-fail':
+      clearBoardFailures(); // 보고 있지 않은 사이트 것도 (전수검사 11-13)
+      phone.failure = null;
+      wiki.failure = null;
+      return true;
+  }
+  return true;
+}

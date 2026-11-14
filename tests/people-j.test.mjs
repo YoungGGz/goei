@@ -1,0 +1,102 @@
+// 리수폿 J: 지침 편집(절 덮어쓰기)·단계별 모델·하이파 참조·마지막 갱신 되돌리기
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+
+const dir = await mkdtemp(join(tmpdir(), 'goei-people-j-'));
+await build({
+  entryPoints: ['src/core/people/updater.ts', 'src/core/people/store.ts', 'src/core/people/types.ts', 'src/core/people/settings.ts', 'src/core/people/hypa.ts', 'src/core/people/director.ts', 'src/core/people/prompt/index.ts'],
+  outdir: dir, outbase: 'src', bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' }, logLevel: 'silent',
+});
+const mod = async (n) => import(pathToFileURL(join(dir, `core/people/${n}.mjs`)));
+const U = await mod('updater');
+const S = await mod('store');
+const T = await mod('types');
+const St = await mod('settings');
+const H = await mod('hypa');
+const D = await mod('director');
+const P = await mod('prompt/index');
+
+const person = (name) => ({ name, faction: 'A00', seeded: { from: 'none', at: '' }, slots: {}, affinity: { base: 0 }, address: { toUser: '요원', register: '반말' }, express: 1, aliases: [], axes: T.DEFAULT_AXES(), axesFrom: 'default', patterns: [], candidates: {} });
+const chat = (...msgs) => ({ message: msgs.map(([role, data, chatId]) => ({ role, data, chatId })) });
+const names = [{ name: '쟈알디', aliases: [], titles: [] }];
+const c = chat(['user', '출근했다', 'u1'], ['char', '쟈알디가 커피를 내밀었다. "고마웠어, 어제." 미나가 옆에서 웃었다.', 'c1']);
+
+test('지침 편집: 절 본문 읽기 (기본 지침은 지침 탭에서만 고친다)', () => {
+  const body = U.sectionBody(P.UPDATER_DETAILED, 'register');
+  assert.ok(body.startsWith('"## 8.') || body.includes('## 8. Relationship'), body.slice(0, 80));
+  assert.equal(U.overrideSections, undefined, '채팅별 절 덮어쓰기는 없앰');
+  assert.equal(St.PS, undefined);
+});
+
+test('단계별 모델·전용 ID: same 은 갱신 모델을 따르고, ID 는 비면 없음', () => {
+  const a = St.peopleSettings({ $pp_model: 'main', $pp_model_router: 'aux', $pp_model_id_director: ' gpt-x ' });
+  assert.deepEqual(a.stageModel, { update: 'main', director: 'main', router: 'aux', tidy: 'main' });
+  assert.deepEqual(a.stageModelId, { update: '', director: '', router: '', tidy: '' }); // 전용 모델 ID 는 없앤 기능
+  const b = St.peopleSettings({});
+  assert.deepEqual(b.stageModel, { update: 'aux', director: 'aux', router: 'aux', tidy: 'aux' });
+});
+
+test('하이파 참조: V3 요약 → 없으면 V2, 글자 상한은 최근 것부터, 자료 memory 에 배경으로', () => {
+  const v3 = { ...c, hypaV3Data: { summaries: [{ text: '옛 요약 하나' }, { text: '둘' }, { text: '' }] } };
+  assert.deepEqual(H.hypaSummaries(v3), ['옛 요약 하나', '둘']);
+  assert.deepEqual(H.hypaSummaries(v3, 3), ['둘']);
+  // 2026-11-07 관련도 선택: 중요 표시 먼저, 질문 낱말이 든 요약 가점, 개수·글자 상한, 중복 제거, 결과는 원래 순서
+  const many = { ...c, hypaV3Data: { summaries: [{ text: '첫 요약 중요 표시', isImportant: true }, { text: '쟈알디가 커피를 탔다' }, { text: '쟈알디가 커피를 탔다' }, { text: '스팡달이 문을 열었다' }, { text: '마지막 요약 아무 상관 없음' }] } };
+  assert.deepEqual(H.hypaSummaries(many, 100000, '쟈알디 커피', { maxItems: 2 }), ['첫 요약 중요 표시', '쟈알디가 커피를 탔다'], '중요 표시 + 낱말 맞은 것, 2개, 중복 하나로');
+  assert.deepEqual(H.hypaSummaries(many, 100000, '', { maxItems: 2 }), ['첫 요약 중요 표시', '마지막 요약 아무 상관 없음'], '질문 없으면 중요 표시 + 최신');
+  const plus = JSON.stringify({ chunks: [{ nodes: [{ type: 'facts', content: '스팡달은 관리국 요원이다', characters: ['스팡달'], createdAt: 5, favorite: false }, { type: 'memory', content: '', createdAt: 6 }] }] });
+  assert.deepEqual(H.hypaPlusItems(plus).map((x) => x.text), ['[사실 · 스팡달]\n스팡달은 관리국 요원이다'], '하이파 플러스 노드');
+  assert.ok(H.hypaSummaries(many, 100000, '스팡달', { maxItems: 3, plus }).some((t) => t.includes('관리국 요원')), '플러스 항목도 관련도로 들어감');
+  const v2 = { ...c, hypaV2Data: { mainChunks: [{ text: 'v2 요약' }] } };
+  assert.deepEqual(H.hypaSummaries(v2), ['v2 요약']);
+  assert.deepEqual(H.hypaSummaries(c), []);
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  const s = St.peopleSettings({ $pp_hypa: '1' });
+  assert.equal(s.hypa, true);
+  const input = U.buildUpdate(c, store, [1], { settings: s, system: 'S', values: {}, names, memory: ['옛 요약'] });
+  assert.deepEqual(input.data.memory, ['옛 요약']);
+  assert.equal(U.buildUpdate(c, store, [1], { settings: s, system: 'S', values: {}, names }).data.memory, undefined);
+  const d = D.buildDirector(c, store, ['쟈알디'], 'x', St.peopleSettings({ $pp_director: 'scene' }), {}, ['옛 요약'], { facts: '# MY DIRECTOR', scene: 'MY SCENE' });
+  assert.deepEqual(d.data.memory, ['옛 요약']);
+  assert.ok(d.system.startsWith('# MY DIRECTOR\nMY SCENE') && !d.system.includes('# Scene Director · facts'), 'Director 기본 지침(지침 탭 FACTS·SCENE)');
+  assert.ok(d.system.includes('## Affinity and taste'), '기능별 절은 그대로');
+  const facts = D.buildDirector(c, store, ['쟈알디'], 'x', St.peopleSettings({ $pp_director: 'facts' }), {}, [], { facts: '# F', scene: 'S!' });
+  assert.ok(facts.system.startsWith('# F') && !facts.system.includes('S!'), '사실형엔 SCENE 절 없음');
+  assert.ok(D.buildDirector(c, store, ['쟈알디'], 'x', St.peopleSettings({ $pp_director: 'scene' }), {}).system.startsWith('# Scene Director'), '비면 내장 글');
+});
+
+test('되돌리기: 갱신이 만든 항목·계기·새 인물을 전부 취소하고, 전 것은 그대로', () => {
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  store.people.쟈알디.slots.state = [{ id: 'old', text: '본부', src: 'seed', anchor: '#0', seq: 1 }];
+  const s = St.peopleSettings({});
+  const input = U.buildUpdate(c, store, [1], { settings: s, system: 'S', values: {}, names });
+  const before = S.snapshotRun(store);
+  U.applyUpdate(store, c, input, {
+    entries: [{ who: '쟈알디', slot: 'knowledge', op: 'add', text: '유저가 어제 도움', m: 'm2', quote: '고마웠어' }],
+    cues: [{ who: '쟈알디', cue: '도움', m: 'm2', quote: '고마웠어', reason: 'x' }],
+    new_people: [{ name: '미나', aliases: [], m: 'm2', quote: '미나가 옆에서', identity: '미확인', speech: null }],
+  }, { settings: s });
+  const run = S.recordRun(store, before, 'now');
+   assert.equal(run.entries.filter((e) => e.who === "쟈알디").length, 1); assert.equal(run.changes.length, 1);
+  assert.ok(store.people.미나 && run.newPeople.includes('미나'), '새 인물도 되돌리기 대상');
+  const live = S.liveness(c);
+  assert.equal(S.liveEntries(store.people.쟈알디.slots.knowledge, live).length, 1);
+  const n = S.undoLastRun(store);
+  assert.ok(n >= 2);
+  assert.equal(S.liveEntries(store.people.쟈알디.slots.knowledge, live).length, 0);
+  assert.equal(S.liveEntries(store.people.쟈알디.slots.state, live).length, 1, '전 항목은 그대로');
+  assert.equal(S.liveChanges(store, live).length, 0);
+  assert.equal(store.lastRun, undefined);
+  assert.equal(store.people.미나, undefined, '새 인물은 지워짐');
+  assert.equal(S.undoLastRun(store), 0);
+  // 저장·읽기
+  const copy = S.peopleStore({ [T.PEOPLE_KEY]: JSON.parse(JSON.stringify({ ...store, lastRun: run })) });
+  assert.equal(copy.lastRun.entries.length, 2);
+});

@@ -1,0 +1,21 @@
+{
+  "name": "goei",
+  "version": "0.21.16",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs",
+    "release:prep": "node scripts/release-prep.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10",
+    "js-tiktoken": "^1.0.21",
+    "typescript": "5.9.3"
+  },
+  "goei": {
+    "updateBase": "https://raw.githubusercontent.com/leepc25/goei/release",
+    "minPlugin": "0.17.0"
+  }
+}

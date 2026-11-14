@@ -1,0 +1,307 @@
+// 카드 업데이트 (선택지용사 방식): 저장소에 올린 카드 데이터(card-update.json)를 받아 지금 카드에 덮어쓴다.
+// 채팅·사진·에셋·이름은 그대로 두고, 로어북·정규식은 같은 이름끼리만 바꾸며, 사용자가 고친 명부(Directory)는 지킨다.
+// 플러그인 자체는 Risu 설정의 플러그인 탭이 //@update-url로 갱신한다.
+import { DIRECTORY_COMMENT, isDirectory, LEGACY_DATA, manifestEntry, OLD_DIRECTORY, RETIRED } from './lorebooks';
+import { dropOldOutsidePlaces, migrateLore, readDirectoryData, withDirectory } from './world/directory';
+import { dropDefaultAliases } from './world/registry';
+import { fillDirectory, findFolder } from './install';
+import type { LoreEntry } from './types';
+
+export const UPDATE_SCHEMA = 1;
+
+/** 저장소의 release 폴더 raw 주소 (비어 있으면 업데이트 확인을 못 함). 빌드 때 package.json의 goei.updateBase로 채운다 */
+export const UPDATE_BASE: string = typeof __UPDATE_BASE__ === 'string' ? __UPDATE_BASE__ : '';
+declare const __UPDATE_BASE__: string | undefined;
+
+/** 카드에서 바꾸는 칸 (Risu 캐릭터 객체 이름) */
+export const CARD_FIELDS = [
+  'characterVersion', 'firstMessage', 'alternateGreetings', 'creatorNotes', 'desc', 'personality', 'scenario', 'exampleMessage',
+  'systemPrompt', 'postHistoryInstructions', 'backgroundHTML', 'lowLevelAccess', 'virtualscript', 'triggerscript',
+] as const;
+
+export interface CardPayload {
+  schema: number;
+  /** 카드 버전 (매니페스트 version과 비교) */
+  version: string;
+  /** 이 카드를 쓰려면 필요한 최소 플러그인 버전 */
+  minPlugin: string;
+  data: Partial<Record<(typeof CARD_FIELDS)[number], unknown>> & { globalLore: LoreEntry[]; customscript: { comment?: string }[] };
+}
+
+/** 사용자 손을 탄 값이라 업데이트가 덮어쓰지 않는 로어북 */
+export const PROTECTED_LORE = [DIRECTORY_COMMENT, OLD_DIRECTORY];
+
+export function compareVersions(a: string, b: string): number {
+  const pa = String(a).split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
+  const pb = String(b).split(/[.-]/).map((x) => Number.parseInt(x, 10) || 0);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d) return d < 0 ? -1 : 1;
+  }
+  return 0;
+}
+
+/** 지금 카드의 버전 (매니페스트 version, 없으면 0 = 업데이트 기능 이전 카드) */
+export function cardVersion(lore: LoreEntry[] | undefined): string {
+  const entry = manifestEntry(lore);
+  try {
+    const v = (JSON.parse(String(entry?.content ?? '')) as { version?: unknown }).version;
+    return typeof v === 'string' && v ? v : '0';
+  } catch {
+    return '0';
+  }
+}
+
+export function isPayload(x: unknown): x is CardPayload {
+  const p = x as CardPayload;
+  return !!p && p.schema === UPDATE_SCHEMA && typeof p.version === 'string' && !!p.data && Array.isArray(p.data.globalLore) && Array.isArray(p.data.customscript);
+}
+
+/** 같은 이름(+폴더)끼리 짝짓는 열쇠. 이름이 겹치면 순서로 구분한다 */
+function keyed<T>(list: T[], name: (x: T) => string): string[] {
+  const seen = new Map<string, number>();
+  return list.map((x) => {
+    const k = name(x);
+    const n = seen.get(k) ?? 0;
+    seen.set(k, n + 1);
+    return `${k}\u0000${n}`;
+  });
+}
+
+export interface MergeCount { replaced: number; added: number; kept: number; protected: number }
+
+/**
+ * 새 목록을 기준으로 합친다: 같은 열쇠는 새 것으로 바꾸고(보호 항목은 지금 것 유지), 새 것에만 있으면 추가,
+ * 지금 것에만 있으면(사용자가 넣은 것) 뒤에 그대로 남긴다.
+ */
+export function mergeByName<T>(current: T[], incoming: T[], name: (x: T) => string, keep: (x: T) => boolean = () => false): { list: T[]; count: MergeCount } {
+  const ck = keyed(current, name);
+  const ik = keyed(incoming, name);
+  const cur = new Map(ck.map((k, i) => [k, current[i]]));
+  const count: MergeCount = { replaced: 0, added: 0, kept: 0, protected: 0 };
+  const list: T[] = incoming.map((x, i) => {
+    const old = cur.get(ik[i]);
+    if (old === undefined) {
+      count.added++;
+      return x;
+    }
+    if (keep(old)) {
+      count.protected++;
+      return old;
+    }
+    if (JSON.stringify(old) !== JSON.stringify(x)) count.replaced++;
+    return x;
+  });
+  const used = new Set(ik);
+  ck.forEach((k, i) => {
+    if (used.has(k)) return;
+    count.kept++;
+    list.push(current[i]);
+  });
+  return { list, count };
+}
+
+/** 카드 업데이트 때 지우는 옛 정규식 */
+/** 플러그인이 대신 하게 되어 카드에서 지우는 정규식 (이미지 태그는 v0.16.40부터 core/imgtag.ts) */
+export const RETIRED_SCRIPTS = ['📊상태창', '🖼️에셋줄바꿈', '🖼️에셋출력', '🖼️에셋리퀘제거'];
+
+const loreName = (e: LoreEntry) => `${e.comment ?? ''}\u0001${(e as { folder?: string }).folder ?? ''}`;
+
+export interface UpdatePlan {
+  next: Record<string, unknown>;
+  lore: MergeCount;
+  scripts: MergeCount;
+  /** 바뀌는 카드 칸 이름 */
+  fields: string[];
+}
+
+/**
+ * 이름을 바꾼 로어북 맞추기: 옛 이름 명부(괴이봇 명부)는 새 카드의 Directory 자리로 옮겨 지키고,
+ * 더 쓰지 않는 로어북(옛 매니페스트·LB Backend)은 뺀다. 새 카드에도 같은 이름이 있으면 그대로 둔다.
+ */
+function renamed(current: LoreEntry[], incoming: LoreEntry[]): LoreEntry[] {
+  const target = incoming.find((e) => e.comment === DIRECTORY_COMMENT);
+  const hasNew = current.some((e) => e.comment === DIRECTORY_COMMENT);
+  const keepNames = new Set(incoming.map((e) => e.comment));
+  // 자리 항목(📚Lore slot, 0.16.x 카드)은 카드가 낸 것이라 「직접 넣은 항목」이 아니다. 새 카드에 없으면 뺀다 (QC 2026-10-28:
+  // 남겨 두면 업데이트한 카드가 계속 옛 경로(채팅 변수로 자리 채우기)로 돌고 로어북 목록에 쓸모없는 항목 4개가 남는다)
+  const retired = (e: LoreEntry) => RETIRED.includes(String(e.comment ?? '')) || String(e.comment ?? '').startsWith('📚Lore slot');
+  return current
+    .filter((e) => !retired(e) || keepNames.has(e.comment))
+    .filter((e) => !(hasNew && e.comment === OLD_DIRECTORY))
+    .map((e) => (e.comment === OLD_DIRECTORY && target ? { ...e, comment: DIRECTORY_COMMENT, folder: (target as { folder?: string }).folder } : e))
+    .filter((e, i, all) => !isDirectory(e.comment) || all.findIndex((x) => isDirectory(x.comment)) === i);
+}
+
+/** 키 지문 (tools/build_lite_card.py key_print와 같게): 쉼표로 나눠 다듬고 다시 이은 글의 FNV-1a 32비트 */
+export function keyPrint(key: unknown): string {
+  const norm = String(key ?? '').split(',').map((k) => k.trim()).filter(Boolean).join(',');
+  let h = 0x811c9dc5;
+  for (const b of new TextEncoder().encode(norm)) h = Math.imul(h ^ b, 0x01000193) >>> 0;
+  return h.toString(16).padStart(8, '0');
+}
+
+/** 새 카드 매니페스트의 「카드가 낸 적 있는 키」 지문 {로어북 이름: [지문…]} */
+function shippedKeys(lore: LoreEntry[]): Record<string, string[]> {
+  try {
+    const k = (JSON.parse(String(manifestEntry(lore)?.content ?? '')) as { keys?: unknown }).keys;
+    return k && typeof k === 'object' ? (k as Record<string, string[]>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** 사용자가 고친 호출 키는 남긴다: 지금 키가 카드가 낸 키(지문)와 다르면 그 키를 새 항목에 옮긴다 */
+function keepUserKeys(current: LoreEntry[], list: LoreEntry[], shipped: Record<string, string[]>): number {
+  const ck = keyed(current, loreName);
+  const cur = new Map(ck.map((k, i) => [k, current[i]]));
+  const lk = keyed(list, loreName);
+  let kept = 0;
+  list.forEach((e, i) => {
+    const prints = shipped[String(e.comment ?? '')];
+    const old = cur.get(lk[i]);
+    if (!prints || !old || old === e || keyPrint(old.key) === keyPrint(e.key) || prints.includes(keyPrint(old.key))) return;
+    list[i] = { ...e, key: old.key, secondkey: old.secondkey ?? e.secondkey };
+    kept++;
+  });
+  return kept;
+}
+
+/**
+ * 명부는 사용자 것을 지키므로, 새 카드 명부에만 있는 칸을 사용자 명부의 빈 자리에 채운다 (고친 값은 그대로).
+ * 2026-11-08 사용자: 부록만 옮겨 새로 생긴 「시작 소지품」이 업데이트로 안 들어옴 → 설치 점검과 같은 fillDirectory 로
+ */
+function addDirectoryDefaults(list: LoreEntry[], incoming: LoreEntry[]): LoreEntry[] {
+  const add = readDirectoryData(incoming) as unknown as Record<string, unknown> | null;
+  const cur = readDirectoryData(list) as unknown as Record<string, unknown> | null;
+  if (!add || !cur) return list;
+  const filled = fillDirectory(cur, add);
+  return filled.gaps ? withDirectory(list, filled.data as never) : list;
+}
+
+/**
+ * ⚙️설정 폴더 key 맞추기: 아무 봇에 설치한 봇은 폴더 key 가 무작위라 카드의 고정 key 와 다르다. 그대로 합치면
+ * 이름+폴더 짝이 안 맞아 명부·매니페스트가 둘씩 생기고 명부를 읽지 못한다 (loader#1).
+ * 새 카드 목록의 사본에서 폴더 key 를 지금 카드 것으로 바꿔 돌려준다 (payload 원본은 그대로. key 가 같으면 원본 그대로)
+ */
+function alignFolder(current: LoreEntry[], incoming: LoreEntry[]): LoreEntry[] {
+  const curKey = String(findFolder(current)?.key ?? '');
+  const inKey = String(findFolder(incoming)?.key ?? '');
+  if (!curKey || !inKey || curKey === inKey) return incoming;
+  const manifest = manifestEntry(incoming);
+  return incoming.map((e) => {
+    let out = e;
+    if (e.mode === 'folder' && e.key === inKey) out = { ...out, key: curKey };
+    if ((e as { folder?: string }).folder === inKey) out = { ...out, folder: curKey } as LoreEntry;
+    if (e === manifest) {
+      try {
+        const m = JSON.parse(String(e.content ?? '')) as { keys?: Record<string, unknown> };
+        if (m && typeof m === 'object' && m.keys && typeof m.keys === 'object' && m.keys.settings === inKey) {
+          out = { ...out, content: JSON.stringify({ ...m, keys: { ...m.keys, settings: curKey } }) };
+        }
+      } catch {
+        // 읽을 수 없는 매니페스트는 그대로 둔다
+      }
+    }
+    return out;
+  });
+}
+
+/**
+ * 안전망: 합친 뒤에도 명부가 둘 이상이면(사용자가 명부를 다른 폴더로 옮긴 경우 등) 사용자 것만 남긴다.
+ * 카드 명부 자리에 사용자 명부를 두고, 뒤에 남은 사용자 명부·카드 명부는 목록에서 뺀다 (사용자 명부 글은 그대로)
+ */
+function keepOneDirectory(current: LoreEntry[], lore: { list: LoreEntry[]; count: MergeCount }): void {
+  const dirs = lore.list.filter((e) => isDirectory(e.comment));
+  if (dirs.length < 2) return;
+  const mine = dirs.find((e) => current.includes(e));
+  if (!mine) return;
+  const slot = lore.list.findIndex((e) => isDirectory(e.comment));
+  const slotWasMine = lore.list[slot] === mine;
+  lore.list = lore.list.map((e, i) => (i === slot ? mine : e)).filter((e, i) => i === slot || !isDirectory(e.comment));
+  if (!slotWasMine) {
+    // 카드 명부를 「새로 넣음」, 사용자 명부를 「직접 넣은 항목」으로 센 것을 「지킴」 하나로 바로잡는다
+    lore.count.added = Math.max(0, lore.count.added - 1);
+    lore.count.kept = Math.max(0, lore.count.kept - 1);
+    lore.count.protected++;
+  }
+}
+
+/**
+ * 내 봇에 설치한 경우(매니페스트에 source 없음)의 매니페스트: 지금 것을 그대로 두고 버전과 카드 사진 목록만 새 카드 것으로 올린다.
+ * 새 카드 매니페스트로 바꾸면 인사말 번호(greetings)가 내 봇의 인사말과 어긋나고 source 가 붙어 정식 카드로 잘못 읽힌다
+ */
+function ownManifest(list: LoreEntry[], mine: LoreEntry, incoming: LoreEntry[], version: string): LoreEntry[] {
+  let m: Record<string, unknown>;
+  try {
+    m = JSON.parse(String(mine.content ?? '')) as Record<string, unknown>;
+  } catch {
+    return list;
+  }
+  let pics: unknown;
+  try {
+    pics = (JSON.parse(String(manifestEntry(incoming)?.content ?? '')) as { pictures?: unknown }).pictures;
+  } catch {
+    pics = undefined;
+  }
+  const next = { ...m, version, ...(Array.isArray(pics) && pics.length ? { pictures: pics } : {}) };
+  const content = JSON.stringify(next);
+  const kept: LoreEntry = content === JSON.stringify(m) ? mine : { ...mine, content };
+  const slot = manifestEntry(list);
+  // 짝이 안 맞아 지금 매니페스트가 뒤에 따로 남았으면 그것은 뺀다 (매니페스트는 하나)
+  return slot ? list.map((e) => (e === slot ? kept : e)).filter((e) => e !== mine || e === kept) : [...list, kept];
+}
+
+/** 내 봇에 「괴이 설치」를 한 봇인가: 매니페스트가 있고 정식 카드 표시(source)가 없다 */
+function ownBotManifest(lore: LoreEntry[] | undefined): LoreEntry | undefined {
+  const entry = manifestEntry(lore);
+  if (!entry) return undefined;
+  try {
+    const m = JSON.parse(String(entry.content ?? '')) as { plugin?: unknown; greetings?: unknown; source?: unknown };
+    return m && m.plugin === 'goei-plugin' && m.greetings && typeof m.greetings === 'object' && !m.source ? entry : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 지금 캐릭터에 업데이트를 합친 결과 (저장은 하지 않음) */
+export function planUpdate(char: Record<string, unknown>, payload: CardPayload): UpdatePlan {
+  const incoming = alignFolder((char.globalLore as LoreEntry[]) ?? [], payload.data.globalLore);
+  const current = renamed((char.globalLore as LoreEntry[]) ?? [], incoming);
+  const lore = mergeByName(current, incoming, loreName, (e) => PROTECTED_LORE.includes(e.comment ?? ''));
+  keepOneDirectory(current, lore);
+  keepUserKeys(current, lore.list, shippedKeys(incoming));
+  // 옛 데이터 로어북(Faction display 등)은 새 카드에 없어 「사용자가 넣은 것」으로 남는다. 명부로 옮기고 지운다
+  if (lore.list.some((e) => LEGACY_DATA.includes(String(e.comment ?? '')))) lore.list = migrateLore(lore.list);
+  // 새 카드 명부의 칸: 사용자 명부에 없는 항목·빈 칸만 채운다 (부록 조건·시작 소지품 등, 사용자가 고친 값은 그대로). 옛 기본값 정리보다 먼저 (채운 뒤 정리)
+  lore.list = addDirectoryDefaults(lore.list, incoming);
+  // 0.16.37 전 카드: 명부 괴이·특수에 기본으로 있던 세력·요원 로어북 후보를 뺀다 (2026-10-21 사용자). 그 뒤에 사용자가 다시 넣은 것은 둔다
+  if (compareVersions(cardVersion(char.globalLore as LoreEntry[]), '0.16.37') < 0) lore.list = dropOldOutsidePlaces(lore.list);
+  // 사용자 명부(보호됨)에 남은 원본 기본 별칭 중 규칙에 걸리는 것만 지운다. 사용자가 더한 별칭은 남는다 (2026-10-21)
+  lore.list = dropDefaultAliases(lore.list);
+  // 내 봇에 설치한 경우: 명부의 빠진 칸·카드 사진·버전만 올린다. 봇 설명·인사말·트리거·첫 메시지·정규식은 그대로 둔다 (사용자 2026-11-14 D-1 (가))
+  const own = ownBotManifest(char.globalLore as LoreEntry[]);
+  if (own) {
+    lore.list = ownManifest(lore.list, own, incoming, payload.version);
+    const mineScripts = Array.isArray(char.customscript) ? char.customscript.length : 0;
+    return { next: { ...char, globalLore: lore.list }, lore: lore.count, scripts: { replaced: 0, added: 0, kept: mineScripts, protected: 0 }, fields: [] };
+  }
+  // Risu 캐릭터의 정규식 칸 이름은 customscript (s 없음)
+  // 상태창 정규식은 플러그인이 그리게 되어(v0.16.31) 옛 카드에서 뺀다 (새 카드에 같은 이름이 있으면 그대로)
+  const incomingNames = new Set(payload.data.customscript.map((r) => r.comment ?? ''));
+  const currentScripts = ((char.customscript as { comment?: string }[]) ?? []).filter((r) => !RETIRED_SCRIPTS.includes(r.comment ?? '') || incomingNames.has(r.comment ?? ''));
+  const scripts = mergeByName(currentScripts, payload.data.customscript, (r) => r.comment ?? '');
+  const next: Record<string, unknown> = { ...char, globalLore: lore.list, customscript: scripts.list };
+  delete next.customscripts;
+  const fields: string[] = [];
+  for (const f of CARD_FIELDS) {
+    if (!(f in payload.data)) continue;
+    if (JSON.stringify(char[f]) !== JSON.stringify(payload.data[f])) fields.push(f);
+    next[f] = payload.data[f];
+  }
+  return { next, lore: lore.count, scripts: scripts.count, fields };
+}
+
+/** 이 플러그인 버전 (빌드 때 package.json에서) */
+export const PLUGIN_VERSION: string = typeof __PLUGIN_VERSION__ === 'string' ? __PLUGIN_VERSION__ : '0';
+declare const __PLUGIN_VERSION__: string | undefined;
