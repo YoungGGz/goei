@@ -30,6 +30,16 @@ jobs:
             echo "이미 릴리스된 판 ($tag): 건너뜀"
             echo "skip=1" >> "$GITHUB_OUTPUT"
           fi
+          # main 에 올라온 것만으로는 릴리스하지 않는다: 판 번호가 바뀐 push 만 (릴리스는 사용자가 「릴리스해」라고 할 때 판을 올려 합친다)
+          before="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            git fetch --depth=1 origin "$before" >/dev/null 2>&1 || true
+            prev=$(git show "$before:package.json" 2>/dev/null | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{console.log(JSON.parse(s).version)}catch{console.log('')}})")
+            if [ -z "$prev" ] || [ "v$prev" = "$tag" ]; then
+              echo "판 번호가 바뀌지 않음 (앞: ${prev:-없음}, 지금: $tag): 건너뜀"
+              echo "skip=1" >> "$GITHUB_OUTPUT"
+            fi
+          fi
       - uses: actions/setup-node@v4
         if: steps.v.outputs.skip != '1'
         with:
