@@ -1,5 +1,5 @@
 // 깡통봇 설치·점검의 받기·저장 (core/install.ts 가 계산, 여기서 Risu 에 쓴다).
-// 로어북·인사말은 캐릭터에, 사진은 에셋 저장소(release/pic), 아이콘은 release/icon.png 를 받아 메인 아이콘으로,
+// 로어북·인사말은 캐릭터에, 사진은 에셋 저장소(release/pic), 아이콘은 release 의 아이콘 파일(icon.webp)을 받아 메인 아이콘으로,
 // 위키 기본 문서 묶음은 release/wiki-base.N.txt 를 받아 플러그인 저장소에 둔다.
 // 설치 자료(인사말·사진 목록·기본 명부·아이콘 정보)는 점검 전에 자료 팩(goei-data-install)으로 받는다 (host/datapack.ts ensureInstallData, QC 개선 나1).
 import { installCheck, installData, installLore, installLoreSettings, isLanding, notePictures, plantGreetings, type InstallState } from '../core/install';
@@ -11,7 +11,7 @@ import { digest, fetchPicture, mergePictures, PicError } from './picpack';
 import type { Picture } from '../core/pictures';
 import { ensureInstallData, getBytes, getText, type Progress } from './datapack';
 import { forgetImages } from '../ui/images';
-import { loadModuleAssets } from './assets';
+import { loadModuleAssets, toBytes } from './assets';
 
 const WIKI_KEY = 'goei:wikibase';
 // 받은 위키 묶음의 릴리스 지문 (전수검사 11-13)
@@ -35,6 +35,8 @@ interface IconNote {
   prev: string;
   /** 사용자가 「이전 아이콘으로」 되돌렸다: 전체 설치 단추가 아이콘을 다시 넣지 않는다 (사용자 11-14 D-2). installIcon 이 기록을 새로 쓰면 풀린다 */
   declined?: boolean;
+  /** ours 그림의 지문 (설치 자료 icon.digest). 릴리스의 그림이 바뀌면 점검이 「새 그림 있음」으로 세어 다시 받는다 (사용자 2026-11-15) */
+  digest?: string;
 }
 async function iconNotes(): Promise<Record<string, IconNote>> {
   try {
@@ -55,6 +57,8 @@ export async function checkInstall(charIndex: number, progress?: Progress): Prom
   const notes = await iconNotes();
   const note = notes[charId(char)];
   const lore = char.globalLore as LoreEntry[] | undefined;
+  const ours = !!note && note.ours === String(char.image ?? '');
+  const iconOld = ours && (await iconStale(notes, charId(char)));
   const packInLore = (lore ?? []).some((e) => typeof e.content === 'string' && e.content.startsWith(WIKI_PACK_HEAD));
   const state = installCheck({
     lore,
@@ -62,14 +66,14 @@ export async function checkInstall(charIndex: number, progress?: Progress): Prom
     loreSettings: char.loreSettings,
     alternateGreetings: char.alternateGreetings,
     assets: char.additionalAssets,
-    iconOurs: !!note && note.ours === String(char.image ?? ''),
+    iconOurs: ours,
+    iconOld,
     // 받아 둔 묶음이 릴리스 판과 다르면 빠진 것으로 세어 설치·점검이 다시 받게 한다 (전수검사 11-13). 글은 「새 판 있음」(wikiOld, 사용자 11-14 D-3)
     wikiPack: packInLore || (!!storedWikiPack() && !(await wikiPackStale())),
     tokenizer: !!tokenizerName(),
   });
   // 되돌린 봇은 이미 이전 아이콘이므로 「이전 아이콘으로」를 내지 않는다.
   // 다만 되돌린 뒤 Risu 아이콘 목록에서 플러그인 아이콘을 직접 메인으로 골랐으면 지금은 우리 것이므로 다시 낸다
-  const ours = !!note && note.ours === String(char.image ?? '');
   return { state, iconPrev: note && (!note.declined || ours) ? (note.prev ?? '') : '', iconDeclined: !!note?.declined && !ours, wikiOld: !packInLore && wikiPackOld() };
 }
 
@@ -155,7 +159,28 @@ export async function installPictures(charIndex: number, progress: Progress): Pr
   return saved;
 }
 
-/** 아이콘: release/icon.png 를 받아 저장하고 메인 아이콘으로. 설치 전 아이콘은 기록해 둔다 (「이전 아이콘으로」) */
+/** 메인인 우리 아이콘이 이번 판 그림이 아닌가 (옛 그림). 기록에 지문이 없으면(옛 판이 넣은 것) 그림을 읽어 지문을 내고 같을 때만 적어 둔다.
+ *  읽지 못하거나 지문을 못 내는 환경이면 같은 것으로 본다 (알 수 없는 것을 매번 「새 그림 있음」으로 세지 않게) */
+async function iconStale(notes: Record<string, IconNote>, id: string): Promise<boolean> {
+  const want = installData().icon.digest;
+  const note = notes[id];
+  if (!want || !note) return false;
+  if (note.digest) return note.digest !== want;
+  let have: string | null = null;
+  try {
+    const bytes = toBytes(await risuai.readImage(note.ours));
+    have = bytes?.length ? await digest(bytes) : null;
+  } catch {
+    have = null;
+  }
+  if (!have) return false;
+  if (have !== want) return true;
+  notes[id] = { ...note, digest: want };
+  await risuai.pluginStorage.setItem(ICON_KEY, JSON.stringify(notes)).catch(() => undefined);
+  return false;
+}
+
+/** 아이콘: release 의 아이콘 파일을 받아 저장하고 메인 아이콘으로. 설치 전 아이콘은 기록해 둔다 (「이전 아이콘으로」) */
 export async function installIcon(charIndex: number, progress: Progress): Promise<void> {
   const icon = installData().icon;
   if (!icon.file) throw new Error('이 판에는 아이콘 정보가 없어요.');
@@ -172,15 +197,32 @@ export async function installIcon(charIndex: number, progress: Progress): Promis
   const notes = await iconNotes();
   const id = charId(char);
   const prev = String(char.image ?? '');
-  notes[id] = { ours: path, prev: notes[id]?.ours === prev ? notes[id].prev : prev };
+  // 지금 메인이 전에 넣은 우리 아이콘(옛 그림)이면 그것은 「설치 전 아이콘」이 아니다: 그때 적어 둔 것을 그대로 둔다
+  const old = notes[id]?.ours ?? '';
+  const prevOurs = !!old && old === prev;
+  notes[id] = { ours: path, prev: prevOurs ? notes[id].prev : prev, ...(icon.digest ? { digest: icon.digest } : {}) };
   await risuai.pluginStorage.setItem(ICON_KEY, JSON.stringify(notes));
-  // Risu 는 캐릭터 아이콘을 여러 개 둘 수 있다 (캐릭터 디스플레이 → 캐릭터 아이콘 「+」, ccAssets 의 type icon). 메인은 image.
-  // 기존 아이콘은 목록에 남기고(없으면 더해) 우리 것을 더한 뒤 메인으로 (사용자 2026-10-27)
-  const cc = (Array.isArray(char.ccAssets) ? (char.ccAssets as CcAsset[]) : []).filter((a) => a && typeof a === 'object');
+  // Risu 는 캐릭터 아이콘을 여러 개 둘 수 있다 (캐릭터 디스플레이 → 캐릭터 아이콘 「+」). 메인(image)과 나머지 목록(ccAssets 의 type icon)을 따로 그리고,
+  // 목록에서 고르면 메인과 맞바꾼다. 그래서 메인이 되는 우리 아이콘은 목록에 넣지 않는다: 넣으면 같은 그림이 두 장으로 보인다 (사용자 2026-11-15).
+  // 전에 넣은 우리 아이콘(옛 그림)도 목록에서 뺀다. 설치 전 아이콘은 목록에 남긴다(없으면 더한다, 사용자 2026-10-27)
+  const cc = (Array.isArray(char.ccAssets) ? (char.ccAssets as CcAsset[]) : []).filter((a) => a && typeof a === 'object' && !(a.type === 'icon' && (a.uri === path || (!!old && a.uri === old))));
   const hasIcon = (uri: string) => cc.some((a) => a.type === 'icon' && a.uri === uri);
-  if (prev && !hasIcon(prev)) cc.push({ type: 'icon', uri: prev, name: cc.some((a) => a.type === 'icon' && a.name === 'main') ? 'previous' : 'main', ext: extOf(prev) });
-  if (!hasIcon(path)) cc.push({ type: 'icon', uri: path, name: 'goei', ext: extOf(icon.file) });
+  if (prev && !prevOurs && !hasIcon(prev)) cc.push({ type: 'icon', uri: prev, name: cc.some((a) => a.type === 'icon' && a.name === 'main') ? 'previous' : 'main', ext: extOf(prev) });
   await risuai.setCharacterToIndex(charIndex, { ...char, image: path, ccAssets: cc });
+}
+
+/** 아이콘 목록 정리: 옛 판이 메인 아이콘을 목록에도 넣어 같은 그림이 두 장으로 보이던 것을 목록에서 뺀다 (사용자 2026-11-15).
+ *  플러그인이 아이콘을 넣은 기록이 있는 봇만, 메인과 같은 그림(목록의 type icon)만 뺀다. 뺀 것이 있으면 true */
+export async function tidyIconList(charIndex: number): Promise<boolean> {
+  const char = (await risuai.getCharacterFromIndex(charIndex)) as Record<string, unknown> | null;
+  if (!char || !Array.isArray(char.ccAssets)) return false;
+  const image = String(char.image ?? '');
+  if (!image || !(await iconNotes())[charId(char)]) return false;
+  const all = char.ccAssets as CcAsset[];
+  const cc = all.filter((a) => !(a && typeof a === 'object' && a.type === 'icon' && a.uri === image));
+  if (cc.length === all.length) return false;
+  await risuai.setCharacterToIndex(charIndex, { ...char, ccAssets: cc });
+  return true;
 }
 
 interface CcAsset {
@@ -198,7 +240,10 @@ export async function restoreIcon(charIndex: number): Promise<boolean> {
   const notes = await iconNotes();
   const note = notes[charId(char)];
   if (!note?.prev) return false;
-  await risuai.setCharacterToIndex(charIndex, { ...char, image: note.prev });
+  // 메인과 목록을 맞바꾼다 (Risu 가 목록에서 고를 때와 같게): 되돌린 아이콘은 목록에서 빼고, 우리 아이콘은 목록에 둔다 (다시 고를 수 있게)
+  const cc = (Array.isArray(char.ccAssets) ? (char.ccAssets as CcAsset[]) : []).filter((a) => a && typeof a === 'object' && !(a.type === 'icon' && (a.uri === note.prev || a.uri === note.ours)));
+  if (note.ours && note.ours !== note.prev) cc.push({ type: 'icon', uri: note.ours, name: 'goei', ext: extOf(note.ours) });
+  await risuai.setCharacterToIndex(charIndex, { ...char, image: note.prev, ccAssets: cc });
   // 기록을 지우지 않고 되돌렸다고 적어 둔다: 지우면 「빠진 것 전부 채우기」가 아이콘을 다시 플러그인 것으로 바꾼다 (사용자 11-14 D-2)
   notes[charId(char)] = { ...note, declined: true };
   await risuai.pluginStorage.setItem(ICON_KEY, JSON.stringify(notes));
