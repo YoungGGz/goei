@@ -44,7 +44,8 @@ export function linkTerms(text: string, terms: StatusContext['terms']): string {
   return out + esc(text.slice(i));
 }
 
-const kv = (rows: [string, string][]) => `<span class="gst-tip"><span class="gst-kv">${rows.map(([k, v]) => `<i>${esc(k)}</i><em>${esc(v)}</em>`).join('')}</span></span>`;
+// 값은 span 으로 쓴다: em 은 Risu 채팅 글의 기울임 글자색을 받아 밝은 풍선 바탕에서 안 보였다
+const kv = (rows: [string, string][]) => `<span class="gst-tip"><span class="gst-kv">${rows.map(([k, v]) => `<span class="gst-k">${esc(k)}</span><span class="gst-v">${esc(v)}</span>`).join('')}</span></span>`;
 
 export function statusHtml(tag: StatusTag, ctx: StatusContext): string {
   const hid = (id: ColId) => !!ctx.hide?.has(id);
@@ -144,7 +145,7 @@ const STATUS_CSS = `
 .gst-tip::before{content:'';position:absolute;left:50%;top:100%;margin-left:-5px;border:5px solid transparent;border-top-color:var(--gs-text)}
 .gst-clock .gst-tip{left:0;transform:none}.gst-clock .gst-tip::before{left:20px}
 .gst-kv{display:grid;grid-template-columns:auto auto;gap:2px 10px;align-items:baseline;text-align:left}
-.gst-kv i{font-style:normal;font-size:11px;opacity:.7}.gst-kv em{font-style:normal;font-weight:700}
+.gst-kv .gst-k{font-size:11px;opacity:.7}.gst-kv .gst-v{font-weight:700}
 @media (hover:hover){[data-gst-tip]:hover>.gst-tip{opacity:1;visibility:visible}}
 [data-gst-tip].open>.gst-tip{opacity:1;visibility:visible}
 @media (max-width:450px){.gst{padding:11px 12px}.gst-clock{font-size:17px}.gst-top{gap:8px}}
