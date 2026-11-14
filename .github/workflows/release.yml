@@ -46,9 +46,10 @@ jobs:
           node-version: 22
       - if: steps.v.outputs.skip != '1'
         run: npm ci
-      - name: '빌드 (npm run release:prep 과 같은 순서: 빌드 → 카드 → 빌드 → release/ 로 복사)'
+      # 시험이 실패하면 여기서 멈춰 release 브랜치·Releases 에 올리지 않는다 (2026-11-15 사용자: GitHub 릴리스에 시험을 넣는다)
+      - name: '빌드·시험 (npm run release:prep 과 같은 순서: 빌드 → 카드 → 빌드 → release/ 로 복사 → 형 검사·단위 시험)'
         if: steps.v.outputs.skip != '1'
-        run: node scripts/release-prep.mjs --skip-tests --no-fixture
+        run: node scripts/release-prep.mjs --no-fixture
       - name: release 브랜치에 올리기
         if: steps.v.outputs.skip != '1'
         env:

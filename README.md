@@ -36,4 +36,4 @@ RisuAI용 괴담 시뮬레이션 「괴이 ː ANOMALY」의 전용 플러그인�
 - `npm ci` → `npm run build`: `dist/`에 시작기(`goei-plugin.js`), 본체 조각(`goei-body.*`), 자료 팩(`goei-data-*`), 토크나이저 조각(`tok-o200k.*`)을 만듭니다.
 - 시험: `npm run typecheck` → `npm test`(단위). 화면 시험(`tests/*-browser.mjs`)은 고친 화면 것만 돌립니다.
 - 릴리스 준비: `npm run release:prep -- --bump patch`(판 올림 → 빌드 → 카드 빌드 → `release/`에 받기용 파일 → 형 검사·단위 시험). `release/`는 git에 올리지 않습니다.
-- 릴리스: main의 `package.json` 판이 아직 릴리스되지 않은 판이면 GitHub Actions(`.github/workflows/release.yml`)가 같은 순서로 빌드해 `release` 브랜치를 새로 덮어쓰고 Releases에 zip·카드를 올립니다. 설치된 플러그인은 `release` 브랜치에서 본체·자료·카드 업데이트를 받습니다.
+- 릴리스: main의 `package.json` 판이 아직 릴리스되지 않은 판이면 GitHub Actions(`.github/workflows/release.yml`)가 같은 순서로 빌드하고 형 검사·단위 시험을 통과하면 `release` 브랜치를 새로 덮어쓰고 Releases에 zip·카드를 올립니다. 설치된 플러그인은 `release` 브랜치에서 본체·자료·카드 업데이트를 받습니다.
