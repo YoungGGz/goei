@@ -4,6 +4,9 @@ import type { AgentRow, AppendixRow, Directory, OrgRow, PlaceRow } from './direc
 import { orgOf } from './directory';
 import { AGENT_FIELDS, ANOMALY_FIELDS, APPENDIX_FIELDS, ORG_FIELDS, SITE_FIELDS, type FieldDef } from './schema';
 import { fieldOrder, fieldValue, type ExtraField, type WorldRecord } from './records';
+import { guideTxt } from '../guides';
+// 머리 글(### Character - … · #### Identity · 괴이 제목 줄 · [Affiliation code: …])은 지침 「메인 요청에 붙는 글」 WORLD.AGENT.* · WORLD.ANOMALY.* · WORLD.ORG.CODE 절.
+// 칸 절 제목은 schema.ts 의 title(WORLD.FIELD.* 절). 코드는 잇기만 한다 (2026-11-14 사용자: 모델에 가는 글은 전부 지침 파일에)
 
 const VAR = '{{getvar::st_faction}}';
 
@@ -49,9 +52,9 @@ export function assembleAgent(rec: WorldRecord, a: AgentRow, dir: Directory, fac
     return v(f.id);
   });
   const appearance = lines(rec, 'appearance', AGENT_FIELDS.filter((f) => f.sec === 'appearance'), (f) => v(f.id));
-  const parts: string[] = [`### Character - ${a.english || a.name}`];
-  if (identity.length) parts.push(`#### Identity\n${identity.join('\n')}`);
-  if (appearance.length) parts.push(`#### Appearance\n${appearance.join('\n')}`);
+  const parts: string[] = [guideTxt('Main', 'WORLD.AGENT.HEAD', { name: a.english || a.name })];
+  if (identity.length) parts.push(`${guideTxt('Main', 'WORLD.AGENT.IDENTITY')}\n${identity.join('\n')}`);
+  if (appearance.length) parts.push(`${guideTxt('Main', 'WORLD.AGENT.APPEARANCE')}\n${appearance.join('\n')}`);
   for (const f of AGENT_FIELDS.filter((f) => f.type === 'text')) {
     const t = v(f.id);
     if (t) parts.push(`#### ${f.title}\n${t}`);
@@ -112,10 +115,10 @@ function sections(rec: WorldRecord, defs: FieldDef[], faction?: string, skip: st
   return out;
 }
 
-/** 괴이 로어 글: 제목 + 절들. 공통 머리말(ANOMALY_NOTE·덧쓰기)은 요청의 괴이 묶음 앞에 한 번만 (body.ts, records.ts activeAnomalyNote) */
+/** 괴이 로어 글: 제목 + 절들. 공통 머리말(지침 WORLD.ANOMALY.NOTE·덧쓰기)은 요청의 괴이 묶음 앞에 한 번만 (body.ts, records.ts activeAnomalyNote) */
 export function assembleAnomaly(rec: WorldRecord, p: PlaceRow, faction?: string): string {
   const title = rec.title || `${p.english || p.label} (${p.label})`;
-  const head = rec.titleRaw ? `### Instructions for the Implementation of ${title}` : `### Instructions for the Implementation of the Anomaly - ${title}`;
+  const head = guideTxt('Main', rec.titleRaw ? 'WORLD.ANOMALY.HEAD_RAW' : 'WORLD.ANOMALY.HEAD', { title });
   return [head, ...sections(rec, ANOMALY_FIELDS, faction)].join('\n\n');
 }
 
@@ -141,7 +144,7 @@ function orgKoName(dir: Directory, org: OrgRow, faction?: string): string {
 /** 조직(세력 상세) 로어 글: 제목(호칭 표 CBS) + 코드 + 절들 */
 export function assembleOrg(rec: WorldRecord, org: OrgRow, dir: Directory, faction?: string): string {
   const title = rec.title || `${orgNameCbs(dir, org)} (${orgKoName(dir, org, faction)})`;
-  const head = org.faction ? `### ${title}\n\n[Affiliation code: ${org.faction}]` : `### ${title}`;
+  const head = org.faction ? `### ${title}\n\n${guideTxt('Main', 'WORLD.ORG.CODE', { code: org.faction })}` : `### ${title}`;
   return [head, ...sections(rec, ORG_FIELDS, faction)].join('\n\n');
 }
 

@@ -6,6 +6,7 @@
 // 조작이 아닌 단추(지우기·추가·되돌리기·지금 실행·다른 화면으로 가기)는 눌린 상태(aria-pressed · role=switch)가 없어 목록에 동작이 생기지 않는다.
 // 이름 없는 표 칸(고유 상점 표·시그니처 상품 표)도 줄 이름이 없어 들어오지 않는다.
 import { consultValue, type ConsultItem } from '../../core/consult';
+import { guideTxt } from '../../core/guides';
 
 export type CatCtl =
   /** 고르기: 값 → 그 단추가 보내는 값 */
@@ -203,7 +204,8 @@ export function pageRows(html: string, page: string, menu: string): CatRow[] {
     const name = txt(d.querySelector(':scope > summary > b'));
     if (!name) return;
     const count = txt(d.querySelector(':scope > summary > .adv-count'));
-    const help = `${count ? `지금 ${count}. ` : ''}${txt(d.querySelector('.ps-note'))} 상담에서는 바꾸지 못해요. 설정 화면에서 펼쳐 칸으로 고쳐요.`.trim();
+    // 상담에게 주는 말은 지침 「AI 상담」 CATALOG.FOLDED_COUNT · CATALOG.FOLDED_NOTE 절
+    const help = `${count ? `${guideTxt('Consult', 'CATALOG.FOLDED_COUNT', { count })} ` : ''}${txt(d.querySelector('.ps-note'))} ${guideTxt('Consult', 'CATALOG.FOLDED_NOTE')}`.trim();
     out.push({ id: `row.${page}.${++infoN}`, page, menu, group: txt(d.closest('.ps-group')?.querySelector('h3')), name, kind: 'info', cur: '', help, go: [`set:${page}`, ''], keys: [name] });
   });
   return out;

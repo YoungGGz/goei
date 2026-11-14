@@ -2,7 +2,8 @@
 // 원칙(원본과 같음): 사용자 글·댓글·쪽지는 앱이 소유한다. 모델은 NPC 글·댓글·쪽지와 조회·추천 증가만 보탤 수 있고,
 // 저장된 글의 본문·작성자·날짜는 절대 바꾸지 못한다. 글 번호는 줄지 않는다(1846000부터).
 import type { Chat } from './types';
-import { BOARD_NAME, viewSite } from './boards';
+import { BOARD_GUIDE, BOARD_NAME, siteOfName, viewSite } from './boards';
+import { guideTxt } from './guides';
 import { exactTokens } from './tokenizer';
 import { readWorld } from './world/output';
 import { attachmentRecords, bodyParts as parts, describe, hasAttachment, stripForged } from './attach';
@@ -1178,7 +1179,8 @@ export function incomingPlan(
   return { ...plan, allowed: true, post, comment, commentIndex: ci };
 }
 
-export function incomingTask(plan: IncomingPlan, activityPosts?: ActivityPost[]): string {
+/** head: 지침 절 INCOMING.OPTIONS_HEAD 글 (gnetPrompt 가 이 게시판 지침에서 읽어 넘긴다) */
+export function incomingTask(plan: IncomingPlan, head: string, activityPosts?: ActivityPost[]): string {
   const body: Record<string, unknown> = { userHandle: plan.userHandle, incomingAllowed: plan.allowed };
   if (plan.allowed && plan.post) {
     body.incomingOrigin = {
@@ -1188,7 +1190,7 @@ export function incomingTask(plan: IncomingPlan, activityPosts?: ActivityPost[])
     body.previousIncoming = plan.history;
   }
   if (activityPosts) body.activityPosts = activityPosts;
-  return `\nCOMBINED OUTPUT OPTIONS:\n${JSON.stringify(body)}`;
+  return `\n${head}\n${JSON.stringify(body)}`;
 }
 
 /** 선쪽지 반영 (첫 번째 올바르고 중복 아닌 것 하나). 반영했으면 true */
@@ -1248,6 +1250,10 @@ export function parseDmBody(raw: string): string {
 
 /** site: 화면에 보이는 게시판 이름. 여러 게시판 덩어리를 모델이 가려 읽게 넣는다 (전수검사 11-13) */
 export function mainContext(st: GState, nick: string, rules: string, focus?: Focus | null, site?: string): string {
+  // 기록의 access 글은 그 게시판 지침의 절 (site 는 화면 이름이라 사이트로 되돌려 지침을 고른다. 없으면 괴담넷)
+  const guide = BOARD_GUIDE[siteOfName(site)];
+  const accessPost = guideTxt(guide, 'MAIN_CONTEXT.ACCESS_POST');
+  const accessDm = guideTxt(guide, 'MAIN_CONTEXT.ACCESS_DM');
   // pin: 보관함에서 잠깐 되살린 글(back)과 이번 턴에 쓴 글·댓글 단 글(touch)은 그 턴에 꼭 넣는다 (전수검사 11-13)
   const posts: (Pick<Record<string, unknown>> & { pin?: boolean })[] = [];
   // 내가 쓴 것만: 내 글, 내 댓글이 달린 글(그 댓글과 위쪽 댓글만), 내가 주고받은 쪽지는 원래 모두 내 것 (원본 context_own_only)
@@ -1270,7 +1276,7 @@ export function mainContext(st: GState, nick: string, rules: string, focus?: Foc
       order: p.id,
       pin: p.back !== undefined || p.touch !== undefined,
       related: related(focus, [p.nick, p.title, ...comments.map((c) => c.author)], `${p.title}\n${p.body}\n${comments.map((c) => c.content).join('\n')}`),
-      data: { kind: 'public_post', title: p.title, date: p.date, author: p.nick, content: describe(p.body), comments, access: 'publicly accessible; reading by each character is not established' },
+      data: { kind: 'public_post', title: p.title, date: p.date, author: p.nick, content: describe(p.body), comments, access: accessPost },
     });
   }
   const dms: Pick<Record<string, unknown>>[] = [];
@@ -1281,7 +1287,7 @@ export function mainContext(st: GState, nick: string, rules: string, focus?: Foc
       related: related(focus, [d.nick], d.body),
       data: {
         kind: 'private_message', sender: d.side === 'me' ? nick : d.nick, recipient: d.side === 'me' ? d.nick : nick, content: describe(d.body),
-        ...(d.date ? { date: d.date } : {}), order: i + 1, access: 'sender and recipient only',
+        ...(d.date ? { date: d.date } : {}), order: i + 1, access: accessDm,
       },
     });
   }

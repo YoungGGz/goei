@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const out = await build({ stdin: { contents: `export * from './src/core/malls'; export { appendItems, dropItemsNamed, emptyShop, parseShelf, parseTalk, applyTalk, buyNote, SHOP_LINE, SECRET_LINE, lineOf, TRUTH_RULE, sayToOwner, stampLastLine } from './src/core/shop'; export { inventoryText } from './src/core/items';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false });
+const out = await build({ stdin: { contents: `export * from './src/core/malls'; export { appendItems, dropItemsNamed, emptyShop, parseShelf, parseTalk, applyTalk, buyNote, lineOf, sayToOwner, stampLastLine } from './src/core/shop'; export { guideTxt } from './src/core/guides'; export { inventoryText } from './src/core/items';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false });
 const M = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 
 /** 정해진 수열을 내는 난수 (시험용) */
@@ -33,7 +33,7 @@ test('진열 배정: 끄면 빈 글, 상황용 칸 수는 설정대로, 장르·
   const r = M.cosRoll({ $cos_roll_genres: '요리, 원예,요리', $cos_roll_tiers: '싼것|cheap|1000|2000\n비싼것|dear|5000|9000\n이상한줄\n거꾸로|x|9|1' });
   assert.deepEqual(r.genres, ['요리', '원예'], '쉼표로 나누고 중복은 뺀다');
   assert.deepEqual(r.tiers.map((t) => [t.name, t.lo, t.hi]), [['싼것', 1000, 2000], ['비싼것', 5000, 9000]], '이상한 줄·거꾸로 된 구간은 버린다');
-  assert.equal(M.tiersText(M.parseTiers(M.tiersText(M.COS_TIERS_DEFAULT))), M.tiersText(M.COS_TIERS_DEFAULT), '글 ↔ 값 왕복');
+  assert.equal(M.tiersText(M.parseTiers(M.tiersText(M.rollDefaults('cos').tiers))), M.tiersText(M.rollDefaults('cos').tiers), '글 ↔ 값 왕복');
   const t = M.cosAssignment(3, false, r, seq(0.2));
   assert.ok(t.includes('GENRE: 요리') && t.includes('GENRE: 원예'), '장르가 칸보다 적으면 돌려 쓴다');
   assert.ok(M.cosRollChanged({ $cos_roll_genres: 'a' }) && !M.cosRollChanged({}));
@@ -76,12 +76,13 @@ test('추첨 방식: 장르 겹침·통일, 등급 가중치·골고루·통일,
   assert.equal(new Set(d3.map((s) => s.tier.name)).size, 5, '골고루 → 5칸에 5등급 전부');
   assert.equal(M.cosRoll({}).gmode, 'uniq'); assert.equal(M.cosRoll({}).tmode, 'weight');
   assert.equal(M.parseTiers('x|y|1|2')[0].w, 1, '가중치 비우면 1');
-  assert.ok(M.tiersText(M.COS_TIERS_DEFAULT).endsWith('|1'), '글에 가중치가 붙는다');
+  assert.ok(M.tiersText(M.rollDefaults('cos').tiers).endsWith('|1'), '글에 가중치가 붙는다');
 });
 
 test('숨긴 진짜 효과: 우주몰 줄 끝 「진실」 칸은 저장되고 화면용 효과와 따로 간다 (11-09 사용자: 효과는 광고 문구, 진짜는 모델만)', () => {
-  assert.equal(M.SECRET_LINE, `${M.SHOP_LINE}|진실`);
-  assert.equal(M.lineOf('Cos'), M.SECRET_LINE); assert.equal(M.lineOf('Shop'), M.SHOP_LINE);
+  // 줄 꼴은 지침의 LINE 절 (2026-11-14 사용자: 모델 글은 전부 지침 파일로)
+  assert.equal(M.lineOf('Shop'), '이름|값|쓰임|그림|무게|설명|효과|구분');
+  assert.equal(M.lineOf('Cos'), `${M.lineOf('Shop')}|진실`);
   const r = M.parseShelf('<shelf>\n빛의 돌|1200000|사용|glowing stone|0.2|둥근 돌이다|어둠을 밝힌다|-|쥐면 주변 전등이 전부 꺼진다\n보통 돌|999999|-|stone|0.3|돌|???||\n</shelf>', { sells: 'x', never: '', prices: '' });
   assert.equal(r.items[0].truth, '쥐면 주변 전등이 전부 꺼진다');
   assert.equal(r.items[0].effect, '어둠을 밝힌다');
@@ -92,7 +93,7 @@ test('진실 섞기: ? 는 「아무도 모름」, 설정 기본은 섞음, 시�
   const r = M.parseShelf('<shelf>\n돌|999999|-|stone|0.3|돌|???||?\n</shelf>', { sells: 'x', never: '', prices: '' });
   assert.equal(r.items[0].truth, '?');
   assert.equal(M.cosTruthMode({}), 'mix'); assert.equal(M.cosTruthMode({ $cos_truth: 'none' }), 'none');
-  assert.ok(M.TRUTH_RULE.mix.includes('MIX') && M.TRUTH_RULE.none.includes('EVERY'));
+  assert.ok(M.guideTxt('Cos', 'TRUTH_MIX').includes('MIX') && M.guideTxt('Cos', 'TRUTH_NONE').includes('EVERY'));
 });
 
 test('정보 쪽지: <info>제목|값|내용</info> → 대사에 붙은 쪽지, 같은 제목은 한 번만, 사면 bought (11-09 사용자)', () => {

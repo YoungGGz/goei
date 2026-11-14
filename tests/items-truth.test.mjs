@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const out = await build({ stdin: { contents: `export * from './src/core/items';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false });
+const out = await build({ stdin: { contents: `export * from './src/core/items'; export { guideTxt } from './src/core/guides';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false });
 const I = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 const alive = new Set(['a1']);
 const base = { slots: 8, limit: '8 items' };
@@ -26,7 +26,8 @@ test('truth: 안 쓰는 턴엔 Really 없음, 쓰는 턴엔 Really 에 진짜, ?
   assert.ok(used.includes('- 돌: not even its seller knows (the label says 「???」 and may be false) — decide what it really does now'), used);
   // Really 설명은 쓰는 턴의 Really 머리줄에만 (11-13 전수검사: INVENTORY_NOTE 에서 뺌)
   assert.ok(used.includes('Really (what these actually do — decided by no one in advance'), used);
-  assert.ok(!I.INVENTORY_NOTE.includes('Really'));
+  // 안내 글은 지침 「메인 요청에 붙는 글」 INVENTORY.NOTE 절 (2026-11-14: 코드 사본 INVENTORY_NOTE 를 없앰)
+  assert.ok(!I.guideTxt('Main', 'INVENTORY.NOTE').includes('Really'));
 });
 
 test('쪽지 내용(text): 저장되고 본편 줄에 reads 로 간다', () => {

@@ -1,7 +1,7 @@
 // 참고 자료 모으기 (원본 REFERENCE_CORE). 위키·괴담넷·괴담톡이 같이 쓴다.
 // 봇 설명, 작가 노트, 제목과 같은 이름의 로어북, 글에 이름이 나온 로어북, 상시 로어북(고른 것, 기본 📜Faction·🙂Roster),
 // 그 로어북들 속 이름으로 한 번 더 찾은 2차 참조를 모아 "[종류: 출처]\n내용" 블록으로 만든다.
-import { guidePrompt, isGuideName } from './guides';
+import { guidePrompt, guideTxt, isGuideName } from './guides';
 import { evaluate, type CbsEnv } from './cbs';
 import { readScene, stripSceneCard, stripStartCard, stripUnsentMark } from './dispatch';
 import { hasCall, stripCall } from './phone';
@@ -72,7 +72,13 @@ export function toggleActiveBook(state: Record<string, unknown> | undefined, nam
   if (!key) return activeBooksValue(cur);
   return activeBooksValue(cur.some((n) => bookKey(n) === key) ? cur.filter((n) => bookKey(n) !== key) : [...cur, name.trim()]);
 }
+/* 기본 자료의 출처 이름. 코드가 견주는 이름이고(phonePrompt 등), 요청에 적을 때는 지침 「요청 공통」 REFS.SOURCE.* 절의 글로 바꾼다 */
 export const PERSONA_SOURCE = '사용자 페르소나';
+const DESC_SOURCE = '봇 설명';
+const NOTE_SOURCE = '작가 노트';
+const SOURCE_SECTION = new Map<string, string>([[DESC_SOURCE, 'REFS.SOURCE.DESC'], [NOTE_SOURCE, 'REFS.SOURCE.NOTE'], [PERSONA_SOURCE, 'REFS.SOURCE.PERSONA']]);
+/** 요청에서 {{user}} 대신 쓰는 이름 (지침 「요청 공통」 REFS.USER_NAME 절) */
+const userName = (): string => guideTxt('Common', 'REFS.USER_NAME');
 
 export function allowedBook(e: LoreEntry): boolean {
   const name = String(e.comment ?? '');
@@ -95,7 +101,7 @@ export function stripModules(text: string): string {
 }
 
 export function cbsEnv(src: RefSource): CbsEnv {
-  return { vars: src.chat.scriptstate ?? {}, char: src.char.name, charDesc: src.char.desc, user: '주인공' };
+  return { vars: src.chat.scriptstate ?? {}, char: src.char.name, charDesc: src.char.desc, user: userName() };
 }
 
 function allBooks(src: RefSource): LoreEntry[] {
@@ -165,9 +171,9 @@ export function collectRefs(src: RefSource, o: CollectOptions): RefRow[] {
   };
   const required = (kind: RefKind) => (o.scope === 'wiki' ? kind === 'base' || kind === 'primary' || kind === 'active' : kind === 'base' || kind === 'direct');
 
-  if (o.description !== false && src.char.desc) add('base', '봇 설명', stripModules(evaluate(src.char.desc, env)));
+  if (o.description !== false && src.char.desc) add('base', DESC_SOURCE, stripModules(evaluate(src.char.desc, env)));
   const note = typeof src.chat.note === 'string' ? src.chat.note : '';
-  if (o.authors !== false && note.trim()) add('base', '작가 노트', stripModules(evaluate(note, env)));
+  if (o.authors !== false && note.trim()) add('base', NOTE_SOURCE, stripModules(evaluate(note, env)));
   if (o.persona !== false && src.persona?.trim()) add('base', PERSONA_SOURCE, stripModules(evaluate(src.persona, env)));
   const seen = new Set<string>();
   const pull = (kind: RefKind, name: string) => {
@@ -210,10 +216,13 @@ export function limitRefs(rows: RefRow[], max: number, o?: LimitOptions): RefRow
   return out;
 }
 
-const KIND_LABEL: Record<RefKind, string> = { base: '공통', primary: '주제 원본', active: '활성 로어북', direct: '관련 로어북', secondary: '2차 참조' };
-
+/** 참고 자료 묶음. 머리 줄은 지침 「요청 공통」 REFS.HEAD (종류 이름 REFS.KIND.*, 출처 이름 REFS.SOURCE.*) */
 export function refText(rows: RefRow[]): string {
-  return rows.map((r) => `[${KIND_LABEL[r.kind]}: ${r.sources.join(' / ')}]\n${r.content}`).join('\n\n');
+  const source = (s: string) => {
+    const sec = SOURCE_SECTION.get(s);
+    return sec ? guideTxt('Common', sec) : s;
+  };
+  return rows.map((r) => `${guideTxt('Common', 'REFS.HEAD', { kind: guideTxt('Common', `REFS.KIND.${r.kind}`), sources: r.sources.map(source).join(' / ') })}\n${r.content}`).join('\n\n');
 }
 
 // ── 최근 본문 ──
@@ -227,9 +236,9 @@ export function messageText(data: string): string {
   let t = stripThoughts(stripStartCard(stripUnsentMark(String(data ?? ''))));
   if (t.includes('%%SCENE_CARD:')) {
     const s = readScene(t);
-    t = s ? `[이동] 목표: ${s.target} / 투입: ${s.party}` : stripSceneCard(t);
+    t = s ? guideTxt('Common', 'REFS.MOVE', { target: s.target, party: s.party }) : stripSceneCard(t);
   }
-  if (hasCall(t)) t = stripCall(t).replace(/\{\{user\}\}/gi, '주인공');
+  if (hasCall(t)) t = stripCall(t).replace(/\{\{user\}\}/gi, () => userName());
   if (hasWorldTags(t)) t = cleanOutput(t);
   return stripModules(t);
 }
@@ -248,9 +257,12 @@ export function recentTurns(chat: Chat, n: number, withUser = true): Turn[] {
   return turns.slice(-Math.max(1, n));
 }
 
+/** 최근 본문. 이름표는 지침 「요청 공통」 REFS.STORY.USER · REFS.STORY.CHAR 절 */
 export function storyText(turns: Turn[]): string {
+  const user = guideTxt('Common', 'REFS.STORY.USER');
+  const char = guideTxt('Common', 'REFS.STORY.CHAR');
   return turns
-    .flatMap((t) => [...(t.user ? [`[user]\n${t.user}`] : []), ...t.char.map((c) => `[char]\n${c}`)])
+    .flatMap((t) => [...(t.user ? [`${user}\n${t.user}`] : []), ...t.char.map((c) => `${char}\n${c}`)])
     .join('\n\n');
 }
 

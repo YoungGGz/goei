@@ -8,6 +8,7 @@ import { BUILTIN, extraFactions, extraTabs, factionType, isFactionCode } from '.
 import { dateNow, storyTurns, tokens, cut } from './gnet';
 import { attachmentRecords, describe, sitePicAsPhoto, stripForged } from './attach';
 import { pickRecords, related, type Focus, type Pick } from './focus';
+import { guideTxt } from './guides';
 export { hasAttachment } from './attach';
 
 export class PhoneError extends Error {
@@ -909,7 +910,8 @@ export function announcementPacket(chat: Chat, set: PhoneSettings, names: Record
     .map((r) => ({ issuer: r.issuer, category: r.category, title: r.title, text: r.text, time: r.time }));
   return {
     allowed, channel: channel ?? '', channelName: channel ? noticeLabel(channel, names) : '',
-    access: { civilian: 'public', freelancer: 'registered contractor notices', org: 'current affiliation internal notices' }[factionType(channel ?? '', lore)],
+    // 받는 범위 글은 지침 「괴담톡」 ANNOUNCEMENT_ACCESS.<소속 갈래> 절
+    access: guideTxt('Phone', `ANNOUNCEMENT_ACCESS.${factionType(channel ?? '', lore).toUpperCase()}`),
     maxNew: allowed ? LIMITS.notices : 0, recent, turn: storyTurns(chat), minimumTurnGap: noticeSettings(chat.scriptstate).gap,
   };
 }
@@ -1109,11 +1111,12 @@ export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules:
     }
   }
   if (set.contextAnnouncements) {
+    const access = guideTxt('Phone', 'MAIN_CONTEXT.NOTICE_ACCESS');
     // 0개면 slice(-0)이 전부가 되므로 따로 막는다 (전수검사 11-13)
     for (const a of (HISTORY.contextNotices > 0 ? b.items.slice(-HISTORY.contextNotices) : [])) {
       items.push({
         order: a.order, related: true, free: true,
-        data: { kind: 'announcement', channel: a.channel, title: a.title, sender: a.issuer, text: a.text, time: a.time, order: a.order, recipients: ['주인공'], access: 'received by owner; audience bounded by channel' },
+        data: { kind: 'announcement', channel: a.channel, title: a.title, sender: a.issuer, text: a.text, time: a.time, order: a.order, recipients: ['주인공'], access },
       });
     }
   }
@@ -1135,7 +1138,8 @@ const CALL_RE = /%%PHONE_CALL:([0-9a-f]*)%%\r?\n([\s\S]*?)\r?\n%%\/PHONE_CALL%%/
 const fromHex = (h: string) => new TextDecoder().decode(new Uint8Array((h.match(/../g) ?? []).map((x) => parseInt(x, 16))));
 
 export function callRecord(target: string, purpose: string): string {
-  const body = `{{user}} places a phone call to ${target}.${purpose.trim() ? `\n\n${purpose.trim()}` : ''}`;
+  // 전화 거는 문장은 지침 「괴담톡」 CALL 절 ({{user}} 는 Risu 가 바꾼다)
+  const body = `${guideTxt('Phone', 'CALL', { target })}${purpose.trim() ? `\n\n${purpose.trim()}` : ''}`;
   return `%%PHONE_CALL:${hex(target)}%%\n${body}\n%%/PHONE_CALL%%`;
 }
 export const hasCall = (t: string) => typeof t === 'string' && t.includes('%%PHONE_CALL:');

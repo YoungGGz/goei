@@ -4,7 +4,7 @@
 // - 비망록 (원본 「탈옥 (비망록)」): 지침의 MEMO.* 절. 맨 앞에 인물 글과 작업 문장, 맨 끝에 미리 채운 응답과 사용자 한마디.
 // 다시 보기·동시 요청 수·재시도 문구는 모델 호출 쪽(host/llm.ts)에서 한다.
 import { advNum, advValue, type AdvFeature } from './advanced';
-import { guideOr } from './guides';
+import { guideTxt } from './guides';
 
 export type ThoughtsMode = 'off' | 'inner' | 'note';
 type State = Record<string, unknown> | undefined;
@@ -42,17 +42,9 @@ export interface CraftMessage {
   content: string;
 }
 
-/** 다시 물을 때 붙이는 원인 분석 지시 (원본은 생각 단계를 꺼도 이렇게 한다). <lb-process> 칸은 모델 호출이 지운다 */
-export const RETRY_ANALYZE = 'First analyze the error source step-by-step in a short <lb-process> block, then print only the required node with the corrected data in it, without apologies, explanations, or preambles.';
-
-/** 원본 lb.thoughts 머리말 (모드별) */
-const NOTE_HEAD = 'Think step-by-step for final data, but keep minimal draft per step.\n\nFollow this template.';
-const NOTE_TAIL = 'Always include subject and object. For list items like generated new topics, summarize them into 3-5 essential keywords, focusing on nouns. '
-  + 'Write the process in an extremely condensed telegraphic style plaintext, almost to the level of noun lists, without any preambles or markdown decorations.\n\n'
-  + 'Put the above step-by-step process into a `<lb-process>` block BEFORE the required output:\n<lb-process>\n(process)\n</lb-process>\n\nThen output the required data exactly as instructed. The application removes the <lb-process> block.';
-const INNER_HEAD = 'The following template is your internal guide. Reason through it thoroughly, every step of it. Do not write the reasoning out; output only the required data.';
-/** 위 글들은 지침 「요청 공통」의 RETRY.ANALYZE · THOUGHTS.* 절에서 읽는다 (설정 → 지침에서 고침). 절이 없으면 위 글 */
-export const retryAnalyze = (): string => guideOr('Common', 'RETRY.ANALYZE', RETRY_ANALYZE);
+/** 다시 물을 때 붙이는 원인 분석 지시 (원본은 생각 단계를 꺼도 이렇게 한다). <lb-process> 칸은 모델 호출이 지운다.
+ *  글은 지침 「요청 공통」의 RETRY.ANALYZE 절, 생각 단계 머리말(원본 lb.thoughts, 모드별)은 THOUGHTS.* 절, 비망록 작업 머리는 MEMO.JOB_TITLE 절 (설정 → 지침에서 고침) */
+export const retryAnalyze = (): string => guideTxt('Common', 'RETRY.ANALYZE');
 
 /** system 칸 하나를 고친다 (첫 system, 없으면 맨 앞에 새로) */
 function editSystem(messages: CraftMessage[], edit: (s: string) => string): CraftMessage[] {
@@ -66,12 +58,12 @@ export function craftMessages<M extends CraftMessage>(messages: M[], s: CraftSet
   let out: CraftMessage[] = messages;
   const steps = texts.thoughts?.trim();
   if (steps && s.thoughts !== 'off') {
-    const block = s.thoughts === 'note' ? `# Thoughts\n${guideOr('Common', 'THOUGHTS.NOTE_HEAD', NOTE_HEAD)}\n\n${steps}\n\n${guideOr('Common', 'THOUGHTS.NOTE_TAIL', NOTE_TAIL)}` : `# Thoughts Guideline\n${guideOr('Common', 'THOUGHTS.INNER_HEAD', INNER_HEAD)}\n\n${steps}`;
+    const block = s.thoughts === 'note' ? `${guideTxt('Common', 'THOUGHTS.NOTE_TITLE')}\n${guideTxt('Common', 'THOUGHTS.NOTE_HEAD')}\n\n${steps}\n\n${guideTxt('Common', 'THOUGHTS.NOTE_TAIL')}` : `${guideTxt('Common', 'THOUGHTS.INNER_TITLE')}\n${guideTxt('Common', 'THOUGHTS.INNER_HEAD')}\n\n${steps}`;
     out = editSystem(out, (sys) => `${sys}\n\n${block}`);
   }
   const memo = texts.memo;
   if (s.memo && memo && memo.persona.trim()) {
-    out = editSystem(out, (sys) => `${memo.persona.trim()}\n\n${memo.job.trim() ? `# Job Note\n${memo.job.trim()}\n\n` : ''}${sys}`);
+    out = editSystem(out, (sys) => `${memo.persona.trim()}\n\n${memo.job.trim() ? `${guideTxt('Common', 'MEMO.JOB_TITLE')}\n${memo.job.trim()}\n\n` : ''}${sys}`);
     if (memo.prefill.trim()) {
       out = [...out, { role: 'assistant', content: memo.prefill.trim() }];
       if (memo.prefillUser.trim()) out = [...out, { role: 'user', content: memo.prefillUser.trim() }];

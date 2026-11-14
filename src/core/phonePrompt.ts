@@ -12,7 +12,7 @@ import { applyAdvanced, genSettings, type RefToggles } from './advanced';
 import { fnHistory, fnNum, fnRefs } from './reffn';
 import { previousView, viewSettings, type ViewRoom } from './phoneView';
 import { craftMessages, craftSettings, memoTexts, retryAnalyze, type CraftMessage } from './craft';
-import { fillVars, GUIDE_LABEL } from './guides';
+import { fillVars, guideDefaultSec, guideTxt, GUIDE_LABEL } from './guides';
 import { trimRelated, trimSecondary, trimTurns } from './budget';
 import { playerAgent } from './player';
 import { bookText, PERSONA_SOURCE, collectRefs, factionCodesToNames, policySections, recentTurns, type RefSource } from './refs';
@@ -20,14 +20,12 @@ import { bookText, PERSONA_SOURCE, collectRefs, factionCodesToNames, policySecti
 export interface PhonePrompt {
   messages: CraftMessage[];
   contactMode: boolean;
-  /** 새로고침 응답이 형식에 안 맞을 때 다시 묻는 글 (지침 절 RETRY.REFRESH). 없으면 코드에 남긴 글 */
+  /** 새로고침 응답이 형식에 안 맞을 때 다시 묻는 글 (지침 절 RETRY.REFRESH) */
   retryRule?: string;
 }
 
-const LANGUAGE = 'Reply in the dominant language of the actual conversation; default to Korean when no conversation is available.';
-
-/** 언어 문장: 지침 「괴담톡」 LANGUAGE 절 (없으면 위 글) */
-const languageLine = (p: Record<string, string>): string => p.LANGUAGE?.trim() || LANGUAGE;
+/** 언어 문장: 지침 「괴담톡」 LANGUAGE 절 (고친 지침에 없거나 비었으면 기본 지침 파일의 절) */
+const languageLine = (): string => guideTxt('Phone', 'LANGUAGE');
 
 function sections(src: RefSource): Record<string, string> {
   applyAdvanced(src.chat.scriptstate);
@@ -106,7 +104,7 @@ function rules(src: RefSource, body: Body, mode: 'REPLY' | 'REFRESH'): string {
   const br = phoneSettings(src.chat.scriptstate).banterRows;
   // 수다가 든 확인 요청은 방마다 말풍선 상한을 수다 줄 수까지: 지침 숫자와 저장 상한을 맞춘다 (전수검사 11-13)
   const limits = { events: eventCap(src.chat.scriptstate, mode === 'REFRESH' && !!body.rooms?.some((x) => x.banter)) };
-  return [...keys.map((k) => dropSitePicGuide(section(p, k, limits)).replace(/__PH_BANTER_RANGE__/g, br[0] === br[1] ? String(br[0]) : `${br[0]}-${br[1]}`)), genSettings(src.chat.scriptstate).language ?? languageLine(p)].join('\n\n');
+  return [...keys.map((k) => dropSitePicGuide(section(p, k, limits)).replace(/__PH_BANTER_RANGE__/g, br[0] === br[1] ? String(br[0]) : `${br[0]}-${br[1]}`)), genSettings(src.chat.scriptstate).language ?? languageLine()].join('\n\n');
 }
 
 // ── 자료 ──
@@ -294,7 +292,7 @@ function finish(src: RefSource, st: PState, body: Body, mode: 'REPLY' | 'REFRESH
   // 인물 로어북이 participants[].lore 와 universe.activeLoreBooks 에 똑같이 두 번 실리지 않게 참여자 쪽만 남긴다 (전수검사 11-13, 확인 1회 약 1.7만 토큰)
   const ownLore = body.participants.map((p) => p.lore).filter((l): l is string => typeof l === 'string' && !!l);
   if (ownLore.length) body.narratorOnly.universe.activeLoreBooks = body.narratorOnly.universe.activeLoreBooks.filter((b) => !ownLore.some((l) => l.includes(b.content)));
-  for (const p of body.participants) if (firstContact(p, body, st)) p.relationshipToOwner = 'none: never met or talked with the owner before; the owner only saved this contact';
+  for (const p of body.participants) if (firstContact(p, body, st)) p.relationshipToOwner = guideTxt('Phone', 'FIRST_CONTACT');
   if (phoneSettings(src.chat.scriptstate).habits) {
     const ids = new Set(body.participants.map((x) => x.sender));
     const rows = readHabits(src.chat.scriptstate).filter((h) => ids.has(h.id)).map((h) => ({ sender: h.id, note: h.note }));
@@ -307,7 +305,9 @@ function finish(src: RefSource, st: PState, body: Body, mode: 'REPLY' | 'REFRESH
     { role: 'system', content: factionCodesToNames(system, names) },
     { role: 'user', content: factionCodesToNames(JSON.stringify(body), names) },
   ];
-  return { messages: craftMessages(messages, craftSettings(src.chat.scriptstate, 'ph'), { thoughts: read('THOUGHTS'), memo: memoTexts(read) }), contactMode: false, retryRule: read('RETRY.REFRESH') };
+  // 다시 묻는 글: 고친 지침에 절이 없거나 비었으면 기본 지침 파일의 절
+  const retryRule = read('RETRY.REFRESH') || section({ 'RETRY.REFRESH': guideDefaultSec('Phone', 'RETRY.REFRESH') ?? '' }, 'RETRY.REFRESH');
+  return { messages: craftMessages(messages, craftSettings(src.chat.scriptstate, 'ph'), { thoughts: read('THOUGHTS'), memo: memoTexts(read) }), contactMode: false, retryRule };
 }
 
 function gnetBoard(src: RefSource, query: string): unknown {
@@ -420,12 +420,12 @@ function personOfContact(c: Contact): PPerson {
 /** 새로고침 응답이 형식에 안 맞을 때 같은 자료로 한 번 더 (원본 재시도 문구) */
 export function refreshRetry(prompt: PhonePrompt, reason: string): PhonePrompt['messages'] {
   const [sys, ...rest] = prompt.messages;
-  // 글은 지침 「괴담톡」 RETRY.REFRESH 절. 절이 없으면 아래에 남긴 글
-  const rule = prompt.retryRule?.trim();
+  // 글은 지침 「괴담톡」 RETRY.REFRESH 절 (finish 가 넣는다. 없으면 지침에서 바로)
+  const rule = prompt.retryRule?.trim() || guideTxt('Phone', 'RETRY.REFRESH');
   return [
     {
       role: 'system',
-      content: rule ? `${sys.content}\n${fillVars(rule, { reason: reason.slice(0, 600), analyze: retryAnalyze() })}` : `${sys.content}\nThe previous response was rejected and nothing was saved. Recreate the complete result from the same supplied data, following the REFRESH OUTPUT CONTRACT. Return a compact COMPLETE JSON object. The configured message lengths/counts are ceilings, not targets; reduce optional messages rather than ending mid-JSON. Omit silent rooms from updates. Use valid JSON string escaping for newlines, quotation marks and backslashes. Do not copy these instructions into messages. Validation error: ${reason.slice(0, 600)}\n${retryAnalyze()}`,
+      content: `${sys.content}\n${fillVars(rule, { reason: reason.slice(0, 600), analyze: retryAnalyze() })}`,
     },
     ...rest,
   ];
@@ -443,7 +443,7 @@ export function viewPrompt(src: RefSource, names: Record<string, string>, views:
   keys.push('VIEW.OUTPUT');
   // 지침 속 낱말이 아니라 절이 있는지로 본다 (전수검사 11-13)
   if (p['VIEW.OUTPUT'] === undefined) throw new PhoneError(`${GUIDE_LABEL.Phone} 지침에 보기 전용 방 섹션이 없어요.`);
-  const system = [...keys.map(opt).filter(Boolean), genSettings(src.chat.scriptstate).language ?? languageLine(p)].join('\n\n');
+  const system = [...keys.map(opt).filter(Boolean), genSettings(src.chat.scriptstate).language ?? languageLine()].join('\n\n');
   const previousRoom = previousView(views, set.preset, fnHistory(src.chat.scriptstate, 'ph', 'view'));
   const owner = ownerCharacter(src).character;
   const body = {

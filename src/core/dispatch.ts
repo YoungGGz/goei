@@ -2,7 +2,7 @@
 // 지시문 문장은 카드의 Directive 로어북에서 읽고, 채팅에는 SCENE_CARD로 감싼 유저 메시지 하나로 남긴다.
 // 화면에는 카드(목표·투입)만 보이고, 모델 요청에서는 감싼 표식만 지운 본문이 간다.
 import type { LoreEntry } from './types';
-import { guidePrompt } from './guides';
+import { guideDefault, guidePrompt } from './guides';
 
 export class DirectiveError extends Error {}
 
@@ -29,7 +29,10 @@ const REQUIRED = ['COMMON', 'OPENING', 'CONTINUATION', 'CONTEXT'];
 
 export function parseDirective(_lore?: LoreEntry[] | undefined): Directive {
   // 지시문 문장은 플러그인 내장 지침 (core/guides.ts Directive). 카드 로어북은 읽지 않는다 (2026-10-27)
-  const raw = guidePrompt('Directive');
+  return parseDirectiveText(guidePrompt('Directive'));
+}
+
+function parseDirectiveText(raw: string): Directive {
   if (typeof raw !== 'string' || !raw.trim()) throw new DirectiveError('Directive 지침을 읽지 못했어요.');
   const sections: Record<string, string> = {};
   const heads = [...raw.matchAll(/===([A-Z][A-Z0-9_]*)===/g)];
@@ -236,9 +239,18 @@ export function renderSceneCards(text: string, render: (s: SceneSummary) => stri
   });
 }
 
-/** 지시문 메시지 바로 뒤에 유저가 덧붙여 보낸 글을 "Situation:" 형식으로 합친다 */
+/** 고친 지시문을 읽지 못할 때 쓰는 기본 지침 파일(지침/이동_임무_지시문.txt)의 지시문 */
+function defaultDirective(): Directive | null {
+  try {
+    return parseDirectiveText(guideDefault('Directive'));
+  } catch {
+    return null;
+  }
+}
+
+/** 지시문 메시지 바로 뒤에 유저가 덧붙여 보낸 글을 지시문 FORMAT.user_input 꼴("Situation:" …)로 합친다. 고친 지시문을 못 읽으면 기본 지침 파일의 꼴 (2026-11-14 사용자: 코드에 글을 두지 않는다) */
 export function withUserInput(d: Pick<Directive, 'format'> | null, body: string, extra: string): string {
   if (!extra.trim()) return body;
-  const tpl = d?.format.user_input ?? 'Situation:\n[[INPUT]]';
+  const tpl = (d ?? defaultDirective())?.format.user_input ?? '[[INPUT]]';
   return `${body}\n\n${tpl.replace(/\[\[INPUT\]\]/g, () => extra)}`; // 함수로: 적은 글의 $& 같은 치환 패턴이 지시문을 망가뜨리지 않게
 }

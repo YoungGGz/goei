@@ -13,8 +13,7 @@ import { rhythmClock, rhythmClockLines } from './rhythm';
 import { speechVarietyBlock } from './speech';
 import { SEXUAL_POLICY, sexualAnyOn, sexualDirectorPolicy, sexualTexts } from './sexual';
 import type { PeopleSettings } from './settings';
-import { DIRECTOR_FACTS, DIRECTOR_SCENE } from './basetext';
-import { guideOr } from '../guides';
+import { guideTxt } from '../guides';
 import { SLOT_META, slotsFor, type PeopleStore, type SlotId } from './types';
 
 /** 2026-11-07 (전수검사 2 의 E): 메모 상한 120 → 400자, 모르는 것 ≤8, 불확실한 점(uncertain) 추가 (원본 note ≤12,000 + uncertainties) */
@@ -26,54 +25,13 @@ export interface SearchHit { ref: string; text: string }
 export interface SearchResult { kind: SearchKind; query: string; hits: SearchHit[] }
 export const SEARCH_MAX = 4;
 
-const SYSTEM_SEARCH = [
-  '## Missing material (one extra pass)',
-  `Only when a judgment this turn depends on material not supplied (the exact wording of an earlier line, a past event's details, a lore or wiki fact about a named thing), return instead {"need":[{"kind":"chat|lore|wiki","query":"<Korean term exactly as it would appear>","reason":"<≤60 chars>"}]} with at most ${SEARCH_MAX} items and nothing else. \`chat\` searches earlier messages of this chat, \`lore\` the character's lorebook, \`wiki\` the chat's wiki documents by title or body. The program runs the searches and calls you once more with \`found\` (hits with a \`ref\` and an excerpt); that second call must return notes and may not ask again. Do not request a search for a stable relationship or a scene with no open question; a search costs a turn's time.`,
-];
-const SYSTEM_PASS2 = 'This is the second pass. `found` holds the search results (an empty `hits` means nothing matched; say nothing rather than fill the gap). Return notes now; `need` is not allowed.';
-const OUTPUT = 'Return one JSON object only, no code fence: {"notes":[{"who":"<name>","now":"<≤400 chars>","react":"<≤400 chars, only when `react` is defined above; else omit>","must_not_reveal":["<≤120 chars>"],"uncertain":["<≤160 chars>"]}]}';
-
-/** 기능별 Director 적용 지침 (리수폿 Director Application 요약). 켜진 기능만 */
-export const FEATURE_GUIDE: Record<string, string[]> = {
-  axes: [
-    '## Personality axes',
-    'Each person\'s `axes` are baseline traits (0–100 with a band text), not the current mood: read them to shape how the person initiates, how directly they speak, how much they show, how guarded, how impulsive, how persistent. `patterns` are approved long-term changes. Never move or restate them as numbers in the note.',
-  ],
-  affinity: [
-    '## Affinity and taste',
-    'Identify the people actually interacting (including a real counterpart on a call or radio; never an unanswered attempt, a mere mention or a quoted recollection). Read base personality and speech, actual relationships, tastes and biases, and for each target the appraisal, intent, stance, constraint, private feeling and last approach and response. `affinity.appraisal` is the unchanging first impression; `affinity.current_appraisal` is the present view and governs when they differ. Use only information that actually reached this person as evidence of taste. Preserve base personality and the established relationship first, then say concretely how affinity alters conduct in this scene: more attention, asking first, saying only what is necessary, preparing help, keeping distance. A changed address or honorific level needs real evidence that permits it; a stage never authorizes intimacy or obedience. Never assume the next stage in advance; in qualitative mode use only the prose supplied.',
-  ],
-  register: [
-    '## Address and speech register',
-    'For each pair actually speaking this turn, check the current form of address, register, relationship stage and gap in contact; never invent prior experience. Choose the public or private form the situation calls for (`register.context`); using an existing form under its condition is not a new permanent form. Preserve target-specific asymmetry. A planned transition is not one that happened: you may note a wish to switch address or ask for informal speech, never the target\'s acceptance. Let a person act on stale or wrong knowledge (`register.knowledge_gap`) rather than on facts not yet transmitted. When the relationship is stable, do not repeat a status report; give only the baseline and the adjustment this turn must keep (`register.restraint`: expression behind or ahead of the relationship).',
-  ],
-  perception: [
-    '## Perception and knowledge',
-    'From the input, fix who is actually present or connected through a real channel, and what that channel carries. Distinguish, per person, known facts, strong interpretation, weak interpretation, unknown content and false belief; `unknown_to` and `perception.secret` are the boundary. Never make a person perceive a clue they did not see or hear, and never treat a lore entry, a record or another person\'s private state as knowledge. When the writer risks crossing a boundary, lower the expression to the allowed certainty, let the person stay unaware, or note a disclosure that could genuinely occur as a future option. A person can react through a question, cautious reading, topic avoidance or a misunderstanding without receiving new information. A scene with no boundary issue needs no observation report.',
-  ],
-  perception_ext: [
-    '## Sensory paths',
-    'Read the scene\'s light, distance, obstruction, noise, gaze and contact (`perception.channels`), current impairments (`perception.modifiers`) and the person\'s observation tendency (`perception.profile`). Judge clue detection separately from its interpretation; expertise cannot open a closed channel. Never reuse an old impairment as current.',
-  ],
-  suspicion: [
-    '## Suspicion',
-    'Read only the cases relevant to this scene; do not force a suspected target with no current interaction to appear. Separate what the suspecting person newly received, previously known evidence, interpretation, remaining questions and confirmation or closure; exclude undiscovered clues and the target\'s private state. A high stage never replaces actual confirmation; a disproved or closed case is not reopened without new evidence. Give a concrete direction for this turn instead of "is suspicious": attend only to a new discrepancy, suppress the question and keep distance, test a detail, or confront, chosen by personality, relationship and constraints. Never add a message not yet sent, a screen not read, or an investigation that did not occur, and never repeat an answered question without a new reason.',
-  ],
-  openness: [
-    '## Openness and conditions',
-    'First check whether this scene is actually an intimate context; when it is not, never insert openness or contraception. Read the stated conditions (`openness.context`), actual experiences and the current attitude; in numeric mode use only the supplied stage, never the next one; in qualitative mode use the prose. A person who requires contraception keeps that condition visible; hesitant wording is not abandonment; indifference differs from a preference not to use. An openness adjustment is a small difference in speech, attention or conduct and never overrides relationship boundaries, the other participant\'s reaction or personality. Distinguish what the person wants from what they did; never write the user\'s action. Judge attitudes and conditions only; no explicit scene, no medical calculation.',
-  ],
-  rhythm: [
-    '## Narrative rhythm',
-    'Read the scene phase, tension, last advancement and active hooks from `rhythm`, and the program-counted turn clock from `rhythm_clock` (which hooks are in their payoff window or overdue, whether a new plant is allowed). Judge the natural response to the input first; when tension is moving, follow it; when the scene is genuine rest, let it stay quiet. Never add an event because the input is short. If a hook action is allowed, propose at most one, from existing evidence, saying what would enter the scene and which choices stay open to the user; a proposal is not an event. Never expose rhythm numbers in the note.',
-  ],
-};
+/** 기능별 Director 적용 지침 (리수폿 Director Application 요약)은 지침 「Director」 APPLY.<기능> 절. 켜진 기능만 이 차례로 */
 const GUIDE_ORDER = ['axes', 'affinity', 'register', 'perception', 'perception_ext', 'suspicion', 'openness', 'rhythm'];
 
 export interface DirectorInput { system: string; data: Record<string, unknown>; key: string; people: string[]; search: boolean }
 
 /** 요청 자료. people 은 장면 인물(request.ts 가 고른 것) */
-/** base = 지침 탭 「Director」 절(FACTS·SCENE). 비면 내장 글 */
+/** base = FACTS·SCENE 덮어쓰기(시험용). 없거나 비면 지침 「Director」 FACTS·SCENE 절 */
 export function buildDirector(chat: Chat, store: PeopleStore, people: string[], input: string, s: PeopleSettings, values: Record<string, string>, memory: string[] = [], base: { facts?: string; scene?: string } = {}): DirectorInput | null {
   if (!people.length) return null;
   const live = liveness(chat);
@@ -119,13 +77,13 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
     rhythm: rhythm.length > 0,
   };
   const hasSexual = persons.some((p) => 'sexual_desire' in p || 'paraphilia' in p);
-  const guides = s.directorFeatures ? GUIDE_ORDER.filter((f) => (s.features as Set<string>).has(f) && hasData[f] !== false).flatMap((f) => ['', guideOr('Director', `APPLY.${f.toUpperCase()}`, () => FEATURE_GUIDE[f].join('\n')), ...(f === 'register' && speechVarietyBlock(s, 'director') ? [speechVarietyBlock(s, 'director')] : []), ...(f === 'axes' && sexualAnyOn(s) && hasSexual ? [guideOr('Director', 'APPLY.SEXUAL', () => `\`sexual_desire\` / \`paraphilia\` on a person are that person's sexual profile. ${sexualDirectorPolicy()}`, { policy: sexualDirectorPolicy() })] : [])]) : [];
-  // 기본 지침은 지침 탭 「Director」에서 고친다 (리수폿 J-1). 기능별 절·검색·출력 계약은 그대로
-  const facts = base.facts?.trim() || DIRECTOR_FACTS.join('\n');
-  const scene = base.scene?.trim() || DIRECTOR_SCENE.join('\n');
-  const system = [facts, ...(s.director === 'scene' ? [scene] : []), ...guides, '', ...(s.directorSearch ? [guideOr('Director', 'SEARCH', () => SYSTEM_SEARCH.join('\n'), { max: SEARCH_MAX })] : []), guideOr('Director', 'OUTPUT', OUTPUT), s.directorRules.trim() ? `## User rules\n${s.directorRules.trim()}` : '']
+  const guides = s.directorFeatures ? GUIDE_ORDER.filter((f) => (s.features as Set<string>).has(f) && hasData[f] !== false).flatMap((f) => ['', guideTxt('Director', `APPLY.${f.toUpperCase()}`), ...(f === 'register' && speechVarietyBlock(s, 'director') ? [speechVarietyBlock(s, 'director')] : []), ...(f === 'axes' && sexualAnyOn(s) && hasSexual ? [guideTxt('Director', 'APPLY.SEXUAL', { policy: sexualDirectorPolicy() })] : [])]) : [];
+  // 기본 지침은 지침 탭 「Director」 FACTS·SCENE 절 (리수폿 J-1). base 는 시험용 덮어쓰기
+  const facts = base.facts?.trim() || guideTxt('Director', 'FACTS');
+  const scene = base.scene?.trim() || guideTxt('Director', 'SCENE');
+  const system = [facts, ...(s.director === 'scene' ? [scene] : []), ...guides, '', ...(s.directorSearch ? [guideTxt('Director', 'SEARCH', { max: SEARCH_MAX })] : []), guideTxt('Director', 'OUTPUT'), s.directorRules.trim() ? `${guideTxt('Director', 'USER_RULES.HEAD')}\n${s.directorRules.trim()}` : '']
     .join('\n')
-    .replace('{{LANG}}', s.directorLang === 'ko' ? 'Korean' : 'English')
+    .replace('{{LANG}}', () => guideTxt('Director', s.directorLang === 'ko' ? 'LANG.KO' : 'LANG.EN'))
     .replace('{{LINES}}', s.directorLen === 'normal' ? '3' : '1');
   const data = { people: persons, ...(rhythm.length ? { rhythm, rhythm_clock: rhythmClockLines(rhythmClock(store, chat, live)) } : {}), ...(memory.length ? { memory } : {}), recent, input: input.slice(0, 4000) };
   // 최근 글도 열쇠에 넣는다: 같은 입력을 두 번 보내도 장면이 나아갔으면 다시 묻는다. 리롤은 최근 글이 같아 그대로 재사용 (전수검사 11-13)
@@ -135,14 +93,14 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
 
 /** 출력 검증 실패 뒤 고침 요청 (원본 repairDirectorPrompt): 같은 지침 + 오류·이전 답을 붙여 1회 더 */
 export function repairDirector(built: DirectorInput, invalid: string, error: string): DirectorInput {
-  // 글은 지침 「Director」 REPAIR 절. 절이 없으면 여기 남긴 글
-  const fix = guideOr('Director', 'REPAIR', () => `## Output repair\nYour previous response failed validation: ${plain(error, 200)}. Return exactly one JSON object in the shape given above, with no code fence, explanation, preface or trailing text. Use only the names in \`people\`; never invent a field or a narrative fact.`, { error: plain(error, 200) });
+  // 글은 지침 「Director」 REPAIR 절
+  const fix = guideTxt('Director', 'REPAIR', { error: plain(error, 200) });
   return { ...built, system: `${built.system}\n\n${fix}`, data: { ...built.data, invalid_previous_response: invalid.slice(0, 6000) } };
 }
 
 /** 2차 호출 자료: 같은 지침 + 「2차」 안내 + found */
 export function buildDirectorPass2(built: DirectorInput, found: SearchResult[]): DirectorInput {
-  return { ...built, system: `${built.system}\n\n${guideOr('Director', 'PASS2', SYSTEM_PASS2)}`, data: { ...built.data, found }, search: false };
+  return { ...built, system: `${built.system}\n\n${guideTxt('Director', 'PASS2')}`, data: { ...built.data, found }, search: false };
 }
 
 function jsonOf(raw: string): Record<string, unknown> {
@@ -235,14 +193,13 @@ export function runSearches(searches: DirectorSearch[], src: { chat: Chat; lore?
   });
 }
 
-export const DIRECTOR_HEAD = '[Director note]';
-/** 본편에 넣는 글 */
+/** 본편에 넣는 글. 머리·줄 꼴은 지침 「Director」 MAIN_NOTE.* 절 */
 export function directorBlock(notes: DirectorNote[], user: string): string {
   if (!notes.length) return '';
-  const lines = notes.map((n) => [`- ${n.who}: ${n.now}`, n.react ? `  Likely reaction this turn: ${n.react}` : '', ...n.mustNot.map((m) => `  Must not reveal: ${m}`), ...(n.uncertain ?? []).map((u) => `  Uncertain: ${u}`)].filter(Boolean).join('\n'));
-  // 머리말은 지침 「Director」 MAIN_NOTE 절. 절이 없으면 여기 남긴 글
-  const head = guideOr('Director', 'MAIN_NOTE', () => `Reference for ${user}'s scene partners, from their records. Tendencies and knowledge limits only; not events, not lines to say. Keep the roleplay's established output language; this English reference does not change it. Never expose this note verbatim.`, { user, knowledge_rule: knowledgeRule() });
-  return `${DIRECTOR_HEAD}\n${head}\n${lines.join('\n')}`;
+  const lines = notes.map((n) => [guideTxt('Director', 'MAIN_NOTE.ITEM', { who: n.who, now: n.now }), n.react ? `  ${guideTxt('Director', 'MAIN_NOTE.REACT', { react: n.react })}` : '', ...n.mustNot.map((m) => `  ${guideTxt('Director', 'MAIN_NOTE.MUST_NOT', { text: m })}`), ...(n.uncertain ?? []).map((u) => `  ${guideTxt('Director', 'MAIN_NOTE.UNCERTAIN', { text: u })}`)].filter(Boolean).join('\n'));
+  // 머리말은 지침 「Director」 MAIN_NOTE 절
+  const head = guideTxt('Director', 'MAIN_NOTE', { user, knowledge_rule: knowledgeRule() });
+  return `${guideTxt('Director', 'MAIN_NOTE.HEAD')}\n${head}\n${lines.join('\n')}`;
 }
 
 /** 화면 「지침 편집」용 기본 지침 원문 (연출형 기준) */

@@ -2,7 +2,7 @@
 // 앵무새 막기 (사용자): 지침에 예시 대사·소재 목록을 넣지 않는다. 사람을 먼저 「진짜로」 만든다 — 코드가 주사위 칸을 굴리고(설정에서 고침),
 // 모델이 그 값으로 상담사 카드를 한 번 짓는다(저장). 대화는 매 턴 그 카드를 같이 보낸다. 최근 상담사 요약을 넘겨 겹치지 않게 한다.
 // 지침 글: 플러그인 내장 지침 「BmDesk」(지침/포인트몰_1대1상담.txt, 설정 → 지침 → 포인트몰 1:1 상담에서 고침).
-import { fillGuide, guideOr, guideSections } from './guides';
+import { fillGuide, guideSections, guideTxt } from './guides';
 import type { CraftMessage } from './craft';
 
 type Vars = Record<string, unknown> | undefined;
@@ -15,16 +15,8 @@ export const DESK_AVOID_DEFAULT = 6;
 const PAST_KEEP = 20;
 
 /** 주사위 칸 기본 (설정에서 통째로 고친다. 한 줄에 「칸 이름: 값, 값, …」 — 같은 값을 여러 번 적으면 그만큼 잘 뽑힌다).
- *  직급은 위키 백일몽 문서의 직급표(사원~차장) 안에서. 나머지는 사람 됨됨이 축이지 소재가 아니다 */
-export const DESK_AXES_DEFAULT = [
-  '직급: 사원, 사원, 사원, 주임, 주임, 대리, 과장, 차장',
-  '근속: 입사 석 달 차, 1년 차, 2년 차, 4년 차, 7년 차, 10년이 넘음',
-  '이력: 처음부터 내근, 현장에서 다쳐 내근으로 옮김, 지금도 현장을 겸함, 다른 부서에서 밀려옴, 곧 다른 부서로 옮김',
-  '회사를 대하는 태도: 진심으로 회사를 믿음, 월급만큼만 일함, 승진에 목맴, 속으로 회사를 싫어함, 회사를 두려워함, 별생각 없음',
-  '오늘 기분: 지나치게 밝음, 지쳐 있음, 짜증을 참는 중, 들떠 있음, 멍함, 불안함, 차분함',
-  '매뉴얼 준수도: 토씨 하나까지 지킴, 대충 지킴, 자주 어김, 몰래 흘림',
-  '성격: 수다스러움, 무뚝뚝함, 소심함, 능글맞음, 깐깐함, 덤벙댐, 다정함, 냉소적임',
-].join('\n');
+ *  글은 지침 「포인트몰 1:1 상담」의 DICE_DEFAULT 절 (2026-11-14 사용자: 모델에 가는 글은 지침에). 직급은 위키 백일몽 문서의 직급표(사원~차장) 안에서. 나머지는 사람 됨됨이 축이지 소재가 아니다 */
+export const deskAxesDefault = (): string => guideTxt('BmDesk', 'DICE_DEFAULT');
 
 export interface DeskAxis { name: string; values: string[] }
 export function parseAxes(text: string): DeskAxis[] {
@@ -56,7 +48,7 @@ export function deskSettings(vars: Vars): DeskSettings {
   return {
     on: String(vars?.[DESK_KEY.on] ?? '') !== '0',
     axesText,
-    axes: parsed.length ? parsed : parseAxes(DESK_AXES_DEFAULT),
+    axes: parsed.length ? parsed : parseAxes(deskAxesDefault()),
     again: String(vars?.[DESK_KEY.again] ?? '') === '1',
     avoid: String(vars?.[DESK_KEY.avoid] ?? '') !== '' && Number.isFinite(n) ? Math.max(DESK_AVOID_RANGE[0], Math.min(DESK_AVOID_RANGE[1], n)) : DESK_AVOID_DEFAULT,
   };
@@ -127,16 +119,16 @@ function bubbles(text: string): string[] {
 /** 상담원 번호 (코드가 정한다) */
 export const newDeskNo = (rnd: () => number = Math.random): string => String(1000 + Math.floor(rnd() * 9000));
 /** 손님에게 보이는 호칭 (번호 없는 옛 카드는 id 로 만든다) */
-export const deskTag = (a: DeskAgent): string => `상담원 ${a.no ?? String(1000 + (parseInt(a.id.slice(-4), 36) % 9000))}`;
+export const deskTag = (a: DeskAgent): string => guideTxt('BmDesk', 'AGENT_TAG', { no: a.no ?? String(1000 + (parseInt(a.id.slice(-4), 36) % 9000)) });
 
 export function parseCard(raw: string, dice: DeskDice, no: string): { agent: DeskAgent; say: string[] } {
   const card = block(raw, 'card');
-  if (!card) throw fail('응답에 <card> 블록(상담사 카드)이 없어요.', raw);
+  if (!card) throw fail(guideTxt('BmDesk', 'ERR_NO_CARD'), raw);
   const get = (k: string) => clean(new RegExp(`^\\s*${k}\\s*[:：]\\s*(.+)$`, 'm').exec(card)?.[1], k === '소개' || k === '말투' ? 200 : 30);
   const name = get('이름');
-  if (!name) throw fail('상담사 카드에 이름이 없어요.', raw);
+  if (!name) throw fail(guideTxt('BmDesk', 'ERR_NO_NAME'), raw);
   const say = bubbles(block(raw, 'say'));
-  if (!say.length) throw fail('응답에 <say> 블록(첫 인사)이 없어요.', raw);
+  if (!say.length) throw fail(guideTxt('BmDesk', 'ERR_NO_GREETING'), raw);
   const rank = get('직급') || (dice.find(([k]) => k === '직급')?.[1] ?? '');
   return { agent: { id: `a${Date.now().toString(36)}${Math.floor(Math.random() * 1e4).toString(36)}`, no, name, rank, dept: get('부서'), intro: get('소개'), voice: get('말투'), dice }, say };
 }
@@ -145,7 +137,7 @@ export const deskRawSafe = (raw: string): string =>
   raw.replace(/<card\b[^>]*>[\s\S]*?(?:<\/card\s*>|$)/gi, '<card>(상담원 카드 — 숨김)</card>').replace(/<(thoughts|think)\b[^>]*>[\s\S]*?(?:<\/\1\s*>|$)/gi, '<$1>(생각 단계 — 숨김)</$1>');
 export function parseSay(raw: string): string[] {
   const say = bubbles(block(raw, 'say'));
-  if (!say.length) throw fail('응답에 <say> 블록(상담사 답)이 없어요.', raw);
+  if (!say.length) throw fail(guideTxt('BmDesk', 'ERR_NO_SAY'), raw);
   return say;
 }
 
@@ -162,21 +154,22 @@ export interface DeskSource {
 }
 
 const G = () => guideSections('BmDesk');
-const diceText = (d: DeskDice) => d.map(([k, v]) => `${k}: ${v}`).join('\n');
-const cardText = (a: DeskAgent) => `손님에게 보이는 호칭: ${deskTag(a)}\n이름: ${a.name}\n직급: ${a.rank}\n부서: ${a.dept}\n소개: ${a.intro}\n말투: ${a.voice}\n${diceText(a.dice)}`;
+// 요청 글은 전부 지침 「포인트몰 1:1 상담」의 절 (2026-11-14 사용자: 코드에 글을 두지 않는다)
+const diceText = (d: DeskDice) => d.map(([k, v]) => guideTxt('BmDesk', 'DICE_LINE', { name: k, value: v })).join('\n');
+const cardText = (a: DeskAgent) => guideTxt('BmDesk', 'CARD', { tag: deskTag(a), name: a.name, rank: a.rank, dept: a.dept, intro: a.intro, voice: a.voice, dice: diceText(a.dice) });
 const material = (src: DeskSource) => [
-  // 머리말은 지침 절에서, 없으면 옛 글 (전수검사 11-13)
-  src.refs ? `${guideOr('BmDesk', 'HEAD_REFS', '[참고 자료 — 백일몽에 대해 이 상담사가 알 수 있는 것]')}\n${src.refs}` : '',
-  `[지금 진열된 상품]\n${src.shelf || '(없음)'}`,
-  `[손님]\n사내 계정: ${src.nick || '-'}\n남은 포인트: ${Math.trunc(src.points).toLocaleString('en-US')}p`,
+  src.refs ? `${guideTxt('BmDesk', 'HEAD_REFS')}\n${src.refs}` : '',
+  guideTxt('BmDesk', 'SHELF', { shelf: src.shelf || guideTxt('BmDesk', 'NONE') }),
+  guideTxt('BmDesk', 'CUSTOMER', { nick: src.nick || '-', points: Math.trunc(src.points).toLocaleString('en-US') }),
 ].filter(Boolean).join('\n\n');
 
 /** 상담사 만들기 + 첫 인사 */
 export function makePrompt(src: DeskSource, dice: DeskDice, recent: DeskAgent[], no: string): { messages: CraftMessage[]; thoughts: string } {
   const g = G();
   const system = [fillGuide(g.COMMON, {}), fillGuide(g.MAKE, {}), fillGuide(g.MANUAL, {}), fillGuide(g.MAKE_OUTPUT, {}), src.language ?? ''].filter(Boolean).join('\n\n');
-  const past = recent.length ? recent.map((a) => `- ${a.name} (${a.rank}, ${a.dept}): ${a.intro} / 말투: ${a.voice}`).join('\n') : '(없음)';
-  return { messages: [{ role: 'system', content: system }, { role: 'user', content: `${material(src)}\n\n[손님에게 보이는 호칭]\n상담원 ${no}\n\n[이번 상담사 주사위]\n${diceText(dice)}\n\n${guideOr('BmDesk', 'HEAD_PAST', '[최근 상담사 — 겹치지 말 것]')}\n${past}\n\n[현재 작업]\n상담사 카드와 첫 메시지` }], thoughts: fillGuide(g.THOUGHTS_MAKE, {}) };
+  const past = recent.length ? recent.map((a) => guideTxt('BmDesk', 'PAST_LINE', { name: a.name, rank: a.rank, dept: a.dept, intro: a.intro, voice: a.voice })).join('\n') : guideTxt('BmDesk', 'NONE');
+  const user = guideTxt('BmDesk', 'MAKE_USER', { material: material(src), tag: guideTxt('BmDesk', 'AGENT_TAG', { no }), dice: diceText(dice), head_past: guideTxt('BmDesk', 'HEAD_PAST'), past });
+  return { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], thoughts: fillGuide(g.THOUGHTS_MAKE, {}) };
 }
 
 /** 대화: 카드 + 이번 상담 대화 전부 */
@@ -184,6 +177,6 @@ export function talkPrompt(src: DeskSource, st: DeskState): { messages: CraftMes
   const g = G();
   const a = st.agent!;
   const system = [fillGuide(g.COMMON, {}), fillGuide(g.MANUAL, {}), fillGuide(g.TALK, {}), fillGuide(g.TALK_OUTPUT, {}), src.language ?? ''].filter(Boolean).join('\n\n');
-  const talk = st.talk.filter((l) => l.who !== 'sys').map((l) => `${l.who === 'me' ? '[손님]' : '[상담사]'} ${l.text}`).join('\n');
-  return { messages: [{ role: 'system', content: system }, { role: 'user', content: `${material(src)}\n\n[상담사 카드]\n${cardText(a)}\n\n[이번 상담 대화 — 마지막 줄이 손님이 방금 한 말]\n${talk}` }], thoughts: fillGuide(g.THOUGHTS_TALK, {}) };
+  const talk = st.talk.filter((l) => l.who !== 'sys').map((l) => guideTxt('BmDesk', l.who === 'me' ? 'TALK_ME' : 'TALK_OP', { text: l.text })).join('\n');
+  return { messages: [{ role: 'system', content: system }, { role: 'user', content: guideTxt('BmDesk', 'TALK_USER', { material: material(src), card: cardText(a), talk }) }], thoughts: fillGuide(g.THOUGHTS_TALK, {}) };
 }

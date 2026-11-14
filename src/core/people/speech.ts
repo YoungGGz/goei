@@ -6,7 +6,7 @@
 //         횟수를 3 미만으로 두면 세지 않고 모델이 알아서 바꾼다 (원본과 같음).
 // 이식판 차이: 항목 글이 한 줄(plain 이 줄바꿈을 지움)이라 표지는 글 끝의 「[말투 변화 조짐 가까워짐 1/3] 이유 / 이유」 꼴로 둔다. 표지는 코드만 쓴다.
 import type { PeopleSettings } from './settings';
-import { guideOr } from '../guides';
+import { guideTxt } from '../guides';
 
 export type SpeechVariety = 'off' | 'one' | 'two';
 export type SpeechChange = 'ask' | 'auto';
@@ -88,44 +88,11 @@ export function decideSpeechPending(text: string, approve: boolean): string {
 }
 export const speechState = (text: string): SpeechState => parseSpeechMarker(text).state;
 
-// ── 지침 (원본 글 그대로. 이식판 출력 형식에 맞게 core.speech → `speech`, 줄 → 글 끝) ──
-const WRITER_ONE = [
-  '## Speech variety (user setting)',
-  'The user switched on speech variety. These lines add to the `speech` slot rules above and win where they differ.',
-  'In each `speech` entry, after the form of address and the register, also write, in Korean and only from dialogue this character actually spoke in the supplied span:',
-  '- what is different in how the character speaks to this target compared with other targets;',
-  '- speech habits that were actually observed: sentence endings, sentence length and pace, recurring openers or interjections.',
-  `You may quote one short line as an example. Keep the whole entry under ${SPEECH_ENTRY_CHARS} characters.`,
-  'If the character has not spoken to this target yet, write only the address and register. Never invent a habit, an ending or an example.',
-  'Complete old entries: when a stored `speech` entry for a target holds only address and register (no difference toward this target, no speech habits), and the supplied span contains dialogue this character speaks to that target, upsert that entry in this response to add those details. This is required and overrides the rule above that tells you to leave an unchanged `speech` entry alone.',
-  'Completing an entry is not a register change: keep the stored form of address and honorific level exactly as they are, and return no `address` item for it.',
-  'An entry that already lists speech habits is complete. Leave it alone unless the span shows a clearly new habit that is not listed yet.',
-];
-const WRITER_TWO = [
-  'Speech change signs are also on.',
-  'A sign is evidence in this span that the way the character speaks to one target is starting to shift: closer (more relaxed, familiar, warmer) or more distant (stiffer, colder, more formal). Growing or broken closeness, a change of status or role, and a clear rise or fall of affinity all count when the span shows them.',
-  'When this span gives a sign for a target, upsert that `speech` entry with its stored wording kept, and end the text with exactly this form: `SIGN closer: <reason in Korean, under 60 characters>` or `SIGN distant: <reason in Korean, under 60 characters>`. At most one sign per target in one response. A span without a sign needs no upsert.',
-  'Do not put a SIGN in the same upsert that completes an old entry with speech habits: when a SIGN is present the program keeps the stored wording and drops the rest. Complete the entry first and report the sign in a later span.',
-  'Do not change the form of address or the honorific level because of a sign, and return no `address` item for it. The program counts the signs and rejects an `address` change while it is counting.',
-  'Bracket text that begins with 말투 변화 or 말투 변경 belongs to the program. Never write, edit or remove it yourself.',
-  'Only when the stored entry contains text beginning with [말투 변경 가능 may you rewrite the address and register of that entry (and return the matching `address` item) to fit the listed reasons and the current span. If the span does not support a change after all, leave the entry alone.',
-];
-const WRITER_TWO_FREE = [
-  'Speech change by your own judgment is also on.',
-  'When the span shows that closeness, status or role, or affinity toward a target has really changed, you may update the form of address and the register of that `speech` entry in the same response (and return the matching `address` item), without waiting for a second scene. Write the reason for the change in the entry in Korean.',
-  'A passing mood, a joke or one angry line is still not a change.',
-];
-const DIRECTOR = [
-  '`speech` entries may list speech habits and target-specific differences. Pass them to the writer as tendencies of that character toward that target.',
-  'Tell the writer not to repeat a quoted example line and not to put the same habit into every line.',
-  'Bracket text beginning with 말투 변화 조짐 is a count kept by the program: the address and register have not changed yet, only the warmth of the current scene may follow it. Text beginning with 말투 변경 승인 대기 also means no change yet.',
-];
-
+// ── 지침: 글은 지침 「인물 기록 갱신기(덧붙임)」 SPEECH.VARIETY·SPEECH.SIGN·SPEECH.FREE 절 · 지침 「Director」 APPLY.SPEECH_VARIETY 절 (코드에 글 없음, 2026-11-14) ──
 /** 단계별 지침 덩어리. 꺼져 있으면 '' */
 export function speechVarietyBlock(s: Pick<PeopleSettings, 'features' | 'registerVariety' | 'registerChange' | 'registerSignLimit'>, stage: 'writer' | 'director'): string {
   const v = speechVariety(s);
   if (v.level === 'off') return '';
-  // 글은 지침 「인물 기록 갱신기(덧붙임)」 SPEECH.* 절 · 지침 「Director」 APPLY.SPEECH_VARIETY 절. 절이 없으면 위에 남긴 글
-  if (stage === 'writer') return [guideOr('UpdaterExtra', 'SPEECH.VARIETY', () => WRITER_ONE.join('\n'), { chars: SPEECH_ENTRY_CHARS }), ...(v.level === 'two' ? [v.counted ? guideOr('UpdaterExtra', 'SPEECH.SIGN', () => WRITER_TWO.join('\n')) : guideOr('UpdaterExtra', 'SPEECH.FREE', () => WRITER_TWO_FREE.join('\n'))] : [])].join('\n');
-  return guideOr('Director', 'APPLY.SPEECH_VARIETY', () => DIRECTOR.join('\n'));
+  if (stage === 'writer') return [guideTxt('UpdaterExtra', 'SPEECH.VARIETY', { chars: SPEECH_ENTRY_CHARS }), ...(v.level === 'two' ? [v.counted ? guideTxt('UpdaterExtra', 'SPEECH.SIGN') : guideTxt('UpdaterExtra', 'SPEECH.FREE')] : [])].join('\n');
+  return guideTxt('Director', 'APPLY.SPEECH_VARIETY');
 }

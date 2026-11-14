@@ -81,3 +81,54 @@ Correct output:
 @@SECTION ALIASES_HEAD
 ## Aliases (for presence verification — still use the full English name in tag)
 @@END
+
+@@SECTION MAIN_TEMPLATE
+## Inserting Character Visual Images
+
+### Objective
+- Generate character image tags only when a defined character is present and performing an action or expressing emotion in that paragraph.
+- Do NOT generate tags for {user_skip}undefined characters.
+
+### Placement Rules
+- Conditional Tagging: Insert an image tag only if a defined character from the lists below is the focus of that paragraph.
+- Skip Rule: If a paragraph focuses solely on {user_skip}narration without characters, or undefined NPCs, do not insert any image tag.
+- Empty Line Buffer: When inserting a tag, place one blank line before and after.
+
+- Example Structure:
+Paragraph Text
+
+<img={name}_{keyword}>
+
+Next Paragraph Text
+
+### Tag Construction Logic
+- Identify the character type and follow the specific string format below.
+{user_rule}
+
+#### Defined Characters
+- Format: <img={name}_{keyword}>
+- Characters {name}: {characters}
+- Available {keyword}: {keywords}
+
+### Logic Priority
+- If only {user_skip}undefined NPCs, or pure narration: Do NOT insert any tag.
+- Strict Adherence: Do not invent new {name}, or {keyword}. Only use those provided.
+
+---
+@@END
+
+@@SECTION MAIN_KEYWORDS
+default, angry, annoyed, bored, confused, contemptuous, crying, curious, dumbfounded, embarrassed, excited, exhausted, happy, laughing, lovestruck, lustful, nervous, proud, sad, scared, serious, shy, smile, smirk, smug, surprised, thinking, suspicious, worried, relieved, disgusted, determined, jealous, pleading, forced smiling, indifferent, guilty, pouting, angry smile, expressionless, tormented, crazy smile
+@@END
+
+@@SECTION EXAMPLE_NAME
+Lee Ha-neul
+@@END
+
+@@SECTION ALIASES_LINE
+- {name} ({aliases})
+@@END
+
+@@SECTION NARRATIVE_LINE
+[{n}] {text}
+@@END

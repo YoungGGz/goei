@@ -5,7 +5,7 @@ import { tokens } from '../core/gnet';
 import { photoData } from './photo';
 import { applyAdvanced } from '../core/advanced';
 import { retryAnalyze } from '../core/craft';
-import { guideOr } from '../core/guides';
+import { guideTxt } from '../core/guides';
 import { imageMissingLine } from '../core/attach';
 import { progressCallChunk, progressCallEnd, progressCallStart, progressCallTokens } from '../core/progress';
 export type ModelChoice = 'main' | 'aux';
@@ -183,12 +183,8 @@ export async function limited<T>(limit: number | undefined, run: () => Promise<T
   }
 }
 
-/** 다시 보기 문장 (원본 그대로) */
-export const reiterationText = (i: number, n: number): string => guideOr('Common', 'REITERATE', () => `<system>
-Reiteration phase (${i}/${n})
-Now, read the instruction and your previous output carefully. Is it format-adhering? Did it follow all the instructions without any omission?
-Carefully think, then if it is OK, output the required node without any changes. If it needs changes, apply the changes and output the node.
-</system>`, { i, n });
+/** 다시 보기 문장 (지침 「요청 공통」 REITERATE 절) */
+export const reiterationText = (i: number, n: number): string => guideTxt('Common', 'REITERATE', { i, n });
 
 
 /** 원본과 같이 응답 형식이 틀렸을 때만 다시 묻는다. 모델 연결 실패(LlmError)는 다시 불러도 대개 같다 */
@@ -201,7 +197,7 @@ const TRANSIENT_RETRIES = 2;
 export const defaultFix = (messages: LlmMessage[]) => (raw: string, reason: string): LlmMessage[] => [
   ...messages,
   ...(raw ? [{ role: 'assistant' as const, content: raw }] : []),
-  { role: 'user', content: guideOr('Common', 'RETRY.DEFAULT', () => `The previous reply was rejected and nothing was saved. Reply again from the same data, following the required output format exactly. Validation error: ${reason.slice(0, 600)}\n${retryAnalyze()}`, { reason: reason.slice(0, 600), analyze: retryAnalyze() }) },
+  { role: 'user', content: guideTxt('Common', 'RETRY.DEFAULT', { reason: reason.slice(0, 600), analyze: retryAnalyze() }) },
 ];
 
 /** 실패 화면에 원문을 보여 주도록 오류에 응답 원문을 붙인다 (이미 있으면 그대로) */

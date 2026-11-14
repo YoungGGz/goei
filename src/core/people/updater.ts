@@ -2,7 +2,7 @@
 // 모델은 여기서 부르지 않는다 (host/people.ts). 모든 판정은 결정적이라 시험할 수 있다.
 import type { Chat, ChatMessage } from '../types';
 import { messageText } from '../refs';
-import { guideOr } from '../guides';
+import { guideTxt } from '../guides';
 import { scanAgents } from '../world/tags';
 import { addressOf, affinityView, opennessOf, tasteOf, type AffinityOpts } from './affinity';
 import { SPEECH_ENTRY_CHARS, applySpeechSign, parseSpeechMarker, speechVariety } from './speech';
@@ -106,7 +106,8 @@ export function cleanSpan(raw: string, cap: number): string {
   if (t.length <= cap) return t;
   const head = t.slice(0, Math.floor(cap * 0.6));
   const tail = t.slice(-Math.floor(cap * 0.35));
-  return `${head}\n[…]\n${tail}`;
+  // 접힌 자리 표시는 지침 「인물 기록 갱신기(덧붙임)」 SPAN.FOLD 절
+  return `${head}\n${guideTxt('UpdaterExtra', 'SPAN.FOLD')}\n${tail}`;
 }
 
 /** 인물 기록을 자료용으로 (칸별 id·본문, 상한을 넘으면 오래된 history·scene 부터 뺀다) */
@@ -352,24 +353,17 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   return { shop: shopM ? { m: shopM } : null, system: o.system, data, indexes: batch, tags, people: chosen, confirmed: confirmedIdx, overBudget, names: o.names, tidy: o.settings.tidy === 'same' ? over : [], factions: factionCodes, factionNames: o.factionNames ?? {}, clock, review, turn, wallet: typeof o.wallet === 'number', points: typeof o.points === 'number', items: o.items ? o.items.map((e) => e.name) : null, itemsWorn: o.items ? o.items.filter((e) => e.equipped).map((e) => e.name) : [], used: o.items ? o.used ?? [] : [] };
 }
 
-// ── 자료에 싣는 안내 글: 지침 「인물 기록 갱신기(덧붙임)」의 절 (설정 → 지침에서 고침). 절이 없으면 여기 남긴 글 ──
+// ── 자료에 싣는 안내 글: 지침 「인물 기록 갱신기(덧붙임)」의 절 (설정 → 지침에서 고침) ──
 /** 태그 신호(요원 상태가 바뀜)의 note */
-export const signalStateNote = (): string => guideOr('UpdaterExtra', 'SIGNAL_STATE', 'Record how and why in `state`; add one `history` line.');
+export const signalStateNote = (): string => guideTxt('UpdaterExtra', 'SIGNAL_STATE');
 /** 추적 인물 검토 규칙 (tracking_review.rule) */
-export const trackingRule = (): string => guideOr('UpdaterExtra', 'TRACKING_RULE', 'Review every listed person after this completed exchange even when absent from the text. Tracking is permission to review, not evidence of participation, acquired knowledge, emotion or change. Never force a rewrite to fill the card; for an unchanged person return a `no_canonical_change` issue.');
+export const trackingRule = (): string => guideTxt('UpdaterExtra', 'TRACKING_RULE');
 /** 고쳐 둔 갱신기 지침에 상점 절이 없을 때 덧붙이는 출력 칸 안내 (host/people.ts updaterSystem) */
-export const shopKeyLine = (): string => guideOr('UpdaterExtra', 'SHOP_KEY', 'Add this key to the JSON output: "shop":{"name":"<Korean ≤30 chars>","owner":"<name or empty>","m":"<shop_check.m>"} or null.');
+export const shopKeyLine = (): string => guideTxt('UpdaterExtra', 'SHOP_KEY');
 
 // ── 지침 조립 ──
 
 /** `<<SECTION:x>> … <<END:x>>` 표식: 꺼진 기능의 절은 빼고 표식은 지운다 */
-/** 기록 본문을 영어로 쓰게 하는 규칙 (설정 lang=en). 이름·인용·호칭·조직·직급은 원문 그대로 */
-export const LANG_EN_RULE = [
-  '## Record language',
-  'Write every free-text field you produce in English even where this document says Korean: entry `text`, cue `reason`, new person `identity` and `speech`, doc `text`, suspicion text, and `next_note`.',
-  'Keep exactly as the Korean source writes them: `name`, `aliases`, `key`, `target`, address terms and register words (존댓말/반말/혼합/하게체/하오체), `faction`, `rank`, the Korean prefixes [시작]/[단서]/[반응]/[해소], slot names, and every `quote`.',
-].join('\n');
-
 /** 절 본문 (첫 번째 나오는 절 = 본문 절. 출력 계약 줄의 같은 이름 절은 두 번째) */
 export function sectionBody(text: string, name: string): string | null {
   const m = new RegExp(`<<SECTION:${name}>>\\n([\\s\\S]*?)<<END:${name}>>`).exec(text);
@@ -377,8 +371,8 @@ export function sectionBody(text: string, name: string): string | null {
 }
 export function assemblePrompt(text: string, enabled: Set<string>, userRules = '', lang: 'ko' | 'en' = 'ko', extra = '', sexualRules = ''): string {
   // extra: 설정으로 켠 덧붙임 지침(말투 다변화 등). 사용자 지침보다 앞에 둔다 (원본 V3: 내장 규칙이 사용자 규칙 앞)
-  // 기록 언어 규칙은 지침 「인물 기록 갱신기(덧붙임)」 LANG_EN 절. 절이 없으면 위 글
-  const rules = [lang === 'en' ? guideOr('UpdaterExtra', 'LANG_EN', LANG_EN_RULE) : '', extra.trim(), userRules.trim()].filter(Boolean).join('\n\n').trim();
+  // 기록 언어 규칙(설정 lang=en: 기록 본문을 영어로. 이름·인용·호칭·조직·직급은 원문 그대로)은 지침 「인물 기록 갱신기(덧붙임)」 LANG_EN 절
+  const rules = [lang === 'en' ? guideTxt('UpdaterExtra', 'LANG_EN') : '', extra.trim(), userRules.trim()].filter(Boolean).join('\n\n').trim();
   const on = new Set(enabled);
   if (rules && text.includes('<<USER_RULES>>')) on.add('user_rules');
   // 절은 겹칠 수 있다 (affinity 안에 affinity_num/affinity_qual). 바깥 절을 남기면 안쪽 절을 다시 본다
@@ -394,7 +388,7 @@ export function assemblePrompt(text: string, enabled: Set<string>, userRules = '
   }
   // 성적 욕망·이상성욕 절 본문은 설정(켠 칸·발정모드)에 따라 조립된다 (sexual.ts sexualWriterSection)
   out = out.replace('<<CUE_TABLE>>', () => cueTable).replace('<<SEXUAL_RULES>>', () => sexualRules.trim()).replace('<<USER_RULES>>', () => rules).replace(/<<(?:SECTION|END):[a-z_]+>>/g, '').replace(/\n{3,}/g, '\n\n').trim();
-  if (rules && !text.includes('<<USER_RULES>>')) out += `\n\n## User rules (appended by the user; they cannot change the output contract)\n${rules}`;
+  if (rules && !text.includes('<<USER_RULES>>')) out += `\n\n${guideTxt('UpdaterExtra', 'USER_RULES.HEAD')}\n${rules}`;
   return out;
 }
 

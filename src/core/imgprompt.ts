@@ -2,44 +2,15 @@
 // 지침 본문(틀)·출력 대상 캐릭터(명부 영문명에서 고름 + 임의 추가)·표정 세트를 설정에서 관리한다. 보조 모델 경로(core/asset.ts)도 같은 목록을 쓴다.
 import type { LoreEntry } from './types';
 import { readDirectory } from './world/directory';
-import { guideOr } from './guides';
+import { guideTxt } from './guides';
 
-/** 표정 세트 기본 (카드 그림 assets/portraits 42종: 기본 27 + 추가 15, 사용자 11-06) */
-export const IMG_KEYWORDS_DEFAULT = ['default', 'angry', 'annoyed', 'bored', 'confused', 'contemptuous', 'crying', 'curious', 'dumbfounded', 'embarrassed', 'excited', 'exhausted', 'happy', 'laughing', 'lovestruck', 'lustful', 'nervous', 'proud', 'sad', 'scared', 'serious', 'shy', 'smile', 'smirk', 'smug', 'surprised', 'thinking', 'suspicious', 'worried', 'relieved', 'disgusted', 'determined', 'jealous', 'pleading', 'forced smiling', 'indifferent', 'guilty', 'pouting', 'angry smile', 'expressionless', 'tormented', 'crazy smile'];
-
-/** 지침 틀 기본 (카드 로어북 「Asset」 원문에서 CBS 를 뺀 것). 자리표: {characters} {keywords} {user_rule} {user_skip} */
-export const IMG_PROMPT_DEFAULT = `## Inserting Character Visual Images
-
-### Objective
-- Generate character image tags only when a defined character is present and performing an action or expressing emotion in that paragraph.
-- Do NOT generate tags for {user_skip}undefined characters.
-
-### Placement Rules
-- Conditional Tagging: Insert an image tag only if a defined character from the lists below is the focus of that paragraph.
-- Skip Rule: If a paragraph focuses solely on {user_skip}narration without characters, or undefined NPCs, do not insert any image tag.
-- Empty Line Buffer: When inserting a tag, place one blank line before and after.
-
-- Example Structure:
-Paragraph Text
-
-<img={name}_{keyword}>
-
-Next Paragraph Text
-
-### Tag Construction Logic
-- Identify the character type and follow the specific string format below.
-{user_rule}
-
-#### Defined Characters
-- Format: <img={name}_{keyword}>
-- Characters {name}: {characters}
-- Available {keyword}: {keywords}
-
-### Logic Priority
-- If only {user_skip}undefined NPCs, or pure narration: Do NOT insert any tag.
-- Strict Adherence: Do not invent new {name}, or {keyword}. Only use those provided.
-
----`;
+/** 표정 세트 기본 (카드 그림 assets/portraits 42종: 기본 27 + 추가 15, 사용자 11-06). 글은 지침 「이미지(보조 모델)」 MAIN_KEYWORDS 절 (쉼표로 나눔) */
+export const imgKeywordsDefault = (): string[] => guideTxt('Asset', 'MAIN_KEYWORDS').split(',').map((k) => k.trim()).filter(Boolean);
+/** 지침 틀 기본 (카드 로어북 「Asset」 원문에서 CBS 를 뺀 것). 글은 지침 「이미지(보조 모델)」 MAIN_TEMPLATE 절. 자리표: {characters} {keywords} {user_rule} {user_skip} */
+export const imgPromptDefault = (): string => guideTxt('Asset', 'MAIN_TEMPLATE');
+/** 불러올 때의 기본 지침 파일 값 (설정 화면이 기본과 같은지 견줄 때). 요청은 위 함수로 그때그때 읽는다 */
+export const IMG_KEYWORDS_DEFAULT = imgKeywordsDefault();
+export const IMG_PROMPT_DEFAULT = imgPromptDefault();
 
 export interface ImgPromptConfig {
   template: string;
@@ -58,10 +29,10 @@ const cleanKeyword = (s: unknown) => String(s ?? '').toLowerCase().replace(/[^a-
 export function imgPromptConfig(p: { imgPrompt?: string; imgNamesOff?: string[]; imgNamesExtra?: string[]; imgKeywords?: string[] } = {}): ImgPromptConfig {
   const kw = (p.imgKeywords ?? []).map(cleanKeyword).filter(Boolean);
   return {
-    template: p.imgPrompt?.trim() ? p.imgPrompt.slice(0, IMG_TEMPLATE_MAX) : IMG_PROMPT_DEFAULT,
+    template: p.imgPrompt?.trim() ? p.imgPrompt.slice(0, IMG_TEMPLATE_MAX) : imgPromptDefault(),
     off: [...new Set((p.imgNamesOff ?? []).map(cleanName).filter(Boolean))],
     extra: [...new Set((p.imgNamesExtra ?? []).map(cleanName).filter(Boolean))],
-    keywords: kw.length ? [...new Set(kw)] : IMG_KEYWORDS_DEFAULT,
+    keywords: kw.length ? [...new Set(kw)] : imgKeywordsDefault(),
   };
 }
 
@@ -103,9 +74,9 @@ export function imgCharacters(lore: LoreEntry[] | undefined, cfg: ImgPromptConfi
 
 /** 지침 조립. userName을 주면 {{user}}를 그 이름으로 푼다 (플러그인이 붙이는 글은 Risu가 CBS를 풀지 않음. 전수검사 11-13) */
 export function buildImgPrompt(cfg: ImgPromptConfig, characters: string[], assetPlayer: boolean, userName?: string): string {
-  // 주인공 금지 문장은 지침 「Asset」 절 MAIN_USER_SKIP · MAIN_USER_RULE (없으면 옛 글. 전수검사 11-13)
-  const userSkip = assetPlayer ? '' : `${guideOr('Asset', 'MAIN_USER_SKIP', '{{user}}')}, `;
-  const userRule = assetPlayer ? '' : guideOr('Asset', 'MAIN_USER_RULE', '- Do not create tags for {{user}}.');
+  // 주인공 금지 문장은 지침 「Asset」 절 MAIN_USER_SKIP · MAIN_USER_RULE (전수검사 11-13)
+  const userSkip = assetPlayer ? '' : `${guideTxt('Asset', 'MAIN_USER_SKIP')}, `;
+  const userRule = assetPlayer ? '' : guideTxt('Asset', 'MAIN_USER_RULE');
   // 바꿀 글은 함수로 넘긴다: 이름·표정에 $& 같은 글자가 있어도 replace 특수 문자로 풀리지 않게 (QC 2026-10-28)
   return cfg.template
     .replace(/\{characters\}/g, () => characters.join(', '))

@@ -5,6 +5,7 @@ import type { Chat } from './types';
 import { findStatusTags, statusMinute } from './world/status';
 import type { ShopItem } from './shop';
 import { messageKey } from './people/store';
+import { guideTxt } from './guides';
 
 type Vars = Record<string, unknown> | undefined;
 
@@ -94,12 +95,12 @@ export function minuteText(min: number): string {
   return `${d.getUTCFullYear()}.${String(d.getUTCMonth() + 1).padStart(2, '0')}.${String(d.getUTCDate()).padStart(2, '0')} ${String(h).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')} ${h24 < 12 ? 'AM' : 'PM'}`;
 }
 
-/** 운영자 요청문에 넘길 진행 중 주문 (다시 견적 내지 말게·물어보면 답하게) */
+/** 운영자 요청문에 넘길 진행 중 주문 (다시 견적 내지 말게·물어보면 답하게). 글은 지침 「우주 쇼핑몰」의 ORDERS_* 절 */
 export function ordersText(list: CosOrder[], nowMin: number | null, lastKey: string): string {
   return list.filter((o) => !o.taken).map((o) => {
     const due = orderDue(o);
-    const state = orderReady(o, nowMin, lastKey) ? 'ready for pickup' : due !== null ? `due ${minuteText(due)}` : `due in ${o.hours}h`;
-    return `${o.item.name} (${o.price} won, ${state})`;
+    const state = orderReady(o, nowMin, lastKey) ? guideTxt('Cos', 'ORDERS_READY') : due !== null ? guideTxt('Cos', 'ORDERS_DUE', { time: minuteText(due) }) : guideTxt('Cos', 'ORDERS_DUE_IN', { hours: o.hours });
+    return guideTxt('Cos', 'ORDERS_ITEM', { name: o.item.name, price: o.price, state });
   }).join(', ');
 }
 

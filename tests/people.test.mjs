@@ -149,7 +149,7 @@ test('기록 블록: 절 단위 혼합, 모르는 것, 단계 문장, 메모', (
   assert.match(block, /Must not reveal: 유저의 전직/);
   assert.ok(!/\d+점|score: \d/.test(block), '숫자 없음');
   const whole = Inj.peopleBlock([block]);
-  assert.ok(whole.startsWith(Inj.PEOPLE_HEAD));
+  assert.ok(whole.startsWith(Inj.peopleHead()));
 });
 
 test('항목 상태: 대체·합침·취소·사라짐을 구분하고, 합친 항목(from)이 죽으면 원본이 되살아난다', () => {

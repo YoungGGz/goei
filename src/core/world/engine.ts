@@ -3,6 +3,7 @@
 // 원본 Lua의 WG.*, parseAnomalies, parseIncidents, parseMysticSite, agParse, spawnAndBrief와 같은 규칙.
 // Risu API를 부르지 않는 순수 로직이라 rng를 넣어 그대로 검사할 수 있다.
 import { BUILTIN } from '../factions';
+import { guideTxt } from '../guides';
 import type { FactionCode } from '../types';
 import { type Catalog, factionNames, presetCanon } from './catalog';
 import { landmarkLoc, locName, POOL, regionMatch, SEALED_LOC, uniqueRegion } from './geo';
@@ -707,6 +708,8 @@ export function bootstrap(c: Catalog, s: WorldSettings, rng: Rng, player = ''): 
 }
 
 // ── 브리핑 (로어북 🏷️Tag 의 {{getvar::an_report}} 등) ──
+// 보고 줄 모양·자리 글은 지침 「메인 요청에 붙는 글」 WORLD.REPORT.* 절 (2026-11-14 사용자: 모델에 가는 글은 전부 지침 파일에)
+const rg = (name: string, vars?: Record<string, string | number>) => guideTxt('Main', `WORLD.REPORT.${name}`, vars);
 
 /** 절대 분 → 「MM.DD HH:MM」 (상태창과 같은 UTC 기준) */
 function clock(minute: number): string {
@@ -718,7 +721,7 @@ function clock(minute: number): string {
 function dueMeta(e: { born: number | null }, group: 'preset' | 'random' | 'incident' | 'mystic', s: WorldSettings): string {
   const hours = s[`${group}_ttl`];
   if (e.born === null || s[`${group}_expire`] !== 1 || !(hours > 0)) return '';
-  return ` {유지 기한 ${clock(e.born + hours * 60)}}`;
+  return ` {${rg('DUE', { time: clock(e.born + hours * 60) })}}`;
 }
 /** 유지 기한 시각(분). 자동 종료가 꺼진 묶음이면 null (전수검사 11-13) */
 function dueAt(e: { born: number | null }, group: 'preset' | 'random' | 'incident' | 'mystic', s: WorldSettings): number | null {
@@ -750,7 +753,7 @@ function takeEndAt(w: WorldState, e: { born: number | null; since: number | null
 function age(w: WorldState, since: number | null): string {
   if (w.minute === null || since === null) return '';
   const mins = Math.max(0, w.minute - since);
-  return ` {${Math.floor(mins / 60)}시간 ${mins % 60}분 전}`;
+  return ` {${rg('AGE', { h: Math.floor(mins / 60), m: mins % 60 })}}`;
 }
 
 export interface Reports {
@@ -763,29 +766,29 @@ export interface Reports {
 export function reports(w: WorldState, c: Catalog, s: WorldSettings, faction: string): Reports {
   const an = w.an.map((e) => {
     const ln = locName(e.loc);
-    if (e.state === '발생대기') return `NEW [AN|${ln}|${e.name || '<발생지점>'}|활성|<등급>|<배치>|<상황>]`;
-    return `[AN|${ln}|${e.name}|${e.state}|${e.grade}|${e.deploy || '없음'}|${e.situation || '<상황>'}]${age(w, e.since)}${dueMeta(e, e.kind, s)}`;
+    if (e.state === '발생대기') return rg('AN.NEW', { loc: ln, name: e.name || rg('UNNAMED') });
+    return `${rg('AN.LINE', { loc: ln, name: e.name, state: e.state, grade: e.grade, deploy: e.deploy || '없음', situation: e.situation || rg('SITUATION') })}${age(w, e.since)}${dueMeta(e, e.kind, s)}`;
   });
   const inc = w.inc.map((e) => {
     const ln = locName(e.loc);
-    if (e.state === '발생대기') return `NEW [IN|${ln}|${e.name || '<발생지점>'}|진행|<배치>|<상황>]`;
-    return `[IN|${ln}|${e.name}|${e.state}|${e.deploy || '없음'}|${e.situation}]${age(w, e.since)}${dueMeta(e, 'incident', s)}`;
+    if (e.state === '발생대기') return rg('IN.NEW', { loc: ln, name: e.name || rg('UNNAMED') });
+    return `${rg('IN.LINE', { loc: ln, name: e.name, state: e.state, deploy: e.deploy || '없음', situation: String(e.situation) })}${age(w, e.since)}${dueMeta(e, 'incident', s)}`;
   });
   const ms = w.ms.map((e) => {
     const ln = locName(e.loc);
-    if (e.state === '발생대기') return `NEW [MS|${ln}|${e.name}|출현|<방문자>|<상황>]`;
-    return `[MS|${ln}|${e.name}|${e.state}|${e.visitors || '없음'}|${e.situation || '<상황>'}]${age(w, e.since)}${dueMeta(e, 'mystic', s)}`;
+    if (e.state === '발생대기') return rg('MS.NEW', { loc: ln, name: e.name });
+    return `${rg('MS.LINE', { loc: ln, name: e.name, state: e.state, visitors: e.visitors || '없음', situation: e.situation || rg('SITUATION') })}${age(w, e.since)}${dueMeta(e, 'mystic', s)}`;
   });
   if (w.pending.an && !w.an.some((e) => e.presetName === w.pending.an || e.name === w.pending.an)) {
-    an.push(`NEW [AN|<발생 지역: 시도와 시군구>|${w.pending.an}|활성|<등급>|<배치>|<상황>]`);
+    an.push(rg('AN.NEW', { loc: rg('REGION'), name: w.pending.an }));
   }
   if (w.pending.in && !w.inc.some((e) => e.name === w.pending.in)) {
     const lm = c.landmarks.find((l) => l.name === w.pending.in);
     const loc = lm && landmarkLoc(lm.sido, lm.gu);
-    inc.push(`NEW [IN|${loc ? locName(loc) : '<발생 지역: 시도와 시군구>'}|${w.pending.in}|진행|<배치>|<상황>]`);
+    inc.push(rg('IN.NEW', { loc: loc ? locName(loc) : rg('REGION'), name: w.pending.in }));
   }
   if (w.pending.ms && !w.ms.some((e) => e.name === w.pending.ms)) {
-    ms.push(`NEW [MS|<발생 지역: 시도와 시군구>|${w.pending.ms}|출현|<방문자>|<상황>]`);
+    ms.push(rg('MS.NEW', { loc: rg('REGION'), name: w.pending.ms }));
   }
   const lines: string[] = [];
   const map: string[] = [];
@@ -793,12 +796,12 @@ export function reports(w: WorldState, c: Catalog, s: WorldSettings, faction: st
     const rec = w.agents[p.id];
     // 영문명이 비면 빈 괄호 없이 이름만 (전수검사 11-13)
     map.push(`${p.id} ${p.name && p.english && p.name !== p.english ? `${p.name} (${p.english})` : p.name || p.english}`);
-    if (!rec || rec.st === '미정') lines.push(`NEW [AG|${p.id}|<상태>|<상황>]`);
-    else lines.push(`[AG|${p.id}|${rec.st}|${rec.situation}]${age(w, rec.since)}`);
+    if (!rec || rec.st === '미정') lines.push(rg('AG.NEW', { id: p.id }));
+    else lines.push(`${rg('AG.LINE', { id: p.id, state: rec.st, situation: String(rec.situation) })}${age(w, rec.since)}`);
   }
   lines.sort();
   map.sort();
-  const ag = [...lines, ...(lines.length ? [''] : []), `- code: ${map.length ? map.join(' | ') : 'none'}`].join('\n');
+  const ag = [...lines, ...(lines.length ? [''] : []), map.length ? rg('AG.CODE', { list: map.join(' | ') }) : rg('AG.CODE_NONE')].join('\n');
   return { an: an.join('\n'), in: inc.join('\n'), ms: ms.join('\n'), ag };
 }
 

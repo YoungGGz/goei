@@ -153,11 +153,10 @@ test('절을 고치면 그 절이 들어가는 요청문이 바뀐다 (절마다
 
 test('자리 채우기: {이름} 만 채우고 {{…}}·모르는 이름은 그대로, 채운 값은 다시 훑지 않는다', () => {
   assert.equal(G.fillVars('a {x} {{user}} {y} {X}', { x: '{y}', user: 'U' }), 'a {y} {{user}} {y} {X}');
-  assert.equal(G.guideOr('Common', 'NO.SUCH', 'old'), 'old');
-  assert.equal(G.guideOr('Common', 'NO.SUCH', () => 'old2'), 'old2');
+  assert.equal(G.guideTxt('Common', 'NO.SUCH'), '', '없는 절은 빈 글 (코드에 옛 글 없음)');
   G.setGuideOverride('Common', withSection(G.guideDefault('Common'), 'RETRY.ANALYZE', () => '   '));
   try {
     assert.equal(G.guideSec('Common', 'RETRY.ANALYZE'), null, '비운 절은 없는 것으로');
-    assert.equal(M.craft.retryAnalyze(), M.craft.RETRY_ANALYZE);
+    assert.equal(M.craft.retryAnalyze(), G.guideDefaultSec('Common', 'RETRY.ANALYZE'), '비우면 기본 파일의 절');
   } finally { reset(); }
 });

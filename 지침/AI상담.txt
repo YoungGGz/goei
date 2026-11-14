@@ -27,3 +27,252 @@ Output these blocks and nothing else:
 <go>(only when pointing the user to one row: its id from [설정 목록]. The app adds a button that goes to that row.)</go>
 (<set>, <apply>, <open> and <go> only as described above; otherwise leave them out.)
 @@END
+
+@@SECTION USER
+[지금 상태]
+{state}
+
+[지난 턴 실제]
+{last}
+
+[메뉴]
+{menus}
+
+[설정 목록]
+{list}
+
+[바꾸자고 한 것]
+{pending}
+
+[이 창의 대화 — 마지막 줄이 사용자가 방금 한 말]
+{talk}
+@@END
+
+@@SECTION LIST.MENU
+## {menu}
+{items}
+@@END
+
+@@SECTION LIST.NONE
+(펼친 메뉴 없음)
+@@END
+
+@@SECTION PENDING.LINE
+{id}={value} ({menu} · {name}, 지금 {cur})
+@@END
+
+@@SECTION PENDING.NONE
+(없음)
+@@END
+
+@@SECTION TALK.ME
+[사용자] {text}
+@@END
+
+@@SECTION TALK.OP
+[상담] {text}
+@@END
+
+@@SECTION ERR.NO_SAY
+<say> 블록이 없어요.
+@@END
+
+@@SECTION LABEL.ON
+켬
+@@END
+
+@@SECTION LABEL.OFF
+끔
+@@END
+
+@@SECTION LABEL.EMPTY
+(빈 글)
+@@END
+
+@@SECTION LABEL.BLANK
+(비어 있음)
+@@END
+
+@@SECTION CHOICE.NUM
+{lo}~{hi}{unit} (정수)
+@@END
+
+@@SECTION CHOICE.STEP
+정수{unit}, {how}
+@@END
+
+@@SECTION CHOICE.STEP_UNIT
+({unit})
+@@END
+
+@@SECTION CHOICE.STEP_STRIDE
+지금 값에서 {stride}씩
+@@END
+
+@@SECTION CHOICE.STEP_BUTTONS
+화면의 − + 단추가 닿는 값
+@@END
+
+@@SECTION CHOICE.TEXT
+글{max}{lines}
+@@END
+
+@@SECTION CHOICE.TEXT_MAX
+(최대 {max}자)
+@@END
+
+@@SECTION CHOICE.TEXT_MULTI
+, 여러 줄은 \n 으로 이음
+@@END
+
+@@SECTION CHOICE.TEXT_SINGLE
+, 한 줄
+@@END
+
+@@SECTION ITEM.INFO
+[{id}] {name} | 바꾸기: 못 함{help}
+@@END
+
+@@SECTION ITEM.LINE
+[{id}] {name} | 지금: {cur} | {change}{scope}{help}
+@@END
+
+@@SECTION ITEM.LOCKED
+바꾸기: 못 함 (지금 잠김)
+@@END
+
+@@SECTION ITEM.CHOICES
+고를 수 있는 값: {choices}
+@@END
+
+@@SECTION ITEM.SCOPE
+| 저장: {scope}
+@@END
+
+@@SECTION ITEM.HELP
+| 설명: {help}
+@@END
+
+@@SECTION STATE.SUMMARY
+턴마다 보조 호출 {sure}회{maybe} · 메인 1회{tok}
+@@END
+
+@@SECTION STATE.SUMMARY_MAYBE
+(조건에 따라 최대 {max}회)
+@@END
+
+@@SECTION STATE.SUMMARY_TOKENS
+· 예상 토큰 {tok}
+@@END
+
+@@SECTION STATE.NOT_STARTED
+아직 채팅을 시작하기 전이에요. 값은 새 채팅이 받을 값이에요.
+@@END
+
+@@SECTION STATE.PRE
+메인 요청 전
+@@END
+
+@@SECTION STATE.MAIN
+메인 응답
+@@END
+
+@@SECTION STATE.POST
+메인 응답 뒤
+@@END
+
+@@SECTION STATE.MANUAL
+누르거나 열 때만
+@@END
+
+@@SECTION STATE.NODE
+- {name} | {on}{model} | 호출: {calls}{tok}
+@@END
+
+@@SECTION STATE.NODE_ON
+턴마다 호출
+@@END
+
+@@SECTION STATE.NODE_OFF
+턴마다 호출 없음
+@@END
+
+@@SECTION STATE.NODE_MODEL
+| 모델: {model}
+@@END
+
+@@SECTION STATE.NODE_TOKENS
+| 예상 토큰 {tok}
+@@END
+
+@@SECTION STATE.MAIN_NODE
+- {name} | 호출: {calls}
+@@END
+
+@@SECTION STATE.MANUAL_NODE
+- {name}{model} | 호출: {calls}
+@@END
+
+@@SECTION LAST.NONE
+(지난 턴 기록 없음)
+@@END
+
+@@SECTION LAST.HEAD
+메인 요청 {main} · 메인 응답 {reply}
+@@END
+
+@@SECTION LAST.TOKENS
+{n}토큰
+@@END
+
+@@SECTION LAST.NO_RECORD
+기록 없음
+@@END
+
+@@SECTION LAST.MODEL_MAIN
+메인
+@@END
+
+@@SECTION LAST.MODEL_AUX
+보조
+@@END
+
+@@SECTION LAST.MODEL_ID
+ID 지정 모델
+@@END
+
+@@SECTION LAST.CALL
+- {label} | {phase} | {model} | 보낸 토큰 {sent} | 받은 토큰 {got} | {sec}초 | {result}
+@@END
+
+@@SECTION LAST.OK
+성공
+@@END
+
+@@SECTION LAST.FAIL
+실패
+@@END
+
+@@SECTION LAST.TOTAL
+보조 호출 {n}회 · 보낸 토큰 {sent} · 받은 토큰 {got}
+@@END
+
+@@SECTION MENUS.LINE
+- {menu}{intro} | 줄: {names}
+@@END
+
+@@SECTION MENUS.INTRO
+: {intro}
+@@END
+
+@@SECTION MENUS.OTHERS_HEAD
+이 창에서 바꿀 수 없는 곳 (자리만 안내)
+@@END
+
+@@SECTION CATALOG.FOLDED_COUNT
+지금 {count}.
+@@END
+
+@@SECTION CATALOG.FOLDED_NOTE
+상담에서는 바꾸지 못해요. 설정 화면에서 펼쳐 칸으로 고쳐요.
+@@END

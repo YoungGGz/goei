@@ -4,6 +4,7 @@
 import type { Chat } from './types';
 import { messageKey } from './people/store';
 import { findStatusTags } from './world/status';
+import { guideTxt } from './guides';
 
 export const WALLET_VAR = '$st_wallet';
 /** 새 채팅 시작 잔고 기본값 (사용자 2026-10-27: 14만 원). 설정에서 바꾸고, 채팅마다 장부 시작값·지금 잔고도 고칠 수 있다 */
@@ -49,10 +50,10 @@ export const walletRecentN = (vars: Record<string, unknown> | undefined): number
   const n = Number(vars?.[WALLET_RECENT_VAR]);
   return Number.isInteger(n) && n >= 0 ? Math.min(WALLET_RECENT_MAX, n) : 0;
 };
-/** 살아 있는 최근 거래 n줄 (영어 한 줄: 「-30,000 won 택시」). 상태창 맞춤 줄은 뺀다 */
+/** 살아 있는 최근 거래 n줄 (영어 한 줄: 「-30,000 won 택시」, 지침 「메인 요청에 붙는 글」의 STATUS.RECENT_CASH_LINE 절). 상태창 맞춤 줄은 뺀다 */
 export function recentWalletLines(w: Wallet, alive: Set<string>, n: number): string[] {
   if (n <= 0) return [];
-  return liveWallet(w, alive).filter((e) => e.memo !== WALLET_SYNC_MEMO).slice(-n).map((e) => `${e.amount > 0 ? '+' : ''}${e.amount.toLocaleString('en-US')} won ${e.memo}`);
+  return liveWallet(w, alive).filter((e) => e.memo !== WALLET_SYNC_MEMO).slice(-n).map((e) => guideTxt('Main', 'STATUS.RECENT_CASH_LINE', { amount: `${e.amount > 0 ? '+' : ''}${e.amount.toLocaleString('en-US')}`, memo: e.memo }));
 }
 export const walletEditable = (vars: Record<string, unknown> | undefined) => vars?.[WALLET_EDIT_VAR] === '1';
 /** 이야기가 시작됐나 (유저 메시지가 하나라도 있으면): 그 뒤로는 수정이 꺼져 있으면 시작 잔고도 못 바꾼다 */

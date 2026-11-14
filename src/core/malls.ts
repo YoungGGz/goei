@@ -3,7 +3,7 @@
 // 상점과 달리 본편 표식 없이 브라우저에서 언제든 연다. 우주몰은 운영자 문의 창이 있고, 포인트몰은 운영자가 없다(정가 구매만, 로그인해야 씀).
 import type { Chat } from './types';
 import { type TruthMode, emptyShop, readShop, reviveShop, SHOP_VAR, shopBlocked, shopSettings, type ShopSettings, type ShopState } from './shop';
-import { guideOr, type GuideName } from './guides';
+import { guideTxt, type GuideName } from './guides';
 import { lastBot, SHOP_CTX_VAR, SHOP_SHARED_VARS } from './shop';
 import { liveOrders, readyNotes } from './orders';
 import { readDesk } from './bmdesk';
@@ -78,22 +78,8 @@ export const COS_ACCOUNT = '농협 352-1849-2706-13 (예금주 : 어서오세요
 
 // ── 우주몰 진열 배정 (구버전 Lua cosBuildRefreshPrompt 방식, 11-09 사용자: 새로고침해도 같은 물건) ──
 // 칸마다 장르(겹치지 않게 섞음)×값 등급(₩구간)을 코드가 굴려 요청에 박는다. 같은 입력이 반복돼도 모델이 같은 진열을 내지 못하게.
-// 11-09 사용자: 하드코딩 금지 — 사용 여부·장르 목록·값 등급·상황용 칸 수를 전부 설정에서 고친다 ($cos_roll_*). 기본값만 여기.
-export const COS_GENRES_DEFAULT = [
-  'classical martial arts', 'sci-fi', 'fantasy', 'cyberpunk', 'steampunk',
-  'ancient', 'occult', 'cosmic horror', 'creature', 'mythology',
-  'religious/sacred', 'post-apocalyptic', 'alien', 'folktale', 'fairy tale',
-  'alchemy', 'military', 'fiction', 'SCP', 'Cthulhu mythos',
-];
+// 11-09 사용자: 하드코딩 금지 — 사용 여부·장르 목록·값 등급·상황용 칸 수를 전부 설정에서 고친다 ($cos_roll_*). 기본값은 그 몰 지침의 ROLL_GENRES·ROLL_TIERS 절.
 export interface CosTier { name: string; desc: string; lo: number; hi: number; /** 뽑힐 가중치 (기본 1) */ w: number }
-/** 값 등급 기본: 이름 · 등급 설명 · 하한 · 상한 (구간 연속). 물건은 등급에 맞춰 만들고 값은 그 가치를 따른다 */
-export const COS_TIERS_DEFAULT: CosTier[] = [
-  { name: '최저가', desc: 'mundane, trivial — a curiosity or minor utility', lo: 999_999, hi: 2_499_999, w: 1 },
-  { name: '저가', desc: 'common — modestly useful, low stakes', lo: 2_500_000, hi: 4_999_999, w: 1 },
-  { name: '중가', desc: 'notable, uncommon — genuinely useful or potent', lo: 5_000_000, hi: 9_999_999, w: 1 },
-  { name: '고가', desc: 'potent, rare — strong effect, sought-after', lo: 10_000_000, hi: 19_999_999, w: 1 },
-  { name: '최고가', desc: 'powerful, coveted — a high-value artifact', lo: 20_000_000, hi: 49_999_999, w: 1 },
-];
 export type CosUseful = 'auto' | '0' | '1' | '2';
 /** 장르 뽑기: uniq = 칸마다 다르게(목록을 섞어 앞에서부터) · any = 칸마다 따로 무작위(겹쳐도 됨) · one = 이번 판은 한 장르로 통일 */
 export type CosGenreMode = 'uniq' | 'any' | 'one';
@@ -103,17 +89,10 @@ export interface CosRoll { on: boolean; genres: string[]; tiers: CosTier[]; usef
 export const COS_ROLL_KEY = { on: '$cos_roll_on', genres: '$cos_roll_genres', tiers: '$cos_roll_tiers', useful: '$cos_roll_useful', gmode: '$cos_roll_gmode', tmode: '$cos_roll_tmode' } as const;
 /** 몰별 진열 배정 변수 (2026-11-09 사용자 「1번은 해」: 포인트몰에도 같은 진열 배정, 켜고 끄기 따로). bm: $bm_roll_* */
 export const rollKeys = (site: MallSite): typeof COS_ROLL_KEY => (site === 'cos' ? COS_ROLL_KEY : ({ on: '$bm_roll_on', genres: '$bm_roll_genres', tiers: '$bm_roll_tiers', useful: '$bm_roll_useful', gmode: '$bm_roll_gmode', tmode: '$bm_roll_tmode' } as unknown as typeof COS_ROLL_KEY));
-/** 포인트몰 기본 분류 (복지몰답게 일상 물건부터 현장 장비까지; 설정에서 고친다) */
-export const BM_GENRES_DEFAULT = ['생활용품', '가전', '건강·의약품', '식품·음료', '의류·보호구', '현장 탐사 장비', '괴담 대응 소모품', '사무·문구', '취미·여가', '사내 서비스·이용권'];
-/** 포인트몰 기본 값 등급 (포인트). 위키: 괴담 등급별 클리어 보상 수백~수천 포인트 → 생활용품 수십 p 부터 최상급 수천 p 까지 */
-export const BM_TIERS_DEFAULT: CosTier[] = [
-  { name: '저가', desc: 'everyday welfare goods — small, cheap, practical', lo: 30, hi: 149, w: 3 },
-  { name: '중저가', desc: 'common supplies and basic field items', lo: 150, hi: 399, w: 3 },
-  { name: '중가', desc: 'solid equipment or medicine with a clear use', lo: 400, hi: 999, w: 2 },
-  { name: '고가', desc: 'rare company product — strong, regulated, limited', lo: 1000, hi: 2999, w: 1 },
-  { name: '최고가', desc: 'top-grade company asset — life-saving or coveted', lo: 3000, hi: 9999, w: 1 },
-];
-export const rollDefaults = (site: MallSite): { genres: string[]; tiers: CosTier[] } => (site === 'cos' ? { genres: COS_GENRES_DEFAULT, tiers: COS_TIERS_DEFAULT } : { genres: BM_GENRES_DEFAULT, tiers: BM_TIERS_DEFAULT });
+/** 몰 지침(우주몰 Cos · 포인트몰 Bm)의 절 */
+const rollGuide = (site: MallSite): GuideName => (site === 'bm' ? 'Bm' : 'Cos');
+/** 기본 장르(포인트몰: 분류)·값 등급 (2026-11-14 사용자: 모델에 가는 글은 지침에). 그 몰 지침의 ROLL_GENRES(쉼표로 나눔)·ROLL_TIERS(한 줄에 「이름|설명|하한|상한|가중치」) 절. 설정에서 고치지 않았을 때 쓴다 */
+export const rollDefaults = (site: MallSite): { genres: string[]; tiers: CosTier[] } => ({ genres: parseGenres(guideTxt(rollGuide(site), 'ROLL_GENRES')), tiers: parseTiers(guideTxt(rollGuide(site), 'ROLL_TIERS')) });
 
 /** 값 등급 ↔ 글 (한 줄에 「이름|설명|하한|상한」). 설정 칸에서 그대로 고친다 */
 export const tiersText = (t: CosTier[]): string => t.map((x) => `${x.name}|${x.desc}|${x.lo}|${x.hi}|${x.w}`).join('\n');
@@ -151,7 +130,7 @@ export const cosRoll = (vars: Vars): CosRoll => mallRoll(vars, 'cos');
 export const rollChanged = (vars: Vars, site: MallSite): boolean => Object.values(rollKeys(site)).some((k) => String(vars?.[k] ?? '') !== '');
 export const cosRollChanged = (vars: Vars): boolean => rollChanged(vars, 'cos');
 /** 값 구간 표기 (요청문·설정 예): 우주몰 ₩, 포인트몰 p */
-export const rollPrice = (site: MallSite, lo: number, hi: number): string => (site === 'bm' ? `${lo.toLocaleString('en-US')}-${hi.toLocaleString('en-US')} p` : `₩${lo.toLocaleString('en-US')}-${hi.toLocaleString('en-US')}`);
+export const rollPrice = (site: MallSite, lo: number, hi: number): string => guideTxt(rollGuide(site), 'ASSIGN_PRICE', { lo: lo.toLocaleString('en-US'), hi: hi.toLocaleString('en-US') });
 
 /** 한 칸의 배정 */
 export interface CosSlot { genre: string; tier: CosTier; useful: boolean }
@@ -191,14 +170,15 @@ export function cosAssignment(count: number, context: boolean, roll: CosRoll, rn
   const slots = cosDraw(count, context, roll, rnd);
   if (!slots.length) return '';
   const want = slots.some((s) => s.useful);
-  const G = site === 'bm' ? 'CATEGORY' : 'GENRE'; // 포인트몰은 장르가 아니라 상품 분류
-  // 글은 그 몰 지침의 ASSIGN_* 절. 절이 없으면 여기 남긴 글
-  const guide: GuideName = site === 'bm' ? 'Bm' : 'Cos';
+  // 글은 전부 그 몰 지침의 ASSIGN_* 절 (포인트몰은 장르가 아니라 상품 분류: ASSIGN_UNIT)
+  const guide = rollGuide(site);
+  const unit = guideTxt(guide, 'ASSIGN_UNIT');
   const lines = slots.map((s, i) => {
-    const role = s.useful ? ` | ROLE: ${guideOr(guide, 'ASSIGN_ROLE_USEFUL', "useful for the protagonist's current situation (a fitting tool, remedy or edge; describe the item only, never the protagonist)")}` : want ? ` | ROLE: ${guideOr(guide, 'ASSIGN_ROLE_BROAD', 'broad stock, unrelated to the current scene')}` : '';
-    return `Item ${i + 1} — ${G}: ${s.genre} | VALUE TIER: ${s.tier.name} (${s.tier.desc}), price ${rollPrice(site, s.tier.lo, s.tier.hi)}${role}`;
+    const v = { n: i + 1, unit, genre: s.genre, tier: s.tier.name, desc: s.tier.desc, price: rollPrice(site, s.tier.lo, s.tier.hi) };
+    const role = s.useful ? guideTxt(guide, 'ASSIGN_ROLE_USEFUL') : want ? guideTxt(guide, 'ASSIGN_ROLE_BROAD') : '';
+    return role ? guideTxt(guide, 'ASSIGN_LINE_ROLE', { ...v, role }) : guideTxt(guide, 'ASSIGN_LINE', v);
   });
-  return `${lines.join('\n')}\n${guideOr(guide, 'ASSIGN_RULE', () => `Build each item to its assigned ${G} and VALUE TIER: its worth, power and rarity match the tier, and its price follows from that worth inside the tier's range. ${G === 'GENRE' ? 'Genres' : 'Categories'} differ by design — do not re-pick. Every listing is new: nothing from previous shelves, from the reference material, or from earlier pages.`, { unit: G, units: G === 'GENRE' ? 'Genres' : 'Categories' })}`;
+  return `${lines.join('\n')}\n${guideTxt(guide, 'ASSIGN_RULE', { unit, units: guideTxt(guide, 'ASSIGN_UNITS') })}`;
 }
 
 // ── 우주몰 시그니처 상품 (구버전 Lua: 「우리가 도움!」·「착한 친구」를 코드가 확률로 끼움, 모델 생성 아님) ──
@@ -265,21 +245,23 @@ export function mallEvents(chat: Chat): string[] {
   const cosMain = shopMain(vars, 'cos');
   const lines = shopMainLines(vars);
   const cos = readMall(vars, 'cos').talk.filter((l) => l.k === key);
-  if (cosMain.has('ask') && cos.some((l) => l.who === 'me')) out.push(`chatted by text with the operator on the ${MALL_NAME.cos} website — ${capLines(cos, lines).map((l) => `${l.who === 'me' ? 'protagonist' : 'operator'}: "${l.text}"`).join(' / ')}`);
+  // 글은 지침 「메인 요청에 붙는 글」의 MALL.* 절 (2026-11-14 사용자: 코드에 글을 두지 않는다)
+  const said = (l: { who: string; text: string }, other: string) => guideTxt('Main', 'MALL.LINE', { who: guideTxt('Main', l.who === 'me' ? 'MALL.WHO.ME' : other), text: l.text });
+  if (cosMain.has('ask') && cos.some((l) => l.who === 'me')) out.push(guideTxt('Main', 'MALL.ASK', { mall: MALL_NAME.cos, lines: capLines(cos, lines).map((l) => said(l, 'MALL.WHO.OPERATOR')).join(' / ') }));
   if (cosMain.has('order')) {
     for (const o of liveOrders(vars, aliveAnchors(chat))) {
-      if (o.anchor === key && !o.taken) out.push(`placed a custom order with ${MALL_NAME.cos} for 「${o.item.name}」, paid ${o.price.toLocaleString('en-US')} won in advance; it will be ready in about ${o.hours} hours and has not arrived yet`);
+      if (o.anchor === key && !o.taken) out.push(guideTxt('Main', 'MALL.ORDER', { mall: MALL_NAME.cos, item: o.item.name, price: o.price.toLocaleString('en-US'), hours: o.hours }));
     }
     // 맞춤 주문이 바로 앞 응답에서 완성됐으면 한 번만 (그 뒤 턴에는 다시 넘기지 않는다). 「완성 알림」이 「카드 + 메인 요청」일 때만
     if (cosReadyMode(vars) === 'both') {
       const at = lastBot(chat)!.index;
-      for (const o of readyNotes(chat).get(at) ?? []) out.push(`the custom order 「${o.item.name}」 from ${MALL_NAME.cos} is now finished and waiting; the protagonist was notified but has not collected it yet (it is collected on the website, not delivered into the scene by itself)`);
+      for (const o of readyNotes(chat).get(at) ?? []) out.push(guideTxt('Main', 'MALL.READY', { mall: MALL_NAME.cos, item: o.item.name }));
     }
   }
   const desk = readDesk(vars);
   // 상담 줄마다 적힌 응답 키로 거른다 (키 없는 옛 줄은 상담 키): 창을 열어 둔 채 다음 턴에 이어 한 말도 넘어가고, 지난 턴 줄은 다시 안 간다 (전수검사 11-13)
   const dl = desk.talk.filter((l) => l.who !== 'sys' && ((l as { k?: string }).k ?? desk.anchor) === key);
-  if (shopMain(vars, 'bm').has('desk') && dl.some((l) => l.who === 'me')) out.push(`chatted by text with a counselor on the ${MALL_NAME.bm} 1:1 상담 — ${capLines(dl, lines).map((l) => `${l.who === 'me' ? 'protagonist' : 'counselor'}: "${l.text}"`).join(' / ')}`);
+  if (shopMain(vars, 'bm').has('desk') && dl.some((l) => l.who === 'me')) out.push(guideTxt('Main', 'MALL.DESK', { mall: MALL_NAME.bm, lines: capLines(dl, lines).map((l) => said(l, 'MALL.WHO.COUNSELOR')).join(' / ') }));
   return out;
 }
 

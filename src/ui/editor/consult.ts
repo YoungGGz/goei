@@ -19,6 +19,7 @@ import { GHOST_ICON, ICONS } from '../icons';
 import { catalogAll, catalogCurrent, catalogOthers, catalogPage, sendsFor, type CatMenu, type CatRow } from './catalog';
 import { flowView } from './flowpage';
 import { flowNodes, flowTokState } from './flow';
+import { guideTxt } from '../../core/guides';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const KEY = 'goei:consult';
@@ -72,7 +73,8 @@ async function persist(): Promise<void> {
   }
 }
 
-/* ── 요청에 넣는 것 ── */
+/* ── 요청에 넣는 것 (글은 전부 지침 「AI 상담」의 STATE.*·LAST.*·MENUS.* 절, 2026-11-14 사용자: 코드에 글을 두지 않는다) ── */
+const C = (section: string, vars?: Record<string, string | number>) => guideTxt('Consult', section, vars);
 const fmt = (n: number) => n.toLocaleString('ko-KR');
 const flat = (s: string) => s.toLowerCase().replace(/\s+/g, '');
 /** 목록 전체에서 id 로 (같은 조작이 두 메뉴에 있으면 앞의 것) */
@@ -89,14 +91,15 @@ export function consultState(ctx: ChatContext, started: boolean): string {
   const maybe = all.reduce((n, x) => n + x.maybe, 0);
   const ready = flowTokState().ready;
   const tok = all.filter((x) => x.on && typeof x.tok === 'number').reduce((n, x) => n + (x.tok as number), 0);
-  const line = (x: (typeof all)[number]) => `- ${x.name} | ${x.on ? '턴마다 호출' : '턴마다 호출 없음'}${x.model ? ` | 모델: ${x.model}` : ''} | 호출: ${x.calls}${ready && x.on && typeof x.tok === 'number' ? ` | 예상 토큰 ${fmt(x.tok)}` : ''}`;
+  const modelPart = (x: { model?: string }) => (x.model ? ` ${C('STATE.NODE_MODEL', { model: x.model })}` : '');
+  const line = (x: (typeof all)[number]) => C('STATE.NODE', { name: x.name, on: C(x.on ? 'STATE.NODE_ON' : 'STATE.NODE_OFF'), model: modelPart(x), calls: x.calls, tok: ready && x.on && typeof x.tok === 'number' ? ` ${C('STATE.NODE_TOKENS', { tok: fmt(x.tok) })}` : '' });
   return [
-    `턴마다 보조 호출 ${sure}회${maybe ? ` (조건에 따라 최대 ${sure + maybe}회)` : ''} · 메인 1회${ready ? ` · 예상 토큰 ${fmt(tok)}` : ''}`,
-    ...(started ? [] : ['아직 채팅을 시작하기 전이에요. 값은 새 채팅이 받을 값이에요.']),
-    '메인 요청 전', ...pre.map(line),
-    '메인 응답', `- ${main.name} | 호출: ${main.calls}`,
-    '메인 응답 뒤', ...post.map(line),
-    '누르거나 열 때만', ...manual.map((x) => `- ${x.name}${x.model ? ` | 모델: ${x.model}` : ''} | 호출: ${x.calls}`),
+    C('STATE.SUMMARY', { sure, maybe: maybe ? ` ${C('STATE.SUMMARY_MAYBE', { max: sure + maybe })}` : '', tok: ready ? ` ${C('STATE.SUMMARY_TOKENS', { tok: fmt(tok) })}` : '' }),
+    ...(started ? [] : [C('STATE.NOT_STARTED')]),
+    C('STATE.PRE'), ...pre.map(line),
+    C('STATE.MAIN'), C('STATE.MAIN_NODE', { name: main.name, calls: main.calls }),
+    C('STATE.POST'), ...post.map(line),
+    C('STATE.MANUAL'), ...manual.map((x) => C('STATE.MANUAL_NODE', { name: x.name, model: modelPart(x), calls: x.calls })),
   ].join('\n');
 }
 
@@ -106,22 +109,23 @@ export async function consultLast(): Promise<string> {
   try { turns = await loadTrace(); } catch { /* 못 읽으면 기록 없음 */ }
   // 턴 밖에서 누른 호출만 있는 묶음(상점 열기·AI 상담 등)은 「지난 턴」이 아니다 (flowpage.ts lastTurn 과 같은 규칙)
   const t = [...turns].reverse().find((x) => x.main || x.calls.some((c) => c.phase !== 'manual'));
-  if (!t) return '(지난 턴 기록 없음)';
+  if (!t) return C('LAST.NONE');
   const calls = t.calls.filter((c) => c.phase !== 'manual');
-  const model = (m: string) => (m === 'main' ? '메인' : m === 'aux' ? '보조' : 'ID 지정 모델');
+  const model = (m: string) => C(m === 'main' ? 'LAST.MODEL_MAIN' : m === 'aux' ? 'LAST.MODEL_AUX' : 'LAST.MODEL_ID');
+  const toks = (n: number | undefined) => (n !== undefined ? C('LAST.TOKENS', { n: fmt(n) }) : C('LAST.NO_RECORD'));
   const sent = calls.reduce((n, c) => n + (c.requestTokens ?? 0), 0);
   const got = calls.reduce((n, c) => n + (c.responseTokens ?? 0), 0);
   return [
-    `메인 요청 ${t.main?.totalTokens !== undefined ? `${fmt(t.main.totalTokens)}토큰` : '기록 없음'} · 메인 응답 ${t.reply?.tokens !== undefined ? `${fmt(t.reply.tokens)}토큰` : '기록 없음'}`,
-    ...calls.map((c) => `- ${c.label} | ${c.phase === 'before' ? '메인 요청 전' : '메인 응답 뒤'} | ${model(c.model)} | 보낸 토큰 ${fmt(c.requestTokens ?? 0)} | 받은 토큰 ${fmt(c.responseTokens ?? 0)} | ${Math.round(c.ms / 100) / 10}초 | ${c.ok ? '성공' : '실패'}`),
-    `보조 호출 ${calls.length}회 · 보낸 토큰 ${fmt(sent)} · 받은 토큰 ${fmt(got)}`,
+    C('LAST.HEAD', { main: toks(t.main?.totalTokens), reply: toks(t.reply?.tokens) }),
+    ...calls.map((c) => C('LAST.CALL', { label: c.label, phase: C(c.phase === 'before' ? 'STATE.PRE' : 'STATE.POST'), model: model(c.model), sent: fmt(c.requestTokens ?? 0), got: fmt(c.responseTokens ?? 0), sec: Math.round(c.ms / 100) / 10, result: C(c.ok ? 'LAST.OK' : 'LAST.FAIL') })),
+    C('LAST.TOTAL', { n: calls.length, sent: fmt(sent), got: fmt(got) }),
   ].join('\n');
 }
 
 /** [메뉴]: 메뉴마다 소개와 줄 이름. 끝에 설정 메뉴가 아닌 항목 이름 (안내만) */
 export function consultMenus(menus: CatMenu[]): string {
   const names = (m: CatMenu) => [...new Set(m.rows.flatMap((r) => r.keys))].join(', ');
-  return [...menus.map((m) => `- ${m.menu}${m.intro ? `: ${m.intro}` : ''} | 줄: ${names(m)}`), '이 창에서 바꿀 수 없는 곳 (자리만 안내)', catalogOthers()].join('\n');
+  return [...menus.map((m) => C('MENUS.LINE', { menu: m.menu, intro: m.intro ? C('MENUS.INTRO', { intro: m.intro }) : '', names: names(m) })), C('MENUS.OTHERS_HEAD'), catalogOthers()].join('\n');
 }
 
 /** 사용자 글에 이름이 나온 메뉴: 메뉴 이름, 또는 한두 메뉴에만 있는 묶음·줄 이름 (여러 메뉴에 다 있는 이름으로는 메뉴를 못 고른다) */
@@ -279,7 +283,7 @@ async function ask(d: ConsultDeps, ctx: ChatContext): Promise<void> {
     const more = value.open.map((n) => menus.find((m) => flat(m.menu) === flat(n))?.page ?? '').filter((p) => p && !want.includes(p));
     // 달라고 한 메뉴는 지금 메뉴 바로 다음에 둔다: 맨 뒤면 요청 토큰 상한에 먼저 걸려 빠졌다 (전수검사 11-13)
     if (more.length) value = await call(cur && want[0] === cur ? [cur, ...more, ...want.slice(1)] : [...more, ...want]);
-    if (!value.say) throw new Error('<say> 블록이 없어요.');
+    if (!value.say) throw new Error(C('ERR.NO_SAY'));
     const now = d.ctx();
     const same = !!now && chatKey(now) === key;
     const go = all.find((r) => r.id === value.go)?.go;

@@ -118,9 +118,9 @@ test('우주몰 문의 요청에 진실 칸·SHELF_SECRET (shop#7·guides#2)', (
   const st = { ...M.emptyShop({ raw: '', shop: '우주 쇼핑몰', owner: '운영자' }, ''), loaded: true, items: [{ id: 'a', name: '빛의 돌', price: 1200000, desc: '둥근 돌', effect: '어둠을 밝힌다', use: false, truth: '쥐면 주변 전등이 꺼진다' }] };
   const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null, truthMode: 'mix' };
   const sys = M.talkPrompt(src, M.shopSettings({}), 'Cos')[0].content;
-  assert.ok(sys.includes(M.SECRET_LINE), 'Cos 문의 줄 꼴은 진실 칸까지');
+  assert.ok(sys.includes(M.lineOf('Cos')) && M.lineOf('Cos').endsWith('|진실'), 'Cos 문의 줄 꼴은 진실 칸까지');
   const shopSys = M.talkPrompt(src, M.shopSettings({}), 'Shop')[0].content;
-  assert.ok(!shopSys.includes(M.SECRET_LINE), '기본 상점은 8칸 그대로');
+  assert.ok(!shopSys.includes(M.lineOf('Cos')), '기본 상점은 8칸 그대로');
   assert.ok(sys.length > shopSys.length);
 });
 

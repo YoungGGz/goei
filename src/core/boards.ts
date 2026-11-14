@@ -3,11 +3,16 @@
 // 다른 사이트는 읽을 때 그 사이트 변수를 괴담넷 이름으로 비춰 보이고(boardView), 쓸 때 되돌린다(boardWrite).
 // 괴담넷(gn)은 그대로라 옛 채팅 변수와 같다.
 import type { Chat, ScriptState } from './types';
+import type { GuideName } from './guides';
 
 export type BoardSite = 'gn' | 'gal' | 'wpf' | 'sm';
 export const BOARD_SITES: BoardSite[] = ['gn', 'gal', 'wpf', 'sm'];
 export const isBoardSite = (v: unknown): v is BoardSite => (BOARD_SITES as unknown[]).includes(v);
 export const BOARD_NAME: Record<BoardSite, string> = { gn: '괴담넷', gal: '괴담갤', wpf: '세정게', sm: '연어 마켓' };
+/** 사이트마다 따로 쓰는 지침 (2026-11-08 사용자: 공용 없이 전부 따로) */
+export const BOARD_GUIDE: Record<BoardSite, GuideName> = { gn: 'GNet', gal: 'Gal', wpf: 'Wpf', sm: 'Salmon' };
+/** 화면 이름(BOARD_NAME) → 사이트. 모르는 이름이면 괴담넷 */
+export const siteOfName = (name: string | undefined): BoardSite => BOARD_SITES.find((k) => BOARD_NAME[k] === name) ?? 'gn';
 /** 요청문이 지금 어느 사이트인지 아는 변수 (보기에만 있고 저장하지 않는다) */
 export const BOARD_SITE_VAR = '$gn_site';
 /** 사이트마다 따로 두지 않는 괴담넷 변수: 닉네임은 인터넷 로그인 하나, 쪽지 자동 정리는 게시판 넷이 한 값 */

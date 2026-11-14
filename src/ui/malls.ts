@@ -19,7 +19,7 @@ import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, canc
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
-import { DESK_AVOID_RANGE, DESK_AXES_DEFAULT, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
+import { DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
 import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, mallAutoKey, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
 import { SHOP_SIZE_HI, SHOP_SIZE_LO } from '../core/shop';
 import { onOffSwitch } from './controls';
@@ -28,6 +28,7 @@ import { shopGive } from '../core/shopfn';
 import { itemPic } from './items';
 import { siteLogo } from './browser';
 import { isPhone } from './media';
+import { guideTxt } from '../core/guides';
 
 /** 상담 줄 + 그 줄을 쓴 때의 마지막 응답 키 (core/malls.ts mallEvents 가 이 키로 거른다) */
 type DeskLineK = DeskLine & { k?: string };
@@ -115,7 +116,7 @@ function saleDone<C extends ChatContext['chat']>(chat: C, site: MallSite, itemId
   if (!liveItemsOf(it0, chat).some((x) => x.id === itemId)) return null;
   const anchor = lastBot(chat)?.key ?? '';
   const w0 = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
-  const w = addWalletEntry(w0, { id: freshWalletId(w0, `${site}_sl_${itemId}_${now.sales.length}`, anchor), anchor, amount: o.price, memo: `${o.name} (${MALL_NAME[site]} 매입)`, src: 'store' }, aliveAnchors(chat)); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
+  const w = addWalletEntry(w0, { id: freshWalletId(w0, `${site}_sl_${itemId}_${now.sales.length}`, anchor), anchor, amount: o.price, memo: guideTxt('Main', 'MALL.MEMO.SELL', { item: o.name, mall: MALL_NAME[site] }), src: 'store' }, aliveAnchors(chat)); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
   const items = sellItem(it0, itemId, anchor, `${MALL_NAME[site]}에 팖`);
   const nextShop = closeSale(now, anchor); // 판 응답 키 — 다시 굴리면 판 것 목록에서도 빠진다 (전수검사 11-13)
   if (!nextShop) return null;
@@ -290,10 +291,11 @@ async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<Sho
     let st = now;
     for (const it of list) {
       const walletId = it.price > 0 ? freshWalletId(w, `${site}_${it.id}`, anchor) : '';
-      if (walletId) w = addWalletEntry(w, { id: walletId, anchor, amount: -it.price, memo: `${it.name} (${MALL_NAME[site]})`, src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
+      if (walletId) w = addWalletEntry(w, { id: walletId, anchor, amount: -it.price, memo: guideTxt('Main', 'MALL.MEMO.BUY', { item: it.name, mall: MALL_NAME[site] }), src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
       // 흥정으로 붙은 다른 대가(it.pay)도 기록에 남긴다 (일반 상점 ui/shop.ts 와 같게, 릴리스 점검 11-09)
-      const extra = it.pay ? ` + ${it.pay}` : '';
-      const paid = p ? { paidWith: `${it.price.toLocaleString('en-US')} Baekilmong points at ${MALL_NAME[site]}${extra}` } : { price: it.price, ...(walletId ? { walletId } : {}), paidWith: `bank transfer to ${MALL_NAME[site]}${extra}` };
+      // 기록 글은 지침 「메인 요청에 붙는 글」의 MALL.PAID.* 절 (본편에 「paid with …」로 간다)
+      const extra = it.pay ? ` ${guideTxt('Main', 'MALL.PAID.EXTRA', { pay: it.pay })}` : '';
+      const paid = p ? { paidWith: guideTxt('Main', 'MALL.PAID.POINTS', { price: it.price.toLocaleString('en-US'), mall: MALL_NAME[site], extra }) } : { price: it.price, ...(walletId ? { walletId } : {}), paidWith: guideTxt('Main', 'MALL.PAID.BANK', { mall: MALL_NAME[site], extra }) };
       items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...paid });
       st = markSold(st, it.id, anchor);
     }
@@ -422,8 +424,8 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (walletBalance(w, alive) < n.price) { short = true; return null; }
         const anchor = lastBot(chat)?.key ?? '';
         const walletId = freshWalletId(w, `${site}_note_${n.id}`, anchor);
-        w = addWalletEntry(w, { id: walletId, anchor, amount: -n.price, memo: `쪽지: ${n.title} (${MALL_NAME[site]})`, src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
-        const items = addItem(readItems(chat.scriptstate), alive, { name: `쪽지: ${n.title}`, desc: `${MALL_NAME[site]} 운영자가 보낸 쪽지`, text: n.body, use: false, icon: 'note paper', weight: 0.01, from: 'store', store: site, anchor, price: n.price, walletId, paidWith: `bank transfer to ${MALL_NAME[site]}` });
+        w = addWalletEntry(w, { id: walletId, anchor, amount: -n.price, memo: guideTxt('Main', 'MALL.MEMO.NOTE', { title: n.title, mall: MALL_NAME[site] }), src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
+        const items = addItem(readItems(chat.scriptstate), alive, { name: guideTxt('Main', 'MALL.NOTE.NAME', { title: n.title }), desc: guideTxt('Main', 'MALL.NOTE.DESC', { mall: MALL_NAME[site] }), text: n.body, use: false, icon: 'note paper', weight: 0.01, from: 'store', store: site, anchor, price: n.price, walletId, paidWith: guideTxt('Main', 'MALL.PAID.BANK', { mall: MALL_NAME[site], extra: '' }) });
         ok = true;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...itemsVars(items), ...mallVarsOf(site, nextShop) } };
       });
@@ -446,7 +448,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (walletBalance(w, alive) < q.price) { short = true; return null; }
         const anchor = lastBot(chat)?.key ?? '';
         const walletId = freshWalletId(w, `${site}_ord_${q.id}`, anchor);
-        w = addWalletEntry(w, { id: walletId, anchor, amount: -q.price, memo: `맞춤 주문 선납: ${q.item.name} (${MALL_NAME[site]})`, src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
+        w = addWalletEntry(w, { id: walletId, anchor, amount: -q.price, memo: guideTxt('Main', 'MALL.MEMO.ORDER', { item: q.item.name, mall: MALL_NAME[site] }), src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
         const { sold: _s, tag: _t, was: _w, orig: _o, pay: _p, ...item } = q.item;
         const order: CosOrder = { id: q.id, anchor, price: q.price, hours: q.hours, orderedAt: worldMinute(chat), orderedKey: anchor, walletId, item };
         ok = true;
@@ -467,7 +469,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (!cur || cur.taken) return null;
         const anchor = lastBot(chat)?.key ?? '';
         const it = cur.item;
-        const items = addItem(readItems(chat.scriptstate), aliveAnchors(chat), { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site === 'cos' ? 'cos-order' : site, anchor, price: cur.price, walletId: cur.walletId ?? `${site}_ord_${cur.id}`, paidWith: `custom order from ${MALL_NAME[site]}, paid in advance` });
+        const items = addItem(readItems(chat.scriptstate), aliveAnchors(chat), { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site === 'cos' ? 'cos-order' : site, anchor, price: cur.price, walletId: cur.walletId ?? `${site}_ord_${cur.id}`, paidWith: guideTxt('Main', 'MALL.PAID.ORDER', { mall: MALL_NAME[site] }) });
         ok = true;
         const next = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(list.map((x) => (x.id === o.id ? { ...x, taken: true, takenKey: anchor } : x))) } };
         // 받았으니 채팅의 완성 알림 카드(표식)를 지운다
@@ -544,7 +546,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       }
       if (site !== 'cos' || !said || v.loading || !st.loaded) return true;
       const chip = st.items.find((x) => x.id === v.chip && !x.sold);
-      const next = stampLastLine(sayToOwner(st, `${chip ? `[${chip.name}] ` : ''}${said}`), lastBot(ctx.chat)?.key ?? '');
+      const next = stampLastLine(sayToOwner(st, chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said), lastBot(ctx.chat)?.key ?? '');
       v.input = '';
       v.chip = '';
       v.picking = false;
@@ -569,7 +571,7 @@ export function deskSource(ctx: ChatContext): DeskSource {
   const s = mallSettings(vars, 'bm');
   const st = readMall(vars, 'bm', aliveAnchors(ctx.chat));
   const src = shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: mallVars(vars, 'bm') as typeof ctx.chat.scriptstate } }, { ...st, shop: '백일몽', owner: '' }, s, shopGive(vars, 'bm', 'desk'));
-  return { refs: src.refs, shelf: onShelf(st).map((x) => `${x.name}|${x.price}p|${x.desc}`).join('\n'), points: balanceOf(ctx, 'bm'), nick: loggedNick(ctx), language: src.language };
+  return { refs: src.refs, shelf: onShelf(st).map((x) => guideTxt('BmDesk', 'SHELF_LINE', { name: x.name, price: x.price, desc: x.desc })).join('\n'), points: balanceOf(ctx, 'bm'), nick: loggedNick(ctx), language: src.language };
 }
 
 async function saveDesk(ctx: ChatContext, st: DeskState) {
@@ -940,7 +942,7 @@ function tierTable(vars: Record<string, unknown> | undefined, site: MallSite): s
 interface AxisRaw { name: string; values: string[] }
 const axesRaw = (text: string): AxisRaw[] => String(text ?? '').split(/\r?\n/).filter((l) => l.includes(':')).map((l) => { const i = l.indexOf(':'); return { name: l.slice(0, i).trim(), values: l.slice(i + 1).split(/[,，]/).map((x) => x.trim()).filter(Boolean) }; });
 const axesRawText = (a: AxisRaw[]): string => a.map((x) => `${x.name}: ${x.values.join(', ')}`).join('\n');
-const axisRows = (vars: Record<string, unknown> | undefined): AxisRaw[] => { const st = String(vars?.[DESK_KEY.axes] ?? ''); return axesRaw(st.trim() ? st : DESK_AXES_DEFAULT); };
+const axisRows = (vars: Record<string, unknown> | undefined): AxisRaw[] => { const st = String(vars?.[DESK_KEY.axes] ?? ''); return axesRaw(st.trim() ? st : deskAxesDefault()); };
 function axisTable(vars: Record<string, unknown> | undefined): string {
   const rows = axisRows(vars);
   const body = rows.map((a, i) => {
@@ -1005,7 +1007,7 @@ function cosRollGroup(ctx: ChatContext, site: MallSite): string {
 function deskGroup(ctx: ChatContext): string {
   const d = deskSettings(ctx.chat.scriptstate);
   const how = '<p class="ps-note">상담을 열 때마다 코드가 아래 칸마다 값을 하나씩 뽑고, 모델이 그 값으로 상담사(이름·직급·부서·소개·말투)를 한 번 만들어 둬요. 대화하는 동안은 그 카드를 매번 같이 보내서 사람이 바뀌지 않아요. 턴이 넘어가거나 「상담 종료」·「다른 상담사 연결」을 누르면 다음엔 새 상담사예요. 업무 지침과 말 규칙은 설정 → 지침 → 포인트몰 1:1 상담에서 고쳐요.</p>';
-  const aSet = defChanged(d.axesText, DESK_AXES_DEFAULT, axesNorm);
+  const aSet = defChanged(d.axesText, deskAxesDefault(), axesNorm);
   const reset = aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-desk-reset">기본값으로</button></div>` : '';
   return group('1:1 상담', how + [
     row('사용', mseg('bm', 'desk_on', d.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 왼쪽 메뉴에 「1:1 상담」이 안 보여요.'),
@@ -1105,7 +1107,7 @@ async function deskSettingsAction(action: string, value: string | undefined, ctx
   {
     // 주사위 칸 줄 단위 고치기 (저장 글 꼴 「칸 이름: 값, 값」 그대로)
     const rows = () => axisRows(ctx.chat.scriptstate);
-    const save = (a: AxisRaw[]) => { const t = axesRawText(a); return set({ [DESK_KEY.axes]: !a.length || t === DESK_AXES_DEFAULT ? '' : t }); };
+    const save = (a: AxisRaw[]) => { const t = axesRawText(a); return set({ [DESK_KEY.axes]: !a.length || t === deskAxesDefault() ? '' : t }); };
     const clean = (v: string, n: number) => v.replace(/[:,，\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n);
     if (action === 'ms-ax-name') { const m = /^(\d+)=([\s\S]*)$/.exec(value ?? ''); if (!m) return true; return save(rows().map((a, i) => (i === Number(m[1]) ? { ...a, name: clean(m[2], 20) } : a))); }
     if (action === 'ms-ax-del') return save(rows().filter((_, i) => i !== Number(value)));
@@ -1114,7 +1116,7 @@ async function deskSettingsAction(action: string, value: string | undefined, ctx
   }
   if (action === 'ms-desk') {
     const m = /^axes=([\s\S]*)$/.exec(value ?? '');
-    return m ? set({ [DESK_KEY.axes]: defStored(m[1], DESK_AXES_DEFAULT, axesNorm) }) : true;
+    return m ? set({ [DESK_KEY.axes]: defStored(m[1], deskAxesDefault(), axesNorm) }) : true;
   }
   if (action === 'ms-desk-step') {
     const d = deskSettings(ctx.chat.scriptstate);

@@ -11,3 +11,7 @@ Rules:
 3. `new_characters`: proper names (or a unique nickname used as a name) in `input` or `recent` that are not in the catalog and that speak or act. Give `name`, `aliases` seen, and a short verbatim `quote` when one exists. These are hints, not facts; never build a full name from a role or surname, and never list the user's own character.
 4. At most {{MAX}} selected names; use canonical `name` values only. Return one JSON object, no code fence: {"selected":[{"name":"<canonical>"}],"new_characters":[{"name":"<name>","aliases":["<alias>"],"quote":"<verbatim or empty>"}]}
 @@END
+
+@@SECTION USER_RULES.HEAD
+## User rules
+@@END

@@ -1,8 +1,8 @@
 // 망상홈쇼핑 시청 기록 → 본편 참고 기록 (core/hslog.ts)
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hslog, homeshop, budget, focus } from '../dist-test/core.mjs';
-const { appendLog, readLog, hsMainContext, hsMainSettings, hsMainOn, hsMainRules, HS_LOG_VAR, HS_LOG_MAX, HS_LOG_HOST, HS_MAIN_SET, HS_MAIN_KEY, HS_MAIN_FALLBACK, sameProgram } = hslog;
+import { hslog, homeshop, budget, focus, guideDefaultSec } from '../dist-test/core.mjs';
+const { appendLog, readLog, hsMainContext, hsMainSettings, hsMainOn, hsMainRules, HS_LOG_VAR, HS_LOG_MAX, HS_LOG_HOST, HS_MAIN_SET, HS_MAIN_KEY, sameProgram } = hslog;
 
 const item = (id, name, pay, desc) => ({ id, name, pay, desc, price: 0 });
 const showOf = (key, ids = ['a1', 'a2']) => ({
@@ -87,7 +87,7 @@ test('설정: 기본값 · 끄기 · 종류 · 토큰 범위 · 설정 표', () 
   assert.equal(hsMainOn({ ...vars, $hs_main: '0' }), false);
   assert.equal(hsMainOn({}), false, '기록이 없으면 안 넘긴다');
   assert.ok(hsMainRules().length > 20);
-  assert.ok(HS_MAIN_FALLBACK.length > 20);
+  assert.equal(hsMainRules(), guideDefaultSec('Hs', 'MAIN_CONTEXT'), '머리말은 지침 「망상홈쇼핑」의 MAIN_CONTEXT 절 (코드에 옛 글 없음)');
 });
 
 test('본편 참고 기록: 머리말 + 상품(부)마다 묶은 기록', () => {

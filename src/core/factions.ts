@@ -3,7 +3,7 @@
 import { directoryEntries } from './lorebooks';
 import { migrateRoster } from './world/roster-v';
 import type { DirectoryData } from './world/directory';
-import { guideText } from './guides';
+import { guideText, guideTxt } from './guides';
 import { SCENARIOS } from './scenarios';
 import { factionScenes, pickScenes, type ScenesData } from './scenes';
 import type { Faction, FactionType, LoreEntry, Scenario, ScriptState } from './types';
@@ -245,11 +245,8 @@ export function nextCode(used: Iterable<string>): string | null {
   return null;
 }
 
-const TYPE_GM: Record<FactionType, string> = {
-  org: 'Organization: runs operations, has internal notices and its own agents.',
-  civilian: 'Civilian-type: no operations; members only visit and move around.',
-  freelancer: 'Freelancer-type: members take contracted missions.',
-};
+/** 유형별 소개 끝 한 줄: 지침 「메인 요청에 붙는 글」 WORLD.FACTION.TYPE.<유형> 절 */
+const typeGm = (type: FactionType): string => guideTxt('Main', `WORLD.FACTION.TYPE.${type}`);
 
 /**
  * 태그·세력 로어북 자리표시자에 들어갈 채팅 변수. 새 세력이 없으면 모두 빈 값이라 원래 글과 같다.
@@ -268,7 +265,8 @@ export function factionVars(lore: LoreEntry[] | undefined): ScriptState {
       .map((n) => ` | ${n}`)
       .join(''),
     $fac_extra: extras
-      .map((f) => `\n\n### ${gmName(f)} [${f.code}]\n${f.gmDesc || `A faction the protagonist can belong to. See the 「${f.org}」 entry.`}\n${TYPE_GM[f.type ?? 'org']}`)
+      // 설명이 비면 지침 WORLD.FACTION.EXTRA_DESC 절
+      .map((f) => `\n\n### ${gmName(f)} [${f.code}]\n${f.gmDesc || guideTxt('Main', 'WORLD.FACTION.EXTRA_DESC', { org: String(f.org) })}\n${typeGm(f.type ?? 'org')}`)
       .join(''),
   };
 }

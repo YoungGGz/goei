@@ -26,6 +26,7 @@ import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, wal
 import { pointsVars, readPoints } from '../core/points';
 import { addItem, dropUse, EQUIP_LABEL, gridItems, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { getPrefs } from '../core/settings';
+import { guideTxt } from '../core/guides';
 import {
   applyShelf, applyTalk, cancelSell, closeSale, currentShop, markSold, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
   type ShopItem, type ShopSource, type ShopState,
@@ -311,7 +312,7 @@ export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ct
   // 최근 챗로그는 맥락 반영이 꺼져 있어도 관련 로어북을 고를 때는 읽는다
   const story = storyText(recentTurns(ctx.chat, give ? give.turns : sh.turns, genSettings(vars).userMessages));
   const doc = findDoc(ctx.chat, st.shop, ctx.char.globalLore);
-  const extra = doc ? [{ source: `위키: ${st.shop}`, content: innerBody(doc.body).slice(0, 3000) }] : [];
+  const extra = doc ? [{ source: guideTxt('Shop', 'REFS_WIKI_SOURCE', { shop: st.shop }), content: innerBody(doc.body).slice(0, 3000) }] : [];
   const text = `${st.shop}\n${st.owner}\n${story}`;
   let rows: RefRow[];
   if (give) {
@@ -573,7 +574,8 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       const sell = shopUi.chipKind === 'sell' && !!st?.sell;
       const said = (value ?? shopUi.input).trim();
       // 팔기 칩은 글이 없어도 보낼 수 있다 (물건만 내민다)
-      const text = sell ? `[판매: ${st!.sell!.name}]${said ? ` ${said}` : ''}` : `${shopUi.chip ? `[${shopUi.chip}] ` : ''}${said}`.trim();
+      // 주인에게 가는 내 말 꼴은 지침 「상점」의 ASK_SELL · ASK_SELL_BARE · ASK_CHIP 절
+      const text = sell ? (said ? guideTxt('Shop', 'ASK_SELL', { item: st!.sell!.name, said }) : guideTxt('Shop', 'ASK_SELL_BARE', { item: st!.sell!.name })) : (shopUi.chip ? guideTxt('Shop', 'ASK_CHIP', { item: shopUi.chip, said }) : said).trim();
       if (!st || !text || (!sell && !said) || st.closed || shopUi.loading || !st.loaded) return true;
       shopUi.input = '';
       shopUi.chip = '';

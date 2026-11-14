@@ -269,7 +269,7 @@ function writePost(ctx: ChatContext, env: GnetEnv, input: string, tag = '') {
     const s = gnetSettings(ctx.chat.scriptstate);
     const draftPost: GPost = { id: 0, date: '', nick, title: '', body: input, views: 0, votes: 0, mine: true, comments: [] };
     const plan = incomingPlan(ctx.chat, st, s, nick, Math.random, { post: draftPost });
-    const prompt = fitPrompt(fnBudget(ctx.chat.scriptstate, 'gn', 'post'), () => postPrompt(source(ctx), st, tag ? `[${tag}] ${input}` : input, plan, names(ctx)));
+    const prompt = fitPrompt(fnBudget(ctx.chat.scriptstate, 'gn', 'post'), () => postPrompt(source(ctx), st, input, plan, names(ctx), tag));
     const { value, draft: parsed } = (await generate(prompt.messages, s.model, (r) => {
       const v = withRaw(r, () => parseJsonPayload(r)) as Record<string, unknown>;
       return { value: v, draft: withRaw(r, () => parsePostDraft(v)) };

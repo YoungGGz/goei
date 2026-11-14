@@ -3,13 +3,14 @@
 import type { AgentRow, Directory, OrgRow } from './directory';
 import { orgOf } from './directory';
 import { orgNameCbs } from './assemble';
-import { guideOr } from '../guides';
+import { guideTxt } from '../guides';
 import { excludedOrgs, fieldValue, RELATION_STAGES, type Relations, type RelationStage, type WorldRecord } from './records';
 
 const VAR = '{{getvar::st_faction}}';
-export const FACTION_INTRO = 'This reference describes the world to the GM. Public labels, hidden affiliations, doctrine, and internal information are known to an NPC only through that NPC\'s actual access.';
-export const ROSTER_INTRO = '- Purpose: GM reference for consistent character introductions before individual lore is active.\n- Detail: Use active character lore for fuller characterization.';
-const STAGE_MARK: Record<RelationStage, string> = { hostile: 'H', wary: 'W', neutral: 'N', favorable: 'F', friendly: 'A' };
+// 글(머리·머리말·관계표 글자)은 모두 지침 「메인 요청에 붙는 글」 WORLD.FACTION.* · WORLD.ROSTER.HEAD · FACTION.INTRO · ROSTER.INTRO · FACTION.RELATIONS_LEGEND 절
+const g = (name: string, vars?: Record<string, string | number>) => guideTxt('Main', name, vars);
+/** 관계표 칸 글자 (WORLD.FACTION.MARK.<단계>, 자기 자신은 self) */
+const stageMark = (stage: RelationStage | 'self'): string => g(`WORLD.FACTION.MARK.${stage}`);
 
 const firstParagraph = (t: string) => t.trim().split(/\n\s*\n/)[0]?.trim() ?? '';
 
@@ -39,8 +40,7 @@ const code = (o: OrgRow) => (o.faction ? ` [${o.faction}]` : '');
 
 /** Faction 지침: 세력 요약(소개 첫 문단) → 관계(중립 아닌 쌍만) → 공통 규칙 */
 export function assembleFaction(dir: Directory, orgs: Map<string, WorldRecord>, rel: Relations): string {
-  // 머리말·관계표 설명은 지침 「메인 요청에 붙는 글」 FACTION.* · ROSTER.INTRO 절. 절이 없으면 위 글
-  const parts: string[] = ['## Faction', guideOr('Main', 'FACTION.INTRO', FACTION_INTRO)];
+  const parts: string[] = [g('WORLD.FACTION.HEAD'), g('FACTION.INTRO')];
   const named = (name: string): string => {
     const o = dir.orgs.find((x) => x.name === name);
     return o ? orgNameCbs(dir, o) : name;
@@ -69,20 +69,20 @@ export function assembleFaction(dir: Directory, orgs: Map<string, WorldRecord>, 
   };
   if (members.length > 1 && members.some((a) => members.some((b) => a !== b && stageOf(a, b) !== 'neutral'))) {
     const no = new Map(members.map((n, i) => [n, i + 1]));
-    const head = `| viewer \\ target | ${members.map((n) => no.get(n)).join(' | ')} |`;
+    const head = g('WORLD.FACTION.TABLE_HEAD', { cols: members.map((n) => no.get(n)).join(' | ') });
     const sep = `|---|${members.map(() => '---').join('|')}|`;
-    const rows = members.map((a) => `| ${no.get(a)} ${named(a)} | ${members.map((b) => (a === b ? '-' : STAGE_MARK[stageOf(a, b)])).join(' | ')} |`);
+    const rows = members.map((a) => `| ${no.get(a)} ${named(a)} | ${members.map((b) => stageMark(a === b ? 'self' : stageOf(a, b))).join(' | ')} |`);
     // 메모는 기본값이 비어 있고(사용자 2026-10-27), 사용자가 쓴 칸만 표 아래에 한 줄씩
     const notes = members.flatMap((a) => members.filter((b) => a !== b && rel.pairs[`${a}>${b}`]?.memo?.trim()).map((b) => `- ${no.get(a)} → ${no.get(b)}: ${fillCodes(rel.pairs[`${a}>${b}`]!.memo!.trim().replace(/\n+/g, ' '), dir)}`));
-    parts.push(`## Faction Relations\n${guideOr('Main', 'FACTION.RELATIONS_LEGEND', 'How the row faction regards the column faction: H hostile, W wary, N neutral, F favorable, A allied, - self. Factions not in the table regard each other neutrally.')}\n${head}\n${sep}\n${rows.join('\n')}${notes.length ? `\nNotes:\n${notes.join('\n')}` : ''}`);
+    parts.push(`${g('WORLD.FACTION.RELATIONS_HEAD')}\n${g('FACTION.RELATIONS_LEGEND')}\n${head}\n${sep}\n${rows.join('\n')}${notes.length ? `\n${g('WORLD.FACTION.NOTES')}\n${notes.join('\n')}` : ''}`);
   }
-  if (rel.common.trim()) parts.push(`## Faction Doctrine and Relations\n${fillCodes(rel.common.trim(), dir)}`);
+  if (rel.common.trim()) parts.push(`${g('WORLD.FACTION.DOCTRINE_HEAD')}\n${fillCodes(rel.common.trim(), dir)}`);
   return parts.join('\n\n') + '\n\n---';
 }
 
 /** Roster 지침: 조직 → 부서(영문 표기) → 요원 소개 한 줄. 소개가 비면 그 요원은 빠진다 */
 export function assembleRoster(dir: Directory, agents: Map<string, WorldRecord>, orgs: Map<string, WorldRecord>): string {
-  const parts: string[] = [`## Roster\n${guideOr('Main', 'ROSTER.INTRO', ROSTER_INTRO)}`];
+  const parts: string[] = [`${g('WORLD.ROSTER.HEAD')}\n${g('ROSTER.INTRO')}`];
   const byOrg = new Map<string, AgentRow[]>();
   for (const a of dir.agents) {
     const rec = agents.get(a.lore);

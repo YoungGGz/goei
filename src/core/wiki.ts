@@ -5,7 +5,7 @@ import { related, type Focus } from './focus';
 import { tokens, trimTokens } from './gnet';
 import { trimPrevious, trimRelated, trimSecondary, trimTurns } from './budget';
 import { craftMessages, craftSettings, memoTexts, type CraftMessage } from './craft';
-import { GUIDE_LABEL } from './guides';
+import { GUIDE_LABEL, guideTxt } from './guides';
 import { collectRefs, factionCodesToNames, hasBook, limitRefs, policySections, recentTurns, refText, storyText, type RefSource } from './refs';
 import type { Chat, LoreEntry } from './types';
 import { buildRegistry, resolveName, type Registry } from './world/registry';
@@ -284,15 +284,16 @@ export function wikiPrompt(src: RefSource, req: WikiRequest, s: WikiSettings, fa
   const pool = `${req.title}\n${refText(rows)}\n${story}`;
   // 주제 그림은 표시(subject)로 가린다. 표시가 없는 옛 호출만 첫 항목을 주제로 본다 (전수검사 11-13)
   const images = (req.images ?? []).filter((x, i) => (x.subject ?? i === 0) || (x.label && pool.includes(x.label))).slice(0, 30);
-  if (images.length && sec['NW.IMAGES']) system.push(sec['NW.IMAGES'].replace('__NW_IMAGES__', images.map((x) => `- ${x.name} = ${x.label}`).join('\n')));
+  if (images.length && sec['NW.IMAGES']) system.push(sec['NW.IMAGES'].replace('__NW_IMAGES__', images.map((x) => guideTxt('Wiki', 'NW.IMAGES_ITEM', { name: x.name, label: x.label })).join('\n')));
   if (req.moods?.length && sec['NW.PORTRAIT']) system.push(sec['NW.PORTRAIT'].replace('__NW_MOODS__', req.moods.join(', ')));
   const language = genSettings(src.chat.scriptstate).language;
   if (language) system.push(language);
-  let user = `문서 제목: ${req.title}\n\n[참고 자료]\n${refText(rows)}`;
-  if (story) user += `\n\n[최근 챗로그]\n${story}`;
-  if (previous) user += `\n\n[이전 위키]\n${innerBody(previous)}`;
-  if (req.writingRequest.trim()) user += `\n\n[사용자 작성 지침: 모든 문서 공통]\n${req.writingRequest.trim()}`;
-  if (req.docRequest?.trim()) user += `\n\n[사용자 작성 지침: 이 문서만]\n${req.docRequest.trim()}`;
+  // 머리말은 지침 「괴이위키」 NW.HEAD_* 절 (2026-11-14 사용자: 모델에 가는 글은 지침 파일로)
+  let user = `${guideTxt('Wiki', 'NW.HEAD_TITLE', { title: req.title })}\n\n${guideTxt('Wiki', 'NW.HEAD_REFS')}\n${refText(rows)}`;
+  if (story) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_STORY')}\n${story}`;
+  if (previous) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_PREVIOUS')}\n${innerBody(previous)}`;
+  if (req.writingRequest.trim()) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_REQUEST_ALL')}\n${req.writingRequest.trim()}`;
+  if (req.docRequest?.trim()) user += `\n\n${guideTxt('Wiki', 'NW.HEAD_REQUEST_DOC')}\n${req.docRequest.trim()}`;
   const sources = [...new Set(rows.flatMap((x) => x.sources))];
   const primarySources = [...new Set(rows.filter((x) => x.kind === 'primary').flatMap((x) => x.sources))];
   const messages: CraftMessage[] = [
@@ -558,7 +559,7 @@ export function wikiMainContext(chat: Chat, rules: string, focus?: Focus | null,
   const kept: { kind: string; title: string; mode: string; content: string }[] = [];
   const payload = () => `[MODULE_CONTEXT_BEGIN]\n${rules}\n${JSON.stringify({ feature: 'wiki', records: kept })}\n[MODULE_CONTEXT_END]`;
   // 상한을 넘는 문서는 빼고 다음 문서로 빈자리를 채운다. 남은 몫이 충분하면 긴 문서는 그만큼 잘라 넣는다 (전수검사 11-13, 사용자 결정)
-  const CUT = '\n…(이하 생략)';
+  const CUT = `\n${guideTxt('Wiki', 'MAIN_CONTEXT.CUT')}`;
   for (const { d } of docs) {
     if (kept.length >= count) break;
     const rec = { kind: 'wiki_reference', title: d.title, mode: d.meta?.mode ?? 'unknown', content: innerBody(d.body) };
@@ -609,9 +610,11 @@ export function wikiTitlePrompt(src: RefSource, candidates: string[], written: s
   if (!rule) throw new WikiError(`${GUIDE_LABEL.Wiki} 지침의 NW.AUTO_TITLE 섹션이 없어요.`);
   const n = trimTurns(wikiSettings(src.chat.scriptstate).chatTurns);
   const story = n ? storyText(recentTurns(src.chat, n, genSettings(src.chat.scriptstate).userMessages)) : '';
-  let user = `[후보 제목]\n${candidates.map((t) => `- ${t}`).join('\n')}`;
-  if (written.length) user += `\n\n[이미 쓴 문서]\n${written.map((t) => `- ${t}`).join('\n')}`;
-  if (story) user += `\n\n[최근 챗로그]\n${story}`;
+  // 머리말·목록 줄 꼴은 지침 「괴이위키」 NW.TITLE_* 절
+  const item = (t: string) => guideTxt('Wiki', 'NW.TITLE_ITEM', { title: t });
+  let user = `${guideTxt('Wiki', 'NW.TITLE_HEAD_CANDIDATES')}\n${candidates.map(item).join('\n')}`;
+  if (written.length) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_WRITTEN')}\n${written.map(item).join('\n')}`;
+  if (story) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_STORY')}\n${story}`;
   return [
     { role: 'system', content: factionCodesToNames(rule, names) },
     { role: 'user', content: factionCodesToNames(user, names) },

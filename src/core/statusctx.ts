@@ -4,9 +4,9 @@
 // 그래서 요청 속 지난 상태창 줄은 모두 지우고, 마지막 한 줄만 「직전 상태」 블록으로 마지막 사용자 메시지 앞에 넣는다.
 // 요청 속 메시지에서 찾으므로 다시 굴리기에도 맞다(다시 만들 응답은 요청에 없다). 저장 본문과 화면은 건드리지 않는다.
 import { findStatusTags } from './world/status';
-import { colDef, formatStatusLine, walletCell, type ColId } from './world/statuscols';
+import { colPromptLabels, formatStatusLine, walletCell, type ColId } from './world/statuscols';
 import type { PromptMessage } from './request';
-import { guideOr } from './guides';
+import { guideTxt } from './guides';
 
 /** 이 채팅의 상태창 모양: 사용하는 칸 + 장부 잔고 (잔고 칸을 쓸 때) */
 export interface StatusShape {
@@ -20,10 +20,12 @@ export interface StatusShape {
   recentPoints?: string[];
 }
 
-export const STATUS_HEAD = '[Previous status]';
-const NOTE =
-  'This is the status line of the scene right before the next input; older status lines were removed from the history. ' +
-  'Continue from it: advance the time, update the other fields, and output exactly one new [▣] line at the very end of your response.';
+/** 직전 상태 블록의 머리 (지침 「메인 요청에 붙는 글」 STATUS.HEAD 절). 이미 넣은 블록도 이 머리로 알아본다 */
+export const statusHead = (): string => guideTxt('Main', 'STATUS.HEAD');
+/** 기본 지침의 머리 (시험·옛 호출용. 요청은 statusHead() 로 지금 지침을 읽는다) */
+export const STATUS_HEAD = statusHead();
+/** 「Fields: 칸 | 칸」 줄 (끝 줄바꿈 포함). 칸이 없으면 빈 글 */
+const fieldsLine = (cols?: ColId[]): string => (cols?.length ? `${guideTxt('Main', 'STATUS.FIELDS_LINE', { labels: colPromptLabels(cols) })}\n` : '');
 
 /** 요청 속 마지막 상태창 줄 (원문). 없으면 null */
 export function lastStatusLine(messages: PromptMessage[]): string | null {
@@ -49,9 +51,8 @@ export function stripStatusLines<M extends PromptMessage>(messages: M[]): M[] {
 }
 
 export function statusBlock(line: string, cols?: ColId[]): string {
-  const fields = cols?.length ? `Fields: ${cols.map((c) => colDef(c).label).join(' | ')}\n` : '';
-  // 안내 글은 지침 「메인 요청에 붙는 글」 STATUS.NOTE 절. 절이 없으면 위 글
-  return `${STATUS_HEAD}\n${line}\n${fields}${guideOr('Main', 'STATUS.NOTE', NOTE)}`;
+  // 안내 글은 지침 「메인 요청에 붙는 글」 STATUS.NOTE 절
+  return `${statusHead()}\n${line}\n${fieldsLine(cols)}${guideTxt('Main', 'STATUS.NOTE')}`;
 }
 
 /**
@@ -90,20 +91,20 @@ export function withIdentity(line: string, identity: string): string {
 
 /** 지난 줄을 지우고 마지막 한 줄을 직전 상태 블록으로 넣는다. 상태창이 하나도 없으면 그대로. shape 가 있으면 그 칸 구성으로 다시 만든다 */
 export function withStatusBlock<M extends PromptMessage>(messages: M[], identity = '', shape?: StatusShape): M[] {
-  if (messages.some((m) => typeof m?.content === 'string' && m.content.startsWith(STATUS_HEAD))) return messages;
+  const head = statusHead();
+  if (messages.some((m) => typeof m?.content === 'string' && m.content.startsWith(head))) return messages;
   const line0 = lastStatusLine(messages);
   if (!line0) {
     // 첫 턴(상태창 줄이 아직 없음): 지난 줄은 없어도 장부 값은 넘긴다. 안 넘기면 모델이 잔고를 지어내(0) 장부가 그 값으로 맞춰졌다
     // (2026-11-09 사용자: 시작 잔고 1,140,000이 첫 응답 뒤 0으로)
     const starts = [
-      shape?.wallet !== undefined && shape?.wallet !== null ? `Balance = ${walletCell(shape.wallet)}` : '',
-      shape?.points !== undefined && shape?.points !== null ? `Points = ${walletCell(shape.points)}` : '',
+      shape?.wallet !== undefined && shape?.wallet !== null ? guideTxt('Main', 'STATUS.START.WALLET', { n: walletCell(shape.wallet) }) : '',
+      shape?.points !== undefined && shape?.points !== null ? guideTxt('Main', 'STATUS.START.POINTS', { n: walletCell(shape.points) }) : '',
     ].filter(Boolean);
     if (!starts.length) return messages;
-    const fields = shape?.cols?.length ? `Fields: ${shape.cols.map((c) => colDef(c).label).join(' | ')}\n` : '';
-    // 글은 지침 「메인 요청에 붙는 글」 STATUS.FIRST 절. 절이 없으면 여기 남긴 글
-    const first = guideOr('Main', 'STATUS.FIRST', () => `No status line yet: this is the first turn.\nStarting values: ${starts.join(', ')}\n${fields}Treat them as the previous values (copy them unless the story changes them) and output exactly one new [▣] line at the very end of your response.`, { starts: starts.join(', '), fields });
-    const block = { role: 'system', content: `${STATUS_HEAD}\n${first}` } as M;
+    // 글은 지침 「메인 요청에 붙는 글」 STATUS.FIRST 절
+    const first = guideTxt('Main', 'STATUS.FIRST', { starts: starts.join(', '), fields: fieldsLine(shape?.cols) });
+    const block = { role: 'system', content: `${head}\n${first}` } as M;
     const at = messages.map((m) => m?.role).lastIndexOf('user');
     return at < 0 ? [...messages, block] : [...messages.slice(0, at), block, ...messages.slice(at)];
   }
@@ -112,9 +113,9 @@ export function withStatusBlock<M extends PromptMessage>(messages: M[], identity
   const at = out.map((m) => m?.role).lastIndexOf('user');
   const recent = (shape?.recent ?? []).filter(Boolean);
   const recentP = (shape?.recentPoints ?? []).filter(Boolean);
-  // 거래 내역 줄은 지침 「Main」 STATUS.RECENT_CASH·STATUS.RECENT_POINT 절. 절이 없으면 여기 남긴 글 (전수검사 11-13)
-  const cash = recent.length ? `\n${guideOr('Main', 'STATUS.RECENT_CASH', () => `Recent cash transactions (oldest first): ${recent.join('; ')}`, { list: recent.join('; ') })}` : '';
-  const points = recentP.length ? `\n${guideOr('Main', 'STATUS.RECENT_POINT', () => `Recent Baekilmong point transactions (oldest first): ${recentP.join('; ')}`, { list: recentP.join('; ') })}` : '';
+  // 거래 내역 줄은 지침 「Main」 STATUS.RECENT_CASH·STATUS.RECENT_POINT 절 (전수검사 11-13)
+  const cash = recent.length ? `\n${guideTxt('Main', 'STATUS.RECENT_CASH', { list: recent.join('; ') })}` : '';
+  const points = recentP.length ? `\n${guideTxt('Main', 'STATUS.RECENT_POINT', { list: recentP.join('; ') })}` : '';
   const block = { role: 'system', content: `${statusBlock(line, shape?.cols)}${cash}${points}` } as M;
   return at < 0 ? [...out, block] : [...out.slice(0, at), block, ...out.slice(at)];
 }

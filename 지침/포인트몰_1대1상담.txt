@@ -53,3 +53,105 @@ Output exactly one block and nothing else:
 @@END
 
 <!-- HEAD_REFS·HEAD_PAST 는 상담 요청 자료의 머리말입니다. MAKE 절이 「[최근 상담사 — 겹치지 말 것]」을 글자 그대로 가리키므로 HEAD_PAST 를 고치면 MAKE 절도 같이 고치세요. -->
+
+
+@@SECTION DICE_DEFAULT
+직급: 사원, 사원, 사원, 주임, 주임, 대리, 과장, 차장
+근속: 입사 석 달 차, 1년 차, 2년 차, 4년 차, 7년 차, 10년이 넘음
+이력: 처음부터 내근, 현장에서 다쳐 내근으로 옮김, 지금도 현장을 겸함, 다른 부서에서 밀려옴, 곧 다른 부서로 옮김
+회사를 대하는 태도: 진심으로 회사를 믿음, 월급만큼만 일함, 승진에 목맴, 속으로 회사를 싫어함, 회사를 두려워함, 별생각 없음
+오늘 기분: 지나치게 밝음, 지쳐 있음, 짜증을 참는 중, 들떠 있음, 멍함, 불안함, 차분함
+매뉴얼 준수도: 토씨 하나까지 지킴, 대충 지킴, 자주 어김, 몰래 흘림
+성격: 수다스러움, 무뚝뚝함, 소심함, 능글맞음, 깐깐함, 덤벙댐, 다정함, 냉소적임
+@@END
+
+@@SECTION AGENT_TAG
+상담원 {no}
+@@END
+
+@@SECTION SHELF
+[지금 진열된 상품]
+{shelf}
+@@END
+
+@@SECTION SHELF_LINE
+{name}|{price}p|{desc}
+@@END
+
+@@SECTION NONE
+(없음)
+@@END
+
+@@SECTION CUSTOMER
+[손님]
+사내 계정: {nick}
+남은 포인트: {points}p
+@@END
+
+@@SECTION CARD
+손님에게 보이는 호칭: {tag}
+이름: {name}
+직급: {rank}
+부서: {dept}
+소개: {intro}
+말투: {voice}
+{dice}
+@@END
+
+@@SECTION DICE_LINE
+{name}: {value}
+@@END
+
+@@SECTION PAST_LINE
+- {name} ({rank}, {dept}): {intro} / 말투: {voice}
+@@END
+
+@@SECTION MAKE_USER
+{material}
+
+[손님에게 보이는 호칭]
+{tag}
+
+[이번 상담사 주사위]
+{dice}
+
+{head_past}
+{past}
+
+[현재 작업]
+상담사 카드와 첫 메시지
+@@END
+
+@@SECTION TALK_USER
+{material}
+
+[상담사 카드]
+{card}
+
+[이번 상담 대화 — 마지막 줄이 손님이 방금 한 말]
+{talk}
+@@END
+
+@@SECTION TALK_ME
+[손님] {text}
+@@END
+
+@@SECTION TALK_OP
+[상담사] {text}
+@@END
+
+@@SECTION ERR_NO_CARD
+응답에 <card> 블록(상담사 카드)이 없어요.
+@@END
+
+@@SECTION ERR_NO_NAME
+상담사 카드에 이름이 없어요.
+@@END
+
+@@SECTION ERR_NO_GREETING
+응답에 <say> 블록(첫 인사)이 없어요.
+@@END
+
+@@SECTION ERR_NO_SAY
+응답에 <say> 블록(상담사 답)이 없어요.
+@@END

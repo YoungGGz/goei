@@ -85,3 +85,107 @@ Write all output in Japanese.
 ### {title}
 {text}
 @@END
+
+@@SECTION THOUGHTS.NOTE_TITLE
+# Thoughts
+@@END
+
+@@SECTION THOUGHTS.INNER_TITLE
+# Thoughts Guideline
+@@END
+
+@@SECTION MEMO.JOB_TITLE
+# Job Note
+@@END
+
+@@SECTION ATTACH.KIND.image
+사진
+@@END
+
+@@SECTION ATTACH.KIND.photo
+사진
+@@END
+
+@@SECTION ATTACH.KIND.video
+영상
+@@END
+
+@@SECTION ATTACH.KIND.file
+파일
+@@END
+
+@@SECTION ATTACH.KIND.link
+링크
+@@END
+
+@@SECTION ATTACH.KIND.gift
+선물
+@@END
+
+@@SECTION ATTACH.DESCRIBE.IMAGE
+[{label} 첨부: 실제 이미지]
+@@END
+
+@@SECTION ATTACH.DESCRIBE.IMAGE_NOTE
+[{label} 첨부: 실제 이미지 (설명: {text})]
+@@END
+
+@@SECTION ATTACH.DESCRIBE.CONTENT
+[{label} 첨부 내용: {text}]
+@@END
+
+@@SECTION ATTACH.DESCRIBE.BRIEF
+[{label}]
+@@END
+
+@@SECTION REFS.HEAD
+[{kind}: {sources}]
+@@END
+
+@@SECTION REFS.KIND.base
+공통
+@@END
+
+@@SECTION REFS.KIND.primary
+주제 원본
+@@END
+
+@@SECTION REFS.KIND.active
+활성 로어북
+@@END
+
+@@SECTION REFS.KIND.direct
+관련 로어북
+@@END
+
+@@SECTION REFS.KIND.secondary
+2차 참조
+@@END
+
+@@SECTION REFS.SOURCE.DESC
+봇 설명
+@@END
+
+@@SECTION REFS.SOURCE.NOTE
+작가 노트
+@@END
+
+@@SECTION REFS.SOURCE.PERSONA
+사용자 페르소나
+@@END
+
+@@SECTION REFS.MOVE
+[이동] 목표: {target} / 투입: {party}
+@@END
+
+@@SECTION REFS.USER_NAME
+주인공
+@@END
+
+@@SECTION REFS.STORY.USER
+[user]
+@@END
+
+@@SECTION REFS.STORY.CHAR
+[char]
+@@END

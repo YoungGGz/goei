@@ -460,3 +460,68 @@ Please fix your last output into correct structure as previously instructed, whi
 {analyze}
 </system>
 @@END
+
+@@SECTION SYSTEM.PROTAGONIST_HEAD
+## User-controlled protagonist (narrator reference only)
+@@END
+
+@@SECTION DM.ROLE_BINDING
+ROLE BINDING (application-owned metadata):
+@@END
+
+@@SECTION REQUEST.HEAD_REFS
+[참고 자료 — 작중 인물에게 자동 공개되지 않음]
+@@END
+
+@@SECTION REQUEST.HEAD_STORY
+[최근 본문]
+@@END
+
+@@SECTION REQUEST.HEAD_TASK
+[현재 작업]
+@@END
+
+@@SECTION REFS.SITUATION_SOURCE
+현재 발생 상황
+@@END
+
+@@SECTION SAMPLING.SEED
+<x-output-seed-a>{a}</x-output-seed-a>
+<x-output-seed-b>{b}</x-output-seed-b>
+@@END
+
+@@SECTION INCOMING.OPTIONS_HEAD
+COMBINED OUTPUT OPTIONS:
+@@END
+
+@@SECTION DM.ORIGIN
+Original forum post #{postid} (preserved at first contact):
+Title: {title}
+Posted by: {author}
+Post text: {body}
+@@END
+
+@@SECTION DM.ORIGIN_QUOTE
+Referenced public comment — author: {author}
+{quote}
+@@END
+
+@@SECTION DM.STORY_TIME
+Current story time: {time}
+@@END
+
+@@SECTION DM.PUBLIC_HEAD
+PUBLIC BOARD REFERENCE:
+@@END
+
+@@SECTION MAIN_CONTEXT.ACCESS_POST
+publicly accessible; reading by each character is not established
+@@END
+
+@@SECTION MAIN_CONTEXT.ACCESS_DM
+sender and recipient only
+@@END
+
+@@SECTION POST.INPUT_TAG
+[{tag}] {input}
+@@END

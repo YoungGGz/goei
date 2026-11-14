@@ -96,3 +96,183 @@ Build each item to its assigned {unit} and VALUE TIER: its worth, power and rari
 @@SECTION HEAD_ASSIGN
 [이번 진열 배정 — 칸마다 그대로 따를 것]
 @@END
+
+@@SECTION HEAD_SHOP
+[가게]
+{shop}
+@@END
+
+@@SECTION HEAD_SHOP_OWNER
+[가게]
+{shop} / 주인: {owner}
+@@END
+
+@@SECTION HEAD_IDENTITY_WON
+[가게 정체 — 고정]
+sells: {sells}
+never: {never}
+prices: {prices}
+currency: won
+@@END
+
+@@SECTION HEAD_IDENTITY_POINTS
+[가게 정체 — 고정]
+sells: {sells}
+never: {never}
+prices: {prices}
+currency: points
+@@END
+
+@@SECTION HEAD_PROTAGONIST
+[주인공 신분]
+@@END
+
+@@SECTION HEAD_STATUS
+[상태창 — 지금 시각·장소]
+@@END
+
+@@SECTION HEAD_SITUATION
+[진행 중 괴이·사건]
+@@END
+
+@@SECTION HEAD_STORY
+[최근 본문]
+@@END
+
+@@SECTION TALK_LINE_ME
+[주인공] {text}
+@@END
+
+@@SECTION TALK_LINE_OWNER
+[주인] {text}
+@@END
+
+@@SECTION HEAD_VISIT_TALK
+[이번 방문 대화]
+@@END
+
+@@SECTION TASK_FIRST
+[현재 작업]
+가게 정체·주인 첫 대사·진열대
+@@END
+
+@@SECTION TASK_RESTOCK
+[현재 작업]
+진열대 새로 짜기
+@@END
+
+@@SECTION HEAD_SHELF_NOW
+[지금 진열대]
+@@END
+
+@@SECTION SHELF_EMPTY
+(empty)
+@@END
+
+@@SECTION TAG_RARE
+희귀
+@@END
+
+@@SECTION TAG_SALE
+특가:{was}
+@@END
+
+@@SECTION HEAD_BOUGHT
+[이번 방문에 산 것]
+@@END
+
+@@SECTION HEAD_OWNER_BOUGHT
+[이번 방문에 주인이 산 것]
+@@END
+
+@@SECTION NOTE_ITEM_BOUGHT
+{title} ({price}, bought)
+@@END
+
+@@SECTION NOTE_ITEM_OPEN
+{title} ({price}, not bought)
+@@END
+
+@@SECTION HEAD_QUOTES
+[이번 방문에 낸 맞춤 주문 견적]
+@@END
+
+@@SECTION QUOTE_ITEM_PAID
+{name} ({price} won, {hours}h, paid and ordered)
+@@END
+
+@@SECTION QUOTE_ITEM_OPEN
+{name} ({price} won, {hours}h, not accepted)
+@@END
+
+@@SECTION HEAD_SELLING
+[팔려는 물건 — 주인공이 내민 것]
+@@END
+
+@@SECTION SELLING_TRUTH
+(what it really does, which the seller may not know: {truth})
+@@END
+
+@@SECTION SELLING_PAID
+(bought earlier for {paid} won)
+@@END
+
+@@SECTION SELLING_OFFER_WON
+(your last offer: {price} won)
+@@END
+
+@@SECTION SELLING_OFFER_POINTS
+(your last offer: {price} points)
+@@END
+
+@@SECTION HEAD_TALK_NOW
+[이번 방문 대화 — 마지막 줄이 지금 한 말]
+@@END
+
+@@SECTION SIZE_EXACT
+exactly {n}
+@@END
+
+@@SECTION SIZE_RANGE
+{min} to {max}
+@@END
+
+@@SECTION LINE
+이름|값|쓰임|그림|무게|설명|효과|구분
+@@END
+
+@@SECTION HEAD_NOTES
+[이번 방문에 내민 정보 쪽지 — 다시 내밀지 말 것]
+@@END
+
+@@SECTION ASSIGN_UNIT
+CATEGORY
+@@END
+
+@@SECTION ASSIGN_UNITS
+Categories
+@@END
+
+@@SECTION ASSIGN_LINE
+Item {n} — {unit}: {genre} | VALUE TIER: {tier} ({desc}), price {price}
+@@END
+
+@@SECTION ASSIGN_LINE_ROLE
+Item {n} — {unit}: {genre} | VALUE TIER: {tier} ({desc}), price {price} | ROLE: {role}
+@@END
+
+@@SECTION ASSIGN_PRICE
+{lo}-{hi} p
+@@END
+
+@@SECTION ROLL_GENRES
+생활용품, 가전, 건강·의약품, 식품·음료, 의류·보호구, 현장 탐사 장비, 괴담 대응 소모품, 사무·문구, 취미·여가, 사내 서비스·이용권
+@@END
+
+@@SECTION ROLL_TIERS
+저가|everyday welfare goods — small, cheap, practical|30|149|3
+중저가|common supplies and basic field items|150|399|3
+중가|solid equipment or medicine with a clear use|400|999|2
+고가|rare company product — strong, regulated, limited|1000|2999|1
+최고가|top-grade company asset — life-saving or coveted|3000|9999|1
+@@END

@@ -33,10 +33,9 @@ import { getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
 import { guideSections } from '../core/guides';
 
-/** Director 기본 지침: 지침 탭 「Director」의 FACTS·SCENE 절 */
+/** Director 기본 지침(지침 탭 「Director」의 FACTS·SCENE 절)은 buildDirector 가 읽는다 */
 /** Router 기본 지침: 지침 탭 「Router」의 ROLE·RULES 절 */
 const routerBase = () => { const g = guideSections('Router'); return [g.ROLE, g.RULES].filter((x) => x?.trim()).join('\n'); };
-const directorBase = () => { const g = guideSections('Director'); return { facts: g.FACTS, scene: g.SCENE }; };
 import { parseIdentity, rankLevel } from '../core/people/identity';
 import type { Identity, PeopleStore } from '../core/people/types';
 import { factionList } from '../core/factions';
@@ -647,7 +646,7 @@ let directorCache: { key: string; notes: DirectorNote[] } | null = null;
 /** Director 메모 글(사실형·연출형). 시간 제한을 넘거나 실패하면 빈 문자열(본편을 막지 않는다). 입력·기록이 같으면 직전 메모 재사용 */
 export async function directorNoteText(chat: Chat, store: PeopleStore, people: string[], input: string, settings: PeopleSettings, user: string, lore?: unknown, char?: { chaId?: string }): Promise<string> {
   if (settings.director !== 'scene' && settings.director !== 'facts') return '';
-  const built = buildDirector(chat, store, people, input, settings, Object.fromEntries(people.map((n) => [n, valuesOf(n)])), await hypaMemory(chat, char, [input, ...(Array.isArray(chat.message) ? chat.message.slice(-Math.max(1, settings.recentMsgs)).map((m) => messageText(String(m.data ?? ''))) : []), ...people].join('\n'), settings, Math.min(settings.hypaCap, 6000)), directorBase());
+  const built = buildDirector(chat, store, people, input, settings, Object.fromEntries(people.map((n) => [n, valuesOf(n)])), await hypaMemory(chat, char, [input, ...(Array.isArray(chat.message) ? chat.message.slice(-Math.max(1, settings.recentMsgs)).map((m) => messageText(String(m.data ?? ''))) : []), ...people].join('\n'), settings, Math.min(settings.hypaCap, 6000)));
   if (!built) return '';
   if (settings.directorReuse && directorCache?.key === built.key) return directorBlock(directorCache.notes, user);
   // 1차: 메모 또는 검색 요청. 검색 요청이면 코드가 찾아서 2차 (리수폿 B). 각 호출에 시간 제한
@@ -713,7 +712,7 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
     const me = playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
     const { people } = peopleBlockFor(ctx.chat, { settings, store, sheetOf: sheetOf(ctx), temperOf, extraNames: extraNames(), input, user: me?.name || userInfo().name || '주인공', factionNames: factionNamesOf(ctx.char.globalLore) });
     const memory = await hypaMemory(ctx.chat, ctx.char, [input, ...people].join('\n'), settings, Math.min(settings.hypaCap, 6000)).catch(() => [] as string[]);
-    const b = buildDirector(ctx.chat, store, people, input, settings, Object.fromEntries(people.map((n) => [n, valuesOf(n)])), memory, directorBase());
+    const b = buildDirector(ctx.chat, store, people, input, settings, Object.fromEntries(people.map((n) => [n, valuesOf(n)])), memory);
     if (b) out.director = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];
   }
   if (settings.when === 'turn') {

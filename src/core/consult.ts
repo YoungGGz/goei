@@ -7,7 +7,7 @@
 // - 바꾸는 순서는 코드가 지킨다: <set> 은 「바꾸자고 한 것」으로 적어만 두고, 다음 턴에 <apply> 가 와야 그 적어 둔 것만 적용한다 (ui 쪽).
 // - 목록에 없는 id, 바꿀 수 없는 줄, 고를 수 없는 값, 범위 밖 수, 너무 긴 글은 여기서 걸러 적용될 길이 없다.
 // 지침 글: 플러그인 내장 지침 「Consult」(지침/AI상담.txt, 설정 → 지침 → AI 상담에서 고침).
-import { fillGuide, guideSections } from './guides';
+import { fillGuide, guideSections, guideTxt } from './guides';
 
 export interface ConsultItem {
   id: string;
@@ -41,15 +41,16 @@ export interface ConsultChange { id: string; value: string }
 export interface ConsultReply { say: string; set: { id: string; raw: string }[]; apply: boolean; open: string[]; go: string }
 export interface ConsultTalk { who: 'me' | 'op'; text: string }
 
-const onOff = (l: string) => (l === 'ON' ? '켬' : l === 'OFF' ? '끔' : l);
-const EMPTY = '(빈 글)';
+// 요청에 들어가는 글은 전부 지침 「AI 상담」의 절 (2026-11-14 사용자: 코드에 글을 두지 않는다). 켬·끔·빈 글 표시는 모델이 <set> 에 그대로 적어 돌려주므로 읽을 때도 같은 절로 맞춘다
+const C = (section: string, vars?: Record<string, string | number>) => guideTxt('Consult', section, vars);
+const onOff = (l: string) => (l === 'ON' ? C('LABEL.ON') : l === 'OFF' ? C('LABEL.OFF') : l);
 /** 여러 줄 글을 한 줄로 적는 꼴 (요청문·<set>): 줄바꿈 ↔ 「\n」 두 글자 */
 const oneLine = (s: string) => s.replace(/\r?\n/g, '\\n');
 /** 값의 보이는 이름 */
 export function consultLabel(item: ConsultItem, value: string): string {
-  if (item.kind === 'text') return value === '' ? EMPTY : value;
+  if (item.kind === 'text') return value === '' ? C('LABEL.EMPTY') : value;
   if (item.kind === 'num' || item.kind === 'step') {
-    if (value.trim() === '') return item.zero ?? '(비어 있음)';
+    if (value.trim() === '') return item.zero ?? C('LABEL.BLANK');
     const n = Number(value) || 0;
     return n === 0 && item.zero ? item.zero : `${n}${item.unit ?? ''}`;
   }
@@ -60,17 +61,17 @@ export function consultLabel(item: ConsultItem, value: string): string {
 export const consultCan = (i: ConsultItem): boolean => i.kind !== 'info' && !i.locked;
 
 function choices(i: ConsultItem): string {
-  if (i.kind === 'num') return `${i.lo ?? 0}~${i.hi ?? 0}${i.unit ?? ''} (정수)`;
-  if (i.kind === 'step') return `정수${i.unit ? ` (${i.unit})` : ''}, ${i.stride && i.stride > 1 ? `지금 값에서 ${i.stride}씩` : '화면의 − + 단추가 닿는 값'}`;
-  if (i.kind === 'text') return `글${i.max ? ` (최대 ${i.max}자)` : ''}${i.multi ? ', 여러 줄은 \\n 으로 이음' : ', 한 줄'}`;
+  if (i.kind === 'num') return C('CHOICE.NUM', { lo: i.lo ?? 0, hi: i.hi ?? 0, unit: i.unit ?? '' });
+  if (i.kind === 'step') return C('CHOICE.STEP', { unit: i.unit ? ` ${C('CHOICE.STEP_UNIT', { unit: i.unit })}` : '', how: i.stride && i.stride > 1 ? C('CHOICE.STEP_STRIDE', { stride: i.stride }) : C('CHOICE.STEP_BUTTONS') });
+  if (i.kind === 'text') return C('CHOICE.TEXT', { max: i.max ? ` ${C('CHOICE.TEXT_MAX', { max: i.max })}` : '', lines: C(i.multi ? 'CHOICE.TEXT_MULTI' : 'CHOICE.TEXT_SINGLE') });
   return (i.opts ?? []).map(([, l]) => onOff(l)).join(' / ');
 }
 export function itemLine(i: ConsultItem): string {
   const name = `${i.group && i.group !== i.menu && i.group !== i.name ? `${i.group} · ` : ''}${i.name}`;
-  const help = i.help ? ` | 설명: ${i.help}` : '';
-  if (i.kind === 'info') return `[${i.id}] ${name} | 바꾸기: 못 함${help}`;
+  const help = i.help ? ` ${C('ITEM.HELP', { help: i.help })}` : '';
+  if (i.kind === 'info') return C('ITEM.INFO', { id: i.id, name, help });
   const cur = i.kind === 'text' ? oneLine(consultLabel(i, i.cur)) : consultLabel(i, i.cur);
-  return `[${i.id}] ${name} | 지금: ${cur} | ${i.locked ? '바꾸기: 못 함 (지금 잠김)' : `고를 수 있는 값: ${choices(i)}`}${i.scope ? ` | 저장: ${i.scope}` : ''}${help}`;
+  return C('ITEM.LINE', { id: i.id, name, cur, change: i.locked ? C('ITEM.LOCKED') : C('ITEM.CHOICES', { choices: choices(i) }), scope: i.scope ? ` ${C('ITEM.SCOPE', { scope: i.scope })}` : '', help });
 }
 
 export interface ConsultSource {
@@ -95,12 +96,12 @@ export function consultPrompt(src: ConsultSource): { role: 'system' | 'user'; co
   const g = guideSections('Consult');
   const system = [g.COMMON, g.KNOWLEDGE, g.CHANGE, g.OUTPUT].map((t) => fillGuide(dropMax(t), {})).filter(Boolean).join('\n\n');
   const byId = new Map(src.all.map((i) => [i.id, i]));
-  const pending = src.pending.map((c) => { const i = byId.get(c.id); return i ? `${c.id}=${i.kind === 'text' ? oneLine(consultLabel(i, c.value)) : consultLabel(i, c.value)} (${i.menu} · ${i.name}, 지금 ${i.kind === 'text' ? oneLine(consultLabel(i, i.cur)) : consultLabel(i, i.cur)})` : ''; }).filter(Boolean).join('\n');
-  const talk = src.talk.map((l) => `${l.who === 'me' ? '[사용자]' : '[상담]'} ${l.text}`).join('\n');
-  const list = src.opened.map((o) => `## ${o.menu}\n${o.items.map(itemLine).join('\n')}`).join('\n\n');
+  const pending = src.pending.map((c) => { const i = byId.get(c.id); return i ? C('PENDING.LINE', { id: c.id, value: i.kind === 'text' ? oneLine(consultLabel(i, c.value)) : consultLabel(i, c.value), menu: i.menu, name: i.name, cur: i.kind === 'text' ? oneLine(consultLabel(i, i.cur)) : consultLabel(i, i.cur) }) : ''; }).filter(Boolean).join('\n');
+  const talk = src.talk.map((l) => C(l.who === 'me' ? 'TALK.ME' : 'TALK.OP', { text: l.text })).join('\n');
+  const list = src.opened.map((o) => C('LIST.MENU', { menu: o.menu, items: o.items.map(itemLine).join('\n') })).join('\n\n');
   return [
     { role: 'system', content: system },
-    { role: 'user', content: `[지금 상태]\n${src.state}\n\n[지난 턴 실제]\n${src.last}\n\n[메뉴]\n${src.menus}\n\n[설정 목록]\n${list || '(펼친 메뉴 없음)'}\n\n[바꾸자고 한 것]\n${pending || '(없음)'}\n\n[이 창의 대화 — 마지막 줄이 사용자가 방금 한 말]\n${talk}` },
+    { role: 'user', content: C('USER', { state: src.state, last: src.last, menus: src.menus, list: list || C('LIST.NONE'), pending: pending || C('PENDING.NONE'), talk }) },
   ];
 }
 
@@ -109,7 +110,7 @@ export function parseConsult(raw: string): ConsultReply {
   const block = (name: string) => new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, 'i').exec(raw)?.[1] ?? '';
   const say = block('say').trim();
   const open = block('open').split(/[,\n]/).map((s) => s.replace(/[「」\[\]]/g, '').trim()).filter(Boolean);
-  if (!say && !open.length) throw new Error('<say> 블록이 없어요.');
+  if (!say && !open.length) throw new Error(C('ERR.NO_SAY'));
   const set = block('set').split('\n').map((l) => /^\s*\[?([^\s=\[\]]+)\]?\s*=\s?(.*?)\s*$/.exec(l)).filter((m): m is RegExpExecArray => !!m).map((m) => ({ id: m[1], raw: m[2] }));
   return { say, set, apply: /<apply>\s*yes\s*<\/apply>/i.test(raw), open, go: block('go').replace(/[\[\]]/g, '').trim() };
 }
@@ -120,7 +121,7 @@ export function consultValue(item: ConsultItem, raw: string): string | null {
   if (item.kind === 'info') return null;
   if (item.kind === 'text') {
     // 글 칸: 「\n」은 줄바꿈으로(한 줄 칸은 빈칸으로), 꺾쇠(< >)가 든 글과 상한을 넘는 글은 받지 않는다
-    const t = raw === EMPTY ? '' : raw;
+    const t = raw === C('LABEL.EMPTY') ? '' : raw;
     const text = (item.multi ? t.replace(/\\n/g, '\n') : t.replace(/\\n|\r?\n/g, ' ')).trim();
     if (/[<>]/.test(text)) return null;
     if (item.max && text.length > item.max) return null;

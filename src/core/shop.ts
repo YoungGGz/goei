@@ -16,7 +16,7 @@ import { messageKey } from './people/store';
 import { parseWon } from './wallet';
 import { craftMessages, type CraftMessage, type ThoughtsMode } from './craft';
 import { genSettings } from './advanced';
-import { fillGuide, guideDefault, guideOr, guideSections, type GuideName } from './guides';
+import { fillGuide, guideDefault, guideSections, guideTxt, type GuideName } from './guides';
 import { peopleSettings } from './people/settings';
 import { capLines, shopMain, shopMainLines } from './shopctx';
 
@@ -539,18 +539,12 @@ export function costOf(cell: string): { price: number; pay?: string } | null {
   return pay ? { price, pay } : { price };
 }
 
-/** 물건 한 줄 꼴 (모델에 주는 것과 읽는 것이 같게). 쓰임: 손·장비·사용·소모N 중 맞는 것을 「·」로 (없으면 -. 무기 → 손, 사용자 2026-11-14). 그림: 그림 찾기용 영어 낱말. 무게: kg 숫자 (2026-11-08) */
-export const SHOP_LINE = '이름|값|쓰임|그림|무게|설명|효과|구분';
-/** 진실 미리 정하기 (11-09 사용자: 「두개를 섞는게 낫지 않나」 — 기본 섞음) */
+/** 진실 미리 정하기 (11-09 사용자: 「두개를 섞는게 낫지 않나」 — 기본 섞음). 글은 우주몰 지침의 TRUTH_ALL · TRUTH_MIX · TRUTH_NONE 절 */
 export type TruthMode = 'all' | 'mix' | 'none';
-export const TRUTH_RULE: Record<TruthMode, string> = {
-  all: 'Give EVERY item a concrete 진실 (never ?). Make sure at least one item genuinely does what it claims and at least one does something else entirely.',
-  mix: 'MIX the two: give roughly half the items a concrete 진실 and write ? for the rest, varying which ones. Among the concrete ones, at least one genuinely does what it claims and at least one does something else entirely.',
-  none: 'Write ? for EVERY 진실: nothing is decided until it is used.',
-};
-/** 우주몰 줄 꼴: 끝에 숨긴 진짜 효과 (11-09 사용자) */
-export const SECRET_LINE = `${SHOP_LINE}|진실`;
-export const lineOf = (guide: GuideName): string => (guide === 'Cos' ? SECRET_LINE : SHOP_LINE);
+/** 물건 한 줄 꼴 (모델에 주는 것과 읽는 것이 같게): 그 지침의 LINE 절 (2026-11-14 사용자: 모델 글은 전부 지침 파일로).
+ *  칸: 이름|값|쓰임|그림|무게|설명|효과|구분 — 쓰임: 손·장비·사용·소모N 중 맞는 것을 「·」로 (없으면 -. 무기 → 손). 그림: 그림 찾기용 영어 낱말. 무게: kg 숫자.
+ *  우주몰은 끝에 숨긴 진짜 효과 칸(|진실, 11-09 사용자). parseLine 이 같은 칸 순서로 읽는다 */
+export const lineOf = (guide: GuideName): string => guideTxt(guide, 'LINE');
 
 /** 「이름|값|쓰임|그림|무게|설명|효과|구분」 한 줄 → 물건. 이름이나 값이 없으면 null. 구분: 비움 · 희귀 · 특가:원래값 */
 /** 맞춤 주문 견적 줄 「이름|값|납기시간|쓰임|그림|무게|설명|효과|진실」 → 견적 (값·납기가 없으면 null) */
@@ -615,19 +609,19 @@ export interface ShelfReply {
 /** 첫 호출·새로고침 응답. 정체 블록은 첫 호출에만 (이미 있으면 known 을 그대로) */
 export function parseShelf(raw: string, known: ShopIdentity | null): ShelfReply {
   const shelf = block(raw, 'shelf');
-  if (!shelf) throw new ShopError('응답에 <shelf> 블록이 없어요.');
+  if (!shelf) throw new ShopError(guideTxt('Shop', 'ERROR_NO_SHELF'));
   const items = shelf.split('\n').map(parseLine).filter((x): x is Omit<ShopItem, 'id'> => !!x);
-  if (!items.length) throw new ShopError(`<shelf> 블록에 읽을 수 있는 물건 줄이 없어요 (${SHOP_LINE}).`);
+  if (!items.length) throw new ShopError(guideTxt('Shop', 'ERROR_NO_ITEMS', { line: lineOf('Shop') }));
   let identity = known ?? EMPTY_ID;
   const idText = block(raw, 'shop-identity');
   if (!known) {
-    if (!idText) throw new ShopError('응답에 <shop-identity> 블록이 없어요.');
+    if (!idText) throw new ShopError(guideTxt('Shop', 'ERROR_NO_IDENTITY'));
     const get = (k: string) => (new RegExp(`^\\s*${k}\\s*[:：]\\s*(.*)$`, 'im').exec(idText)?.[1] ?? '').trim();
     // 「won (not points)」처럼 원으로 시작하면 원 가게 (전수검사 11-13)
     const cur = get('currency');
     const pts = /point|포인트/i.test(cur) && !/^[\s\W]*(won|krw|원|₩)/i.test(cur);
     identity = { sells: clean(get('sells'), 120), never: clean(get('never'), 120), prices: clean(get('prices'), 120), ...(pts ? { points: true } : {}) };
-    if (!identity.sells) throw new ShopError('<shop-identity> 에 sells 줄이 없어요.');
+    if (!identity.sells) throw new ShopError(guideTxt('Shop', 'ERROR_NO_SELLS'));
   }
   return { identity, owner: clean(block(raw, 'owner'), 300), items: identity.points ? items.map(pointPrice) : items };
 }
@@ -666,7 +660,7 @@ export interface TalkReply {
 /** 주인에게 말한 뒤의 응답: 대사 + 진열대 변경(없음·일부·전체) + 거래 끊음 */
 export function parseTalk(raw: string): TalkReply {
   const owner = clean(block(raw, 'owner'), 400);
-  if (!owner) throw new ShopError('응답에 <owner> 블록(주인 대사)이 없어요.');
+  if (!owner) throw new ShopError(guideTxt('Shop', 'ERROR_NO_OWNER'));
   const m = /<change\b([^>]*)>([\s\S]*?)<\/change\s*>/i.exec(raw);
   const modeRaw = (m && /mode\s*=\s*["']?(none|partial|all)/i.exec(m[1])?.[1]) ?? 'none';
   const mode = modeRaw.toLowerCase() as TalkMode;
@@ -696,7 +690,7 @@ export function parseTalk(raw: string): TalkReply {
   const body = m ? m[2] : '';
   if (mode === 'all') {
     out.all = body.split('\n').map(parseLine).filter((x): x is Omit<ShopItem, 'id'> => !!x);
-    if (!out.all.length) throw new ShopError('mode="all" 인데 물건 줄이 없어요.');
+    if (!out.all.length) throw new ShopError(guideTxt('Shop', 'ERROR_ALL_EMPTY'));
   } else if (mode === 'partial') {
     for (const line0 of body.split('\n')) {
       const line = line0.trim();
@@ -900,13 +894,14 @@ export function shopEvents(chat: Chat): string[] {
   const spoke = turn.some((l) => l.who === 'me');
   // 설정 「메인 요청에 붙이는 것」(core/shopctx.ts): 팔기 · 문의(주인과 나눈 말, 거래 끊김)를 따로 거른다. 대화는 「최대 양」 줄까지 (0 = 전부)
   const main = shopMain(chat.scriptstate, 'shop');
-  if (main.has('sell') && sales.length) out.push(`just sold ${sales.map((x) => `${x.name} (${x.price.toLocaleString('en-US')} ${st.identity.points ? 'Baekilmong points' : 'won'})`).join(', ')} to the owner of ${st.shop}`);
+  // 글은 지침 「메인 요청에 붙는 글」의 INVENTORY.SHOP.* 절
+  if (main.has('sell') && sales.length) out.push(guideTxt('Main', 'INVENTORY.SHOP.SOLD', { items: sales.map((x) => guideTxt('Main', st.identity.points ? 'INVENTORY.SHOP.SOLD_ITEM_POINTS' : 'INVENTORY.SHOP.SOLD_ITEM_WON', { name: x.name, price: x.price.toLocaleString('en-US') })).join(', '), shop: st.shop }));
   if (!main.has('ask')) return out;
-  if (st.closed && lastOwner) out.push(`was refused service and sent out of ${st.shop} ("${lastOwner.text.slice(0, 80)}")`);
+  if (st.closed && lastOwner) out.push(guideTxt('Main', 'INVENTORY.SHOP.REFUSED', { shop: st.shop, line: lastOwner.text.slice(0, 80) }));
   else if (!st.closed && spoke && lastOwner) {
     // 주인과 나눈 말: 이 턴에 나눈 대화 전부 (2026-11-07 사용자: 6줄이 아니라 전부). 그 턴 한 번만 넘어간다
-    const tail = capLines(turn, shopMainLines(chat.scriptstate)).map((l) => `${l.who === 'me' ? 'protagonist' : 'owner'}: "${l.text}"`).join(' / ');
-    out.push(`talked with the owner of ${st.shop} — ${tail}`);
+    const tail = capLines(turn, shopMainLines(chat.scriptstate)).map((l) => guideTxt('Main', l.who === 'me' ? 'INVENTORY.SHOP.TALK_ME' : 'INVENTORY.SHOP.TALK_OWNER', { text: l.text })).join(' / ');
+    out.push(guideTxt('Main', 'INVENTORY.SHOP.TALKED', { shop: st.shop, talk: tail }));
   }
   return out;
 }
@@ -941,7 +936,7 @@ const G = (name: GuideName = 'Shop') => guideSections(name);
 
 const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, guide: GuideName = 'Shop', truthMode: TruthMode = 'mix', talk = false) => {
   const r = s.size;
-  const v = { size: r[0] === r[1] ? `exactly ${r[0]}` : `${r[0]} to ${r[1]}`, line: lineOf(guide), price: s.price, prev: st.prev.join(', '), truth_rule: guideOr(guide, `TRUTH_${truthMode.toUpperCase()}`, TRUTH_RULE[truthMode]) };
+  const v = { size: r[0] === r[1] ? guideTxt(guide, 'SIZE_EXACT', { n: r[0] }) : guideTxt(guide, 'SIZE_RANGE', { min: r[0], max: r[1] }), line: lineOf(guide), price: s.price, prev: st.prev.join(', '), truth_rule: guideTxt(guide, `TRUTH_${truthMode.toUpperCase()}`) };
   return [
     fillGuide(g.SHELF, v),
     guide === 'Cos' ? fillGuide(g.SHELF_SECRET, v) : '',
@@ -958,22 +953,22 @@ const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, 
 /** 진열대 생각 단계 (호출 흐름 미리 보기도 쓴다) */
 export const shopThoughts = (): string => fillGuide(G().THOUGHTS_SHELF, {});
 
-/** guide: 머리말을 읽을 지침 (상점·쇼핑몰 지침의 HEAD_ 절, 없으면 옛 글) */
+/** guide: 머리말을 읽을 지침 (상점·쇼핑몰·망상홈쇼핑 지침의 HEAD_ 절) */
 function material(src: ShopSource, s: ShopSettings, head = '', guide: GuideName = 'Shop'): string {
-  const parts = [head || `[가게]\n${src.st.shop}${src.st.owner ? ` / 주인: ${src.st.owner}` : ''}`];
+  const parts = [head || (src.st.owner ? guideTxt(guide, 'HEAD_SHOP_OWNER', { shop: src.st.shop, owner: src.st.owner }) : guideTxt(guide, 'HEAD_SHOP', { shop: src.st.shop }))];
   if (src.st.loaded && !head) {
     const id = src.st.identity;
-    parts.push(`[가게 정체 — 고정]\nsells: ${id.sells || '-'}\nnever: ${id.never || '-'}\nprices: ${id.prices || '-'}\ncurrency: ${id.points ? 'points' : 'won'}`);
+    parts.push(guideTxt(guide, id.points ? 'HEAD_IDENTITY_POINTS' : 'HEAD_IDENTITY_WON', { sells: id.sells || '-', never: id.never || '-', prices: id.prices || '-' }));
   }
-  // 머리말의 지시는 지침 절에서 (옛 글은 절이 없을 때만, 전수검사 11-13)
-  if (src.refs) parts.push(`${guideOr(guide, 'HEAD_REFS', '[참고 자료 — 작중 인물에게 자동 공개되지 않음]')}\n${src.refs}`);
-  if (src.assign) parts.push(`${guideOr(guide, 'HEAD_ASSIGN', '[이번 진열 배정 — 칸마다 그대로 따를 것]')}\n${src.assign}`);
-  if (src.orders) parts.push(`${guideOr(guide, 'HEAD_ORDERS', '[진행 중 맞춤 주문 — 이미 선납됨, 다시 견적 내지 말 것]')}\n${src.orders}`);
+  // 머리말은 지침 절에서 (2026-11-14 사용자: 코드에 글을 두지 않는다)
+  if (src.refs) parts.push(`${guideTxt(guide, 'HEAD_REFS')}\n${src.refs}`);
+  if (src.assign) parts.push(`${guideTxt(guide, 'HEAD_ASSIGN')}\n${src.assign}`);
+  if (src.orders) parts.push(`${guideTxt(guide, 'HEAD_ORDERS')}\n${src.orders}`);
   if (s.context) {
-    if (src.identity) parts.push(`[주인공 신분]\n${src.identity}`);
-    if (src.status) parts.push(`[상태창 — 지금 시각·장소]\n${src.status}`);
-    if (src.situation) parts.push(`[진행 중 괴이·사건]\n${src.situation}`);
-    if (src.story) parts.push(`[최근 본문]\n${src.story}`);
+    if (src.identity) parts.push(`${guideTxt(guide, 'HEAD_PROTAGONIST')}\n${src.identity}`);
+    if (src.status) parts.push(`${guideTxt(guide, 'HEAD_STATUS')}\n${src.status}`);
+    if (src.situation) parts.push(`${guideTxt(guide, 'HEAD_SITUATION')}\n${src.situation}`);
+    if (src.story) parts.push(`${guideTxt(guide, 'HEAD_STORY')}\n${src.story}`);
   }
   return parts.join('\n\n');
 }
@@ -993,21 +988,22 @@ export function shelfPrompt(src: ShopSource, s: ShopSettings, guide: GuideName =
     src.language ?? '',
   ].filter(Boolean).join('\n\n');
   // 새로고침: 이번 방문 대화 전부를 같이 (2026-11-07 사용자: 주인이 방금 나눈 말을 알고 새 물건·한마디를 내게)
-  const talk = !first && src.st.talk.length ? `\n\n[이번 방문 대화]\n${src.st.talk.map((l) => `${l.who === 'me' ? '[주인공]' : '[주인]'} ${l.text}`).join('\n')}` : '';
-  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, '', guide)}${talk}\n\n[현재 작업]\n${first ? '가게 정체·주인 첫 대사·진열대' : '진열대 새로 짜기'}` }], s, fillGuide(g.THOUGHTS_SHELF, {}));
+  const talk = !first && src.st.talk.length ? `\n\n${guideTxt(guide, 'HEAD_VISIT_TALK')}\n${talkLines(src.st, guide)}` : '';
+  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, '', guide)}${talk}\n\n${guideTxt(guide, first ? 'TASK_FIRST' : 'TASK_RESTOCK')}` }], s, fillGuide(g.THOUGHTS_SHELF, {}));
 }
 
-/** 우주몰 진열 줄 끝 칸(숨긴 진짜 효과) 안내. 지침의 SECRET_NOTE 절이 없을 때 쓰는 글 */
-const SECRET_NOTE = '(last column = what each item REALLY does; ? means not even the catalogue knows. The buyer cannot see it. The 운영자 knows it and never states it: answer on the listed basics, deflect or withhold the rest, invent nothing beyond the listing.)';
+/** 이번 방문 대화 줄 (지침의 TALK_LINE_ME · TALK_LINE_OWNER 절) */
+const talkLines = (st: ShopState, guide: GuideName): string => st.talk.map((l) => guideTxt(guide, l.who === 'me' ? 'TALK_LINE_ME' : 'TALK_LINE_OWNER', { text: l.text })).join('\n');
 /** 주인에게 말하기 (흥정·문의·요청·잡담). 대화는 이번 방문 것 전부 */
 export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 'Shop'): CraftMessage[] {
   const st = src.st;
   // 우주몰: 숨긴 진짜 효과를 운영자만 안다 — 답에서 밝히지 않고 비켜 간다 (11-09 사용자)
   const secret = guide === 'Cos' && shelfItems(st).some((x) => x.truth);
   // 값 칸: 원이 아닌 대가도 화면과 같은 꼴로 (「피 한 방울」이 0원으로 가지 않게) (전수검사 11-13)
-  const shelf = shelfItems(st).map((x) => `${x.name}|${x.pay ? (x.price ? `${x.pay} + ${x.price}` : x.pay) : x.price}|${traitsText(x)}|${x.icon ?? '-'}|${x.weight ?? '-'}|${x.desc}|${x.effect}|${x.tag === 'rare' ? '희귀' : x.tag === 'sale' && x.was ? `특가:${x.was}` : ''}${secret ? `|${x.truth ?? '-'}` : ''}`).join('\n') || '(empty)';
-  // 글은 지침의 SECRET_NOTE 절. 절이 없으면 여기 남긴 글
-  const secretNote = secret ? `\n${guideOr(guide, 'SECRET_NOTE', SECRET_NOTE)}` : '';
+  // 구분 칸 낱말(희귀·특가:원래값)은 지침의 TAG_RARE · TAG_SALE 절 (parseLine 이 같은 낱말을 읽는다)
+  const shelf = shelfItems(st).map((x) => `${x.name}|${x.pay ? (x.price ? `${x.pay} + ${x.price}` : x.pay) : x.price}|${traitsText(x)}|${x.icon ?? '-'}|${x.weight ?? '-'}|${x.desc}|${x.effect}|${x.tag === 'rare' ? guideTxt(guide, 'TAG_RARE') : x.tag === 'sale' && x.was ? guideTxt(guide, 'TAG_SALE', { was: x.was }) : ''}${secret ? `|${x.truth ?? '-'}` : ''}`).join('\n') || guideTxt(guide, 'SHELF_EMPTY');
+  // 우주몰 진열 줄 끝 칸(숨긴 진짜 효과) 안내: 지침의 SECRET_NOTE 절
+  const secretNote = secret ? `\n${guideTxt(guide, 'SECRET_NOTE')}` : '';
   const sold = soldItems(st).map((x) => x.name).join(', ');
   const o = st.sell;
   const g = G(guide);
@@ -1024,22 +1020,17 @@ export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 
     SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true),
     src.language ?? '',
   ].filter(Boolean).join('\n\n');
-  const talk = st.talk.map((l) => `${l.who === 'me' ? '[주인공]' : '[주인]'} ${l.text}`).join('\n');
+  const talk = talkLines(st, guide);
   const sales = st.sales.map((x) => `${x.name} (${x.price})`).join(', ');
-  const notes = (st.notes ?? []).map((n) => `${n.title} (${n.price}${n.bought ? ', bought' : ', not bought'})`).join(', ');
-  const quotes = (st.quotes ?? []).map((q) => `${q.item.name} (${q.price} won, ${q.hours}h${q.accepted ? ', paid and ordered' : ', not accepted'})`).join(', ');
-  const selling = o ? `\n\n[팔려는 물건 — 주인공이 내민 것]\n${o.name}|${traitsText(o)}|${o.desc || '-'}|${o.effect || '-'}${o.truth ? `\n(what it really does, which the seller may not know: ${o.truth})` : ''}${o.paid !== undefined ? `\n(bought earlier for ${o.paid} won)` : ''}${typeof o.price === 'number' ? `\n(your last offer: ${o.price} ${st.identity.points ? 'points' : 'won'})` : ''}` : '';
-  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, '', guide)}\n\n[지금 진열대]\n${shelf}${secretNote}${sold ? `\n\n[이번 방문에 산 것]\n${sold}` : ''}${sales ? `\n\n[이번 방문에 주인이 산 것]\n${sales}` : ''}${notes ? `\n\n${guideOr(guide, 'HEAD_NOTES', '[이번 방문에 내민 정보 쪽지 — 다시 내밀지 말 것]')}\n${notes}` : ''}${quotes ? `\n\n[이번 방문에 낸 맞춤 주문 견적]\n${quotes}` : ''}${selling}\n\n[이번 방문 대화 — 마지막 줄이 지금 한 말]\n${talk}` }], s, fillGuide(o ? g.THOUGHTS_SELL : g.THOUGHTS_TALK, v));
+  const notes = (st.notes ?? []).map((n) => guideTxt(guide, n.bought ? 'NOTE_ITEM_BOUGHT' : 'NOTE_ITEM_OPEN', { title: n.title, price: n.price })).join(', ');
+  const quotes = (st.quotes ?? []).map((q) => guideTxt(guide, q.accepted ? 'QUOTE_ITEM_PAID' : 'QUOTE_ITEM_OPEN', { name: q.item.name, price: q.price, hours: q.hours })).join(', ');
+  const selling = o ? `\n\n${guideTxt(guide, 'HEAD_SELLING')}\n${o.name}|${traitsText(o)}|${o.desc || '-'}|${o.effect || '-'}${o.truth ? `\n${guideTxt(guide, 'SELLING_TRUTH', { truth: o.truth })}` : ''}${o.paid !== undefined ? `\n${guideTxt(guide, 'SELLING_PAID', { paid: o.paid })}` : ''}${typeof o.price === 'number' ? `\n${guideTxt(guide, st.identity.points ? 'SELLING_OFFER_POINTS' : 'SELLING_OFFER_WON', { price: o.price })}` : ''}` : '';
+  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, '', guide)}\n\n${guideTxt(guide, 'HEAD_SHELF_NOW')}\n${shelf}${secretNote}${sold ? `\n\n${guideTxt(guide, 'HEAD_BOUGHT')}\n${sold}` : ''}${sales ? `\n\n${guideTxt(guide, 'HEAD_OWNER_BOUGHT')}\n${sales}` : ''}${notes ? `\n\n${guideTxt(guide, 'HEAD_NOTES')}\n${notes}` : ''}${quotes ? `\n\n${guideTxt(guide, 'HEAD_QUOTES')}\n${quotes}` : ''}${selling}\n\n${guideTxt(guide, 'HEAD_TALK_NOW')}\n${talk}` }], s, fillGuide(o ? g.THOUGHTS_SELL : g.THOUGHTS_TALK, v));
 }
 
 /** 본편 [Inventory] 안내에 붙는 표식 지침 (설정 「상점」 켬일 때, 1~2줄). 지침 「상점」의 MAIN_TAG 절 */
-/** 상점이 열리는 자리 (설정): any(기본, 온라인몰·홈쇼핑·자판기·이면 쇼핑몰처럼 판매자가 없는 곳도) · shop(판매자가 있는 가게 장면만) */
-const WHERE_OLD: Record<ShopWhere, string> = {
-  any: 'Any way of buying counts: store, stall, unstaffed shop, online mall, home shopping, catalog, vending machine, otherworldly mall.',
-  shop: 'Only a physical store or stall with a seller present, or a shop with its own screen listed below; not other online, broadcast, catalog or machine sales.',
-};
-/** 지침 「상점」의 WHERE_ANY · WHERE_SHOP 절 (없으면 위 글) */
-const whereLine = (w: ShopWhere): string => guideOr('Shop', `WHERE_${w.toUpperCase()}`, WHERE_OLD[w]);
+/** 상점이 열리는 자리 (설정): any(기본, 온라인몰·홈쇼핑·자판기·이면 쇼핑몰처럼 판매자가 없는 곳도) · shop(판매자가 있는 가게 장면만). 지침 「상점」의 WHERE_ANY · WHERE_SHOP 절 */
+const whereLine = (w: ShopWhere): string => guideTxt('Shop', `WHERE_${w.toUpperCase()}`);
 /** 상점 판단 기준 (지침 「상점」의 SHOP_RULE 절). 메인 모델 표식 지침과 갱신기가 같은 글을 읽는다 (11-09 사용자: 상점 지침은 양쪽을 동시에) */
 export const shopRule = (vars?: Vars): string => fillGuide(G().SHOP_RULE ?? guideSectionDefault('SHOP_RULE'), { where: whereLine(shopSettings(vars).where), own: ownShopsLine(vars) });
 /** 갱신기만 더 받는 판단 요령 (지침 「상점」 SHOP_JUDGE 절) */
@@ -1048,10 +1039,11 @@ export const shopJudgeGuide = (): string => fillGuide(G().SHOP_JUDGE ?? guideSec
 function ownShopsLine(vars?: Vars): string {
   const list = ownShops(vars).filter((o) => o.on && o.name && (o.web || o.visit));
   if (!list.length) return '';
+  // 줄 꼴·열리는 길 글은 지침 「상점」의 OWN_SHOP_ITEM(_ALSO) · OWN_HOW_* 절
   const item = (o: OwnShop) => {
     const also = ownNames(o).slice(1);
-    const how = o.web && o.visit ? 'online or in person' : o.web ? 'online only' : 'in person only';
-    return `${o.name}${also.length ? ` (also ${also.join(', ')})` : ''} — ${how}`;
+    const how = guideTxt('Shop', o.web && o.visit ? 'OWN_HOW_BOTH' : o.web ? 'OWN_HOW_WEB' : 'OWN_HOW_VISIT');
+    return also.length ? guideTxt('Shop', 'OWN_SHOP_ITEM_ALSO', { name: o.name, also: also.join(', '), how }) : guideTxt('Shop', 'OWN_SHOP_ITEM', { name: o.name, how });
   };
   return fillGuide(G().OWN_SHOPS ?? guideSectionDefault('OWN_SHOPS'), { list: list.map(item).join('; ') });
 }
@@ -1081,13 +1073,14 @@ export function programPrompt(src: ShopSource, s: ShopSettings, fill: Record<str
   const g = G('Hs');
   const v = { ...fill, line: lineOf('Hs') };
   const system = [fillGuide(g.COMMON, v), SHELF_RULES(g, s, src.st, 'Hs'), fillGuide(g.BROADCAST, v), fillGuide(g.HOST ?? '', v), fillGuide(g.VIEWERS ?? '', v), src.language ?? ''].filter(Boolean).join('\n\n');
-  const head = `[채널]\n${src.st.shop}${src.st.owner ? ` / 진행자: ${src.st.owner}` : ''}`;
-  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, head, 'Hs')}\n\n[현재 작업]\n오늘 편성 (상품·상품마다 큐시트와 채팅)` }], s, fillGuide(g.THOUGHTS_PROGRAM ?? '', v));
+  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${guideTxt('Hs', 'TASK_PROGRAM')}` }], s, fillGuide(g.THOUGHTS_PROGRAM ?? '', v));
 }
+/** 망상홈쇼핑 머리 (지침 「망상홈쇼핑」의 HEAD_CHANNEL · HEAD_CHANNEL_HOST 절) */
+const channelHead = (st: ShopState): string => (st.owner ? guideTxt('Hs', 'HEAD_CHANNEL_HOST', { shop: st.shop, owner: st.owner }) : guideTxt('Hs', 'HEAD_CHANNEL', { shop: st.shop }));
 
 /** 망상홈쇼핑 내 채팅 뒤 반응: 참고 자료·본편은 편성과 같게 넘긴다 */
 export function broadcastMaterial(src: ShopSource, s: ShopSettings): string {
-  return material(src, s, `[채널]\n${src.st.shop}${src.st.owner ? ` / 진행자: ${src.st.owner}` : ''}`, 'Hs');
+  return material(src, s, channelHead(src.st), 'Hs');
 }
 
 /** 진열 줄의 쓰임: 모델이 적은 쓰임 글을 그대로 믿지 않고 종류(그림 칸) + 판정 표로 정한다 — 사서 소지품에 들어갈 때(core/items.ts addItem)와 같은 판정. 표에 줄이 없으면 적힌 대로 */

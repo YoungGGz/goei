@@ -1,7 +1,7 @@
 // 인물 기록 정리 (리수폿 「문서 정리」에 해당): 보조 모델이 한 인물의 살아 있는 항목들을 더 적은 수의 조밀한 항목으로 다시 쓴다.
 // 사용자가 인물 화면에서 「정리」를 눌렀을 때만. 합쳐진 원본은 folded 표시(되돌릴 수 없음), 하나에서 온 항목은 대체(replaces).
 import type { PeopleSettings } from './settings';
-import { guideOr } from '../guides';
+import { guideTxt } from '../guides';
 import { entryId, liveEntries, liveness, plain, type Liveness } from './store';
 import { CORE_SLOTS, SLOT_META, slotsFor, type Entry, type PeopleStore, type SlotId } from './types';
 import { recordChars } from './updater';
@@ -13,24 +13,13 @@ export interface ConsolidateInput {
   ids: Map<string, { slot: SlotId; entry: Entry }>;
 }
 
-/** 글은 지침 「인물 기록 갱신기(덧붙임)」 CONSOLIDATE 절. 절이 없으면 아래에 남긴 글 */
-export const CONSOLIDATE_PROMPT = (lang: 'ko' | 'en', slots: SlotId[] = [...CORE_SLOTS]) => guideOr('UpdaterExtra', 'CONSOLIDATE', () => [
-  'You tidy the per-chat record of one roleplay character. The record is a set of slots, each a list of short entries. Over time entries pile up, overlap, or go stale. Rewrite each slot into fewer, denser entries without losing any fact that is still true.',
-  '',
-  'Rules:',
-  '- Merge entries that describe the same thing; drop nothing that is still true. Keep concrete details (names, numbers, places, dates). When two entries conflict, keep the later one (entries are listed oldest first) and you may note the change.',
-  `- \`chars\` is the record's current size and \`target\` the size to reach (sum of entry texts). Reduce toward target; a result near it is enough; never pad. Each entry is one statement ≤300 chars${lang === 'en' ? ' in English' : ' in Korean'}. Names, quotes, address terms, Korean labels and prefixes stay as written.`,
-  '- `state` and `scene` are the present: merge aggressively, keep only what is still true. `history` is a chronological digest: merge adjacent events into one line each. `relationship`, `speech` and the feature slots (`affinity.*`, `register.*`) keep one entry per `target`.',
-  '- Give every result entry `from`: the ids of the input entries it came from (one or more). An input entry that you leave out of every `from` is treated as discarded, so only omit an entry when it is stale or fully covered elsewhere.',
-  '- Slots you do not return stay as they are.',
-  '',
-  'Output exactly one JSON object, nothing else:',
-  '{"slots":{"<slot>":[{"text":"<statement>","target":"<name|@user|null>","from":["<id>"]}]}}',
-  'Slot hints: ' + slots.map((s) => `${s} = ${SLOT_META[s].hint}`).join('; '),
-].join('\n'), { lang_note: lang === 'en' ? ' in English' : ' in Korean', slot_hints: slots.map((s) => `${s} = ${SLOT_META[s].hint}`).join('; ') });
+/* 글은 지침 「인물 기록 갱신기(덧붙임)」 CONSOLIDATE 절 (언어 꼬리 CONSOLIDATE.LANG_EN/LANG_KO, 칸 설명 CONSOLIDATE.HINT.<칸>). 코드에 글 없음 (2026-11-14) */
+const slotHints = (slots: SlotId[]): string => slots.map((s) => `${s} = ${guideTxt('UpdaterExtra', `CONSOLIDATE.HINT.${s}`)}`).join('; ');
+export const CONSOLIDATE_PROMPT = (lang: 'ko' | 'en', slots: SlotId[] = [...CORE_SLOTS]) =>
+  guideTxt('UpdaterExtra', 'CONSOLIDATE', { lang_note: ` ${guideTxt('UpdaterExtra', lang === 'en' ? 'CONSOLIDATE.LANG_EN' : 'CONSOLIDATE.LANG_KO')}`, slot_hints: slotHints(slots) });
 
-/** 정리 요청의 user 글 (host/people.ts). 지침 「인물 기록 갱신기(덧붙임)」 CONSOLIDATE.USER 절, 없으면 여기 남긴 글 */
-export const consolidateUserText = (dataText: string): string => guideOr('UpdaterExtra', 'CONSOLIDATE.USER', () => `Record to tidy:\n${dataText}\n\nReturn the JSON object.`, { data: dataText });
+/** 정리 요청의 user 글 (host/people.ts). 지침 「인물 기록 갱신기(덧붙임)」 CONSOLIDATE.USER 절 */
+export const consolidateUserText = (dataText: string): string => guideTxt('UpdaterExtra', 'CONSOLIDATE.USER', { data: dataText });
 
 export function buildConsolidate(store: PeopleStore, chat: Parameters<typeof liveness>[0], who: string, settings: PeopleSettings): ConsolidateInput | null {
   const p = store.people[who];

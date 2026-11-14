@@ -3,7 +3,7 @@
 // 목록은 명부(인물·괴이·특수)에서 그림이 있는 것만 자동으로 만든다. 보낼 곳·때는 모델이 정한다 (제한 없음).
 import { readDirectory, type AgentRow, type PlaceRow } from './world/directory';
 import { EMOTIONS } from './imgtag';
-import { fillVars } from './guides';
+import { fillVars, guideTxt } from './guides';
 import type { LoreEntry } from './types';
 
 type Char = { globalLore?: LoreEntry[] } & Record<string, unknown>;
@@ -54,22 +54,22 @@ function pics(char: Char): Pic[] {
 }
 
 /** 모델에게 줄 목록 (지침의 __SITE_PICS__ 자리).
- *  sec: 지침 절 읽기 (PICS_NONE · PICS_PEOPLE · PICS_EXPR · PICS_THINGS, {list} 자리). 절이 없으면 코드에 남긴 옛 글 (전수검사 11-13)
+ *  sec: 지침 절 읽기 (PICS_NONE · PICS_PEOPLE · PICS_EXPR · PICS_THINGS, {list} 자리). 없거나 비었으면 괴담넷 지침의 그 절 (전수검사 11-13. 2026-11-14 사용자: 코드에 글을 두지 않는다)
  *  within: 이번 요청의 최근 본문·게시판/쪽지 내용 (늘 붙는 인물 명부 같은 참고 기록은 넣지 않는다: 모든 이름이 걸린다). 주면 거기에 이름(한글·영문·별칭)이 나온 것만 넣는다 (사용자 2026-11-14: 요청마다 전체 목록이 붙지 않게) */
 export function sitePicList(char: Char, sec?: (name: string) => string | null | undefined, within?: string): string {
   const low = within?.toLowerCase();
   const list = low === undefined ? pics(char) : pics(char).filter((p) => p.terms.some((t) => !!t && t.trim().length >= 2 && low.includes(t.trim().toLowerCase())));
   const people = list.filter((p) => p.person).map((p) => p.name);
   const things = list.filter((p) => !p.person).map((p) => p.name);
-  const line = (name: string, old: string, items?: string[]): string => {
-    const t = sec?.(name)?.trim() || old;
+  const line = (name: string, items?: string[]): string => {
+    const t = sec?.(name)?.trim() || guideTxt('GNet', name);
     return items ? fillVars(t, { list: items.join(', ') }) : t;
   };
-  if (!people.length && !things.length) return line('PICS_NONE', 'Available pictures: none.');
+  if (!people.length && !things.length) return line('PICS_NONE');
   return [
-    people.length ? line('PICS_PEOPLE', 'People (may add _expression): {list}', people) : '',
-    people.length ? line('PICS_EXPR', 'Expressions: {list}', [...EMOTIONS]) : '',
-    things.length ? line('PICS_THINGS', 'Anomalies, people and places (no expression): {list}', things) : '',
+    people.length ? line('PICS_PEOPLE', people) : '',
+    people.length ? line('PICS_EXPR', [...EMOTIONS]) : '',
+    things.length ? line('PICS_THINGS', things) : '',
   ].filter(Boolean).join('\n');
 }
 

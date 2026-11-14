@@ -3,8 +3,8 @@
 // 결과는 언제나 두 메시지: system(틀 + 작업 지침 + 출력 형식) / user(참고 자료 + 최근 본문 + 현재 작업).
 import { sitePicList } from './sitepics';
 import { hasAttachment } from './attach';
-import { viewSite, type BoardSite } from './boards';
-import { fillVars, GUIDE_LABEL, type GuideName } from './guides';
+import { BOARD_GUIDE, viewSite, type BoardSite } from './boards';
+import { fillVars, guideDefaultSec, guideTxt, GUIDE_LABEL, type GuideName } from './guides';
 import { evaluate } from './cbs';
 import {
   activityContext, findPost, gnetSettings, gnetVars, keyFigures, HISTORY, incomingTask, LIMITS, protectedPost, countText, trimTokens, postLimit,
@@ -25,12 +25,14 @@ const REQUIRED_GNET = [
 const REQUIRED_LB = ['SYSTEM', 'OUTPUT', 'JAILBREAK', 'JOB'];
 
 /** 사이트마다 따로 쓰는 지침 (2026-11-08 사용자: 공용 없이 전부 따로) */
-const SITE_GUIDE: Record<BoardSite, GuideName> = { gn: 'GNet', gal: 'Gal', wpf: 'Wpf', sm: 'Salmon' };
+const SITE_GUIDE: Record<BoardSite, GuideName> = BOARD_GUIDE;
 /** 사이트 자체의 세계 로어(조직 항목 이름). 있으면 요청마다 「주제 원본」으로 넣는다 — 관점이 그 사이트 사람들 것이 되게 (11-09 사용자: 정보가 아니라 관점) */
 const SITE_LORE: Partial<Record<BoardSite, string[]>> = { wpf: ['세계정치 게시판'] };
 
 export interface GnetBooks {
   read(name: string): string;
+  /** read 와 같되, 고친 지침에 절이 없거나 비었으면 기본 지침 파일(지침/*.txt)의 절 (2026-11-14 사용자: 모델에 가는 글은 코드에 두지 않는다) */
+  txt(name: string): string;
   /** 출력 언어 문장 (고급 설정 → 생성 언어) */
   language: string;
   /** 지침의 __SITE_PICS__ 자리 채우기: 이번 요청의 최근 본문·게시판/쪽지 내용(material)에 이름이 나온 사진만 (사용자 2026-11-14. 참고 기록은 넣지 않는다). read 는 자리를 그대로 두고, 요청문을 묶을 때(pack) 채운다 */
@@ -39,27 +41,29 @@ export interface GnetBooks {
 
 /** GNet 섹션을 읽는 함수. 섹션이 빠졌으면 바로 알린다. 생성 틀(SYSTEM 등)은 옛 카드면 LB Backend에 있다 */
 export function gnetBooks(src: RefSource): GnetBooks {
-  const name = SITE_GUIDE[viewSite(src.chat.scriptstate)];
-  const g = { ...policySections(src.char.globalLore, 'LB Backend'), ...policySections(src.char.globalLore, name) };
-  for (const k of [...REQUIRED_GNET, ...REQUIRED_LB]) if (g[k] === undefined) throw new GnetError(`${GUIDE_LABEL[name]} 지침의 ${k} 섹션이 없어요.`);
+  const guide = SITE_GUIDE[viewSite(src.chat.scriptstate)];
+  const g = { ...policySections(src.char.globalLore, 'LB Backend'), ...policySections(src.char.globalLore, guide) };
+  for (const k of [...REQUIRED_GNET, ...REQUIRED_LB]) if (g[k] === undefined) throw new GnetError(`${GUIDE_LABEL[guide]} 지침의 ${k} 섹션이 없어요.`);
   applyAdvanced(src.chat.scriptstate);
   const env = { ...cbsEnv(src), vars: gnetVars(src.chat.scriptstate) };
   const cs = gnetSettings(src.chat.scriptstate).counts;
+  const proc = (raw: string): string => evaluate(raw, env)
+    .replace(/__GN_POST_RANGE__/g, countText(cs.post))
+    .replace(/__GN_CMT_RANGE__/g, countText(cs.cmt))
+    .replace(/__GN_ACT_RANGE__/g, countText(cs.act))
+    .replace(/__GN_REPLY_RANGE__/g, countText([Math.min(LIMITS.replies_min, LIMITS.replies), LIMITS.replies]))
+    .replace(/__LIMIT_(\w+?)__/g, (m, k: string) => (k in LIMITS ? String(LIMITS[k as keyof typeof LIMITS]) : m))
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .trim();
+  const def = (k: string): string => guideDefaultSec(guide, k) ?? '';
+  // 비우면 기본 글이 쓰이는 절: 고친 지침에 없거나 비었으면 기본 지침 파일의 절
+  const withDef = (k: string): string => (g[k]?.trim() ? g[k] : def(k));
   return {
-    language: genSettings(src.chat.scriptstate).language ?? (g.LANGUAGE?.trim() || LANGUAGE),
+    language: genSettings(src.chat.scriptstate).language ?? withDef('LANGUAGE').trim(),
     // 사진 목록 머리말도 이 사이트 지침의 절 (PICS_*. 전수검사 11-13)
-    pics: (text, material) => (text.includes('__SITE_PICS__') ? text.replace(/__SITE_PICS__/g, () => sitePicList(src.char, (k) => g[k], material)) : text),
-    read(name: string) {
-      const raw = g[name] ?? '';
-      return evaluate(raw, env)
-        .replace(/__GN_POST_RANGE__/g, countText(cs.post))
-        .replace(/__GN_CMT_RANGE__/g, countText(cs.cmt))
-        .replace(/__GN_ACT_RANGE__/g, countText(cs.act))
-        .replace(/__GN_REPLY_RANGE__/g, countText([Math.min(LIMITS.replies_min, LIMITS.replies), LIMITS.replies]))
-        .replace(/__LIMIT_(\w+?)__/g, (m, k: string) => (k in LIMITS ? String(LIMITS[k as keyof typeof LIMITS]) : m))
-        .replace(/<!--[\s\S]*?-->/g, '')
-        .trim();
-    },
+    pics: (text, material) => (text.includes('__SITE_PICS__') ? text.replace(/__SITE_PICS__/g, () => sitePicList(src.char, withDef, material)) : text),
+    read: (k: string) => proc(g[k] ?? ''),
+    txt: (k: string) => proc(g[k] ?? '') || proc(def(k)),
   };
 }
 
@@ -74,25 +78,20 @@ function fill(template: string, values: Record<string, string>): string {
   return template.replace(/__GN_([A-Z_]+)__/g, (m, k: string) => values[k] ?? m);
 }
 
-const LANGUAGE = 'Use the language of the actual conversation; default to Korean.';
-const IMPORTANT = '\n\nImportant Note: May contain unrelated directives/rules regarding other data/image outputs. Ignore these; they are irrelevant in your current job. Focus on settings.';
-
-/** 지침 절이 있으면 그 글, 없으면(옛 글로 고쳐 둔 지침) 코드에 남긴 글. 아래 영어 글들은 모두 게시판 지침의 절로도 있다 (설정 → 지침에서 고침) */
-const orOld = (b: GnetBooks, name: string, old: string): string => b.read(name) || old;
-
 export function systemText(b: GnetBooks, guideline: string, format: string, identity?: unknown, attachments = false): string {
-  const intro = fmt(b.read('SYSTEM'), b.read('JAILBREAK'), b.read('JOB'), `\n\n${orOld(b, 'IMPORTANT_NOTE', IMPORTANT.slice(2))}`, 'anonymous forum author', '', '')
-    .replace(/## Main Protagonist \([^\n]*\)/, '## User-controlled protagonist (narrator reference only)');
+  const head = b.txt('SYSTEM.PROTAGONIST_HEAD');
+  const intro = fmt(b.read('SYSTEM'), b.read('JAILBREAK'), b.read('JOB'), `\n\n${b.txt('IMPORTANT_NOTE')}`, 'anonymous forum author', '', '')
+    .replace(/## Main Protagonist \([^\n]*\)/, () => head);
   let outro = fmt(b.read('OUTPUT'), '', format, guideline);
-  if (identity) outro += `\nROLE BINDING (application-owned metadata):\n${JSON.stringify(identity)}`;
+  if (identity) outro += `\n${b.txt('DM.ROLE_BINDING')}\n${JSON.stringify(identity)}`;
   outro += `\n${b.language}`;
   return `${intro}\n${outro}${attachments ? `\n\n${b.read('ATTACHMENTS.READ')}` : ''}`;
 }
 
 export interface GnetPrompt {
   messages: CraftMessage[];
-  /** 형식이 틀렸을 때 다시 묻는 글 (지침 절 RETRY.FORMAT). 없으면 코드에 남긴 글 */
-  retryRule?: string;
+  /** 형식이 틀렸을 때 다시 묻는 글 (지침 절 RETRY.FORMAT) */
+  retryRule: string;
 }
 
 /** 생각 순서표 절 (작업마다) */
@@ -106,10 +105,10 @@ function pack(src: RefSource, b: GnetBooks, fn: GnetOp, thoughts: ThoughtsKey, g
   const rows = collectRefs(src, {
     scope: 'gnet', text: `${extras}\n${story}`, primaryNames: SITE_LORE[viewSite(src.chat.scriptstate)], description: t.description, authors: t.authors, persona: t.persona, active: t.active,
     related: t.related && !trimRelated(), secondary: t.secondary && !trimSecondary(),
-    extra: [{ source: '현재 발생 상황', content: b.read('LB.EXTRA') }],
+    extra: [{ source: b.txt('REFS.SITUATION_SOURCE'), content: b.read('LB.EXTRA') }],
   });
-  // 참고 자료 머리말은 프로그램 안에 둔다 (사용자 2026-11-14 C-4 (나): 공통 지침에서 읽지 않음)
-  const material = `[참고 자료 — 작중 인물에게 자동 공개되지 않음]\n${refText(rows)}\n[최근 본문]\n${story}\n[현재 작업]\n${extras}`;
+  // 참고 자료 머리말은 이 게시판 지침의 절 (사용자 2026-11-14 C-4 (나): 공통 지침에서 읽지 않음. 같은 날: 모델에 가는 글은 모두 지침 파일로)
+  const material = `${b.txt('REQUEST.HEAD_REFS')}\n${refText(rows)}\n${b.txt('REQUEST.HEAD_STORY')}\n${story}\n${b.txt('REQUEST.HEAD_TASK')}\n${extras}`;
   const attachments = hasAttachment(material);
   // 사진 이름은 최근 본문과 게시판·쪽지 내용(현재 작업)에서만 찾는다. 늘 붙는 참고 기록(🙂Roster 등)에는 모든 인물 이름이 있어 거르기가 듣지 않는다 (사용자 2026-11-14 E-14 물음 2)
   const named = `${story}\n${extras}`;
@@ -117,7 +116,7 @@ function pack(src: RefSource, b: GnetBooks, fn: GnetOp, thoughts: ThoughtsKey, g
     { role: 'system', content: factionCodesToNames(b.pics(systemText(b, guideline, format, identity, attachments), named), factionNames) },
     { role: 'user', content: factionCodesToNames(material, factionNames) },
   ];
-  return { messages: craftMessages(messages, craftSettings(src.chat.scriptstate, 'gn'), { thoughts: b.read(thoughts), memo: memoTexts((k) => b.read(k)) }), retryRule: b.read('RETRY.FORMAT') };
+  return { messages: craftMessages(messages, craftSettings(src.chat.scriptstate, 'gn'), { thoughts: b.read(thoughts), memo: memoTexts((k) => b.read(k)) }), retryRule: b.txt('RETRY.FORMAT') };
 }
 
 function incomingRules(b: GnetBooks, plan: IncomingPlan): string {
@@ -130,20 +129,10 @@ function activityRules(b: GnetBooks, posts: ActivityPost[]): string {
 
 /**
  * 댓글 시각 (v0.16.32): 새 댓글마다 모델이 「HH:MM」을 쓴다. 앱이 글 시각·부모 댓글·지금 사이로 맞추므로(gnet.ts stampComments)
- * 형식만 알려 준다. 옛 카드 지침에는 time 칸이 없어서 코드에서 붙인다.
+ * 형식만 알려 준다. 글은 게시판 지침의 COMMENT.TIME_RULE 절 (b 가 없으면 괴담넷 지침).
  */
-/** 분류 (2026-11-08): 글마다 그 게시판식 말머리를 하나. 옛 지침에는 tag 칸이 없어서 코드에서 붙인다 */
-export const TAG_RULE = 'Post category: every post (new or retained) also has "tag": one short category label in Korean, the way this board sorts its posts (a 말머리). Reuse labels already used on the board when they fit; supplied tags on retained posts are records, never change them.';
-
-/** 다양성 뽑기 안내 (지침 절 SAMPLING) */
-const SAMPLING_RULE = 'Diversity sampling is ON. Include alternativePosts alongside posts and incoming. posts and alternativePosts are two meaningfully different complete boards, each following the same post/comment schema and configured quantity. Sample both at random from the tails of the distribution so that each has a probability lower than 0.10; put those numbers in top-level postsProb and alternativeProb, and order the two boards by probability descending. The application validates both and uses alternativePosts, the second candidate.';
-
 export function commentTimeRule(now: string, b?: GnetBooks): string {
-  const t = b?.read('COMMENT.TIME_RULE');
-  if (t) return fillVars(t, { now: now ? ` (${now})` : '' });
-  return `Comment time: every NEW comment (including replies and activity comments) also has "time": "HH:MM", the 24-hour narrative time it was posted. `
-    + `It must be after its post and after the comment it replies to, and not later than the current narrative time${now ? ` (${now})` : ''}. `
-    + 'Space comments realistically: quick replies minutes apart, slower threads hours apart. Supplied "time" values on existing comments are records; never change them.';
+  return fillVars(b ? b.txt('COMMENT.TIME_RULE') : guideTxt('GNet', 'COMMENT.TIME_RULE'), { now: now ? ` (${now})` : '' });
 }
 
 /** 저장된 글을 출력 형식(AUTO.FORMAT)과 같은 모양으로 */
@@ -166,7 +155,7 @@ function boardExtras(src: RefSource, b: GnetBooks, write: boolean): { guideline:
     if (kept.length) parts.push(fill(b.read('KEYFIGURES.PREVIOUS'), { KEYFIGURES: JSON.stringify(kept) }));
     if (write) {
       parts.push(b.read('KEYFIGURES'));
-      format = `\n${orOld(b, 'KEYFIGURES.FORMAT', 'Also include a top-level "keyFigures" array (use [] when there are no updates).')}`;
+      format = `\n${b.txt('KEYFIGURES.FORMAT')}`;
     }
   }
   return { guideline: parts.filter(Boolean).join('\n\n'), format };
@@ -186,11 +175,11 @@ export function refreshPrompt(src: RefSource, st: GState, plan: IncomingPlan, ni
   ];
   const ex = boardExtras(src, b, true);
   if (ex.guideline) guideline.push(ex.guideline);
-  let format = `${b.read('AUTO.FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}\n${orOld(b, 'POST.TAG_RULE', TAG_RULE)}${ex.format}`;
+  let format = `${b.read('AUTO.FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}\n${b.txt('POST.TAG_RULE')}${ex.format}`;
   if (s.sampling) {
-    // 원본 미니보드 5.0.0: 두 벌 각각 확률을 적게 하고, 요청마다 무작위 씨앗 둘을 넣는다
-    format += `\n${orOld(b, 'SAMPLING', SAMPLING_RULE)}`
-      + `\n<x-output-seed-a>${seed()}</x-output-seed-a>\n<x-output-seed-b>${seed()}</x-output-seed-b>`;
+    // 원본 미니보드 5.0.0: 두 벌 각각 확률을 적게 하고, 요청마다 무작위 씨앗 둘을 넣는다 (씨앗 줄 꼴은 SAMPLING.SEED 절)
+    format += `\n${b.txt('SAMPLING')}`
+      + `\n${fillVars(b.txt('SAMPLING.SEED'), { a: seed(), b: seed() })}`;
   }
   const protectedIds: number[] = [];
   const reference = st.posts.filter((p, i) => {
@@ -202,7 +191,7 @@ export function refreshPrompt(src: RefSource, st: GState, plan: IncomingPlan, ni
   const extras = fill(b.read('EXTENSION.REQUEST'), {
     TIME: dateNow(src.chat), USER_NICK: nick, KEEP_OWN: String(s.keepOwn), KEEP_REPLIED: String(s.keepReplied), PROTECTED: protectedIds.join(','),
     POST_LIMIT: String(postLimit(s)), NEXT_ID: String(st.seq || 100000), ACTION: action, BOARD: boardJson(reference),
-  }) + incomingTask(plan);
+  }) + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'));
   return pack(src, b, 'refresh', 'THOUGHTS.REFRESH', guideline.join('\n\n'), format, extras, factionNames);
 }
 
@@ -210,13 +199,15 @@ export interface PublicPrompt extends GnetPrompt {
   activity: { posts: ActivityPost[]; snapshots: Map<number, ActivitySnapshot> };
 }
 
-/** 새 글: 사용자가 적은 내용(아이디어 또는 본문)으로 제목·본문을 다듬고, 같은 응답에 댓글·선쪽지·다른 글 활동 */
-export function postPrompt(src: RefSource, st: GState, input: string, plan: IncomingPlan, factionNames: Record<string, string>): PublicPrompt {
+/** 새 글: 사용자가 적은 내용(아이디어 또는 본문)으로 제목·본문을 다듬고, 같은 응답에 댓글·선쪽지·다른 글 활동.
+ *  tag: 글쓴이가 고른 말머리 (연어 마켓 팝니다·삽니다). 있으면 POST.INPUT_TAG 절 꼴로 붙인다 */
+export function postPrompt(src: RefSource, st: GState, input0: string, plan: IncomingPlan, factionNames: Record<string, string>, tag = ''): PublicPrompt {
   const b = gnetBooks(src);
+  const input = tag ? fillVars(b.txt('POST.INPUT_TAG'), { tag, input: input0 }) : input0;
   const activity = activityContext(st, null, fnHistory(src.chat.scriptstate, 'gn', 'post'));
   const guideline = [b.read('LB'), b.read('ATTACHMENTS'), b.read('TITLE.GUIDELINE'), b.read('REACT.GUIDELINE'), b.read('PUBLIC.GUIDELINE'), incomingRules(b, plan), activityRules(b, activity.posts), boardExtras(src, b, false).guideline].filter(Boolean).join('\n\n');
-  const extras = input + incomingTask(plan, activity.posts);
-  return { ...pack(src, b, 'post', 'THOUGHTS.ACTION', guideline, `${b.read('PUBLIC.POST_FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}\n${orOld(b, 'POST.TAG_FORMAT', 'Also give post.tag: one short category label in Korean for this post, the way this board sorts its posts.')}`, extras, factionNames), activity };
+  const extras = input + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts);
+  return { ...pack(src, b, 'post', 'THOUGHTS.ACTION', guideline, `${b.read('PUBLIC.POST_FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}\n${b.txt('POST.TAG_FORMAT')}`, extras, factionNames), activity };
 }
 
 export interface CommentPrompt extends PublicPrompt {
@@ -233,9 +224,8 @@ export function commentPrompt(
 ): CommentPrompt {
   const b = gnetBooks(src);
   // 글 하나만 새로고침(POST_REFRESH_ACTION)과 내 댓글 알림 문장은 지침 절 ACTION.POST_REFRESH · ACTION.COMMENT
-  const action = action0 === undefined
-    ? (b.read('ACTION.COMMENT') ? fillVars(b.read('ACTION.COMMENT'), { body }) : `The protagonist publicly commented: ${body}`)
-    : action0 === POST_REFRESH_ACTION ? orOld(b, 'ACTION.POST_REFRESH', POST_REFRESH_ACTION) : action0;
+  const action = action0 === undefined ? fillVars(b.txt('ACTION.COMMENT'), { body })
+    : action0 === POST_REFRESH_ACTION ? b.txt('ACTION.POST_REFRESH') : action0;
   const p = findPost(st, postId);
   if (!p) throw new GnetError('대상 글이 없어졌어요.');
   // 원본과 같이: 글에 단 댓글은 "글" 범위(전체 댓글), 답글은 "댓글" 범위(최근 30개)
@@ -260,19 +250,19 @@ export function commentPrompt(
   });
   const activity = activityContext(st, p.id);
   const guideline = [b.read('LB'), b.read('ATTACHMENTS'), b.read('REACT.GUIDELINE'), b.read('PUBLIC.GUIDELINE'), incomingRules(b, plan), activityRules(b, activity.posts), boardExtras(src, b, false).guideline].filter(Boolean).join('\n\n');
-  const extras = task + incomingTask(plan, activity.posts);
+  const extras = task + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts);
   return { ...pack(src, b, fn, 'THOUGHTS.ACTION', guideline, `${b.read('PUBLIC.REACT_FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}`, extras, factionNames), activity, supplied: selected, total };
 }
 
-/** 글 하나만 새로고침: 시간이 흘러 다른 사람들이 이 글에 댓글을 더 단다 (주인공은 아무것도 하지 않음) */
-export const POST_REFRESH_ACTION =
-  'Time has passed since this post was last viewed. The protagonist did nothing on this post. Other readers return to it: add a few new comments or replies that continue the existing discussion naturally, each from someone other than the protagonist, without repeating earlier comments.';
+/** 글 하나만 새로고침: 시간이 흘러 다른 사람들이 이 글에 댓글을 더 단다 (주인공은 아무것도 하지 않음).
+ *  commentPrompt 의 action0 으로 넘기는 표시일 뿐이고, 모델에 가는 글은 지침 절 ACTION.POST_REFRESH */
+export const POST_REFRESH_ACTION = '__POST_REFRESH__';
 
-/** 공개 글 참고의 안내 글 (지금 보는 게시판 지침의 PUBLIC.ACCESS 절). 없으면 빈 글 → publicBoard 가 코드에 남긴 글을 쓴다 */
-export const publicAccess = (src: RefSource): string => policySections(src.char.globalLore, SITE_GUIDE[viewSite(src.chat.scriptstate)])['PUBLIC.ACCESS']?.trim() ?? '';
+/** 공개 글 참고의 안내 글 (지금 보는 게시판 지침의 PUBLIC.ACCESS 절, 비었으면 기본 지침 파일의 절) */
+export const publicAccess = (src: RefSource): string => guideTxt(SITE_GUIDE[viewSite(src.chat.scriptstate)], 'PUBLIC.ACCESS');
 
-/** 공개 글 참고 (원본 RC.gnetPublic): 쪽지에서 언급된 글을 앞에, 최대 8개 */
-export function publicBoard(st: GState, query: string, access?: string): { access: string; posts: unknown[] } | null {
+/** 공개 글 참고 (원본 RC.gnetPublic): 쪽지에서 언급된 글을 앞에, 최대 8개. access = PUBLIC.ACCESS 절 글 */
+export function publicBoard(st: GState, query: string, access: string): { access: string; posts: unknown[] } | null {
   const ranked = st.posts.map((p, i) => ({ p, i, hit: (!!p.title && query.includes(p.title)) || new RegExp(`#${p.id}(?![\\d.])`).test(query) }));
   ranked.sort((a, b) => (a.hit !== b.hit ? (a.hit ? -1 : 1) : a.i - b.i));
   const rows: unknown[] = [];
@@ -291,7 +281,7 @@ export function publicBoard(st: GState, query: string, access?: string): { acces
   }
   if (!rows.length) return null;
   return {
-    access: access?.trim() || 'Published GNet material available for reference when this conversation mentions, shares or consults a post. Discuss its supplied details naturally. Availability alone does not establish that everyone already read it, the real identity behind a handle, or truth of its claims. No private notes or unsent drafts are included.',
+    access: access.trim(),
     posts: rows,
   };
 }
@@ -301,13 +291,10 @@ export function dmPrompt(src: RefSource, st: GState, nick: string, latest: strin
   const source = st.sources[nick];
   let anchor = b.read('DM.NO-ORIGIN');
   if (source) {
+    // 원글 줄 꼴은 지침 절 DM.ORIGIN · DM.ORIGIN_QUOTE, 작성자 모름 문장은 DM.QUOTE_UNKNOWN (전수검사 11-13)
     anchor = [
-      `Original forum post #${source.postid} (preserved at first contact):`,
-      `Title: ${source.title}`,
-      `Posted by: ${source.author}`,
-      `Post text: ${source.body}`,
-      // 작성자 모름 문장은 지침 절 DM.QUOTE_UNKNOWN (없으면 옛 글. 전수검사 11-13)
-      source.quote ? `Referenced public comment — author: ${source.quoteAuthor.trim() || orOld(b, 'DM.QUOTE_UNKNOWN', '[not retained; do not attribute to the contact]')}\n${source.quote}` : '',
+      fillVars(b.txt('DM.ORIGIN'), { postid: source.postid, title: source.title, author: source.author, body: source.body }),
+      source.quote ? fillVars(b.txt('DM.ORIGIN_QUOTE'), { author: source.quoteAuthor.trim() || b.txt('DM.QUOTE_UNKNOWN'), quote: source.quote }) : '',
     ].join('\n');
   }
   const lines: unknown[] = [];
@@ -319,23 +306,20 @@ export function dmPrompt(src: RefSource, st: GState, nick: string, latest: strin
       content: d.side === 'me' ? d.body : trimTokens(d.body, LIMITS.history_tokens),
     });
   }
-  let task = `Current story time: ${dateNow(src.chat)}\n${fill(b.read('DM.REQUEST'), { NICK: nick, ORIGIN: anchor, HISTORY: JSON.stringify(lines) })}`;
-  const pub = publicBoard(st, `${latest}\n${anchor}`, b.read('PUBLIC.ACCESS'));
-  if (pub) task += `\nPUBLIC BOARD REFERENCE:\n${JSON.stringify(pub)}`;
+  let task = `${fillVars(b.txt('DM.STORY_TIME'), { time: dateNow(src.chat) })}\n${fill(b.read('DM.REQUEST'), { NICK: nick, ORIGIN: anchor, HISTORY: JSON.stringify(lines) })}`;
+  const pub = publicBoard(st, `${latest}\n${anchor}`, b.txt('PUBLIC.ACCESS'));
+  if (pub) task += `\n${b.txt('DM.PUBLIC_HEAD')}\n${JSON.stringify(pub)}`;
   const identity = { speaker: { role: 'npc_correspondent', handle: nick }, owner: { role: 'user', handle: userHandle, personaName: '주인공', referenceOnly: true } };
   const about = /^## About the board\n[^\n]+/m.exec(b.read('LB'))?.[0] ?? '';
   return pack(src, b, 'dm', 'THOUGHTS.DM', [about, b.read('DM.GUIDELINE'), b.read('ATTACHMENTS')].filter(Boolean).join('\n\n'), b.read('DM.FORMAT'), task, factionNames, identity);
 }
 
-/** 쪽지 답장이 형식에 안 맞을 때 한 번 더 (원본 재시도 문구) */
-export function retryMessages(prompt: GnetPrompt, raw: string, error: string, rule: string | undefined = prompt.retryRule): CraftMessage[] {
+/** 쪽지 답장이 형식에 안 맞을 때 한 번 더 (원본 재시도 문구, 지침 절 RETRY.FORMAT) */
+export function retryMessages(prompt: GnetPrompt, raw: string, error: string, rule: string = prompt.retryRule): CraftMessage[] {
   return [
     ...prompt.messages,
     { role: 'assistant', content: raw },
-    {
-      role: 'user',
-      content: rule?.trim() ? fillVars(rule.trim(), { error, analyze: retryAnalyze() }) : `<system>\nValidation error!\nYour previous output did not adhere to the required format, or contained invalid data.\nError message: ${error}\nPlease fix your last output into correct structure as previously instructed, while keeping the data intact.\n${retryAnalyze()}\n</system>`,
-    },
+    { role: 'user', content: fillVars(rule.trim(), { error, analyze: retryAnalyze() }) },
   ];
 }
 

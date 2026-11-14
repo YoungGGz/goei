@@ -7,7 +7,7 @@ import { lastBot, parseShelf, shopSettings, ShopError, SHOP_CTX_VAR, SHOP_SHARED
 import type { Chat } from './types';
 import { userTurns, type PromptMessage } from './request';
 import { aliveAnchors } from './wallet';
-import { fillGuide, guideSections } from './guides';
+import { fillGuide, guideSections, guideTxt } from './guides';
 
 declare const __HOMESHOP_PACK__: string | undefined;
 /** 방송 그림 팩: 방송 화면을 처음 열 때 받는다 (host/homeshop.ts) */
@@ -392,7 +392,7 @@ export interface ShowReply { title: string; items: Omit<ShopItem, 'id'>[]; cues:
 export function parseShow(raw: string, moods: Map<string, string>): ShowReply {
   const shelf = parseShelf(raw, HS_IDENTITY);
   const cueText = block(raw, 'cue');
-  if (!cueText) throw new HsError('응답에 <cue> 블록이 없어요.');
+  if (!cueText) throw new HsError(guideTxt('Hs', 'ERR_NO_CUE'));
   const cues: HsCue[][] = [];
   let cur: HsCue[] | null = null;
   for (const line of cueText.split('\n')) {
@@ -410,7 +410,7 @@ export function parseShow(raw: string, moods: Map<string, string>): ShowReply {
     cur.push(c);
   }
   const items = shelf.items.slice(0, cues.length || shelf.items.length);
-  if (items.some((_, i) => !cues[i]?.length)) throw new HsError(`<cue> 블록에 상품마다 큐 줄이 있어야 해요 (#1 … #${shelf.items.length}, 줄 꼴: cut|mood|line|event).`);
+  if (items.some((_, i) => !cues[i]?.length)) throw new HsError(guideTxt('Hs', 'ERR_CUE_LINES', { n: shelf.items.length }));
   const { shared: chat, parts: chats } = parseChat(block(raw, 'chat'));
   // 번호 머리('#3', '3.', '3)')만 뗀다. 구분 기호 없는 앞 숫자('3번 접으면')·소수('3.5배')는 글이라 둔다 (전수검사 11-13)
   const peeks = block(raw, 'peek').split('\n').map((x) => clean(x.replace(/^\s*(?:[#＃]\s*\d+\s*[.)|:]?|\d+\s*[.)|:](?!\d))\s*/, ''), 80)).filter(Boolean);
@@ -436,7 +436,7 @@ export function parseChat(text: string): { shared: HsChatLine[]; parts: HsChatLi
     const i = line.indexOf('|');
     const nick = clean(i >= 0 ? line.slice(0, i) : '', 16);
     const said = clean(i >= 0 ? line.slice(i + 1) : line, 80);
-    if (said) cur.push({ nick: nick || '익명', text: said });
+    if (said) cur.push({ nick: nick || guideTxt('Hs', 'CHAT_ANON_NICK'), text: said });
   }
   return { shared, parts };
 }
@@ -625,7 +625,7 @@ export function scheduleDues(taken: number[], turn: number, n: number, gap: [num
   }
   return out;
 }
-const boxName = (name: string) => `택배 상자(미개봉) · ${name}`.slice(0, 30);
+const boxName = (name: string) => guideTxt('Hs', 'BOX_NAME', { name }).slice(0, 30);
 /** 새 주문 (장부 줄 + 상자 정보). 상자 물건은 부른 쪽이 소지품에 넣고 boxId 를 채운다 */
 export function newOrder(chat: Chat, item: ShopItem, s: Pick<HsSettings, 'call'>, barter = '', rnd: () => number = Math.random): HsOrder {
   const alive = aliveAnchors(chat);
@@ -635,7 +635,8 @@ export function newOrder(chat: Chat, item: ShopItem, s: Pick<HsSettings, 'call'>
   const { id: _id, sold: _s, soldKey: _k, tag: _t, was: _w, orig: _o, ...rest } = item;
   return { id: `ho_${item.id}`, item: rest, n, ...(barter ? { barter } : {}), anchor: lastBot(chat)?.key ?? '', turn, dues: scheduleDues(taken, turn, n, s.call, rnd), boxId: '' };
 }
-export const HS_BOX = { name: boxName, desc: `${HS_NAME}에서 온 택배 상자. 아직 열지 않았다.`, icon: 'cardboard box' };
+/** 택배 상자 물건 (이름·설명 글은 지침 「망상홈쇼핑」의 BOX_NAME·BOX_DESC 절) */
+export const HS_BOX = { name: boxName, get desc(): string { return guideTxt('Hs', 'BOX_DESC'); }, icon: 'cardboard box' };
 /** 소지품 물건 id → 그 상자의 주문 (안 연 것만) */
 export function boxOrder(vars: Vars, itemId: string, alive: Set<string>): HsOrder | null {
   if (!itemId || !String(vars?.[HS_ORDERS_VAR] ?? '').includes(itemId)) return null;
@@ -652,7 +653,8 @@ export function readAudience(vars: Vars): HsAudience | null {
   }
 }
 
-export const HS_BLOCK_HEAD = '[망상홈쇼핑]';
+/** 본편에 넘기는 글의 머리 (지침 「망상홈쇼핑」의 BLOCK_HEAD 절). 이미 넣었는지도 이 머리로 본다 */
+const blockHead = (): string => guideTxt('Hs', 'BLOCK_HEAD');
 /** 지금 턴에 불려 가는 주문 (예정 턴 = 지금 턴). 여러 건이어도 하나 */
 export function callNow(chat: Chat): { order: HsOrder; nth: number } | null {
   const t = userTurns(chat);
@@ -676,11 +678,12 @@ export function homeshopBlock(chat: Chat): string {
   }
   const aud = readAudience(chat.scriptstate);
   if (aud && s.aud && g.AUDIENCE && aud.anchor === (lastBot(chat)?.key ?? '')) lines.push(fillGuide(g.AUDIENCE, { no: aud.no, name: aud.name }));
-  return lines.length ? `${HS_BLOCK_HEAD}\n${lines.join('\n')}` : '';
+  return lines.length ? `${blockHead()}\n${lines.join('\n')}` : '';
 }
 /** 요청: 위 글을 마지막 유저 메시지 앞에 system 으로 (소지품 블록과 같은 자리). 이미 있으면 그대로 */
 export function withHomeshop<M extends PromptMessage>(messages: M[], chat: Chat): M[] {
-  if (messages.some((m) => typeof m?.content === 'string' && m.content.startsWith(HS_BLOCK_HEAD))) return messages;
+  const head = blockHead();
+  if (messages.some((m) => typeof m?.content === 'string' && m.content.startsWith(head))) return messages;
   const text = homeshopBlock(chat);
   if (!text) return messages;
   const at = messages.map((m) => m?.role).lastIndexOf('user');

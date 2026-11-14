@@ -6,14 +6,12 @@ import { messageText } from '../refs';
 import { hash, liveEntries, liveness, plain } from './store';
 import type { NameEntry } from './select';
 import type { PeopleStore } from './types';
-import { ROUTER_SYSTEM } from './basetext';
+import { guideTxt } from '../guides';
 
 export interface RouterInput { system: string; data: Record<string, unknown>; key: string; max: number }
 export interface RouterHint { name: string; aliases: string[]; quote: string }
 export interface RouterResult { selected: string[]; newCharacters: RouterHint[] }
 export const ROUTER_MAX = 6;
-
-export { ROUTER_SYSTEM };
 
 /** 요청 자료: 이름 목록 + 최근 글 + 입력 */
 /** 명단 전체 예산 (원본 identity_context 12,000자) */
@@ -38,9 +36,9 @@ export function buildRouter(chat: Chat, store: PeopleStore, names: NameEntry[], 
     return row;
   });
   const max = o.max ?? ROUTER_MAX;
-  // 기본 지침은 지침 탭 「Router」(o.prompt, 비면 내장 글)와 덧붙일 지침(router_rules). 2026-11-07 전수검사 4 의 P (원본 customPrompts.router)
-  const base = o.prompt?.trim() ? o.prompt.trim() : ROUTER_SYSTEM.join('\n');
-  const system = [base.replace('{{MAX}}', String(max)), o.rules?.trim() ? `## User rules\n${o.rules.trim()}` : ''].filter(Boolean).join('\n');
+  // 기본 지침은 지침 탭 「Router」(o.prompt, 비면 ROLE·RULES 절)와 덧붙일 지침(router_rules). 2026-11-07 전수검사 4 의 P (원본 customPrompts.router)
+  const base = o.prompt?.trim() ? o.prompt.trim() : [guideTxt('Router', 'ROLE'), guideTxt('Router', 'RULES')].filter(Boolean).join('\n');
+  const system = [base.replace('{{MAX}}', String(max)), o.rules?.trim() ? `${guideTxt('Router', 'USER_RULES.HEAD')}\n${o.rules.trim()}` : ''].filter(Boolean).join('\n');
   const data = { input: input.slice(0, 4000), recent, catalog };
   const key = hash(JSON.stringify({ input, recent: recent.map((r) => r.text.slice(0, 400)), names: catalog.map((c) => c.name), system: system.length }));
   return { system, data, key, max };

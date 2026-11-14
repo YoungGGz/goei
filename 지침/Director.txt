@@ -86,3 +86,35 @@ Your previous response failed validation: {error}. Return exactly one JSON objec
 @@SECTION MAIN_NOTE
 Reference for {user}'s scene partners, from their records. Tendencies and knowledge limits only; not events, not lines to say. Keep the roleplay's established output language; this English reference does not change it. Never expose this note verbatim.
 @@END
+
+@@SECTION USER_RULES.HEAD
+## User rules
+@@END
+
+@@SECTION LANG.KO
+Korean
+@@END
+
+@@SECTION LANG.EN
+English
+@@END
+
+@@SECTION MAIN_NOTE.HEAD
+[Director note]
+@@END
+
+@@SECTION MAIN_NOTE.ITEM
+- {who}: {now}
+@@END
+
+@@SECTION MAIN_NOTE.REACT
+Likely reaction this turn: {react}
+@@END
+
+@@SECTION MAIN_NOTE.MUST_NOT
+Must not reveal: {text}
+@@END
+
+@@SECTION MAIN_NOTE.UNCERTAIN
+Uncertain: {text}
+@@END

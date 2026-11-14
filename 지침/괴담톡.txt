@@ -359,3 +359,27 @@ Reply in the dominant language of the actual conversation; default to Korean whe
 The previous response was rejected and nothing was saved. Recreate the complete result from the same supplied data, following the REFRESH OUTPUT CONTRACT. Return a compact COMPLETE JSON object. The configured message lengths/counts are ceilings, not targets; reduce optional messages rather than ending mid-JSON. Omit silent rooms from updates. Use valid JSON string escaping for newlines, quotation marks and backslashes. Do not copy these instructions into messages. Validation error: {reason}
 {analyze}
 @@END
+
+@@SECTION ANNOUNCEMENT_ACCESS.CIVILIAN
+public
+@@END
+
+@@SECTION ANNOUNCEMENT_ACCESS.FREELANCER
+registered contractor notices
+@@END
+
+@@SECTION ANNOUNCEMENT_ACCESS.ORG
+current affiliation internal notices
+@@END
+
+@@SECTION MAIN_CONTEXT.NOTICE_ACCESS
+received by owner; audience bounded by channel
+@@END
+
+@@SECTION FIRST_CONTACT
+none: never met or talked with the owner before; the owner only saved this contact
+@@END
+
+@@SECTION CALL
+{{user}} places a phone call to {target}.
+@@END

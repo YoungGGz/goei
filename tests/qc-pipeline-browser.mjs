@@ -137,7 +137,7 @@ const unresolved = (t) => [...new Set((t.match(/\{\{[^}]*\}\}/g) ?? []))].filter
     await page.evaluate(() => { window.__chat.message.pop(); });
     const b = loreOf(out).content;
     assert.ok(!b.includes('## RP Guidance'), 'RP 지침 중복 없음');
-    const note = core.ANOMALY_NOTE.slice(0, 40);
+    const note = core.anomalyNoteDefault().slice(0, 40);
     assert.ok(b.includes('Myeongil Apartment') || b.includes('명일 아파트'), '괴이 로어');
     assert.equal((b.match(new RegExp(note.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length, 1, '괴이 머리말 한 번');
   });

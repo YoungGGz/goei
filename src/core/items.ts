@@ -5,7 +5,7 @@
 // 종류 14개는 없앴다 (2026-11-07 밤 사용자). 물건마다 판정: 사용 가능 · 소모성(남은 횟수 숫자 하나, 사용마다 1 빼고 0이면 없어짐) · 장착(손·장비, 사용자 2026-11-14 무기 → 손).
 // 비소모 물건은 숫자 없이 상태만 설명 글로. 상태 4단계(멀쩡·손상·고장·파괴)는 보조 모델만 본문을 보고 바꾼다 (memory goei-equip-design).
 import type { Chat } from './types';
-import { guideOr } from './guides';
+import { guideTxt } from './guides';
 import { aliveAnchors } from './wallet';
 import { messageKey } from './people/store';
 import type { PromptMessage } from './request';
@@ -40,7 +40,9 @@ export const ITEM_AUTO_VAR = '$it_auto';
 export const ITEM_SLOTS_DEFAULT = 16;
 export const ITEM_SLOTS_MIN = 8;
 export const ITEM_SLOTS_MAX = 40;
-export const ITEM_LIMIT_DEFAULT = 'one bag, pockets, and two hands';
+/** 지닐 수 있는 한계의 기본 글: 지침 「메인 요청에 붙는 글」 INVENTORY.LIMIT_DEFAULT 절. 요청은 itemLimit 이 지금 지침을 읽고, 이 값은 설정 칸의 자리 글(기본 지침) */
+export const itemLimitDefault = (): string => guideTxt('Main', 'INVENTORY.LIMIT_DEFAULT');
+export const ITEM_LIMIT_DEFAULT = itemLimitDefault();
 /** 소지 한도 kg (2026-11-08 사용자): 고유 인물은 명부 「소지 한도」를 시작할 때 $it_carry_pc 에 적고, 그 값이 없으면(페르소나·아바타) 설정 값 */
 export const ITEM_CARRY_VAR = '$it_carry';
 export const ITEM_CARRY_PC_VAR = '$it_carry_pc';
@@ -589,8 +591,8 @@ export function itemCarry(vars: Record<string, unknown> | undefined): number {
 export const lineWeight = (e: Item, left: number | undefined): number | undefined => (e.weight === undefined ? undefined : Math.round(e.weight * (e.uses !== undefined ? left ?? e.uses : 1) * 1000) / 1000);
 /** 무게 합 kg (장착한 것까지 전부, 무게 없는 물건은 0) */
 export const totalWeight = (list: Item[], left?: (e: Item) => number | undefined): number => Math.round(list.reduce((n, e) => n + (lineWeight(e, left?.(e)) ?? 0), 0) * 1000) / 1000;
-/** 본편에 넘기는 무게 숫자 (kg, 소수 한 자리까지) */
-const kgText = (n: number) => `${Number(n.toFixed(1))} kg`;
+/** 본편에 넘기는 무게 숫자 (kg 단위, 소수 한 자리까지. 단위 글은 지침 INVENTORY.WEIGHT 절) */
+const kgText = (n: number) => `${Number(n.toFixed(1))}`;
 
 /** 칸 수 설정 (8~40, 기본 16) */
 export function itemSlots(vars: Record<string, unknown> | undefined): number {
@@ -598,7 +600,7 @@ export function itemSlots(vars: Record<string, unknown> | undefined): number {
   if (!Number.isSafeInteger(n)) return ITEM_SLOTS_DEFAULT;
   return Math.min(ITEM_SLOTS_MAX, Math.max(ITEM_SLOTS_MIN, n));
 }
-export const itemLimit = (vars: Record<string, unknown> | undefined): string => clean(vars?.[ITEM_LIMIT_VAR], 60) || ITEM_LIMIT_DEFAULT;
+export const itemLimit = (vars: Record<string, unknown> | undefined): string => clean(vars?.[ITEM_LIMIT_VAR], 60) || itemLimitDefault();
 /** 본편에 넘기기 (기본 켬, '0' 이면 끔) */
 /** 소지품·상점 스위치 (2026-11-07 사용자: 둘은 연동, 하나를 끄면 같이 꺼짐). '0' 이면 둘 다 끔. shop.ts 도 이 값을 본다. 가계부는 따로(상태창 잔고 칸 $st_col_wallet) */
 export const ITEM_ON_VAR = '$it_on';
@@ -614,9 +616,8 @@ export function invJustResumed(chat: Chat): boolean {
   if (!Number.isInteger(at) || at < 0) return false;
   return !(chat.message ?? []).slice(at).some((m) => m.role === 'char');
 }
-const RESUMED_EVENT = 'item tracking was switched off for a while and just came back on — this list may not match what happened in the story since; follow the story and treat the list as a starting point';
-/** 위 글은 지침 「메인 요청에 붙는 글」 INVENTORY.RESUMED 절에서 읽는다. 절이 없으면 위 글 */
-export const resumedEvent = (): string => guideOr('Main', 'INVENTORY.RESUMED', RESUMED_EVENT);
+/** 다시 켬 사건 글: 지침 「메인 요청에 붙는 글」 INVENTORY.RESUMED 절 */
+export const resumedEvent = (): string => guideTxt('Main', 'INVENTORY.RESUMED');
 /** 소지품을 메인 요청에 넣는가. 2026-11-11 사용자: 넣지 않을 거면 쓰는 뜻이 없다 → 따로 끄는 줄을 없애고 「사용」과 같은 값 */
 export const itemPushOn = (vars: Record<string, unknown> | undefined) => invOn(vars);
 /** 보조 모델이 본문을 읽어 목록을 맞추기 (기본 켬, '0' 이면 끔) */
@@ -636,11 +637,11 @@ export type ItemScope = 'narrow' | 'mid' | 'wide';
 export const itemScope = (vars: Record<string, unknown> | undefined): ItemScope => (vars?.[ITEM_SCOPE_VAR] === 'narrow' || vars?.[ITEM_SCOPE_VAR] === 'mid' ? vars[ITEM_SCOPE_VAR] as ItemScope : 'wide');
 /** 단계마다 만들지 않는 종류 (그림 말의 종류 코드, core/itemrules.ts kindOfIcon. 옷·음식·서류·잡동사니) */
 export const ITEM_SCOPE_SKIP: Record<ItemScope, string[]> = { narrow: ['wear', 'food', 'paper', 'misc'], mid: ['food', 'misc'], wide: [] };
-/** 갱신기에 넘기는 한 줄 (자료 items_rule) */
-const ITEM_SCOPE_RULE: Record<ItemScope, string> = {
-  narrow: 'Report `new` only for things with a use in the story: weapons, tools and devices, medicine, keys, talismans, sealed objects, anomaly-related objects, valuables. Do not report clothes, food and drink, documents or small everyday things.',
-  mid: 'Report `new` for things with a use in the story and for issued or bought gear worn or carried on the body (clothes, bags) and mission documents. Do not report food and drink or small everyday things.',
-  wide: '',
+/** 갱신기에 넘기는 한 줄 (자료 items_rule): 지침 「갱신기(덧붙임·정리)」 ITEMS.SCOPE.* 절. 넓게는 줄 없음 */
+const ITEM_SCOPE_SEC: Record<ItemScope, string | null> = { narrow: 'ITEMS.SCOPE.NARROW', mid: 'ITEMS.SCOPE.MID', wide: null };
+const itemScopeRule = (scope: ItemScope): string => {
+  const sec = ITEM_SCOPE_SEC[scope];
+  return sec ? guideTxt('UpdaterExtra', sec) : '';
 };
 /** 만들지 않을 것: 사용자가 직접 적는 글 (갱신기에 그대로 넘긴다) */
 export const ITEM_SKIP_VAR = '$it_skip';
@@ -649,7 +650,7 @@ export const itemSkip = (vars: Record<string, unknown> | undefined): string => c
 /** 자료 items_rule: 범위 단계의 글 + 사용자가 적은 「만들지 않을 것」. 둘 다 없으면 undefined */
 export function itemsRule(vars: Record<string, unknown> | undefined): string | undefined {
   const skip = itemSkip(vars);
-  const out = [ITEM_SCOPE_RULE[itemScope(vars)], skip ? `Never report as \`new\`: ${skip}` : ''].filter(Boolean).join(' ');
+  const out = [itemScopeRule(itemScope(vars)), skip ? guideTxt('UpdaterExtra', 'ITEMS.SKIP', { skip }) : ''].filter(Boolean).join(' ');
   return out || undefined;
 }
 export const ITEM_DETAIL_VAR = '$it_detail';
@@ -744,16 +745,17 @@ export const usePrevVars = (p: UsePrev | null): Record<string, string> => ({ [IT
 /** 마지막 응답 뒤에 직접 합친 것 → 「This turn」 사건 (2026-11-08 사용자: 합쳐도 본편이 몰랐다) */
 export function mergedNow(it: Items, lastAnchor: string): string[] {
   if (!lastAnchor) return [];
-  return it.log.filter((l) => l.what === 'merge' && l.anchor === lastAnchor).map((l) => `combined ${l.name} into ${String(l.note ?? '').replace(/와 합침$/, '')}`);
+  return it.log.filter((l) => l.what === 'merge' && l.anchor === lastAnchor).map((l) => guideTxt('Main', 'INVENTORY.EVENT.MERGED', { name: l.name, other: String(l.note ?? '').replace(/와 합침$/, '') }));
 }
 
 /** 마지막 응답에서 본문이 벗거나·두고 오거나·잃은 것 → 「This turn」 사건 (2026-11-12 사용자: 본편도 알아야 다음 응답에서 그 물건을 도로 입히지 않는다) */
 export function movedNow(it: Items, lastAnchor: string): string[] {
   if (!lastAnchor) return [];
   return it.log.filter((l) => l.by === 'story' && l.anchor === lastAnchor).flatMap((l) => {
-    if (l.what === 'off') return [l.hand ? `put ${l.name} away (still carrying it)` : `took off ${l.name} (still carrying it)`];
-    if (l.what === 'left') { const place = /^두고 옴: ([^·]+)/.exec(String(l.note ?? ''))?.[1]?.trim(); return [`left ${l.name}${place ? ` at ${place}` : ' behind'} — no longer carrying or wearing it`]; }
-    if (l.what === 'gone' || l.what === 'destroy') return l.note === '다 씀' ? [] : [`no longer has ${l.name}`];
+    // 사건 글은 지침 「메인 요청에 붙는 글」 INVENTORY.EVENT.* 절
+    if (l.what === 'off') return [guideTxt('Main', l.hand ? 'INVENTORY.EVENT.PUT_AWAY' : 'INVENTORY.EVENT.TOOK_OFF', { name: l.name })];
+    if (l.what === 'left') { const place = /^두고 옴: ([^·]+)/.exec(String(l.note ?? ''))?.[1]?.trim(); return [place ? guideTxt('Main', 'INVENTORY.EVENT.LEFT_AT', { name: l.name, place }) : guideTxt('Main', 'INVENTORY.EVENT.LEFT_BEHIND', { name: l.name })]; }
+    if (l.what === 'gone' || l.what === 'destroy') return l.note === '다 씀' ? [] : [guideTxt('Main', 'INVENTORY.EVENT.GONE', { name: l.name })];
     return [];
   });
 }
@@ -764,7 +766,7 @@ export function droppedNow(it: Items, lastAnchor: string, after: string[] = []):
   // outKey 는 버린 때의 마지막 메시지(누구 글이든)라, 마지막 응답 뒤의 메시지(사용자 글) 키도 받는다 (11-14 재검토 ①-1)
   const keys = new Set([lastAnchor, ...after].filter(Boolean));
   if (!keys.size) return [];
-  return it.list.filter((x) => x.outHow === 'drop' && !!x.outKey && keys.has(x.outKey)).map((x) => `threw ${x.name} away — the protagonist discarded it on purpose and no longer has it`);
+  return it.list.filter((x) => x.outHow === 'drop' && !!x.outKey && keys.has(x.outKey)).map((x) => guideTxt('Main', 'INVENTORY.EVENT.DROPPED', { name: x.name }));
 }
 
 /** 이번 턴에 인터넷 쇼핑몰 등에 판 것 (2026-11-10 사용자: 우주 쇼핑몰에 입던 옷을 팔았는데 본편은 그 옷을 계속 입고 나왔다 — 판 일이 본편에 안 넘어가고 있었다).
@@ -777,7 +779,7 @@ export function soldNow(it: Items, lastAnchor: string, skipPlace = '', passes?: 
     if (skipPlace && place === skipPlace) return [];
     // 설정 「메인 요청에 붙이는 것」이 꺼 둔 가게에 판 것은 뺀다 (core/malls.ts soldPasses)
     if (passes && !passes(place, /에 팖$/.test(note))) return [];
-    return [`just sold ${l.name}${place ? ` to ${place}` : ''} and handed it over — the protagonist no longer has, carries or wears it`];
+    return [place ? guideTxt('Main', 'INVENTORY.EVENT.SOLD_TO', { name: l.name, place }) : guideTxt('Main', 'INVENTORY.EVENT.SOLD', { name: l.name })];
   });
 }
 
@@ -787,17 +789,20 @@ export function newlyBought(list: Item[], lastAnchor: string): Item[] {
 }
 
 /** 본편에 넘기는 「새로 산 것」 이름: 원이 아닌 값으로 치렀으면 무엇으로 치렀는지 붙인다 (본편 모델이 몸·빚 같은 결과를 이야기로) */
-export const boughtLine = (e: Item): string => (e.paidWith ? `${e.name} (paid with ${e.paidWith}${e.price ? ` + ${e.price.toLocaleString('en-US')} won` : ''})` : e.name);
+export const boughtLine = (e: Item): string =>
+  e.paidWith ? (e.price ? guideTxt('Main', 'INVENTORY.BOUGHT.PAID_WON', { name: e.name, paid: e.paidWith, price: e.price.toLocaleString('en-US') }) : guideTxt('Main', 'INVENTORY.BOUGHT.PAID', { name: e.name, paid: e.paidWith })) : e.name;
 
 /** 본편에 넘기는 물건 한 줄: 이름 — 설명 (효과) [장착] [남은 횟수] [상태] */
 export function itemLine(e: Item, left: number | undefined, equipped: boolean, detail: ItemDetail = 'full'): string {
+  // 꼬리표 글은 지침 「메인 요청에 붙는 글」 INVENTORY.TAG.* 절
+  const tag = (name: string, vars?: Record<string, string | number>) => guideTxt('Main', `INVENTORY.TAG.${name}`, vars);
   const tags = detail === 'name' ? [] : [
-    equipped ? (slotKind(e) === 'weapon' ? 'in hand' : 'worn') : '', // 손 칸 = in hand, 장비 칸 = worn (사용자 2026-11-14)
-    left === 0 ? 'used up' : left !== undefined ? `${left} use${left === 1 ? '' : 's'} left` : '',
-    e.state === 'damaged' ? 'damaged' : e.state === 'broken' ? 'broken, cannot be used' : '',
+    equipped ? tag(slotKind(e) === 'weapon' ? 'IN_HAND' : 'WORN') : '', // 손 칸 = in hand, 장비 칸 = worn (사용자 2026-11-14)
+    left === 0 ? tag('USED_UP') : left !== undefined ? tag(left === 1 ? 'USE_LEFT' : 'USES_LEFT', { n: left }) : '',
+    e.state === 'damaged' ? tag('DAMAGED') : e.state === 'broken' ? tag('BROKEN') : '',
   ].filter(Boolean);
   // 숨긴 진짜 효과(truth)는 여기 안 적는다 — 평소엔 광고 문구(effect)만. 쓰는 턴에만 itemsBlock 이 「Really:」로 넘긴다 (11-09 사용자: 매 턴 보내면 모델이 아는 척한다)
-  const body = detail === 'full' ? `${e.desc ? ` — ${e.desc}` : ''}${e.effect ? ` (${e.effect})` : ''}${e.text ? ` — reads: "${e.text}"` : ''}` : '';
+  const body = detail === 'full' ? `${e.desc ? ` — ${e.desc}` : ''}${e.effect ? ` (${e.effect})` : ''}${e.text ? ` ${guideTxt('Main', 'INVENTORY.LINE.READS', { text: e.text })}` : ''}` : '';
   return `- ${e.name}${body}${tags.map((t) => ` [${t}]`).join('')}`;
 }
 
@@ -816,27 +821,33 @@ export function itemsBlock(list: Item[], opts: { slots: number; limit: string; c
   const extra = (opts.events ?? []).filter(Boolean);
   if (!lines.length && !use.length && !bought.length && !extra.length && !opts.always) return '';
   const carried = gridItems(list).length;
-  const out = [`[Inventory] ${carried}/${opts.slots}${carried > opts.slots ? ' (over the limit)' : ''}`, ...(lines.length ? lines : ['- (nothing)'])];
+  // 글은 모두 지침 「메인 요청에 붙는 글」 INVENTORY.* 절 (2026-11-14 사용자: 모델에 가는 글은 전부 지침 파일에)
+  const g = (name: string, vars?: Record<string, string | number>) => guideTxt('Main', name, vars);
+  const out = [`${inventoryHead()} ${carried}/${opts.slots}${carried > opts.slots ? ` ${g('INVENTORY.OVER_LIMIT')}` : ''}`, ...(lines.length ? lines : [g('INVENTORY.NOTHING')])];
   // 무게 (2026-11-08 사용자): 「무겁다」 같은 말 없이 지금 상황만 — 합계·한도, 넘었으면 얼마나
   if (opts.carry) {
     const w = totalWeight(list, opts.left);
-    out.push(`Weight: ${kgText(w)} / ${kgText(opts.carry)}${w > opts.carry ? ` (${kgText(w - opts.carry)} over)` : ''}`);
+    out.push(w > opts.carry ? g('INVENTORY.WEIGHT_OVER', { weight: kgText(w), carry: kgText(opts.carry), over: kgText(w - opts.carry) }) : g('INVENTORY.WEIGHT', { weight: kgText(w), carry: kgText(opts.carry) }));
   }
-  out.push(`Carry limit: ${opts.limit}`);
+  out.push(g('INVENTORY.CARRY_LIMIT', { limit: opts.limit }));
   const recent = (opts.recent ?? []).filter(Boolean);
-  if (recent.length) out.push(`Recently: ${recent.join('; ')}`);
+  if (recent.length) out.push(g('INVENTORY.RECENT', { list: recent.join('; ') }));
   const events: string[] = [];
-  if (use.length) events.push(`uses ${use.map((u) => `${u.name}${u.n > 1 ? ` ×${u.n}` : ''}${u.after === 0 ? ' (used up after this)' : u.after !== undefined ? ` (${u.after} left after this)` : ''}`).join(', ')}`);
-  if (bought.length) events.push(`just bought ${bought.join(', ')}`);
+  if (use.length) events.push(g('INVENTORY.EVENT.USES', { list: use.map((u) => `${u.name}${u.n > 1 ? ` ×${u.n}` : ''}${u.after === 0 ? ` ${g('INVENTORY.USE.USED_UP')}` : u.after !== undefined ? ` ${g('INVENTORY.USE.LEFT', { n: u.after })}` : ''}`).join(', ') }));
+  if (bought.length) events.push(g('INVENTORY.EVENT.BOUGHT', { list: bought.join(', ') }));
   events.push(...extra);
-  if (carried > opts.slots) events.push('carrying more than the limit');
-  if (events.length) out.push(`This turn: ${events.join('; ')}`);
+  if (carried > opts.slots) events.push(g('INVENTORY.EVENT.OVER_LIMIT'));
+  if (events.length) out.push(g('INVENTORY.THIS_TURN', { events: events.join('; ') }));
   // 숨긴 진짜 효과: 이번 턴에 쓰는 물건, 몸에 걸친 장비만 (11-09 사용자: 평소엔 광고 문구만 가고, 쓰는 순간에 「이번에 일어나는 일」로 받는다)
   const reveal = list.filter((e) => e.truth && (use.some((u) => u.name === e.name) || isEquipped(e, list)));
   if (reveal.length) {
-    // 글은 지침 「메인 요청에 붙는 글」 INVENTORY.REALLY · INVENTORY.REALLY_UNKNOWN 절. 절이 없으면 여기 남긴 글
-    out.push(guideOr('Main', 'INVENTORY.REALLY', 'Really (what these actually do — decided by no one in advance, known to no one in the story; let it happen and show only what is experienced):'));
-    for (const e of reveal) out.push(e.truth === '?' ? guideOr('Main', 'INVENTORY.REALLY_UNKNOWN', () => `- ${e.name}: not even its seller knows${e.effect ? ` (the label says 「${e.effect}」 and may be false)` : ''} — decide what it really does now, then keep it the same from here on.`, { name: e.name, label_note: e.effect ? ` (the label says 「${e.effect}」 and may be false)` : '' }) : `- ${e.name}: ${e.truth}${e.effect ? ` (the label says 「${e.effect}」)` : ''}`);
+    // 글은 지침 「메인 요청에 붙는 글」 INVENTORY.REALLY · INVENTORY.REALLY_UNKNOWN(_LABEL) · INVENTORY.REALLY_LINE(_LABEL) 절
+    out.push(g('INVENTORY.REALLY'));
+    for (const e of reveal) {
+      out.push(e.truth === '?'
+        ? g('INVENTORY.REALLY_UNKNOWN', { name: e.name, label_note: e.effect ? ` ${g('INVENTORY.REALLY_UNKNOWN_LABEL', { effect: e.effect })}` : '' })
+        : e.effect ? g('INVENTORY.REALLY_LINE_LABEL', { name: e.name, truth: e.truth!, effect: e.effect }) : g('INVENTORY.REALLY_LINE', { name: e.name, truth: e.truth! }));
+    }
   }
   return out.join('\n');
 }
@@ -854,12 +865,10 @@ export function searchItems(it: Items, alive: Set<string>, q: string): { items: 
 
 // ── 본편 요청·응답 (body.ts) ──
 
-export const INVENTORY_HEAD = '[Inventory]';
-/** 본편에 넘기기가 꺼지고 상점만 켜졌을 때의 글 머리 */
-export const SHOP_HEAD = '[Shop]';
-export const INVENTORY_NOTE =
-  'What the protagonist carries right now (name — state (effect) [equipped / uses left / condition]); nothing else is on hand. Equipped items are in hand or worn. Keep it in mind when you write what they do, and when "This turn" lists an event, handle it in this response: ' +
-  'describe a used item taking effect (or failing), and if they carry more than the limit, let that show in the story — something is awkward to hold, dropped, left behind, or someone remarks on it. A broken item does not work. Never print this list back.';
+/** [Inventory] 글 머리 (지침 「메인 요청에 붙는 글」 INVENTORY.HEAD 절). 이미 넣은 블록도 이 머리로 알아본다 */
+export const inventoryHead = (): string => guideTxt('Main', 'INVENTORY.HEAD');
+/** 본편에 넘기기가 꺼지고 상점만 켜졌을 때의 글 머리 (INVENTORY.SHOP_HEAD 절) */
+export const shopHead = (): string => guideTxt('Main', 'INVENTORY.SHOP_HEAD');
 
 /** 채팅의 마지막 유저 메시지 키 (없으면 '') */
 export function lastUserKey(chat: Chat): string {
@@ -871,7 +880,8 @@ export function lastUserKey(chat: Chat): string {
 const USE_START = '#start';
 /** 「사용」 자리의 턴 키: 마지막 유저 메시지 키, 없으면 USE_START */
 const useTurnKey = (chat: Chat): string => lastUserKey(chat) || USE_START;
-const LOG_VERB: Record<ItemLogWhat, string> = { get: 'got', use: 'used', drop: 'dropped', gone: 'lost', destroy: 'destroyed', merge: 'combined into', sell: 'sold', left: 'left behind', off: 'took off' };
+/** 기록 한 줄의 글: 지침 「메인 요청에 붙는 글」 INVENTORY.LOG.<종류> 절 ({name} = 물건 이름) */
+const logLine = (what: ItemLogWhat | 'put_away' | 'used_up', name: string): string => guideTxt('Main', `INVENTORY.LOG.${what.toUpperCase()}`, { name });
 /** 최근 봇 응답 n개에 묶인 사용·처분 기록 (설정 「사용·처분 기록 넘기기」). 직접 넣은·버린 줄(기준 메시지 없음)은 셀 수 없어 뺀다 */
 export function recentItemLog(chat: Chat, it: Items, n: number, vars?: Record<string, unknown>): string[] {
   if (n <= 0) return [];
@@ -890,7 +900,7 @@ export function recentItemLog(chat: Chat, it: Items, n: number, vars?: Record<st
       return !e || (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store));
     }
     return true;
-  }).map((l) => (l.what === 'off' && l.hand ? `put ${l.name} away` : `${l.what === 'gone' && l.note === '다 씀' ? 'used up' : LOG_VERB[l.what]} ${l.name}${(l.n ?? 1) > 1 ? ` ×${l.n}` : ''}`)); // 손 칸에서 넣은 것은 「put X away」 (사용자 2026-11-14 C-10)
+  }).map((l) => (l.what === 'off' && l.hand ? logLine('put_away', l.name) : `${logLine(l.what === 'gone' && l.note === '다 씀' ? 'used_up' : l.what, l.name)}${(l.n ?? 1) > 1 ? ` ×${l.n}` : ''}`)); // 손 칸에서 넣은 것은 「put X away」 (사용자 2026-11-14 C-10)
 }
 
 /** 채팅의 마지막 봇 응답 키 (없으면 '') */
@@ -1000,7 +1010,7 @@ export function inventoryText(chat: Chat): string {
   if (!itemPushOn(vars)) {
     // 소지품이 꺼져 있다 (상점도 같이 꺼진다): 물건 목록은 없고, 이번 턴에 판 일·쇼핑몰 사건만 [Shop] 글로 넘긴다
     const soldOff = [...soldNow(readItems(vars), lastBotKey(chat), currentShop(chat)?.shop, (place, plain) => soldPasses(vars, place, plain)), ...mallEvents(chat)];
-    return soldOff.length ? [SHOP_HEAD, `This turn: ${soldOff.join('; ')}`].join('\n') : '';
+    return soldOff.length ? [shopHead(), guideTxt('Main', 'INVENTORY.THIS_TURN', { events: soldOff.join('; ') })].join('\n') : '';
   }
   const it = readItems(vars);
   // 다시 굴리기: 리수가 옛 응답을 먼저 지우고 요청하니 그 사용 기록은 이미 죽어 있다 (횟수가 돌아온 채로 다시 넘긴다).
@@ -1026,8 +1036,8 @@ export function inventoryText(chat: Chat): string {
     recent: recentItemLog(chat, it, itemLogTurns(vars), vars),
   });
   const guide = shop ? shopGuide(vars) : '';
-  // 안내 글은 지침 「메인 요청에 붙는 글」 INVENTORY.NOTE 절. 절이 없으면 INVENTORY_NOTE
-  return text ? `${text}\n${guideOr('Main', 'INVENTORY.NOTE', INVENTORY_NOTE)}${guide ? `\n${guide}` : ''}` : '';
+  // 안내 글은 지침 「메인 요청에 붙는 글」 INVENTORY.NOTE 절
+  return text ? `${text}\n${guideTxt('Main', 'INVENTORY.NOTE')}${guide ? `\n${guide}` : ''}` : '';
 }
 
 /** 메시지 키 k 가 유저 키 userKey 뒤의 응답인가 (다시 굴리는 턴의 옛 응답). USE_START 면 처음부터 */
@@ -1044,7 +1054,8 @@ function keyAfter(chat: Chat, k: string, userKey: string): boolean {
 
 /** 요청: [Inventory] 글을 마지막 유저 메시지 앞에 system 으로 넣는다 (상태창 블록과 같은 자리). 이미 있으면 그대로 */
 export function withInventory<M extends PromptMessage>(messages: M[], chat: Chat): M[] {
-  if (messages.some((m) => typeof m?.content === 'string' && (m.content.startsWith(INVENTORY_HEAD) || m.content.startsWith(SHOP_HEAD)))) return messages;
+  const heads = [inventoryHead(), shopHead()];
+  if (messages.some((m) => typeof m?.content === 'string' && heads.some((h) => (m.content as string).startsWith(h)))) return messages;
   const text = inventoryText(chat);
   if (!text) return messages;
   const at = messages.map((m) => m?.role).lastIndexOf('user');

@@ -101,3 +101,211 @@ Record to tidy:
 
 Return the JSON object.
 @@END
+
+@@SECTION USER_RULES.HEAD
+## User rules (appended by the user; they cannot change the output contract)
+@@END
+
+@@SECTION SPAN.FOLD
+[…]
+@@END
+
+@@SECTION SEXUAL.PLAIN_FALSE.FIND
+Use the 0.10.7 style
+@@END
+
+@@SECTION SEXUAL.PLAIN_FALSE.REPLACE
+When false, use the 0.10.7 style
+@@END
+
+@@SECTION SEXUAL.PLAIN_FALSE.PREFIX
+When false:
+@@END
+
+@@SECTION SEXUAL.EXPLICIT_TRUE.FIND
+Vocabulary rule, mandatory: write
+@@END
+
+@@SECTION SEXUAL.EXPLICIT_TRUE.REPLACE
+write
+@@END
+
+@@SECTION CONSOLIDATE.LANG_EN
+in English
+@@END
+
+@@SECTION CONSOLIDATE.LANG_KO
+in Korean
+@@END
+
+@@SECTION CONSOLIDATE.HINT.identity
+who this person is (affiliation, rank, role, age, appearance)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.personality
+durable traits and values
+@@END
+
+@@SECTION CONSOLIDATE.HINT.state
+current condition, location, injuries, mood — keep only what is still true
+@@END
+
+@@SECTION CONSOLIDATE.HINT.relationship
+stance toward each target; one entry per target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.speech
+how this person talks to each target; one entry per target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.behavior
+habits and patterns of action
+@@END
+
+@@SECTION CONSOLIDATE.HINT.knowledge
+what this person actually knows or does not know
+@@END
+
+@@SECTION CONSOLIDATE.HINT.threads
+open promises, goals, unresolved matters
+@@END
+
+@@SECTION CONSOLIDATE.HINT.history
+notable past events with this person, oldest first
+@@END
+
+@@SECTION CONSOLIDATE.HINT.scene
+present scene facts
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion
+suspicion cases (prefixes [시작]/[단서]/[반응]/[해소] stay)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.profile
+the person's scope of interest, observable tastes and aversions, form of feeling, restraint and approach style, with evidence
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.values
+value priorities, observation criteria, general biases, and the person's logic for them
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.appraisal
+first impression only: the unchanging initial appearance-based appraisal and feeling
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.current_appraisal
+current evaluation only: the present appraisal, its evidence and resulting feeling
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.intent
+nature of target-specific interest and its primary and secondary intents
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.stance
+current target-specific interpretation and treatment, with evidence for change
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.bind
+constraints, how they are handled, rationalization, and evidence for an actual transition
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.private
+unexpressed feeling, conditions limiting expression, actual leaks, and who perceived them
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.approach
+actual approach, the target's response, confirmed boundaries, and the currently permitted range
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.surface_actual
+outward conduct and actual purpose of exploitative or abusive intent, accumulated attempts, witnesses, and results
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.context
+where and when each address and register applies (public/private, before third parties), and which status difference applies
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.stage_assessment
+the relationship's current position as acknowledged shared experience, never a number or grade
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.knowledge_gap
+last contact point and the unverified range since
+@@END
+
+@@SECTION CONSOLIDATE.HINT.register.restraint
+the gap between inner feeling and permitted expression
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.profile
+durable observation tendency and domain expertise
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.modifiers
+current impairments or enhancements of perception, with evidence
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.channels
+the scene's sensory conditions (distance, light, noise, call connection)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.reading
+a clue actually perceived and its interpretation; a clue appearing is not a clue noticed
+@@END
+
+@@SECTION CONSOLIDATE.HINT.perception.secret
+one entry per meaningful secret this person holds: who knows it and who does not
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.regard
+qualitative: the current goodwill or ill will toward this target, what it rests on, what the person accepted, and which reactions now differ; never a score, grade or threshold
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.speech
+qualitative: how current goodwill adjusts speech toward this target, kept apart from the base speech entry
+@@END
+
+@@SECTION CONSOLIDATE.HINT.affinity.behavior
+qualitative: how current goodwill adjusts attention, questions, care and distance toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion.concern
+qualitative: what this person actually received about the target, why it raises a question, which counterevidence they accepted, and what remains; no score or band
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion.speech
+qualitative: how the suspicion adjusts speech toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.suspicion.behavior
+qualitative: what the person actually does about the suspicion toward this target (watching, testing, confronting, reporting)
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.attitude
+qualitative: the current attitude in intimate contexts and its evidence; never a score, band or stage
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.speech
+qualitative: how that attitude shows in speech toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.behavior
+qualitative: how that attitude shows in conduct, stated conditions and hesitation toward this target
+@@END
+
+@@SECTION CONSOLIDATE.HINT.openness.context
+conditions and attitudes actually shown in intimate contexts (contraception demands, boundaries, refusals), as text
+@@END
+
+@@SECTION ITEMS.SCOPE.NARROW
+Report `new` only for things with a use in the story: weapons, tools and devices, medicine, keys, talismans, sealed objects, anomaly-related objects, valuables. Do not report clothes, food and drink, documents or small everyday things.
+@@END
+
+@@SECTION ITEMS.SCOPE.MID
+Report `new` for things with a use in the story and for issued or bought gear worn or carried on the body (clothes, bags) and mission documents. Do not report food and drink or small everyday things.
+@@END
+
+@@SECTION ITEMS.SKIP
+Never report as `new`: {skip}
+@@END

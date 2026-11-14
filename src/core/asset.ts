@@ -1,7 +1,7 @@
 // 보조 모델 이미지(에셋) 태그 보충. 원본 imgTagFireCore와 같은 흐름:
 // 단락 번호 매김 → Image tag 로어북의 캐릭터 → 등장 캐릭터만 → 보조 모델 JSON 패치 → 단락 뒤에 <img=...> 삽입.
 import type { LoreEntry } from './types';
-import { fillVars, guideOr, guideSec } from './guides';
+import { guideTxt } from './guides';
 import { readDirectory } from './world/directory';
 import { termPresent } from './world/registry';
 import { splitThoughts, stripThoughts } from './thoughts';
@@ -114,91 +114,25 @@ export function activeCharacters(narrative: string, d: ImageData): string[] {
 
 /** 보조 모델 요청 (원본 imgBuildPrompt 그대로) */
 export function assetPrompt(active: string[], paras: string[], d: ImageData, limit: number): { role: 'user'; content: string }[] {
-  const first = active[0] ?? 'Lee Ha-neul';
+  // 예시 줄의 이름: 첫 등장 인물 (없으면 지침 EXAMPLE_NAME 절)
+  const first = active[0] ?? guideTxt('Asset', 'EXAMPLE_NAME');
   const n = String(limit);
   const aliasLines = active
     .map((name) => {
       const names = [...d.aliases].filter(([, t]) => t === name).map(([a]) => a).sort();
-      return names.length ? `- ${name} (${names.join(', ')})` : '';
+      return names.length ? guideTxt('Asset', 'ALIASES_LINE', { name, aliases: names.join(', ') }) : '';
     })
     .filter(Boolean);
-  // 글은 지침 「이미지(보조 모델)」 PROMPT · NO_TAG · NO_TAG_USER · ALIASES_HEAD 절 (설정 → 지침에서 고침). PROMPT 절이 없으면 아래에 남긴 글
-  const noTag0 = d.allowUser ? guideOr('Asset', 'NO_TAG', '- DO NOT tag the narrator or undefined NPCs.') : guideOr('Asset', 'NO_TAG_USER', '- DO NOT tag {{user}}, the narrator, or undefined NPCs.');
+  // 글은 지침 「이미지(보조 모델)」 PROMPT · NO_TAG · NO_TAG_USER · ALIASES_HEAD · ALIASES_LINE · NARRATIVE_LINE 절 (설정 → 지침에서 고침)
+  const noTag0 = d.allowUser ? guideTxt('Asset', 'NO_TAG') : guideTxt('Asset', 'NO_TAG_USER');
   // 이름을 알면 {{user}}를 푼다 (모르면 그대로. 전수검사 11-13)
   const noTag = d.userName?.trim() ? noTag0.replace(/\{\{user\}\}/g, () => d.userName!.trim()) : noTag0;
-  const aliasHead = guideOr('Asset', 'ALIASES_HEAD', '## Aliases (for presence verification — still use the full English name in tag)');
-  const narrative = paras.map((p, i) => `[${i + 1}] ${p}`).join('\n\n');
-  const tpl = guideSec('Asset', 'PROMPT');
-  if (tpl) {
-    return [{ role: 'user', content: fillVars(tpl, {
-      no_tag_rule: noTag, limit: n, plural: n === '1' ? '' : 's', limit_x3: limit * 3, names: active.join(' | '),
-      aliases: aliasLines.length ? `${aliasHead}\n${aliasLines.join('\n')}\n\n` : '', keywords: d.keywords.join(', '), first, narrative,
-    }) }];
-  }
-  const w: string[] = [
-    '# Insert <img> tags into a finished narrative.',
-    '',
-    'Output ONLY a JSON array. No text. No explanation. No code fence.',
-    '',
-    '## Format',
-    '[{"line":N,"tag":"<img=\\"Character_keyword\\">"}]',
-    '',
-    "- `line`: 1-based paragraph number from the numbered narrative below. The tag is inserted AFTER that paragraph (the tag represents that paragraph's character).",
-    '- `tag`: full `<img="Name_keyword">` string with Name and keyword from the allowed lists.',
-    '- If no listed character appears in the narrative, output `[]`.',
-    '',
-    '## Rules',
-    '- ONE tag per paragraph maximum. If multiple listed characters appear in the same paragraph, choose the one who is the FOCUS of that paragraph.',
-    "- EVIDENCE-BASED: a character MUST be explicitly mentioned by name (English prefix OR Korean alias) in that paragraph's text to be tagged.",
-    '- FORBIDDEN: tagging characters not present in the narrative. Absence in narrative = NO TAG.',
-    '- MUST tag every visible listed character at least ONCE when they appear and are the focus.',
-    '- Tag at first appearance AND when emotion changes SIGNIFICANTLY (smile → cry, calm → angry, neutral → shocked).',
-    '- DO NOT tag minor variations (smile → bigger smile = SAME tag, skip).',
-    noTag,
-    '- DO NOT invent character names or keywords. Use only the lists below.',
-    '',
-    '## HARD LIMIT (per-character, independent count)',
-    `- Each listed character has their OWN independent counter for tags. The limit is ${n} tag${n === '1' ? '' : 's'} PER character, NOT a total for the whole response.`,
-    `- Character A may receive up to ${n} tag(s). Character B may ALSO receive up to ${n} tag(s). They do not share a budget.`,
-    `- If 3 characters appear and each is the focus of separate paragraphs, you may output up to ${limit * 3} tags total (3 characters × ${n} each).`,
-    '- Per-character priority when over the limit: KEEP the most significant emotion moments, SKIP the rest.',
-    '- This per-character limit is absolute — exceeding it for any single character is a hard error. Under-using it (when more legitimate tags exist for that character) wastes the budget.',
-    '',
-    '## Allowed Character Names (use exactly as written)',
-    active.join(' | '),
-    '',
-    ...(aliasLines.length ? [aliasHead, ...aliasLines, ''] : []),
-    '## Allowed Keywords (use exactly as written)',
-    `SFW: ${d.keywords.join(', ')}`,
-    '',
-    '## Examples',
-    '',
-    '### NEGATIVE (do not do this)',
-    'Narrative:',
-    '[1] The room is empty.',
-    '[2] Wind blows through the window.',
-    '',
-    'Wrong output:',
-    `[{"line":1,"tag":"<img=\\"${first}_neutral\\">"}]   <- no listed character present`,
-    '',
-    'Correct output:',
-    '[]',
-    '',
-    '### POSITIVE (do this)',
-    'Narrative:',
-    `[1] ${first} walked into the room with a quiet smile.`,
-    `[2] ${first} glanced at the figure standing by the desk, her expression hardening into something sharper.`,
-    '',
-    'Correct output:',
-    `[{"line":1,"tag":"<img=\\"${first}_default\\">"},{"line":2,"tag":"<img=\\"${first}_serious\\">"}]`,
-    '',
-    '## Narrative (numbered by paragraph)',
-    '',
-    narrative,
-    '',
-    '# Reminder: Output ONLY the JSON array. No prose. No explanation. If no listed character appears, output [].',
-  ];
-  return [{ role: 'user', content: w.join('\n') }];
+  const aliasHead = guideTxt('Asset', 'ALIASES_HEAD');
+  const narrative = paras.map((p, i) => guideTxt('Asset', 'NARRATIVE_LINE', { n: i + 1, text: p })).join('\n\n');
+  return [{ role: 'user', content: guideTxt('Asset', 'PROMPT', {
+    no_tag_rule: noTag, limit: n, plural: n === '1' ? '' : 's', limit_x3: limit * 3, names: active.join(' | '),
+    aliases: aliasLines.length ? `${aliasHead}\n${aliasLines.join('\n')}\n\n` : '', keywords: d.keywords.join(', '), first, narrative,
+  }) }];
 }
 
 /** 응답에서 JSON 배열만 (앞뒤 글·코드 펜스가 있어도) */

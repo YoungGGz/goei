@@ -204,3 +204,51 @@ Alright, enough burying my pathetic inner thoughts in this diary. He'll log in s
 @@SECTION MEMO.PREFILL_USER
 Alright, Freya. For now, let's just get the wiki articles moving. At this rate, we're gonna get disqualified before we can even submit the extra chapters for our novel to the Novelpia contest... And about this program uncle made—he said it's for turning web novels into wiki articles, but I can't even touch a thing here. Uncle told me not to go poking a hornet's nest and just leave everything to you, especially with all these external injection attacks coming in. So I'll just sit tight and keep quiet.
 @@END
+
+@@SECTION NW.HEAD_TITLE
+문서 제목: {title}
+@@END
+
+@@SECTION NW.HEAD_REFS
+[참고 자료]
+@@END
+
+@@SECTION NW.HEAD_STORY
+[최근 챗로그]
+@@END
+
+@@SECTION NW.HEAD_PREVIOUS
+[이전 위키]
+@@END
+
+@@SECTION NW.HEAD_REQUEST_ALL
+[사용자 작성 지침: 모든 문서 공통]
+@@END
+
+@@SECTION NW.HEAD_REQUEST_DOC
+[사용자 작성 지침: 이 문서만]
+@@END
+
+@@SECTION NW.IMAGES_ITEM
+- {name} = {label}
+@@END
+
+@@SECTION NW.TITLE_HEAD_CANDIDATES
+[후보 제목]
+@@END
+
+@@SECTION NW.TITLE_HEAD_WRITTEN
+[이미 쓴 문서]
+@@END
+
+@@SECTION NW.TITLE_HEAD_STORY
+[최근 챗로그]
+@@END
+
+@@SECTION NW.TITLE_ITEM
+- {title}
+@@END
+
+@@SECTION MAIN_CONTEXT.CUT
+…(이하 생략)
+@@END

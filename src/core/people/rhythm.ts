@@ -3,7 +3,7 @@
 import type { Chat } from '../types';
 import { liveEntries, type Liveness } from './store';
 import { RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, type PeopleStore } from './types';
-import { guideOr } from '../guides';
+import { guideTxt } from '../guides';
 
 export type HookTier = (typeof RHYTHM_HOOK_TIERS)[number];
 export type HookStage = (typeof RHYTHM_HOOK_STAGES)[number];
@@ -103,13 +103,14 @@ export function rhythmClock(store: PeopleStore, chat: Chat, live: Liveness, upto
   const room = (RHYTHM_HOOK_TIERS as readonly HookTier[]).filter((t) => active[t] < HOOK_LIMIT[t]);
   const overdue = hooks.filter((h) => h.overdue);
   const plantAllowed = gapOk && room.length > 0 && !overdue.length;
-  const plantBlocked = !gapOk ? `last plant ${turn - (lastPlant ?? 0)} turn(s) ago (need ${HOOK_PLANT_GAP})` : !room.length ? 'active limits reached' : overdue.length ? 'handle the overdue flow first' : '';
+  // 막힘 사유·우선순위 글은 지침 「Main」 RHYTHM.BLOCK.*·RHYTHM.PRIORITY.* 절
+  const plantBlocked = !gapOk ? guideTxt('Main', 'RHYTHM.BLOCK.GAP', { ago: turn - (lastPlant ?? 0), need: HOOK_PLANT_GAP }) : !room.length ? guideTxt('Main', 'RHYTHM.BLOCK.LIMIT') : overdue.length ? guideTxt('Main', 'RHYTHM.BLOCK.OVERDUE') : '';
   const priority: string[] = [];
   const byNeglect = (a: HookClock, b: HookClock) => b.sinceLast - a.sinceLast;
-  for (const h of [...overdue].sort(byNeglect)) priority.push(`overdue: ${h.key} (${h.tier}, ${h.age} turns since planting, window ${h.window[0]}–${h.window[1]}${h.extended ? ', already extended' : ', may extend once with [ext]'})`);
-  for (const h of hooks.filter((h) => h.stage === 'payoff_ready' && !h.overdue).sort(byNeglect)) priority.push(`payoff ready: ${h.key}`);
-  for (const h of hooks.filter((h) => h.due && h.stage !== 'payoff_ready' && (h.tier !== 'long' || h.sinceLast >= 5)).sort(byNeglect)) priority.push(`advance due: ${h.key} (${h.sinceLast} turns since last advance)`);
-  if (plantAllowed) priority.push(`new plant allowed (${room.join('/')})`);
+  for (const h of [...overdue].sort(byNeglect)) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.OVERDUE', { key: h.key, tier: h.tier, age: h.age, from: h.window[0], to: h.window[1], ext: `, ${guideTxt('Main', h.extended ? 'RHYTHM.PRIORITY.EXTENDED' : 'RHYTHM.PRIORITY.MAY_EXTEND')}` }));
+  for (const h of hooks.filter((h) => h.stage === 'payoff_ready' && !h.overdue).sort(byNeglect)) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.PAYOFF', { key: h.key }));
+  for (const h of hooks.filter((h) => h.due && h.stage !== 'payoff_ready' && (h.tier !== 'long' || h.sinceLast >= 5)).sort(byNeglect)) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.ADVANCE', { key: h.key, since: h.sinceLast }));
+  if (plantAllowed) priority.push(guideTxt('Main', 'RHYTHM.PRIORITY.PLANT', { tiers: room.join('/') }));
   // 직전 장면 기록의 연출 방법 (end 까지의 살아 있는 scene 항목 중 마지막)
   const sceneDoc = Object.values(store.docs).find((d) => d.type === 'rhythm' && d.key === 'scene');
   const scenes = sceneDoc ? liveEntries(sceneDoc.entries, live).filter((e) => (live.at.get(e.anchor) ?? -1) <= end) : [];
@@ -119,10 +120,12 @@ export function rhythmClock(store: PeopleStore, chat: Chat, live: Liveness, upto
 
 /** 지침·본편용 영어 요약 줄 */
 export function rhythmClockLines(c: RhythmClock): string[] {
-  const out = [`Turn ${c.turn} (confirmed replies). Active hooks: short ${c.active.short}/${HOOK_LIMIT.short}, mid ${c.active.mid}/${HOOK_LIMIT.mid}, long ${c.active.long}/${HOOK_LIMIT.long}. New plant ${c.plantAllowed ? 'allowed' : `not allowed: ${c.plantBlocked}`}.`];
-  for (const h of c.hooks) if (ACTIVE.includes(h.stage)) out.push(`- ${h.key}: ${h.stage}, ${h.tier}, planted ${h.age} turn(s) ago, last advance ${h.sinceLast} turn(s) ago, payoff window ${h.window[0]}–${h.window[1]}${h.overdue ? ' — OVERDUE' : h.due ? ' — in window' : ''}${h.extended ? ' (extended)' : ''}`);
-  if (c.priority.length) out.push(`Priority: ${c.priority.join(' · ')}`);
-  // 글은 지침 「Main」 RHYTHM.METHOD 절. 절이 없으면 여기 글 (전수검사 11-13)
-  if (c.lastMethod && c.lastMethod !== 'none') { const method = c.lastMethod; out.push(guideOr('Main', 'RHYTHM.METHOD', () => `Previous staging method: ${method} — do not use the same anticipation method in consecutive turns.`, { method })); }
+  // 줄 꼴은 지침 「Main」 RHYTHM.CLOCK.* 절
+  const plant = c.plantAllowed ? guideTxt('Main', 'RHYTHM.CLOCK.ALLOWED') : guideTxt('Main', 'RHYTHM.CLOCK.NOT_ALLOWED', { reason: c.plantBlocked });
+  const out = [guideTxt('Main', 'RHYTHM.CLOCK.TURN', { turn: c.turn, short: c.active.short, short_limit: HOOK_LIMIT.short, mid: c.active.mid, mid_limit: HOOK_LIMIT.mid, long: c.active.long, long_limit: HOOK_LIMIT.long, plant })];
+  for (const h of c.hooks) if (ACTIVE.includes(h.stage)) out.push(guideTxt('Main', 'RHYTHM.CLOCK.HOOK', { key: h.key, stage: h.stage, tier: h.tier, age: h.age, since: h.sinceLast, from: h.window[0], to: h.window[1], mark: h.overdue ? ` ${guideTxt('Main', 'RHYTHM.CLOCK.OVERDUE')}` : h.due ? ` ${guideTxt('Main', 'RHYTHM.CLOCK.IN_WINDOW')}` : '', extended: h.extended ? ` ${guideTxt('Main', 'RHYTHM.CLOCK.EXTENDED')}` : '' }));
+  if (c.priority.length) out.push(guideTxt('Main', 'RHYTHM.CLOCK.PRIORITY', { items: c.priority.join(' · ') }));
+  // 글은 지침 「Main」 RHYTHM.METHOD 절 (전수검사 11-13)
+  if (c.lastMethod && c.lastMethod !== 'none') out.push(guideTxt('Main', 'RHYTHM.METHOD', { method: c.lastMethod }));
   return out;
 }

@@ -4,7 +4,7 @@ import type { Directory } from '../../core/world/directory';
 import { tokenizerName } from '../../core/tokenizer';
 import { emptyRecord, moveField, moveFieldTo, parseImport, putRecord, recordText, removeRecord, type ImportResult } from '../../core/world/draft';
 import { fieldOrder, fieldValue, isDefaultRecord, PLACEHOLDER_ORGS, worldAnomalyNote, worldRecord, worldRecords, type ExtraField, type WorldOverrides, type WorldRecord } from '../../core/world/records';
-import { ANOMALY_NOTE } from '../../core/world/schema';
+import { anomalyNoteDefault } from '../../core/world/schema';
 import { agentGroup, orgOf } from '../../core/world/directory';
 import { FIELDS, WORLD_KIND_LABEL, type FieldDef, type WorldKind } from '../../core/world/schema';
 import { tokens } from '../../core/gnet';
@@ -307,7 +307,7 @@ export function recordInput(name: string, key: string, value: string, ctx: ChatC
   if (name === 'ed-anote') {
     const over = overridesOf(ctx);
     const next: WorldOverrides = { ...over };
-    if (value === ANOMALY_NOTE) delete next.anomalyNote;
+    if (value === anomalyNoteDefault()) delete next.anomalyNote;
     else next.anomalyNote = value;
     setOverrides(next);
     return true;

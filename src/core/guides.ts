@@ -175,7 +175,7 @@ export const fillGuide = (text: string | undefined, vars: Record<string, string>
   String(text ?? '').replace(/\{([a-z_]+)\}/g, (all, k: string) => (k in vars ? vars[k] : all)).trim();
 
 /* ── 코드에 박혀 있던 지침을 지침 절로 (2026-11-13 사용자: 「설정 지침칸으로 안 빠지고 하드코딩 돼 있는 것을 지침으로」) ──
-   부르는 쪽은 guideOr(지침, 절, 옛 글, 자리 값) 로 읽는다. 절이 없으면(옛 글로 고쳐 저장해 둔 지침) 코드에 남긴 옛 글을 그대로 쓴다 (hslog.ts hsMainRules 와 같은 길). */
+   부르는 쪽은 guideTxt(지침, 절, 자리 값) 로 읽는다. 고친 지침에 그 절이 없거나 비었으면 기본 파일(지침/*.txt)의 절을 쓴다. 코드에는 글을 두지 않는다 (2026-11-14). */
 const secCache = new Map<GuideName, { src: string; secs: Record<string, string> }>();
 /** 지침 절 글 (고친 글 반영, 앞뒤 빈칸 뺌). 절이 없거나 비었으면 null */
 export function guideSec(name: GuideName, section: string): string | null {
@@ -193,7 +193,7 @@ export function guideSec(name: GuideName, section: string): string | null {
 export const fillVars = (text: string, vars: Record<string, string | number>): string =>
   text.replace(/(?<!\{)\{([a-z0-9_]+)\}(?!\})/g, (all, k: string) => (k in vars ? String(vars[k]) : all));
 /* 비우면 기본 글이 쓰이는 절 (전수검사 11-13 나-51 사용자: 지금처럼 기본 글을 쓰고, 빈 칸에 「비우면 기본 글이 쓰여요」라고 표시).
-   guideOr·guideSec 나 「읽은 글 || 옛 글」 꼴로 읽는 절이다. 그 밖의 절은 비우면 요청에서 정말로 빠진다 */
+   guideTxt 로 읽는 절이다. 그 밖의 절은 비우면 요청에서 정말로 빠진다 */
 const BLANK_DEFAULT_ALL: GuideName[] = ['Common', 'Main', 'UpdaterExtra', 'Asset'];
 const BLANK_DEFAULT_GNET = /^(LANGUAGE|IMPORTANT_NOTE|POST\.TAG_RULE|POST\.TAG_FORMAT|COMMENT\.TIME_RULE|KEYFIGURES\.FORMAT|SAMPLING|ACTION\.COMMENT|ACTION\.POST_REFRESH|PUBLIC\.ACCESS|RETRY\.FORMAT|DM\.QUOTE_UNKNOWN|PICS_(NONE|PEOPLE|EXPR|THINGS))$/;
 const BLANK_DEFAULT_SHOP = /^(TRUTH_(ALL|MIX|NONE)|SECRET_NOTE|WHERE_(ANY|SHOP)|ASSIGN_(ROLE_USEFUL|ROLE_BROAD|RULE)|HEAD_(REFS|ASSIGN|ORDERS|NOTES))$/;
@@ -206,9 +206,26 @@ const BLANK_DEFAULT: Partial<Record<GuideName, RegExp>> = {
   Director: /^(SEARCH|PASS2|OUTPUT|APPLY\..+|REPAIR|MAIN_NOTE)$/,
   Hs: /^MAIN_CONTEXT$/,
 };
+/** 2026-11-14 코드에서 꺼내 지침 절로 옮긴 글 (모두 guideTxt 로 읽어 비우면 기본 글) */
+const BLANK_DEFAULT_MOVED: Partial<Record<GuideName, string[]>> = {
+  GNet: ['SYSTEM.PROTAGONIST_HEAD', 'DM.ROLE_BINDING', 'REQUEST.HEAD_REFS', 'REQUEST.HEAD_STORY', 'REQUEST.HEAD_TASK', 'REFS.SITUATION_SOURCE', 'SAMPLING.SEED', 'INCOMING.OPTIONS_HEAD', 'DM.ORIGIN', 'DM.ORIGIN_QUOTE', 'DM.STORY_TIME', 'DM.PUBLIC_HEAD', 'MAIN_CONTEXT.ACCESS_POST', 'MAIN_CONTEXT.ACCESS_DM', 'POST.INPUT_TAG'],
+  Gal: ['SYSTEM.PROTAGONIST_HEAD', 'DM.ROLE_BINDING', 'REQUEST.HEAD_REFS', 'REQUEST.HEAD_STORY', 'REQUEST.HEAD_TASK', 'REFS.SITUATION_SOURCE', 'SAMPLING.SEED', 'INCOMING.OPTIONS_HEAD', 'DM.ORIGIN', 'DM.ORIGIN_QUOTE', 'DM.STORY_TIME', 'DM.PUBLIC_HEAD', 'MAIN_CONTEXT.ACCESS_POST', 'MAIN_CONTEXT.ACCESS_DM', 'POST.INPUT_TAG'],
+  Wpf: ['SYSTEM.PROTAGONIST_HEAD', 'DM.ROLE_BINDING', 'REQUEST.HEAD_REFS', 'REQUEST.HEAD_STORY', 'REQUEST.HEAD_TASK', 'REFS.SITUATION_SOURCE', 'SAMPLING.SEED', 'INCOMING.OPTIONS_HEAD', 'DM.ORIGIN', 'DM.ORIGIN_QUOTE', 'DM.STORY_TIME', 'DM.PUBLIC_HEAD', 'MAIN_CONTEXT.ACCESS_POST', 'MAIN_CONTEXT.ACCESS_DM', 'POST.INPUT_TAG'],
+  Salmon: ['SYSTEM.PROTAGONIST_HEAD', 'DM.ROLE_BINDING', 'REQUEST.HEAD_REFS', 'REQUEST.HEAD_STORY', 'REQUEST.HEAD_TASK', 'REFS.SITUATION_SOURCE', 'SAMPLING.SEED', 'INCOMING.OPTIONS_HEAD', 'DM.ORIGIN', 'DM.ORIGIN_QUOTE', 'DM.STORY_TIME', 'DM.PUBLIC_HEAD', 'MAIN_CONTEXT.ACCESS_POST', 'MAIN_CONTEXT.ACCESS_DM', 'POST.INPUT_TAG'],
+  Cos: ['HEAD_SHOP', 'HEAD_SHOP_OWNER', 'HEAD_IDENTITY_WON', 'HEAD_IDENTITY_POINTS', 'HEAD_PROTAGONIST', 'HEAD_STATUS', 'HEAD_SITUATION', 'HEAD_STORY', 'TALK_LINE_ME', 'TALK_LINE_OWNER', 'HEAD_VISIT_TALK', 'TASK_FIRST', 'TASK_RESTOCK', 'HEAD_SHELF_NOW', 'SHELF_EMPTY', 'TAG_RARE', 'TAG_SALE', 'HEAD_BOUGHT', 'HEAD_OWNER_BOUGHT', 'NOTE_ITEM_BOUGHT', 'NOTE_ITEM_OPEN', 'HEAD_QUOTES', 'QUOTE_ITEM_PAID', 'QUOTE_ITEM_OPEN', 'HEAD_SELLING', 'SELLING_TRUTH', 'SELLING_PAID', 'SELLING_OFFER_WON', 'SELLING_OFFER_POINTS', 'HEAD_TALK_NOW', 'SIZE_EXACT', 'SIZE_RANGE', 'LINE', 'ORDERS_ITEM', 'ORDERS_READY', 'ORDERS_DUE', 'ORDERS_DUE_IN', 'ASSIGN_UNIT', 'ASSIGN_UNITS', 'ASSIGN_LINE', 'ASSIGN_LINE_ROLE', 'ASSIGN_PRICE', 'ROLL_GENRES', 'ROLL_TIERS', 'ASK_CHIP'],
+  Bm: ['HEAD_SHOP', 'HEAD_SHOP_OWNER', 'HEAD_IDENTITY_WON', 'HEAD_IDENTITY_POINTS', 'HEAD_PROTAGONIST', 'HEAD_STATUS', 'HEAD_SITUATION', 'HEAD_STORY', 'TALK_LINE_ME', 'TALK_LINE_OWNER', 'HEAD_VISIT_TALK', 'TASK_FIRST', 'TASK_RESTOCK', 'HEAD_SHELF_NOW', 'SHELF_EMPTY', 'TAG_RARE', 'TAG_SALE', 'HEAD_BOUGHT', 'HEAD_OWNER_BOUGHT', 'NOTE_ITEM_BOUGHT', 'NOTE_ITEM_OPEN', 'HEAD_QUOTES', 'QUOTE_ITEM_PAID', 'QUOTE_ITEM_OPEN', 'HEAD_SELLING', 'SELLING_TRUTH', 'SELLING_PAID', 'SELLING_OFFER_WON', 'SELLING_OFFER_POINTS', 'HEAD_TALK_NOW', 'SIZE_EXACT', 'SIZE_RANGE', 'LINE', 'HEAD_NOTES', 'ASSIGN_UNIT', 'ASSIGN_UNITS', 'ASSIGN_LINE', 'ASSIGN_LINE_ROLE', 'ASSIGN_PRICE', 'ROLL_GENRES', 'ROLL_TIERS'],
+  BmDesk: ['DICE_DEFAULT', 'AGENT_TAG', 'SHELF', 'SHELF_LINE', 'NONE', 'CUSTOMER', 'CARD', 'DICE_LINE', 'PAST_LINE', 'MAKE_USER', 'TALK_USER', 'TALK_ME', 'TALK_OP', 'ERR_NO_CARD', 'ERR_NO_NAME', 'ERR_NO_GREETING', 'ERR_NO_SAY'],
+  Hs: ['LINE', 'SIZE_EXACT', 'SIZE_RANGE', 'HEAD_CHANNEL', 'HEAD_CHANNEL_HOST', 'TASK_PROGRAM', 'HEAD_REFS', 'HEAD_PROTAGONIST', 'HEAD_STATUS', 'HEAD_SITUATION', 'HEAD_STORY', 'BLOCK_HEAD', 'BOX_NAME', 'BOX_DESC', 'ERR_NO_CUE', 'ERR_CUE_LINES', 'ERR_PRICE_WON', 'ERR_NO_SAY', 'COUNT_RANGE', 'SAY_NOW', 'SAY_NOW_TITLED', 'SAY_HOST_LINE', 'SAY_CHAT_LINE', 'SAY_FLOWED', 'SAY_USER', 'ORDER_LOG', 'ORDER_BARTER', 'ORDER_INSTALLMENT', 'ORDER_SPECIAL', 'ORDER_PAID', 'ORDER_BARTER_NOTE', 'MAIN_CONTEXT_ACCESS', 'SAY_ME_NICK', 'PLAYER_SYS_NICK', 'PLAYER_SYS_ORDER', 'PLAYER_SYS_AUDIENCE', 'CHAT_ANON_NICK', 'LOG_PAY_WON'],
+  Phone: ['ANNOUNCEMENT_ACCESS.CIVILIAN', 'ANNOUNCEMENT_ACCESS.FREELANCER', 'ANNOUNCEMENT_ACCESS.ORG', 'MAIN_CONTEXT.NOTICE_ACCESS', 'FIRST_CONTACT', 'CALL'],
+  Wiki: ['NW.HEAD_TITLE', 'NW.HEAD_REFS', 'NW.HEAD_STORY', 'NW.HEAD_PREVIOUS', 'NW.HEAD_REQUEST_ALL', 'NW.HEAD_REQUEST_DOC', 'NW.IMAGES_ITEM', 'NW.TITLE_HEAD_CANDIDATES', 'NW.TITLE_HEAD_WRITTEN', 'NW.TITLE_HEAD_STORY', 'NW.TITLE_ITEM', 'MAIN_CONTEXT.CUT'],
+  Shop: ['HEAD_SHOP', 'HEAD_SHOP_OWNER', 'HEAD_IDENTITY_WON', 'HEAD_IDENTITY_POINTS', 'HEAD_PROTAGONIST', 'HEAD_STATUS', 'HEAD_SITUATION', 'HEAD_STORY', 'TALK_LINE_ME', 'TALK_LINE_OWNER', 'HEAD_VISIT_TALK', 'TASK_FIRST', 'TASK_RESTOCK', 'HEAD_SHELF_NOW', 'SHELF_EMPTY', 'TAG_RARE', 'TAG_SALE', 'HEAD_BOUGHT', 'HEAD_OWNER_BOUGHT', 'NOTE_ITEM_BOUGHT', 'NOTE_ITEM_OPEN', 'HEAD_QUOTES', 'QUOTE_ITEM_PAID', 'QUOTE_ITEM_OPEN', 'HEAD_SELLING', 'SELLING_TRUTH', 'SELLING_PAID', 'SELLING_OFFER_WON', 'SELLING_OFFER_POINTS', 'HEAD_TALK_NOW', 'SIZE_EXACT', 'SIZE_RANGE', 'LINE', 'OWN_SHOP_ITEM', 'OWN_SHOP_ITEM_ALSO', 'OWN_HOW_BOTH', 'OWN_HOW_WEB', 'OWN_HOW_VISIT', 'REFS_WIKI_SOURCE', 'ERROR_NO_SHELF', 'ERROR_NO_ITEMS', 'ERROR_NO_IDENTITY', 'ERROR_NO_SELLS', 'ERROR_NO_OWNER', 'ERROR_ALL_EMPTY', 'ASK_CHIP', 'ASK_SELL', 'ASK_SELL_BARE'],
+  Director: ['USER_RULES.HEAD', 'LANG.KO', 'LANG.EN', 'MAIN_NOTE.HEAD', 'MAIN_NOTE.ITEM', 'MAIN_NOTE.REACT', 'MAIN_NOTE.MUST_NOT', 'MAIN_NOTE.UNCERTAIN'],
+  Router: ['USER_RULES.HEAD'],
+  Consult: ['USER', 'LIST.MENU', 'LIST.NONE', 'PENDING.LINE', 'PENDING.NONE', 'TALK.ME', 'TALK.OP', 'ERR.NO_SAY', 'LABEL.ON', 'LABEL.OFF', 'LABEL.EMPTY', 'LABEL.BLANK', 'CHOICE.NUM', 'CHOICE.STEP', 'CHOICE.STEP_UNIT', 'CHOICE.STEP_STRIDE', 'CHOICE.STEP_BUTTONS', 'CHOICE.TEXT', 'CHOICE.TEXT_MAX', 'CHOICE.TEXT_MULTI', 'CHOICE.TEXT_SINGLE', 'ITEM.INFO', 'ITEM.LINE', 'ITEM.LOCKED', 'ITEM.CHOICES', 'ITEM.SCOPE', 'ITEM.HELP', 'STATE.SUMMARY', 'STATE.SUMMARY_MAYBE', 'STATE.SUMMARY_TOKENS', 'STATE.NOT_STARTED', 'STATE.PRE', 'STATE.MAIN', 'STATE.POST', 'STATE.MANUAL', 'STATE.NODE', 'STATE.NODE_ON', 'STATE.NODE_OFF', 'STATE.NODE_MODEL', 'STATE.NODE_TOKENS', 'STATE.MAIN_NODE', 'STATE.MANUAL_NODE', 'LAST.NONE', 'LAST.HEAD', 'LAST.TOKENS', 'LAST.NO_RECORD', 'LAST.MODEL_MAIN', 'LAST.MODEL_AUX', 'LAST.MODEL_ID', 'LAST.CALL', 'LAST.OK', 'LAST.FAIL', 'LAST.TOTAL', 'MENUS.LINE', 'MENUS.INTRO', 'MENUS.OTHERS_HEAD', 'CATALOG.FOLDED_COUNT', 'CATALOG.FOLDED_NOTE'],
+};
 /** 이 지침의 이 절을 비우면 요청에 기본 글이 쓰이나 (편집 화면 표시용) */
 export const blankUsesDefault = (name: GuideName, section: string): boolean =>
-  BLANK_DEFAULT_ALL.includes(name) || !!BLANK_DEFAULT[name]?.test(section.trim());
+  BLANK_DEFAULT_ALL.includes(name) || !!BLANK_DEFAULT[name]?.test(section.trim()) || !!BLANK_DEFAULT_MOVED[name]?.includes(section.trim());
 /** 기본 지침 파일(지침/*.txt)의 절 글 (앞뒤 빈칸 뺌). 없으면 null */
 const defCache = new Map<GuideName, Record<string, string>>();
 export function guideDefaultSec(name: GuideName, section: string): string | null {
@@ -223,11 +240,5 @@ export function guideDefaultSec(name: GuideName, section: string): string | null
 /** 지침 절 글 (2026-11-14 사용자: 코드에 박힌 모델 글을 전부 지침 파일로). 고친 글의 절 → 없거나 비었으면 기본 파일(지침/*.txt)의 절. 코드에는 글을 두지 않는다 */
 export function guideTxt(name: GuideName, section: string, vars?: Record<string, string | number>): string {
   const t = guideSec(name, section) ?? guideDefaultSec(name, section) ?? '';
-  return vars ? fillVars(t, vars) : t;
-}
-/** 지침 절이 있으면 그 글(자리 채움), 없으면 코드에 남긴 옛 글 */
-export function guideOr(name: GuideName, section: string, fallback: string | (() => string), vars?: Record<string, string | number>): string {
-  const t = guideSec(name, section);
-  if (t === null) return typeof fallback === 'function' ? fallback() : fallback;
   return vars ? fillVars(t, vars) : t;
 }
