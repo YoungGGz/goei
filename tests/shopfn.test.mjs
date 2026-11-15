@@ -89,8 +89,8 @@ test('기본값: 참조 로어북 수가 넉넉하면 진열·문의 요청문�
     assert.deepEqual(shopReq(off, fn).msgs, shopOld(off, fn).msgs);
     for (const site of ['cos', 'bm']) assert.deepEqual(mallReq(off, site, fn).msgs, mallReq(off, site, fn, true).msgs);
   }
-  assert.ok(!JSON.stringify(shopReq(off, 'shelf').msgs).includes('[최근 본문]'));
-  assert.ok(JSON.stringify(shopReq(v, 'shelf').msgs).includes('[최근 본문]'));
+  assert.ok(!JSON.stringify(shopReq(off, 'shelf').msgs).includes('[최근 본문 — 작가용 배경]'));
+  assert.ok(JSON.stringify(shopReq(v, 'shelf').msgs).includes('[최근 본문 — 작가용 배경]'));
 });
 
 test('기본값: 1:1 상담 자료는 예전과 같고 맥락(챗로그·상태창·괴이)은 넘어가지 않는다', () => {
@@ -175,9 +175,9 @@ test('가게 표: 가게마다 따로 (변수 이름·기본값·서로 건드�
   assert.equal(M.mallSettings({ $cos_sh_ctx: '0' }, 'cos').context, false);
   assert.equal(M.mallSettings({ $cos_sh_ctx: '0' }, 'bm').context, true);
   const c = { $sh_refs: '12', $cos_sh_ctx: '0' };
-  assert.ok(!JSON.stringify(mallReq(c, 'cos', 'shelf').msgs).includes('[최근 본문]'));
-  assert.ok(JSON.stringify(mallReq(c, 'bm', 'shelf').msgs).includes('[최근 본문]'));
-  assert.ok(JSON.stringify(shopReq(c, 'shelf').msgs).includes('[최근 본문]'));
+  assert.ok(!JSON.stringify(mallReq(c, 'cos', 'shelf').msgs).includes('[최근 본문 — 작가용 배경]'));
+  assert.ok(JSON.stringify(mallReq(c, 'bm', 'shelf').msgs).includes('[최근 본문 — 작가용 배경]'));
+  assert.ok(JSON.stringify(shopReq(c, 'shelf').msgs).includes('[최근 본문 — 작가용 배경]'));
   // 같이 쓰는 나머지 값은 여전히 기본 상점 자리 하나
   assert.equal(M.mallSettings({ $cos_sh_thoughts: 'note', $cos_sh_turns: '8', $cos_sh_refs: '1' }, 'cos').thoughts, 'off');
   assert.equal(M.mallSettings({ $cos_sh_turns: '8' }, 'cos').turns, 3);
@@ -196,7 +196,7 @@ test('둘 다 켠 것만: 가게 표와 기능 표', () => {
   assert.ok(!sent({ $sh_fn_shelf_related: '0' }, 'shelf').some((h) => h.startsWith('관련')));
   assert.ok(!sent({ $sh_give_secondary: '1' }, 'shelf').some((h) => h.startsWith('2차')), '2차 참조는 둘 다 켜야');
   // 맥락 반영
-  const ctxSent = (vars, fn) => JSON.stringify(shopReq(vars, fn).msgs).includes('[진행 중 괴이·사건]');
+  const ctxSent = (vars, fn) => JSON.stringify(shopReq(vars, fn).msgs).includes('[진행 중 괴이·사건 — 작가용 배경]');
   assert.equal(ctxSent({}, 'shelf'), true);
   assert.equal(ctxSent({ $sh_fn_shelf_ctx: '0' }, 'shelf'), false);
   assert.equal(ctxSent({ $sh_ctx: '0', $sh_fn_shelf_ctx: '1' }, 'shelf'), false);
@@ -217,7 +217,7 @@ test('요청 종류마다 제 줄을 읽는다 (진열 · 문의 · 1:1 상담)'
   assert.ok(shelf.includes('공통:봇 설명') && talk.every((h) => h !== '공통:봇 설명') && desk.includes('공통:봇 설명'));
   assert.ok(shelf.some((h) => h.startsWith('활성')) && talk.some((h) => h.startsWith('활성')) && !desk.some((h) => h.startsWith('활성')));
   assert.ok(!shelf.some((h) => h.startsWith('관련')) && talk.some((h) => h.startsWith('관련')));
-  assert.ok(JSON.stringify(shopReq(v, 'shelf').msgs).includes('[최근 본문]') && !JSON.stringify(shopReq(v, 'talk').msgs).includes('[최근 본문]'));
+  assert.ok(JSON.stringify(shopReq(v, 'shelf').msgs).includes('[최근 본문 — 작가용 배경]') && !JSON.stringify(shopReq(v, 'talk').msgs).includes('[최근 본문 — 작가용 배경]'));
   // 쇼핑몰도 같은 기능 표를 같이 쓴다
   assert.ok(!heads(mallReq(v, 'cos', 'talk').src.refs).includes('공통:봇 설명'));
   assert.ok(heads(mallReq(v, 'cos', 'shelf').src.refs).includes('공통:봇 설명'));
