@@ -21,7 +21,7 @@ export interface RefRow {
 }
 
 export interface RefSource {
-  /** moduleLore: 켜진 모듈의 로어북. 「보조 호출 로어북 = Risu와 같게」일 때만 host/risu.ts 가 채운다 */
+  /** moduleLore: 켜진 모듈의 로어북. 「보조 호출 로어북 = 로어북 포함」일 때만 host/risu.ts 가 채운다 */
   char: { name?: string; desc?: string; globalLore?: LoreEntry[]; moduleLore?: LoreEntry[] };
   chat: Chat;
   /** 사용자 페르소나 설명 ({{persona}}, 창을 열 때 읽어 둔 값) */
@@ -188,7 +188,7 @@ export function collectRefs(src: RefSource, o: CollectOptions): RefRow[] {
   for (const x of o.extra ?? []) add('active', x.source, x.content);
   if (o.active !== false) for (const n of activeBooks(src.chat.scriptstate)) pull('active', n);
   if (o.related !== false) for (const e of referenceEntries(registry, o.text)) if (e.lore) pull('direct', e.lore);
-  // 「Risu와 같게」: 플러그인 틀 밖의 로어북(카드에 넣은 항목·채팅·모듈)을 Risu 규칙으로 더한다 (core/auxlore.ts). 위의 고르기는 그대로다
+  // 「로어북 포함」: 플러그인 틀 밖의 로어북(카드에 넣은 항목·채팅·모듈)을 Risu 규칙으로 더한다 (core/auxlore.ts). 위의 고르기는 그대로다
   const outside = auxLoreRisu(src.chat.scriptstate)
     ? outsideEntries({ card: src.char.globalLore, local: Array.isArray(src.chat.localLore) ? (src.chat.localLore as LoreEntry[]) : [], modules: src.char.moduleLore }, allowedBook)
     : [];

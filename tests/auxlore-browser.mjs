@@ -1,4 +1,4 @@
-// 보조 호출 로어북 「Risu와 같게」: 설정 → 로어북 호출의 고르기 줄, 켜면 모듈 로어북이 괴담톡 확인 요청에 들어가고 끄면(기본) 안 들어간다
+// 보조 호출 로어북 「로어북 포함」: 설정 → 로어북 호출의 고르기 줄, 켜면 모듈 로어북이 괴담톡 확인 요청에 들어가고 끄면(기본) 안 들어간다
 // 사용법: node tests/auxlore-browser.mjs <fixture.json>
 import { boot, closeEditor, launch, loadFixture, openEditor, openWin, sleep } from './qc-settings-harness.mjs';
 
@@ -25,7 +25,7 @@ for (const vp of ['pc', 'phone']) {
     const on = [...(box?.querySelectorAll('button.on, button[aria-pressed="true"]') ?? [])].map((b) => b.textContent.trim());
     return { found: !!el, on, btns: [...(box?.querySelectorAll('button') ?? [])].map((b) => b.textContent.trim()) };
   });
-  ok(row.found && row.btns.includes('플러그인 기준') && row.btns.includes('Risu와 같게') && row.on.includes('플러그인 기준'), `${vp} 설정 줄과 기본값`, JSON.stringify(row));
+  ok(row.found && row.btns.includes('플러그인 기준') && row.btns.includes('로어북 포함') && row.on.includes('플러그인 기준'), `${vp} 설정 줄과 기본값`, JSON.stringify(row));
   await page.evaluate(() => [...document.querySelectorAll('.gw .gw-body *')].find((x) => x.children.length === 0 && x.textContent.trim() === '보조 호출 로어북')?.scrollIntoView({ block: 'center' }));
   await sleep(200);
   await page.screenshot({ path: `${OUT}로어북호출_설정_${vp}.png` });
@@ -40,21 +40,21 @@ for (const vp of ['pc', 'phone']) {
   };
   const base = await request();
   ok(!base.includes('MODULE_ALWAYS_TEXT') && !base.includes('MODULE_KEYED_TEXT'), `${vp} 기본값: 모듈 로어북은 요청에 없다`);
-  // 「Risu와 같게」로 바꾼다 (채팅 변수) → 다시 읽은 뒤의 요청에는 항상 활성화 글과 키가 걸린 글이 들어간다
+  // 「로어북 포함」로 바꾼다 (채팅 변수) → 다시 읽은 뒤의 요청에는 항상 활성화 글과 키가 걸린 글이 들어간다
   await openEditor(page, 'set:lore'); await sleep(400);
   await page.evaluate(() => {
     const el = [...document.querySelectorAll('.gw .gw-body *')].find((x) => x.children.length === 0 && x.textContent.trim() === '보조 호출 로어북');
     const box = el?.closest('.ps-row, .adv-row, .st-row, li, section > div') ?? el?.parentElement?.parentElement;
-    [...(box?.querySelectorAll('button') ?? [])].find((b) => b.textContent.trim() === 'Risu와 같게')?.click();
+    [...(box?.querySelectorAll('button') ?? [])].find((b) => b.textContent.trim() === '로어북 포함')?.click();
   });
   await sleep(900);
   ok((await page.evaluate(() => window.__chat.scriptstate.$gen_aux_lore)) === 'risu', `${vp} 설정에서 고르면 이 채팅에 저장된다`);
   await page.screenshot({ path: `${OUT}로어북호출_설정_${vp}.png` });
   await closeEditor(page, true); await sleep(500);
   const on = await request();
-  ok(on.includes('MODULE_ALWAYS_TEXT'), `${vp} Risu와 같게: 항상 활성화 모듈 글이 들어간다`);
-  ok(on.includes('MODULE_KEYED_TEXT'), `${vp} Risu와 같게: 활성화 키가 대화에 나온 모듈 글이 들어간다`);
-  ok(!on.includes('MODULE_OTHER_TEXT'), `${vp} Risu와 같게: 키가 안 나온 모듈 글은 없다`);
+  ok(on.includes('MODULE_ALWAYS_TEXT'), `${vp} 로어북 포함: 항상 활성화 모듈 글이 들어간다`);
+  ok(on.includes('MODULE_KEYED_TEXT'), `${vp} 로어북 포함: 활성화 키가 대화에 나온 모듈 글이 들어간다`);
+  ok(!on.includes('MODULE_OTHER_TEXT'), `${vp} 로어북 포함: 키가 안 나온 모듈 글은 없다`);
   ok(errors.length === 0, `${vp} 콘솔 오류 없음`, errors.slice(0, 2).join(' | '));
   await page.close();
 }

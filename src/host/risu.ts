@@ -12,7 +12,7 @@ export interface CharacterSnapshot {
   chaId?: string;
   alternateGreetings?: string[];
   globalLore?: LoreEntry[];
-  /** 켜진 모듈의 로어북 (「보조 호출 로어북 = Risu와 같게」일 때만 채운다. core/auxlore.ts) */
+  /** 켜진 모듈의 로어북 (「보조 호출 로어북 = 로어북 포함」일 때만 채운다. core/auxlore.ts) */
   moduleLore?: LoreEntry[];
   [key: string]: unknown;
 }
