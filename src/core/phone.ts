@@ -10,6 +10,7 @@ import { attachmentRecords, describe, sitePicAsPhoto, stripForged } from './atta
 import { pickRecords, related, type Focus, type Pick } from './focus';
 import { guideTxt } from './guides';
 import type { ViewRoom } from './phoneView';
+import { messageHash, messageKey } from './people/store';
 export { hasAttachment } from './attach';
 
 export class PhoneError extends Error {
@@ -1104,7 +1105,11 @@ export function chatPrefixKept(before: Chat, now: Chat): boolean {
   const a = before.message ?? [];
   const b = now.message ?? [];
   if (b.length < a.length) return false;
-  for (let i = a.length - 1; i >= 0; i--) if (a[i]?.role !== b[i]?.role || a[i]?.data !== b[i]?.data) return false;
+  // 메시지 정체(chatId)와 읽음 판정용 내용 해시로 견준다. 플러그인이 응답 본문에 붙였다 떼는 것(상점 표식·이미지 태그·끝 줄바꿈)은 바뀐 것으로 보지 않는다
+  for (let i = a.length - 1; i >= 0; i--) {
+    if (a[i]?.role !== b[i]?.role || messageKey(a[i], i) !== messageKey(b[i], i)) return false;
+    if (a[i]?.data !== b[i]?.data && messageHash(a[i]) !== messageHash(b[i])) return false;
+  }
   return true;
 }
 
@@ -1174,13 +1179,18 @@ export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules:
     return `[MODULE_CONTEXT_BEGIN]\n${rules}${more}\n${JSON.stringify(body)}\n[MODULE_CONTEXT_END]`;
   };
   const over = (text: string) => HISTORY.contextTokens > 0 && tokens(text) > HISTORY.contextTokens;
+  // 보기 전용 방 몫을 먼저 떼어 둔다: 톡 기록이 상한을 다 채워도 가장 최근 방의 최근 말(톡 기록의 「아주 최근」과 같은 수, 상한의 절반까지)은 들어간다
+  const viewList = HISTORY.contextViews ? extra.views ?? [] : [];
+  const base = HISTORY.contextTokens > 0 ? HISTORY.contextTokens - tokens(payload([])) : Infinity;
+  const held = viewList.length && HISTORY.contextTokens > 0 ? mainViews(viewList, focus, base / 2, HISTORY.contextRecent) : [];
   const kept = pickRecords(items, {
     focus: HISTORY.focus, recent: HISTORY.contextRecent, max: HISTORY.context,
-    fits: (k) => !over(payload(k)),
+    fits: (k) => !over(payload(k, held)),
     // 기록마다 한 번만 센다 (전수검사 11-13: 후보마다 묶음 전체를 다시 세서 기록이 많으면 몇 초씩 늦었다)
-    cost: (d) => tokens(JSON.stringify(d)) + 1, room: HISTORY.contextTokens > 0 ? HISTORY.contextTokens - tokens(payload([])) : Infinity,
+    cost: (d) => tokens(JSON.stringify(d)) + 1, room: held.length ? HISTORY.contextTokens - tokens(payload([], held)) : base,
   });
-  const views = HISTORY.contextViews ? mainViews(extra.views ?? [], focus, HISTORY.contextTokens > 0 ? HISTORY.contextTokens - tokens(payload(kept)) : Infinity) : [];
+  // 톡 기록을 고르고 남은 토큰은 관전에 더 준다
+  const views = viewList.length ? mainViews(viewList, focus, HISTORY.contextTokens > 0 ? HISTORY.contextTokens - tokens(payload(kept)) : Infinity) : [];
   // 건별 합은 어림이라 실제 상한은 여기서 지킨다: 오래된 방의 오래된 말부터 뺀다
   while (views.length && over(payload(kept, views))) {
     const last = views[views.length - 1];
@@ -1192,19 +1202,19 @@ export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules:
 
 interface MainView { kind: string; name: string; viewpoint: string; time: string; messages: { sender: string; text: string }[] }
 /** 메인 요청에 붙일 보기 전용 방: 최근 방부터, 방마다 최근 말부터 room(토큰) 안에서 고른다. 말풍선 수는 「넣을 말풍선」까지.
- *  「장면에 나온 것만」이면 가장 최근 방과, 참여 인물 이름이 장면에 나온 방만 */
-function mainViews(list: ViewRoom[], focus: Focus | null | undefined, room: number): MainView[] {
+ *  「장면에 나온 것만」이면 가장 최근 방과, 참여 인물 이름이 장면에 나온 방만. only 를 주면 가장 최근 방의 최근 말 only 개까지만 */
+function mainViews(list: ViewRoom[], focus: Focus | null | undefined, room: number, only?: number): MainView[] {
   const out: MainView[] = [];
   let used = 0;
   let count = 0;
-  const rooms = list.slice().reverse().filter((r, i) => !HISTORY.focus || i === 0 || related(focus, r.people.map((p) => p.name)));
+  const rooms = list.slice().reverse().filter((r, i) => (only === undefined ? !HISTORY.focus || i === 0 || related(focus, r.people.map((p) => p.name)) : i === 0));
   for (const r of rooms) {
     const name = (id: string) => r.people.find((p) => p.id === id)?.name ?? id;
     const v: MainView = { kind: r.preset, name: r.name, viewpoint: name(r.pov), time: r.time, messages: [] };
     const head = tokens(JSON.stringify(v)) + 2;
     if (used + head > room) break;
     let sum = head;
-    for (let i = r.messages.length - 1; i >= 0 && count < HISTORY.context; i--) {
+    for (let i = r.messages.length - 1; i >= 0 && count < Math.min(HISTORY.context, only ?? Infinity); i--) {
       const m = r.messages[i];
       if (m.type !== 'text') continue;
       const row = { sender: name(m.sender), text: m.text };

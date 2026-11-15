@@ -311,6 +311,51 @@ test('자동 호출 결과: 채팅 뒤에 메시지가 붙기만 했으면 쓰�
   assert.doesNotMatch(ui, /automatic && \(chat\.message\?\.length \?\? 0\) !== startLength/);
 });
 
+test('메인 요청 기록: 톡 기록이 토큰 상한을 채워도 켜 둔 보기 전용 방의 최근 말은 들어간다', () => {
+  const st = P.blankState();
+  const r = dmRoom('c_1');
+  st.rooms[r.id] = r;
+  for (let i = 0; i < 300; i++) P.push(st, r, i % 2 ? 'c_1' : 'me', `톡 말 ${i} ${'가나다라마바사아자차'.repeat(5)}`, 't');
+  const views = [{ id: 'v_1', preset: 'side', name: '퇴근길', pov: 'p1', people: [{ id: 'p1', name: '에일린' }, { id: 'p2', name: '동료' }], time: 't',
+    unread: false, messages: Array.from({ length: 10 }, (_, i) => ({ sender: i % 2 ? 'p1' : 'p2', type: 'text', text: `관전 말 ${i}` })) }];
+  const set = P.phoneSettings({});
+  const read = (text) => JSON.parse(text.split('\n').at(-2));
+  try {
+    for (const vars of [{ '$ph_adv_ctx_focus': '0' }, {}]) {
+      ADV.applyAdvanced({ ...vars });
+      const off = read(P.mainContext(st, { items: [] }, set, 'R', { scene: '상대가 휴대폰을 본다', names: ['상대'] }, { views }));
+      assert.equal(off.viewOnlyRooms, undefined, '끄면 전과 같다');
+      ADV.applyAdvanced({ ...vars, '$ph_adv_ctx_views': '1' });
+      const text = P.mainContext(st, { items: [] }, set, 'R', { scene: '상대가 휴대폰을 본다', names: ['상대'] }, { views });
+      const on = read(text);
+      assert.ok(countTokens(text) <= 4000, `상한 안 (${countTokens(text)})`);
+      assert.ok(on.viewOnlyRooms?.[0].messages.length >= 6, `관전 방의 최근 말이 들어간다 (${on.viewOnlyRooms?.[0].messages.length ?? 0})`);
+      assert.equal(on.viewOnlyRooms[0].messages.at(-1).text, '관전 말 9');
+      assert.ok(on.records.length >= off.records.length - 8 && on.records.at(-1).text === off.records.at(-1).text, '톡 기록은 관전 몫만큼만 줄고 최근 것은 그대로');
+    }
+  } finally {
+    ADV.applyAdvanced({});
+  }
+});
+
+test('자동 호출 결과: 플러그인이 응답에 붙였다 뗀 것(상점 표식·이미지 태그·끝 줄바꿈)은 바뀐 것으로 보지 않는다', () => {
+  const before = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '가게에 들어갔다.', chatId: 'c1' }] };
+  const next = (data, chatId = 'c1') => ({ message: [before.message[0], { role: 'char', data, chatId }, { role: 'user', data: '다음 말', chatId: 'u2' }] });
+  assert.equal(P.chatPrefixKept(before, next('가게에 들어갔다.\n[shop: 잡화점|주인]')), true, '갱신기가 상점 표식을 붙임');
+  assert.equal(P.chatPrefixKept({ message: [before.message[0], { role: 'char', data: '가게에 들어갔다.\n[shop: 잡화점|주인]', chatId: 'c1' }] }, next('가게에 들어갔다.')), true, '지난 응답의 상점 표식을 지움');
+  assert.equal(P.chatPrefixKept(before, next('가게에 들어갔다.\n')), true, '끝 줄바꿈');
+  assert.equal(P.chatPrefixKept(before, next('<img=가게>\n가게에 들어갔다.')), true, '이미지 태그 보충');
+  assert.equal(P.chatPrefixKept(before, next('가게에 들어갔다.', 'c9')), false, '같은 글이어도 다른 메시지(다시 굴림)');
+  assert.equal(P.chatPrefixKept(before, next('가게를 지나쳤다.')), false, '내용을 고침');
+});
+
+test('자동 확인·자동 관전: 본편 응답을 기다리는 동안에는 결과를 저장하지 않고 대기가 풀린 뒤 저장한다', () => {
+  const ui = readFileSync(new URL('../src/ui/phone.ts', import.meta.url), 'utf8');
+  // 두 곳 모두 저장(updateChat) 바로 앞에서 기다리고, 기다린 뒤 저장 안에서 앞 메시지를 다시 확인한다
+  assert.equal(ui.match(/if \(automatic\) await whenIdle\(\);\n    await updateChat\(ctx\.charIndex, ctx\.chatIndex, \(chat\) => \{\n[^\n]*\n      if \(automatic && !chatPrefixKept\(ctx\.chat, chat\)\)/g)?.length, 2);
+  assert.match(ui, /function whenIdle\(\): Promise<void> \{\n  if \(!isWaiting\(\)\) return Promise\.resolve\(\);/);
+});
+
 test('답장·확인 요청: 괴담넷 글·다른 방 말풍선·후보 수를 설정으로 줄이거나 끈다 (기본은 전과 같다)', { skip: !realLore }, () => {
   const gst = { seq: POST_BASE, posts: [], dms: [], sources: {} };
   for (let i = 0; i < 3; i++) userPost(gst, '나', `글 ${i}`, '본문', '2025.05.13 14:00');

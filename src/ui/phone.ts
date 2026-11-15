@@ -39,6 +39,7 @@ import { personaText } from '../host/user';
 import { playerSource } from '../core/player';
 import { updateChat, type ChatContext } from '../host/risu';
 import { isPhone } from './media';
+import { isWaiting, onWaiting } from '../host/waiting';
 
 type Sub = 'contacts' | 'chats' | 'notices';
 
@@ -114,6 +115,18 @@ function envForAuto(ctx: { charIndex: number; chatIndex: number }): PhoneEnv {
   if (!env) return quietEnv;
   const showing = env.current?.();
   return showing === undefined || (showing && chatKey(showing) === chatKey(ctx)) ? env : quietEnv;
+}
+
+/** 본편 응답 대기가 풀릴 때까지 (host/people.ts waitNotBusy 와 같은 방식). 요청 도중에 채팅을 저장하면 응답과 겹쳐 덮을 수 있다 */
+function whenIdle(): Promise<void> {
+  if (!isWaiting()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const off = onWaiting((w) => {
+      if (w) return;
+      off();
+      resolve();
+    });
+  });
 }
 
 const PAGE = 40;
@@ -402,6 +415,8 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
       first: joint && ((m) => joint.ask('phone', m)),
     });
     let note = '';
+    // 자동 확인은 사용자가 다음 말을 보낸 뒤에 끝날 수 있다: 본편 응답을 기다리는 동안에는 저장하지 않고, 대기가 풀린 뒤 앞 메시지가 그대로인지 확인하고 저장한다
+    if (automatic) await whenIdle();
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
       // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
       if (automatic && !chatPrefixKept(ctx.chat, chat)) {
@@ -814,6 +829,8 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
     let note = '';
     let id = '';
     let roomName = value.name;
+    // 본편 응답을 기다리는 동안에는 저장하지 않는다 (refreshInbox 와 같음)
+    if (automatic) await whenIdle();
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
       // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
       if (automatic && !chatPrefixKept(ctx.chat, chat)) {
