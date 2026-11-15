@@ -98,3 +98,15 @@ test('로어북 토큰 예산 설정: 늘 켜진 가상 항목이 있어도 설�
   assert.ok(small <= 3000, '작은 로어북은 3000 안에 든다');
   assert.deepEqual(run({ budget: 0 }).budget, all.budget, '0 = 카드 설정');
 });
+
+test('로어북 토큰 예산 설정: 자리 항목이 있는 카드에서는 카드 예산 몫을 넘지 않는다 (Risu가 자리 항목을 빼지 않게)', () => {
+  const chat = { message: [], scriptstate: {} };
+  const slots = Object.values(lore.SLOTS).map((s) => ({ comment: s.comment, key: '', mode: 'normal', content: '' }));
+  const card = { globalLore: slots, loreSettings: { tokenBudget: 20000 } };
+  const base = lore.loreOptions(card, chat, 'plugin').budget;
+  assert.equal(base, 18000);
+  assert.equal(lore.loreOptions(card, chat, 'plugin', '', { budget: 50000 }).budget, base, '카드 몫보다 크게 적어도 카드 몫');
+  assert.equal(lore.loreOptions(card, chat, 'plugin', '', { budget: 5000 }).budget, 5000, '작게 적으면 그 값');
+  const free = { globalLore: [], loreSettings: { tokenBudget: 20000 } };
+  assert.equal(lore.loreOptions(free, chat, 'plugin', '', { budget: 50000 }).budget, 50000, '자리 항목 없는 카드는 설정값 그대로');
+});

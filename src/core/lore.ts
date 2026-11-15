@@ -606,15 +606,18 @@ export function loreOptions(char: { name?: string; globalLore?: LoreEntry[]; lor
   // over: 플러그인 설정 「검색 깊이」·「로어북 토큰 예산」 (core/advanced.ts loreLimits). 플러그인이 고를 때만 쓰고, 0·없음이면 카드 설정
   const own = mode === 'plugin' ? over : undefined;
   const depth = Number(own?.depth) > 0 ? Number(own?.depth) : Number(ls.scanDepth) > 0 ? Number(ls.scanDepth) : DEFAULT_DEPTH;
-  // 플러그인 설정값은 고른 로어북 전체의 상한 그대로 쓴다 (늘 켜진 몫·여유분을 빼지 않는다). 카드 설정은 아래 식
+  // 플러그인 설정값은 고른 로어북 전체의 상한 그대로 쓴다 (늘 켜진 몫·여유분을 빼지 않는다). 카드 설정은 아래 식. 자리 항목이 있는 카드는 카드 몫이 상한
   const ownBudget = Number(own?.budget) > 0 ? Math.floor(Number(own?.budget)) : 0;
   const total = Number(ls.tokenBudget) > 0 ? Number(ls.tokenBudget) : DEFAULT_BUDGET;
   const slots = new Set(LORE_KINDS.map((k) => SLOTS[k].comment));
   const always = (char.globalLore ?? []).filter((e) => e.alwaysActive && e.mode !== 'folder' && !slots.has(str(e.comment))).reduce((n, e) => n + tokens(str(e.content)), 0);
+  const cardBudget = total ? Math.max(1, Math.floor((total - always) * 0.9)) : 0;
+  // 자리 항목이 있는 카드는 Risu 가 카드 예산으로 자리 항목을 끼우므로, 설정값이 커도 카드 몫을 넘기지 않는다 (넘으면 Risu 가 자리 항목을 통째로 뺀다)
+  const budget = !ownBudget ? cardBudget : hasSlots(char.globalLore) ? Math.min(ownBudget, cardBudget) : ownBudget;
   return {
     mode,
     depth,
-    budget: ownBudget || (total ? Math.max(1, Math.floor((total - always) * 0.9)) : 0),
+    budget,
     env: { vars: chat.scriptstate ?? {}, char: char.name, ...(user ? { user } : {}) },
   };
 }
