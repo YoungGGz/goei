@@ -337,8 +337,10 @@ export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ct
   const situation = ['$an_report', '$in_report'].map((k) => String(vars[k] ?? '').trim()).filter(Boolean).join('\n').slice(0, 1500);
   const identity = peopleSettings(vars).on ? identityText(peopleStore(ctx.chat).identity) : '';
   // 가게 표와 기능 표 가운데 하나라도 맥락 반영이 꺼져 있으면 신분·상태창·괴이·챗로그를 넘기지 않는다
-  if (give && !give.context) return { st, refs: refText(rows), story: '', status: '', situation: '', identity: '', language: genSettings(vars).language };
-  return { st, refs: refText(rows), story, status, situation, identity, language: genSettings(vars).language };
+  // 양 표 「지난 대화」: 진열·문의 요청에 같이 넘기는 지난 문의 대화의 줄 수 (give 가 없으면 전부)
+  const talkMax = give ? { talkMax: give.talk } : {};
+  if (give && !give.context) return { st, refs: refText(rows), story: '', status: '', situation: '', identity: '', language: genSettings(vars).language, ...talkMax };
+  return { st, refs: refText(rows), story, status, situation, identity, language: genSettings(vars).language, ...talkMax };
 }
 
 /** 팔기 확정 (「판매」 단추와 주인의 <deal/> 가 같이 쓴다): 가계부 수입(src store) + 소지품에서 뺌(기록 sell) + 판 것 목록. 팔 수 없으면 null */
@@ -383,7 +385,7 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
       next = applyShelf(st0, value, s);
     } else {
       const { value } = await generate(talkPrompt(src, s), s.model, parseTalk, opts);
-      next = applyTalk(st0, value, s.kick);
+      next = applyTalk(st0, value, s.kick, s.talkStock);
       // 말로 판 것: 주인이 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리
       if (value.deal && next.sell && typeof next.sell.price === 'number') deal = next.sell.itemId;
     }

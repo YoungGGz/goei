@@ -12,7 +12,7 @@ import { HS_MAIN_SET, hsMainSettings, type HsLogKind } from '../core/hslog';
 import { SHOP_MAIN_ALL, SHOP_MAIN_KINDS, SHOP_MAIN_LABEL, SHOP_MAIN_LINES, SHOP_PLACES, shopMain, shopMainLines, type ShopPlace } from '../core/shopctx';
 import { advChipsCtl, advCtl } from './advanced';
 import { advValue } from '../core/advanced';
-import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopFnNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
+import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopAmountNone, shopFnNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
 import { siteLogo } from './browser';
 import { ICONS } from './icons';
 import { ckWide, helpBox, mxGrid, numCtl, numSet, setGroup, setRow, setSeg, stepSize, type CkBand } from './setrow';
@@ -240,7 +240,7 @@ export function shopTable(vars: State, busy = false): string {
   // 망상홈쇼핑 줄 (2026-11-13): 방송에서 생기는 것은 다른 가게와 달라 칸 셋(방송 내용·시청자 채팅·내 채팅)을 더한다. 주문은 「구매」 칸. 값은 core/hslog.ts ($hs_main·$hs_main_kinds·$hs_main_tokens)
   const hsRow = rows.find((r) => r.id === 'hs')!;
   const hm = hsMainSettings(v);
-  const HS_EXTRA: [HsLogKind, string][] = [['show', '방송 내용'], ['chat', '시청자 채팅'], ['say', '내 채팅']];
+  const HS_EXTRA: [HsLogKind, string][] = [['show', '방송 내용'], ['chat', '시청자 채팅'], ['say', '내 채팅'], ['aside', '스티커·상담원']];
   const hsCell = (k: HsLogKind) => hm.kinds.includes(k);
   const hsAct = (k: HsLogKind) => (hm.on ? `s:hs:main_hs_${k}=${hsCell(k) ? '0' : '1'}` : null);
   const attach: CkBand = { title: '메인 요청에 붙이는 것', groups: [
@@ -259,12 +259,16 @@ export function shopTable(vars: State, busy = false): string {
       ['맞춤 주문', '주문한 일, 완성된 일, 받은 물건이에요. 완성된 일은 우주 쇼핑몰 설정의 「완성 알림」이 「카드 + 메인 요청」일 때만 붙어요.'],
       ['방송 내용', '망상홈쇼핑에서 본 편성 제목, 상품, 진행자 대사예요.'],
       ['내 채팅', '방송 채팅에 내가 친 말과 거기에 돌아온 반응이에요.'],
+      ['스티커·상담원', '망상홈쇼핑에서 들춰 본 스티커 밑 글과 전화 주문 상담원의 말이에요.'],
+      ['진열', '사지 않은 물건까지 진열대 전체와, 진열과 함께 온 주인의 말이나 쇼핑몰 공지예요. 쇼핑몰은 진열을 받은 턴에만 붙어요.'],
     ]) };
   const numBox = (key: string, n: number, lo: number, hi: number, unit: string, label: string) => `<div class="st-step adv-step${stepSize(hi, unit, '제한 없음')}"><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.max(lo, n - 1)}" ${n <= lo || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 줄이기">−</button><input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" data-change="fam-num" data-key="${key}" value="${n === 0 ? '' : n}" placeholder="제한 없음" aria-label="최대 양 ${label}"${busy ? ' disabled' : ''}><span>${unit}</span><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.min(hi, n + 1)}" ${n >= hi || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 늘리기">+</button></div>`;
   const HT = HS_MAIN_SET.tokens;
-  const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [hsN, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, hsN)]]), helpBox('', [
+  const HU = HS_MAIN_SET.turns;
+  const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [hsN, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, hsN)], ['시청 기록', numBox('s:hs:main_turns', hm.turns, HU.lo, HU.hi, HU.unit, '시청 기록')]]), helpBox('', [
     ['대화', '「문의」와 「1:1 상담」으로 붙이는 대화의 줄 수예요. 넘으면 최근 줄만 붙여요.'],
     [hsN, '망상홈쇼핑에서 붙이는 것의 토큰 상한이에요. 넘으면 오래된 시청자 채팅부터 빼요.'],
+    ['시청 기록', '망상홈쇼핑 방송을 마지막으로 본 턴부터 몇 턴 동안 붙일지예요. 비우면 다음 편성을 받을 때까지 붙여요.'],
   ])));
   /* ── 1-2. 가게 표: 줄 = 가게 넷, 칸 = 넘길 내용 여섯 + 맥락 반영 (core/shopfn.ts) ── */
   const GIVE_OPTS = ['봇 설명', '작가 노트', '페르소나', '상시 로어북', '관련 로어북', '2차 참조', '맥락 반영'];
@@ -284,13 +288,14 @@ export function shopTable(vars: State, busy = false): string {
     marks: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => (shopFnNone(f.key, k) ? null : shopFnOn(v, f.key, k)))),
     acts: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => (shopFnNone(f.key, k) ? null : `s:shop:fn_${f.key}_${k}=${shopFnOn(v, f.key, k) ? '0' : '1'}`))),
     foot: helpBox('가게 표와 기능 표에서 모두 켠 것만 넘겨요. 「–」는 그곳에 없는 값이에요.') };
-  const AMT = ['turns', 'refs'] as const;
+  const AMT = ['turns', 'refs', 'talk'] as const;
   const amountFn: CkBand = { title: '넘길 양', groups: AMT.map((k) => ({ name: SHOP_AMOUNTS[k].label, opts: [SHOP_AMOUNTS[k].unit], kind: 'num' as const })),
-    marks: SHOP_FNS.map((f) => AMT.map((k) => ({ n: shopFnNum(v, f.key, k), lo: SHOP_AMOUNTS[k].min, hi: SHOP_AMOUNTS[k].max }))),
-    acts: SHOP_FNS.map((f) => AMT.map((k) => `s:shop:fn_${f.key}_${k}`)),
+    marks: SHOP_FNS.map((f) => AMT.map((k) => (shopAmountNone(f.key, k) ? null : { n: shopFnNum(v, f.key, k), lo: SHOP_AMOUNTS[k].min, hi: SHOP_AMOUNTS[k].max }))),
+    acts: SHOP_FNS.map((f) => AMT.map((k) => (shopAmountNone(f.key, k) ? null : `s:shop:fn_${f.key}_${k}`))),
     foot: helpBox('', [
       ['챗로그', '맥락 반영이 켜져 있을 때 넘기는 최근 턴의 수예요. 꺼져 있어도 관련 로어북을 고를 때는 이만큼 읽어요.'],
       ['참조 로어북', '관련 로어북과 2차 참조 가운데 넘기는 수예요.'],
+      ['지난 대화', '진열을 새로 받거나 문의할 때 같이 넘기는 지난 문의 대화의 줄 수예요. 넘으면 최근 줄만 넘겨요.'],
     ]) };
   const fnPart = `<h2 class="fam-h">기능마다 따로 정하는 값</h2><div class="fam-wide">${ckWide([giveFn], FL, busy)}${ckWide([amountFn], FL, busy)}</div>`;
 
@@ -305,6 +310,7 @@ export function shopTable(vars: State, busy = false): string {
     ]),
     R('다양성 강화', sw('diverse', s0.diverse), '켜면 싼 것, 비싼 것, 흔한 것, 특이한 것을 섞어 받아요.'),
     R('지난 목록 피하기', sw('prev', s0.avoidPrev), '켜면 지난번에 나온 물건을 다시 내지 않게 해요.'),
+    R('문의로 물건 바꾸기', sw('talkstock', s0.talkStock), '끄면 주인이나 운영자가 말로 물건을 더하거나 진열을 새로 짜지 않아요. 문의 요청에서 진열 규칙이 빠져 요청이 짧아져요. 값 흥정은 그대로 돼요.'),
   ].join(''));
   const note = blocked ? `<p class="gx-hint">${blocked === 'both' ? '소지품과 가계부가' : blocked === 'items' ? '소지품이' : '가계부가'} 꺼져 있어 기본 상점과 쇼핑몰 둘을 쓸 수 없어요. 산 물건은 소지품에, 돈은 가계부로 오가서 둘 다 켜져 있어야 해요.</p>` : '';
   /* ── 3. 기본 상점에만 있는 값: 거래 끊음 + (ui/settings.ts 가 잇는) 열리는 조건 ── */

@@ -9,16 +9,18 @@ export type ShopPlace = 'shop' | 'cos' | 'bm';
 export const SHOP_PLACES: ShopPlace[] = ['shop', 'cos', 'bm'];
 export const isShopPlace = (v: unknown): v is ShopPlace => v === 'shop' || v === 'cos' || v === 'bm';
 
-/** 붙일 것: 구매 · 팔기 · 문의(주인·운영자와 나눈 말, 거래 끊김) · 맞춤 주문(선납·완성) · 1:1 상담 */
-export type ShopMainKind = 'buy' | 'sell' | 'ask' | 'order' | 'desk';
-export const SHOP_MAIN_ALL: ShopMainKind[] = ['buy', 'sell', 'ask', 'order', 'desk'];
+/** 붙일 것: 구매 · 팔기 · 문의(주인·운영자와 나눈 말, 거래 끊김) · 맞춤 주문(선납·완성) · 1:1 상담 · 진열(사지 않은 물건까지 진열대 전체, 진열과 함께 온 주인의 말·몰 공지) */
+export type ShopMainKind = 'buy' | 'sell' | 'ask' | 'order' | 'desk' | 'shelf';
+export const SHOP_MAIN_ALL: ShopMainKind[] = ['buy', 'sell', 'ask', 'order', 'desk', 'shelf'];
 /** 화면 이름 (그 화면들에 이미 있는 말) */
-export const SHOP_MAIN_LABEL: Record<ShopMainKind, string> = { buy: '구매', sell: '팔기', ask: '문의', order: '맞춤 주문', desk: '1:1 상담' };
+export const SHOP_MAIN_LABEL: Record<ShopMainKind, string> = { buy: '구매', sell: '팔기', ask: '문의', order: '맞춤 주문', desk: '1:1 상담', shelf: '진열' };
+/** 따로 켜야 붙는 종류 (기본 끔): 진열은 전에는 메인 요청에 가지 않던 것이라, 켠 가게에서만 붙인다. 나머지는 기본 켬 */
+export const SHOP_MAIN_OFF: ShopMainKind[] = ['shelf'];
 /** 가게마다 실제로 생기는 것 (core/shop.ts shopEvents · core/malls.ts mallEvents · core/items.ts newlyBought·soldNow) */
 export const SHOP_MAIN_KINDS: Record<ShopPlace, ShopMainKind[]> = {
-  shop: ['buy', 'sell', 'ask'],
-  cos: ['buy', 'ask', 'order'],
-  bm: ['buy', 'desk'],
+  shop: ['buy', 'sell', 'ask', 'shelf'],
+  cos: ['buy', 'ask', 'order', 'shelf'],
+  bm: ['buy', 'desk', 'shelf'],
 };
 
 /** 변수: 기본 상점 `$sh_main`·`$sh_main_buy` …, 쇼핑몰 `$cos_sh_main`·`$bm_sh_main_desk` … (쇼핑몰 설정 이름 규칙 mallKey 와 같은 꼴) */
@@ -41,7 +43,7 @@ export interface ShopMain {
 
 export function shopMain(vars: Vars, p: ShopPlace): ShopMain {
   const on = vars?.[shopMainKey(p)] !== '0';
-  const kinds = Object.fromEntries(SHOP_MAIN_ALL.map((k) => [k, SHOP_MAIN_KINDS[p].includes(k) && vars?.[shopMainKey(p, k)] !== '0'])) as Record<ShopMainKind, boolean>;
+  const kinds = Object.fromEntries(SHOP_MAIN_ALL.map((k) => [k, SHOP_MAIN_KINDS[p].includes(k) && (SHOP_MAIN_OFF.includes(k) ? vars?.[shopMainKey(p, k)] === '1' : vars?.[shopMainKey(p, k)] !== '0')])) as Record<ShopMainKind, boolean>;
   return { on, kinds, has: (k) => on && kinds[k] };
 }
 

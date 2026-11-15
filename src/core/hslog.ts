@@ -5,7 +5,8 @@ import { tokens } from './gnet';
 import { related, type Focus } from './focus';
 import { guideTxt } from './guides';
 import { aliveAnchors } from './wallet';
-import { liveOrders, type HsShow } from './homeshop';
+import { HS_KEY, liveOrders, type HsShow } from './homeshop';
+import { messageKey } from './people/store';
 import type { Chat } from './types';
 
 /** 시청 기록 (채팅 변수, JSON) */
@@ -18,9 +19,14 @@ const TEXT_MAX = 200;
 
 type Vars = Record<string, unknown> | undefined;
 
-/** show = 진행자 대사(와 편성 제목·상품) · chat = 시청자 채팅 · say = 내 채팅과 그 반응 · buy = 전화 주문·맞교환 */
-export type HsLogKind = 'show' | 'chat' | 'say' | 'buy';
-export const HS_LOG_KINDS: HsLogKind[] = ['show', 'chat', 'say', 'buy'];
+/** show = 진행자 대사(와 편성 제목·상품) · chat = 시청자 채팅 · say = 내 채팅과 그 반응 · buy = 전화 주문·맞교환 · aside = 들춰 본 스티커 밑 한 줄과 전화 주문 상담원의 말 */
+export type HsLogKind = 'show' | 'chat' | 'say' | 'buy' | 'aside';
+export const HS_LOG_KINDS: HsLogKind[] = ['show', 'chat', 'say', 'buy', 'aside'];
+/** 따로 정하지 않았을 때 넘기는 종류: 스티커·상담원 말(aside)은 전에는 메인 요청에 가지 않던 것이라 켠 때만 넘긴다 */
+export const HS_LOG_DEF: HsLogKind[] = ['show', 'chat', 'say', 'buy'];
+/** aside 줄의 who: 스티커 밑 한 줄은 지침 「망상홈쇼핑」의 LOG_STICKER_NICK 절, 상담원 말은 LOG_OPERATOR_NICK 절 */
+export const hsLogSticker = (): string => guideTxt('Hs', 'LOG_STICKER_NICK');
+export const hsLogOperator = (): string => guideTxt('Hs', 'LOG_OPERATOR_NICK');
 export interface HsLogEntry {
   k: HsLogKind;
   /** 몇 부 (0부터) */
@@ -42,6 +48,8 @@ export interface HsLog {
   /** 화면에 나온 부의 상품 (부 번호 → 상품) */
   items: Record<string, HsLogItem>;
   entries: HsLogEntry[];
+  /** 마지막으로 줄을 적은 턴 (core/shop.ts turnKey). 「최근 N턴만 넘기기」가 이 턴부터 센다. 없는 옛 기록은 세지 않는다 */
+  at?: string;
 }
 export const emptyLog = (): HsLog => ({ key: '', pid: '', title: '', items: {}, entries: [] });
 
@@ -65,7 +73,7 @@ export function readLog(vars: Vars): HsLog {
     for (const [p, it] of Object.entries(j.items && typeof j.items === 'object' ? j.items : {})) {
       if (it && typeof it === 'object' && typeof it.name === 'string') items[p] = { name: it.name, pay: String(it.pay ?? ''), desc: String(it.desc ?? '') };
     }
-    return { key: String(j.key ?? ''), pid: String(j.pid ?? ''), title: String(j.title ?? ''), items, entries: j.entries.map(entryOf).filter((e): e is HsLogEntry => !!e) };
+    return { key: String(j.key ?? ''), pid: String(j.pid ?? ''), title: String(j.title ?? ''), items, entries: j.entries.map(entryOf).filter((e): e is HsLogEntry => !!e), ...(typeof j.at === 'string' && j.at ? { at: j.at } : {}) };
   } catch {
     return emptyLog();
   }
@@ -81,19 +89,21 @@ const mine = (e: HsLogEntry) => e.k === 'buy' || (e.k === 'say' && !!e.me);
 
 /**
  * 화면에 나온 줄을 덧붙인다. 다른 편성이면 기록을 갈아 끼운다 (지금 편성 하나만).
- * 대본 줄(진행자 대사·시청자 채팅)은 같은 부를 다시 틀어도 한 번만 적는다. 돌려주는 것은 채팅 변수 조각 (바뀐 것이 없으면 빈 것)
+ * 대본 줄(진행자 대사·시청자 채팅)과 스티커·상담원 말은 같은 부를 다시 틀어도 한 번만 적는다. 돌려주는 것은 채팅 변수 조각 (바뀐 것이 없으면 빈 것).
+ * turn: 적는 때의 턴 열쇠 (core/shop.ts turnKey). 주면 기록에 남겨 「최근 N턴만 넘기기」가 이 턴부터 센다
  */
-export function appendLog(vars: Vars, show: Pick<HsShow, 'key' | 'title' | 'parts'>, entries: HsLogEntry[]): Record<string, string> {
+export function appendLog(vars: Vars, show: Pick<HsShow, 'key' | 'title' | 'parts'>, entries: HsLogEntry[], turn = ''): Record<string, string> {
   const add = entries.map(entryOf).filter((e): e is HsLogEntry => !!e);
   if (!add.length) return {};
   const old = readLog(vars);
   const same = old.key === show.key && old.pid === showPid(show);
   const log: HsLog = same ? { ...old, title: clean(show.title, 60), items: { ...old.items }, entries: [...old.entries] } : { key: show.key, pid: showPid(show), title: clean(show.title, 60), items: {}, entries: [] };
   const id = (e: HsLogEntry) => `${e.k}\u0001${e.p}\u0001${e.who}\u0001${e.text}`;
-  const seen = new Set(log.entries.filter((e) => e.k === 'show' || e.k === 'chat').map(id));
+  const once = (e: HsLogEntry) => e.k === 'show' || e.k === 'chat' || e.k === 'aside';
+  const seen = new Set(log.entries.filter(once).map(id));
   let changed = !same;
   for (const e of add) {
-    if (e.k === 'show' || e.k === 'chat') {
+    if (once(e)) {
       if (seen.has(id(e))) continue;
       seen.add(id(e));
     }
@@ -102,6 +112,8 @@ export function appendLog(vars: Vars, show: Pick<HsShow, 'key' | 'title' | 'part
     const it = show.parts[e.p]?.item;
     if (it && !log.items[e.p]) log.items[e.p] = { name: clean(it.name, 60), pay: clean(it.pay || (it.price > 0 ? guideTxt('Hs', 'LOG_PAY_WON', { price: it.price.toLocaleString('en-US') }) : ''), 40), desc: clean(it.desc, 200) };
   }
+  // 같은 줄을 다시 본 것뿐이어도 본 턴은 새로 적는다 (「넘기는 기간」이 마지막으로 본 턴부터 세게)
+  if (turn && log.at !== turn) { log.at = turn; changed = true; }
   if (!changed) return {};
   // 한계: 내 채팅·주문이 아닌 오래된 줄부터, 그래도 넘으면 가장 오래된 줄부터
   let over = log.entries.length - HS_LOG_MAX;
@@ -114,34 +126,53 @@ export function appendLog(vars: Vars, show: Pick<HsShow, 'key' | 'title' | 'part
 
 // ── 설정 (채팅 변수. 설정 화면은 다른 곳에서 이 표를 읽어 만든다) ──
 
-export const HS_MAIN_KEY = { on: '$hs_main', kinds: '$hs_main_kinds', tokens: '$hs_main_tokens' } as const;
+export const HS_MAIN_KEY = { on: '$hs_main', kinds: '$hs_main_kinds', tokens: '$hs_main_tokens', turns: '$hs_main_turns' } as const;
 /** 설정 표: 변수 이름 · 기본값 · 범위 · 화면 이름 (제안) */
 export const HS_MAIN_SET = {
   on: { key: HS_MAIN_KEY.on, def: '1', values: ['1', '0'], label: '시청 기록을 메인 요청에 넘기기', hint: '방송에서 본 것·친 채팅·주문을 메인 요청의 참고 기록으로 넣어요' },
   kinds: {
-    key: HS_MAIN_KEY.kinds, def: HS_LOG_KINDS.join(','), values: HS_LOG_KINDS, label: '넘길 기록',
-    labels: { show: '방송 내용(편성 제목·상품·진행자 대사)', chat: '시청자 채팅', say: '내 채팅과 반응', buy: '전화 주문·맞교환' } as Record<HsLogKind, string>,
+    key: HS_MAIN_KEY.kinds, def: HS_LOG_DEF.join(','), values: HS_LOG_KINDS, label: '넘길 기록',
+    labels: { show: '방송 내용(편성 제목·상품·진행자 대사)', chat: '시청자 채팅', say: '내 채팅과 반응', buy: '전화 주문·맞교환', aside: '스티커·상담원 말' } as Record<HsLogKind, string>,
   },
   tokens: { key: HS_MAIN_KEY.tokens, def: 3000, lo: 0, hi: 200000, unit: '토큰', label: '컨텍스트 토큰 상한', zero: '제한 없음' },
+  /** 마지막으로 방송을 본 턴부터 몇 턴 동안 넘기나. 0 = 다음 편성을 받을 때까지 (전과 같은 동작) */
+  turns: { key: HS_MAIN_KEY.turns, def: 0, lo: 0, hi: 99, unit: '턴', label: '넘기는 기간', zero: '제한 없음' },
 } as const;
-export interface HsMainSettings { on: boolean; kinds: HsLogKind[]; tokens: number }
+export interface HsMainSettings { on: boolean; kinds: HsLogKind[]; tokens: number; turns: number }
 export function hsMainSettings(vars: Vars): HsMainSettings {
   const rawKinds = vars?.[HS_MAIN_KEY.kinds];
   const picked = typeof rawKinds === 'string' && rawKinds !== '' ? rawKinds.split(/[,\s]+/).map((x) => x.trim().toLowerCase()).filter(isKind) : null;
   const t = HS_MAIN_SET.tokens;
   const n = Number(vars?.[t.key]);
   const raw = vars?.[t.key];
+  const u = HS_MAIN_SET.turns;
+  const un = Number(vars?.[u.key]);
+  const uraw = vars?.[u.key];
   return {
     on: vars?.[HS_MAIN_KEY.on] !== '0',
     // 「none」처럼 아는 종류가 하나도 없는 글이면 아무것도 안 넘긴다 (비었거나 없으면 기본 = 전부)
-    kinds: picked ? HS_LOG_KINDS.filter((k) => picked.includes(k)) : [...HS_LOG_KINDS],
+    kinds: picked ? HS_LOG_KINDS.filter((k) => picked.includes(k)) : [...HS_LOG_DEF],
     tokens: raw === undefined || raw === '' || !Number.isFinite(n) ? t.def : Math.max(t.lo, Math.min(t.hi, Math.round(n))),
+    turns: uraw === undefined || uraw === '' || !Number.isFinite(un) ? u.def : Math.max(u.lo, Math.min(u.hi, Math.round(un))),
   };
 }
 /** 본편에 넘길 것이 있나 (기록이 있고 켜져 있을 때) */
 /** 망상홈쇼핑에서 산 물건을 메인 요청에 넘기나: 망상홈쇼핑 줄 「컨텍스트 포함」과 「구매」 칸 (전수검사 11-13) */
 export const hsBuyPasses = (vars: Vars): boolean => { const m = hsMainSettings(vars); return m.on && m.kinds.includes('buy'); };
-export const hsMainOn = (vars: Vars): boolean => !!vars?.[HS_LOG_VAR] && hsMainSettings(vars).on && hsMainSettings(vars).kinds.length > 0;
+/** 망상홈쇼핑을 꺼 두었으면 남아 있는 옛 시청 기록도 넘기지 않는다 */
+export const hsMainOn = (vars: Vars): boolean => !!vars?.[HS_LOG_VAR] && vars?.[HS_KEY.on] !== '0' && hsMainSettings(vars).on && hsMainSettings(vars).kinds.length > 0;
+
+/** 기록을 마지막으로 적은 턴 뒤로 본편 응답이 몇 번 더 나왔나. 그 턴을 못 찾으면(옛 기록·지워진 메시지) 0 */
+export function hsLogAge(chat: Chat, log: Pick<HsLog, 'at'>): number {
+  const m = /^t:(.+)$/.exec(log.at ?? '');
+  if (!m || m[1].startsWith('first:')) return 0;
+  const list = chat.message ?? [];
+  const from = list.findIndex((x, i) => messageKey(x, i) === m[1]);
+  if (from < 0) return 0;
+  let bots = 0;
+  for (let i = from + 1; i < list.length; i++) if (list[i].role === 'char') bots++;
+  return Math.max(0, bots - 1);
+}
 
 /** 머리말: 지침 「망상홈쇼핑」의 MAIN_CONTEXT 절 (고친 지침에 없거나 비었으면 기본 지침 파일의 절. 2026-11-14 사용자: 코드에 글을 두지 않는다) */
 export const hsMainRules = (): string => guideTxt('Hs', 'MAIN_CONTEXT');
@@ -153,6 +184,7 @@ function lineOf(e: HsLogEntry): Line {
   if (e.k === 'show') return { type: 'host', text: e.text };
   if (e.k === 'chat') return { type: 'viewer', nick: e.who, text: e.text };
   if (e.k === 'buy') return { type: 'user_order', text: e.text };
+  if (e.k === 'aside') return e.who === hsLogSticker() ? { type: 'under_the_usage_sticker', text: e.text } : { type: 'phone_order_operator', text: e.text };
   if (e.me) return { type: 'user_chat', nick: e.who, text: e.text };
   return e.who === hsLogHost() ? { type: 'host_reply_to_user', text: e.text } : { type: 'viewer_reply_to_user', nick: e.who, text: e.text };
 }
@@ -165,8 +197,10 @@ function lineOf(e: HsLogEntry): Line {
 export function hsMainContext(chat: Chat, rule: string, focus?: Focus | null, cap?: number): string {
   const vars = chat.scriptstate;
   const set = hsMainSettings(vars);
-  if (!set.on || !set.kinds.length) return '';
+  if (!set.on || !set.kinds.length || vars?.[HS_KEY.on] === '0') return '';
   const log = readLog(vars);
+  // 「넘기는 기간」: 마지막으로 방송을 본 턴부터 그 턴 수만큼만 넘긴다 (0 = 다음 편성을 받을 때까지)
+  if (set.turns > 0 && hsLogAge(chat, log) >= set.turns) return '';
   // 없던 일이 된 주문(주문한 응답이 지워짐)은 뺀다
   const orders = log.entries.some((e) => e.k === 'buy' && e.ref) ? new Set(liveOrders(vars, aliveAnchors(chat)).map((o) => o.id)) : null;
   const entries = log.entries.filter((e) => set.kinds.includes(e.k) && !(e.k === 'buy' && e.ref && !orders?.has(e.ref)));

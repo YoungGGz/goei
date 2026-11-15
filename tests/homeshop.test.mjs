@@ -274,3 +274,32 @@ test('망상홈쇼핑: 큐 낱말은 영어로 주고, 영어·우리말 둘 다
   assert.deepEqual([s.sayCue, s.sayChat], [[2, 4], [0, 9]]);
   assert.deepEqual([homeshop.hsSettings({}).sayCue, homeshop.hsSettings({}).sayChat], [[1, 3], [2, 5]]);
 });
+
+test('망상홈쇼핑 편성 요청문: 「스티커 들추기」「물건 맞교환」을 꺼 두면 스티커 밑 글·맞교환 말을 청하지 않는다 (켜 두면 전과 같다)', () => {
+  const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '무이자 N회' }, prev: [] };
+  const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
+  const fill = { cue: '6 to 10', chat: '12 to 18', cuts: '와이드, 바스트', moods: '말하기', moods_b: '-', events: '가격 공개' };
+  const sys = (extra) => core1112.programPrompt(src, core1112.shopSettings({}), { ...fill, ...extra }).find((m) => m.role === 'system').content;
+  const all = sys({});
+  assert.match(all, /<\/chat>\n<peek>\none line per item, in shelf order\n<\/peek>\n<operator>\nhello\|[^\n]+\ndone\|[^\n]+\nbarter\|[^\n]+\n<\/operator>\n<cue>:/);
+  assert.match(all, /\n<peek>: what shows under the usage sticker/);
+  const noPeek = sys({ peek_block: '', peek_rule: '' });
+  assert.doesNotMatch(noPeek, /<peek>|usage sticker when a viewer lifts/);
+  assert.match(noPeek, /<\/chat>\n<operator>\nhello\|/);
+  assert.match(noPeek, /\nbarter\|/);
+  const noBarter = sys({ barter_line: '' });
+  assert.doesNotMatch(noBarter, /barter\|/);
+  assert.match(noBarter, /\ndone\|[^\n]+\n<\/operator>/);
+  assert.match(noBarter, /<peek>\n/);
+  const none = sys({ peek_block: '', peek_rule: '', barter_line: '' });
+  assert.doesNotMatch(none, /<peek>|barter\||\{[a-z_]+\}|\n\n\n/);
+  assert.ok(none.length < all.length);
+  // 스티커 밑 글·맞교환 말이 없는 응답도 그대로 읽는다 (예전 꼴의 응답도 계속 읽는다)
+  const raw = (more) => `<title>밤 편성</title>\n<shelf>\n무전기|무이자 6회|-|기기/무전기/radio|0.3|받는다|\n</shelf>\n<cue>\n#1\nwide|talk|어서 오세요|-\n</cue>\n<chat>\n#1\nㅇㅇ|와\n</chat>\n${more}`;
+  const bare = homeshop.parseShow(raw('<operator>\nhello|네 고객님\ndone|접수했습니다\n</operator>'), new Map());
+  assert.deepEqual(bare.peeks, []);
+  assert.deepEqual(bare.ops, { hello: '네 고객님', done: '접수했습니다', barter: '' });
+  const old = homeshop.parseShow(raw('<peek>\n사실은 받는 쪽\n</peek>\n<operator>\nhello|네\ndone|접수\nbarter|물건 받았습니다\n</operator>'), new Map());
+  assert.deepEqual(old.peeks, ['사실은 받는 쪽']);
+  assert.equal(old.ops.barter, '물건 받았습니다');
+});

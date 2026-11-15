@@ -24,7 +24,7 @@ import { shopSource } from './shop';
 import { itemPic } from './items';
 import { isPhone } from './media';
 import { playerFlush } from './hsplayer';
-import { appendLog, sameProgram, type HsLogEntry } from '../core/hslog';
+import { appendLog, hsLogOperator, hsLogSticker, sameProgram, type HsLogEntry } from '../core/hslog';
 import { isWaiting, onWaiting } from '../host/waiting';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -102,8 +102,14 @@ function cueWords(): Record<string, string> {
 }
 /** 편성 요청문: 방송 전용 지침(첫 절·물건 줄·방송 꼴·시청자 절·생각 단계). 상점 진열 지침은 빌리지 않는다 (11-12 사용자) */
 const range = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : guideTxt('Hs', 'COUNT_RANGE', { lo: r[0], hi: r[1] }));
+/** 편성 지침의 고를 수 있는 부분: 「스티커 들추기」를 꺼 두면 스티커 밑 한 줄을, 「물건 맞교환」을 꺼 두면 상담원의 맞교환 말을 청하지 않는다 (받아도 화면에 쓰이지 않는다) */
+export const broadcastParts = (s: Pick<HsSettings, 'peek' | 'barter'>): Record<string, string> => ({
+  peek_block: s.peek ? guideTxt('Hs', 'BROADCAST_PEEK') : '',
+  peek_rule: s.peek ? guideTxt('Hs', 'BROADCAST_PEEK_RULE') : '',
+  barter_line: s.barter ? guideTxt('Hs', 'BROADCAST_BARTER') : '',
+});
 function showPrompt(ctx: ChatContext, show: HsShow, s: HsSettings): LlmMessage[] {
-  return programPrompt(showSource(ctx, show, s), s.shop, { ...cueWords(), cue: range(s.cue), chat: range(s.chat) }) as LlmMessage[];
+  return programPrompt(showSource(ctx, show, s), s.shop, { ...cueWords(), cue: range(s.cue), chat: range(s.chat), ...broadcastParts(s) }) as LlmMessage[];
 }
 
 /** 호출 흐름 미리 계산용 (모델은 안 부름). 꺼져 있으면 null */
@@ -222,6 +228,11 @@ export async function homeshopAction(action: string, value: string | undefined, 
       ui.agree = false;
       ui.audNo = '';
       env.render();
+      // 전화를 걸면 상담원의 첫 말이 화면에 나온다: 시청 기록에 적는다 (설정 「스티커·상담원」을 켠 때만 메인 요청에 간다)
+      if (ui.pop === 'call') {
+        const { show, part, ordered } = nowPart(ctx);
+        if (part && !ordered && show.ops?.hello) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogOperator(), text: show.ops.hello }], show);
+      }
       return true;
     case 'hs-pay':
       ui.pay = value === 'barter' ? 'barter' : 'inst';
@@ -231,10 +242,14 @@ export async function homeshopAction(action: string, value: string | undefined, 
       ui.barter = value ?? '';
       env.render();
       return true;
-    case 'hs-lift':
+    case 'hs-lift': {
       ui.lifted = true;
       env.render();
+      // 들춰 본 스티커 밑 한 줄도 시청 기록에 적는다
+      const { show, part } = nowPart(ctx);
+      if (part?.peek && hsSettings(ctx.chat.scriptstate).peek) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogSticker(), text: part.peek }], show);
       return true;
+    }
     case 'hs-agree':
       ui.agree = !ui.agree;
       env.render();
@@ -297,7 +312,7 @@ function saveLog(charIndex: number, chatIndex: number, entries: HsLogEntry[], sh
   void whenIdle().then(() => updateChat(charIndex, chatIndex, (chat) => {
     const cur = readShow(chat.scriptstate);
     if (!sameProgram(cur, show)) return null;
-    const vars = appendLog(chat.scriptstate, cur, entries);
+    const vars = appendLog(chat.scriptstate, cur, entries, turnKey(chat));
     return Object.keys(vars).length ? { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } } : null;
   })).catch((error) => console.log(`[goei] ${hsName()} 시청 기록 저장 실패: ${error instanceof Error ? error.message : String(error)}`));
 }
@@ -352,7 +367,9 @@ async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
     ok = true;
     usedBarter = !!gave;
     // 시청 기록의 주문 줄 (본편 참고 기록, core/hslog.ts). 주문 id 를 달아 두어 주문이 없던 일이 되면 본편에도 안 간다
-    const bought = appendLog(chat.scriptstate, show, [{ k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how }), ref: o.id }]);
+    // 주문을 받으며 상담원이 한 말(확정·맞교환)도 같이 적는다
+    const opSaid = (gave ? show.ops?.barter : show.ops?.done) ?? '';
+    const bought = appendLog(chat.scriptstate, show, [{ k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how }), ref: o.id }, ...(opSaid ? [{ k: 'aside' as const, p: show.at, who: hsLogOperator(), text: opSaid }] : [])], turnKey(chat));
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o]), ...bought } };
   });
   if (ok) {

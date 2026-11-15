@@ -888,15 +888,20 @@ export function recentItemLog(chat: Chat, it: Items, n: number, vars?: Record<st
   const list = chat.message ?? [];
   const keys = new Set<string>();
   for (let i = list.length - 1; i >= 0 && keys.size < n; i--) if (list[i].role === 'char') keys.add(messageKey(list[i], i));
+  // 망상홈쇼핑 전화 주문·맞교환: 이 턴의 것은 같은 글의 「새로 산 것」(택배 상자)과 「This turn」(맞교환으로 낸 물건) 줄이 이미 넘기므로 여기서 되풀이하지 않는다
+  const nowKey = lastBotKey(chat);
+  const hsBarter = guideTxt('Hs', 'ORDER_BARTER_NOTE');
   return it.log.filter((l) => {
     if (!l.anchor || !keys.has(l.anchor)) return false;
     // 상점 「메인 요청에 붙이는 것」을 끈 판 것·산 것은 뺀다 (soldNow·newlyBought 와 같게, 전수검사 11-13)
     if (l.what === 'sell') {
       const note = String(l.note ?? '');
+      if (l.anchor === nowKey && note === hsBarter) return false;
       return soldPasses(vars, note.replace(/에 팖$/, '').trim(), /에 팖$/.test(note));
     }
     if (l.what === 'get' && l.by === 'store') {
       const e = it.list.find((x) => x.id === l.item);
+      if (e && e.store === 'hs' && e.from === 'store' && l.anchor === nowKey && e.anchor === nowKey && !e.outHow) return false;
       return !e || (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store));
     }
     return true;

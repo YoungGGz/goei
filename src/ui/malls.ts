@@ -15,12 +15,12 @@ import { addItem, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, li
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
 import { liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, worldMinute, type CosOrder } from '../core/orders';
-import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, parseShelf, parseTalk, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
+import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, parseShelf, parseTalk, pointPrice, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
-import { DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
-import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAutoKey, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
+import { carryDesk, DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
+import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
 import { SHOP_SIZE_HI, SHOP_SIZE_LO } from '../core/shop';
 import { onOffSwitch } from './controls';
 import { shopSource } from './shop';
@@ -97,7 +97,7 @@ const balanceOf = (ctx: ChatContext, site: MallSite): number => {
 };
 const loggedNick = (ctx: ChatContext): string => (String(ctx.chat.scriptstate?.['$br_login'] ?? '') === '1' ? String(ctx.chat.scriptstate?.['$br_nick'] ?? '').trim() : '');
 /** 자동 호출 「창을 열 때」: 마지막으로 짠 응답 */
-const atKey = (site: MallSite) => `$${site}_shop_at`;
+const atKey = mallAtKey;
 
 // ── 모델 ──
 
@@ -146,6 +146,9 @@ export function mergeLate(now: ShopState, next: ShopState, st0: ShopState): Shop
 /** mergeLate 에 넘길 「저장 직전 상태」: 요청 전 상태를 읽을 때와 똑같이 살아 있는 응답 기준으로 읽는다 */
 export const lateNow = (chat: ChatContext['chat'], site: MallSite): ShopState => readMall(chat.scriptstate, site, aliveAnchors(chat));
 
+/** 요청에 「진행 중 맞춤 주문」 목록을 넣나: 우주 쇼핑몰의 문의 요청에만 (견적 규칙이 문의 지침에만 있다) */
+export const sendsOrders = (site: MallSite, kind: 'shelf' | 'talk'): boolean => site === 'cos' && kind === 'talk';
+
 async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf' | 'talk', st0: ShopState): Promise<void> {
   const job = `${chatKey(ctx)}:${site}`;
   if (jobs.has(job)) return;
@@ -164,14 +167,15 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
     // 우주몰 진열: 칸마다 장르·값 등급을 굴려 넣는다 (11-09 사용자: 새로고침해도 같은 물건)
     if (kind === 'shelf') src.assign = cosAssignment(s.size[0] + Math.floor(Math.random() * (s.size[1] - s.size[0] + 1)), give.context, mallRoll(ctx.chat.scriptstate, site), Math.random, site); // 포인트몰도 (11-09 사용자)
     if (site === 'cos') src.truthMode = cosTruthMode(ctx.chat.scriptstate);
-    if (site === 'cos') { const od = ordersText(liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat)), worldMinute(ctx.chat), lastBot(ctx.chat)?.key ?? ''); if (od) src.orders = od; }
+    // 진행 중 맞춤 주문 목록은 문의 요청에만 (견적 규칙은 문의 지침에만 있어 진열 요청에서는 쓰이지 않는다)
+    if (sendsOrders(site, kind)) { const od = ordersText(liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat)), worldMinute(ctx.chat), lastBot(ctx.chat)?.key ?? ''); if (od) src.orders = od; }
     const g = genSettings(ctx.chat.scriptstate);
     const opts = { retries: g.retries, retryModel: g.retryModel, concurrent: g.concurrent, state: ctx.chat.scriptstate, label: `${MALL_NAME[site]} ${kind === 'shelf' ? '진열' : '문의'}` };
     let next: ShopState;
     let note: string | null = null;
     let deal = '';
     if (kind === 'shelf') {
-      const { value } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => parseShelf(raw, st0.loaded ? st0.identity : null), opts);
+      const { value } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => { const r = parseShelf(raw, st0.loaded ? st0.identity : null); return site === 'bm' ? { ...r, items: r.items.map(pointPrice) } : r; }, opts);
       let applied = applyShelf(st0, value, s);
       if (site === 'cos') {
         // 시그니처 상품 (설정 「시그니처 상품」): 모델이 같은 이름을 냈으면 버리고, 확률대로 코드가 끼운다 (이미 진열돼 있거나 산 것은 건너뜀)
@@ -184,7 +188,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       next = { ...applied, talk: st0.talk };
     } else {
       const { value } = await generate(talkPrompt(src, s, MALL_GUIDE[site]), s.model, parseTalk, opts);
-      next = stampLastLine(applyTalk(st0, value, false), lastBot(ctx.chat)?.key ?? '');
+      next = stampLastLine(applyTalk(st0, value, false, s.talkStock), lastBot(ctx.chat)?.key ?? '');
       // 우주몰: 문의로 새로 들어온 물건에 진실 칸이 비었으면 「?」 (시그니처 상품 fixedItem 과 같게 — 광고 문구가 사실이 되지 않게, 전수검사 11-13)
       if (site === 'cos') { const had = new Set(st0.items.map((x) => x.id)); next = { ...next, items: next.items.map((x) => (!x.sold && !had.has(x.id) && !x.truth ? { ...x, truth: '?' } : x)) }; }
       // 말로 판 것: 운영자가 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리
@@ -648,6 +652,13 @@ async function deskOpen(ctx: ChatContext, env: MallEnv): Promise<boolean> {
   let st = readDesk(ctx.chat.scriptstate);
   const key = lastBot(ctx.chat)?.key ?? '';
   if (st.agent && st.anchor === key) return env.render(), true;
+  // 연결만 해 두고 말을 걸지 않은 상담은 턴이 넘어가도 그대로 이어 쓴다 (새 상담사를 다시 만들지 않는다)
+  const kept = carryDesk(st, key);
+  if (kept) {
+    await saveDesk(ctx, kept);
+    await env.refresh();
+    return true;
+  }
   if (st.agent) st = endDesk(st);
   const again = pickAgain(st, ds);
   if (again) {

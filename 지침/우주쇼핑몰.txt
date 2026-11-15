@@ -47,7 +47,6 @@ Output, in this order:
 sells: what this shop sells, in one line
 never: what this shop does not and will not sell (one line)
 prices: how this shop is paid (money, or what the reference material says it takes) and its price character, in one line, from who runs it and what the place is
-currency: points only if this is Baekilmong's company point shop (the Welfare Mall), paid only in Baekilmong welfare points — then every 값 is a plain integer in points; otherwise won. Any other shop never accepts Baekilmong points.
 </shop-identity>
 <owner>
 the owner's first line to the protagonist, in character, 1–3 sentences, Korean, no stage directions
@@ -83,6 +82,10 @@ This is Baekilmong's point shop: every price and every offer is a plain integer 
 
 @@SECTION TALK
 The protagonist speaks to the owner. Read what they mean from context — do not keyword-match. Decide the owner's reaction from the owner's character and the fixed shop identity. Requests for something not on the shelf: fetch it (partial add) only if it fits the shop identity; otherwise the owner says they do not carry it. If the player wants a different selection, re-stock the whole shelf (all). Questions and small talk change nothing (none).
+@@END
+
+@@SECTION TALK_NO_STOCK
+In this reply the stock on the shelf is fixed: never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines). When the protagonist asks for something not on the shelf or for a different selection, the owner answers in words only. A custom-order quote, where this shop takes custom orders, is still allowed.
 @@END
 
 @@SECTION TALK_FEATURE

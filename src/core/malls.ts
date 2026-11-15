@@ -4,7 +4,7 @@
 import type { Chat } from './types';
 import { type TruthMode, emptyShop, readShop, reviveShop, SHOP_VAR, shopBlocked, shopSettings, type ShopSettings, type ShopState } from './shop';
 import { guideTxt, type GuideName } from './guides';
-import { lastBot, SHOP_CTX_VAR, SHOP_SHARED_VARS } from './shop';
+import { lastBot, shelfMainText, SHOP_CTX_VAR, SHOP_SHARED_VARS, turnKey } from './shop';
 import { liveOrders, readyNotes } from './orders';
 import { readDesk } from './bmdesk';
 import { aliveAnchors } from './wallet';
@@ -70,6 +70,8 @@ export const mallVarsOf = (site: MallSite, st: ShopState): Record<string, string
 /** 진열대와 함께 온 운영자 한마디·몰 공지 (문의 대화와 따로, 첫 화면에 보인다) */
 export const mallNoteKey = (site: MallSite) => `${MALL_VAR[site]}_note`;
 export const mallNote = (vars: Vars, site: MallSite): string => String(vars?.[mallNoteKey(site)] ?? '');
+/** 진열대를 마지막으로 받은 턴 (core/shop.ts turnKey). 「이 턴에 이미 짰나」와 「이 턴에 받은 진열인가」를 가린다 */
+export const mallAtKey = (site: MallSite) => `${MALL_VAR[site]}_at`;
 
 /** 이번 턴에 쇼핑몰을 새로 짤지 (자동 호출 「매 턴」) */
 export const mallTurnRefresh = (chat: Chat, site: MallSite): boolean => mallSettings(chat.scriptstate, site).on && mallSettings(chat.scriptstate, site).auto === 'turn' && readMall(chat.scriptstate, site).loaded;
@@ -258,6 +260,17 @@ export function mallEvents(chat: Chat): string[] {
       const at = lastBot(chat)!.index;
       for (const o of readyNotes(chat).get(at) ?? []) out.push(guideTxt('Main', 'MALL.READY', { mall: MALL_NAME.cos, item: o.item.name }));
     }
+  }
+  // 「진열」(기본 끔): 이 턴에 받은 진열대 전체(사지 않은 물건까지)와 같이 온 운영자 한마디·몰 공지. 진열을 받은 턴에 한 번만 넘어간다
+  const turn = turnKey(chat);
+  for (const site of MALL_SITES) {
+    if (!shopMain(vars, site).has('shelf') || !turn || String(vars?.[mallAtKey(site)] ?? '') !== turn) continue;
+    const st = readMall(vars, site, aliveAnchors(chat));
+    if (!st.loaded) continue;
+    const shelf = shelfMainText(st);
+    if (shelf) out.push(guideTxt('Main', 'MALL.SHELF', { mall: MALL_NAME[site], items: shelf }));
+    const note = mallNote(vars, site);
+    if (note) out.push(guideTxt('Main', 'MALL.NOTICE', { mall: MALL_NAME[site], text: note }));
   }
   const desk = readDesk(vars);
   // 상담 줄마다 적힌 응답 키로 거른다 (키 없는 옛 줄은 상담 키): 창을 열어 둔 채 다음 턴에 이어 한 말도 넘어가고, 지난 턴 줄은 다시 안 간다 (전수검사 11-13)

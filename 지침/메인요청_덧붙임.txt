@@ -811,6 +811,34 @@ protagonist: "{text}"
 owner: "{text}"
 @@END
 
+@@SECTION INVENTORY.SHOP.SHELF
+the shelf of {shop} now offers these, not bought — {items}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_ITEM
+{name} ({price}){desc}{effect}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_DESC
+: {desc}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_EFFECT
+, effect: {effect}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_PRICE_WON
+{price} won
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_PRICE_POINTS
+{price} Baekilmong points
+@@END
+
+@@SECTION INVENTORY.SHOP.OWNER_SAID
+the owner of {shop} said on showing the shelf: "{line}"
+@@END
+
 @@SECTION STATUS.RECENT_CASH_LINE
 {amount} won {memo}
 @@END
@@ -829,6 +857,14 @@ the custom order 「{item}」 from {mall} is now finished and waiting; the prota
 
 @@SECTION MALL.DESK
 chatted by text with a counselor on the {mall} 1:1 상담 — {lines}
+@@END
+
+@@SECTION MALL.SHELF
+the {mall} website now lists these, not bought — {items}
+@@END
+
+@@SECTION MALL.NOTICE
+the front page of the {mall} website reads: "{text}"
 @@END
 
 @@SECTION MALL.LINE

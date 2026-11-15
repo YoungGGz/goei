@@ -75,7 +75,7 @@ test('시청 기록: 줄 수 한계 — 오래된 줄부터 버리되 내 채팅
 });
 
 test('설정: 기본값 · 끄기 · 종류 · 토큰 범위 · 설정 표', () => {
-  assert.deepEqual(hsMainSettings(undefined), { on: true, kinds: ['show', 'chat', 'say', 'buy'], tokens: 3000 });
+  assert.deepEqual(hsMainSettings(undefined), { on: true, kinds: ['show', 'chat', 'say', 'buy'], tokens: 3000, turns: 0 });
   assert.equal(hsMainSettings({ $hs_main: '0' }).on, false);
   assert.deepEqual(hsMainSettings({ $hs_main_kinds: 'buy, say' }).kinds, ['say', 'buy']);
   assert.deepEqual(hsMainSettings({ $hs_main_kinds: '' }).kinds.length, 4, '비우면 기본');
@@ -203,4 +203,60 @@ test('본편 참고 기록: 없던 일이 된 주문은 넘기지 않는다 · f
   const tight = budget.fitTotal([part, other], 200);
   assert.ok(budget.promptTokens({ messages: tight.map((content) => ({ content })) }) <= 200, '총 상한 안');
   assert.ok(tight[0] === '' || body(tight[0]).records.some((r) => r.lines.some((l) => l.type === 'user_chat' || l.type === 'user_order')), '줄여도 내 채팅·주문부터 남는다');
+});
+
+// ── 스티커·상담원 말(aside): 적기는 늘 적고, 메인 요청에는 켠 때만 ──
+test('스티커 밑 글·상담원 말: 기본은 메인 요청에 안 가고, 「스티커·상담원」을 켜면 간다', () => {
+  const show = showOf('k1');
+  const aside = (p, who, text) => ({ k: 'aside', p, who, text });
+  let vars = appendLog({}, show, [host(0, '첫 줄'), aside(0, hslog.hsLogSticker(), '사실 이건 무전기가 아니다'), aside(0, hslog.hsLogOperator(), '네, 고객님. 망상홈쇼핑입니다.')]);
+  // 같은 글을 다시 들춰도 한 번만 적는다
+  vars = { ...vars, ...appendLog(vars, show, [aside(0, hslog.hsLogSticker(), '사실 이건 무전기가 아니다')]) };
+  assert.equal(readLog(vars).entries.filter((e) => e.k === 'aside').length, 2);
+  assert.deepEqual(hsMainSettings({}).kinds, ['show', 'chat', 'say', 'buy'], '기본 종류에 없다');
+  const off = hsMainContext(chatOf(vars), RULE, null, 0);
+  assert.doesNotMatch(off, /무전기가 아니다|망상홈쇼핑입니다/);
+  const on = hsMainContext(chatOf({ ...vars, $hs_main_kinds: 'show,chat,say,buy,aside' }), RULE, null, 0);
+  const lines = body(on).records[0].lines;
+  assert.deepEqual(lines.filter((l) => l.type === 'under_the_usage_sticker'), [{ type: 'under_the_usage_sticker', text: '사실 이건 무전기가 아니다' }]);
+  assert.deepEqual(lines.filter((l) => l.type === 'phone_order_operator'), [{ type: 'phone_order_operator', text: '네, 고객님. 망상홈쇼핑입니다.' }]);
+  // 스티커·상담원 말만 있는 기록은 꺼 두면 아무것도 안 넘긴다
+  const only = appendLog({}, show, [aside(0, hslog.hsLogSticker(), '밑글')]);
+  assert.equal(hsMainContext(chatOf(only), RULE, null, 0), '');
+});
+
+test('넘기는 기간: 기본(0)은 다음 편성까지 계속, N턴이면 마지막으로 본 턴부터 N번만 넘긴다', () => {
+  const show = showOf('k1');
+  const msgs = (n) => { const out = []; for (let i = 1; i <= n; i++) out.push({ role: 'user', data: `u${i}`, chatId: `u${i}` }, { role: 'char', data: `c${i}`, chatId: `c${i}` }); return out; };
+  // 2턴째(u2 → c2) 뒤에 방송을 봤다
+  const vars = appendLog({}, show, [host(0, '첫 줄')], 't:u2');
+  assert.equal(readLog(vars).at, 't:u2');
+  const ctx = (n, extra = {}) => hsMainContext({ message: msgs(n), scriptstate: { ...vars, ...extra } }, RULE, null, 0);
+  for (const n of [2, 3, 9]) assert.ok(ctx(n).includes('첫 줄'), `기본: ${n}턴째에도 넘긴다`);
+  assert.equal(hsMainSettings({ $hs_main_turns: '2' }).turns, 2);
+  assert.equal(hsMainSettings({ $hs_main_turns: '' }).turns, 0);
+  assert.equal(hsMainSettings({ $hs_main_turns: '999' }).turns, HS_MAIN_SET.turns.hi);
+  assert.equal(hslog.hsLogAge({ message: msgs(2) }, readLog(vars)), 0);
+  assert.equal(hslog.hsLogAge({ message: msgs(4) }, readLog(vars)), 2);
+  assert.ok(ctx(2, { $hs_main_turns: '2' }).includes('첫 줄'), '본 턴');
+  assert.ok(ctx(3, { $hs_main_turns: '2' }).includes('첫 줄'), '그다음 턴');
+  assert.equal(ctx(4, { $hs_main_turns: '2' }), '', '2턴이 지나면 안 넘긴다');
+  assert.equal(ctx(3, { $hs_main_turns: '1' }), '');
+  // 다시 보면(줄이 새로 적히면) 그 턴부터 다시 센다
+  const again = { ...vars, ...appendLog(vars, show, [host(0, '둘째 줄')], 't:u4') };
+  assert.ok(hsMainContext({ message: msgs(4), scriptstate: { ...again, $hs_main_turns: '1' } }, RULE, null, 0).includes('둘째 줄'));
+  // 같은 줄을 다시 보기만 해도 본 턴은 새로 적힌다
+  assert.equal(readLog({ ...vars, ...appendLog(vars, show, [host(0, '첫 줄')], 't:u5') }).at, 't:u5');
+  assert.deepEqual(appendLog(vars, show, [host(0, '첫 줄')], 't:u2'), {}, '같은 턴에 같은 줄이면 바뀐 것이 없다');
+  // 턴이 안 적힌 옛 기록은 세지 않고 넘긴다
+  const legacy = appendLog({}, show, [host(0, '옛 줄')]);
+  assert.ok(hsMainContext({ message: msgs(9), scriptstate: { ...legacy, $hs_main_turns: '1' } }, RULE, null, 0).includes('옛 줄'));
+});
+
+test('망상홈쇼핑을 꺼 두면 남아 있는 시청 기록을 메인 요청에 넘기지 않는다', () => {
+  const { vars } = full();
+  assert.equal(hsMainOn(vars), true);
+  assert.equal(hsMainOn({ ...vars, $hs_on: '0' }), false);
+  assert.equal(hsMainContext(chatOf({ ...vars, $hs_on: '0' }), RULE, null, 0), '');
+  assert.notEqual(hsMainContext(chatOf(vars), RULE, null, 0), '');
 });

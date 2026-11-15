@@ -10,7 +10,8 @@ const out = await build({
       export { HS_PAIRS } from './src/core/setdef/homeshop';
       export { shopGiveOn } from './src/core/shopfn';
       export { dropDoubleSync, syncPointsToStatus, readPoints } from './src/core/points';
-      export { mergeLate, lateNow } from './src/ui/malls';
+      export { mergeLate, lateNow, sendsOrders } from './src/ui/malls';
+      export { broadcastParts } from './src/ui/homeshop';
       export { mallVarsOf, readMall } from './src/core/malls';
       export { aliveAnchors } from './src/core/wallet';
       export { markSold } from './src/core/shop';
@@ -117,4 +118,20 @@ test('settings#6: 최소가 최대를 넘으면 짝도 같이 맞춘다', () => 
   // 짝 없는 칸
   assert.deepEqual(M.hsNumVars({}, 'speed', 12, pair('speed')), { [K('speed')]: '12' });
   assert.deepEqual(M.hsNumVars({}, 'nope', 1), {});
+});
+
+test('우주 쇼핑몰: 「진행 중 맞춤 주문」 목록은 문의 요청에만 넣는다 (진열 요청에는 쓰는 곳이 없다)', () => {
+  assert.equal(M.sendsOrders('cos', 'talk'), true);
+  assert.equal(M.sendsOrders('cos', 'shelf'), false);
+  assert.equal(M.sendsOrders('bm', 'talk'), false);
+  assert.equal(M.sendsOrders('bm', 'shelf'), false);
+});
+
+test('망상홈쇼핑 편성: 꺼 둔 「스티커 들추기」「물건 맞교환」은 지침에서 빠진다', () => {
+  const all = M.broadcastParts({ peek: true, barter: true });
+  assert.match(all.peek_block, /^<peek>\n[^\n]+\n<\/peek>$/);
+  assert.match(all.peek_rule, /^<peek>: /);
+  assert.match(all.barter_line, /^barter\|/);
+  assert.deepEqual(M.broadcastParts({ peek: false, barter: true }), { peek_block: '', peek_rule: '', barter_line: all.barter_line });
+  assert.deepEqual(M.broadcastParts({ peek: true, barter: false }), { peek_block: all.peek_block, peek_rule: all.peek_rule, barter_line: '' });
 });

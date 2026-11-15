@@ -265,6 +265,10 @@ ID 지정 모델
 : {intro}
 @@END
 
+@@SECTION MENUS.LINE_SHORT
+- {menu}{intro}
+@@END
+
 @@SECTION MENUS.OTHERS_HEAD
 이 창에서 바꿀 수 없는 곳 (자리만 안내)
 @@END
