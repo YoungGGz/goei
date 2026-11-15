@@ -177,6 +177,8 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
     if (kind === 'shelf') {
       const { value } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => { const r = parseShelf(raw, st0.loaded ? st0.identity : null); return site === 'bm' ? { ...r, items: r.items.map(pointPrice) } : r; }, opts);
       let applied = applyShelf(st0, value, s);
+      // 우주몰: 새 진열에 진실 칸이 비었으면 「?」 (문의로 들어온 물건과 같게 — 광고 문구가 사실이 되지 않게, 11-15)
+      if (site === 'cos') { const had = new Set(st0.items.map((x) => x.id)); applied = { ...applied, items: applied.items.map((x) => (!x.sold && !had.has(x.id) && !x.truth ? { ...x, truth: '?' } : x)) }; }
       if (site === 'cos') {
         // 시그니처 상품 (설정 「시그니처 상품」): 모델이 같은 이름을 냈으면 버리고, 확률대로 코드가 끼운다 (이미 진열돼 있거나 산 것은 건너뜀)
         const fixed = cosFixed(ctx.chat.scriptstate);
@@ -461,7 +463,9 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         const anchor = lastBot(chat)?.key ?? '';
         const walletId = freshWalletId(w, `${site}_ord_${q.id}`, anchor);
         w = addWalletEntry(w, { id: walletId, anchor, amount: -q.price, memo: guideTxt('Main', 'MALL.MEMO.ORDER', { item: q.item.name, mall: MALL_NAME[site] }), src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
-        const { sold: _s, tag: _t, was: _w, orig: _o, pay: _p, ...item } = q.item;
+        const { sold: _s, tag: _t, was: _w, orig: _o, pay: _p, ...rest } = q.item;
+        // 견적에 진실 칸이 비었으면 「?」 (본편이 쓸 때 정한다 — 광고 문구가 사실이 되지 않게, 11-15)
+        const item = rest.truth ? rest : { ...rest, truth: '?' };
         const order: CosOrder = { id: q.id, anchor, price: q.price, hours: q.hours, orderedAt: worldMinute(chat), orderedKey: anchor, walletId, item };
         ok = true;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...ordersVars([...liveOrders(chat.scriptstate, aliveAnchors(chat)), order]), ...mallVarsOf(site, nextShop) } };

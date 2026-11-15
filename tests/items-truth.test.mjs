@@ -47,3 +47,15 @@ test('truth: 이름이 같은 물건이 둘이면 쓰는 그 줄의 진실만 �
   const real = live.find((e) => e.truth);
   assert.ok(I.itemsBlock(live, { ...base, use: [{ id: real.id, name: '붕대', n: 1 }] }).includes('다른 사람'));
 });
+
+test('truth: 진실이 다르면 합치지 않고, 본문에서 주운 같은 이름 물건은 진실 있는 산 물건 줄에 안 합친다 (11-15)', () => {
+  let it = I.addItem({ list: [], log: [] }, alive, { name: '은하 붕대', effect: '감싼다', truth: '감은 자리가 사라진다', uses: 3, use: true, from: 'store', store: 'cos', anchor: 'a1' });
+  it = I.addItem(it, alive, { name: '붕대', uses: 2, use: true, from: 'manual', anchor: '' });
+  const [a, b] = it.list;
+  assert.equal(I.canMerge(a, b), false);
+  const two = new Set(['a1', 'a2']);
+  let s = I.addItem({ list: [], log: [] }, two, { name: '붕대', effect: '감싼다', truth: '감은 자리가 사라진다', from: 'store', store: 'cos', anchor: 'a1' });
+  s = I.addItem(s, two, { name: '붕대', desc: '길에서 주운 붕대', from: 'story', anchor: 'a2' });
+  assert.equal(I.liveItems(s, two).length, 2);
+  assert.equal(I.liveItems(s, two).find((x) => x.from === 'story').truth, undefined);
+});

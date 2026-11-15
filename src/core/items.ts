@@ -380,7 +380,8 @@ export function addItem(it: Items, alive: Set<string>, e: ItemInput): Items {
   const kind = kindOfIcon(e.icon);
   const ruled = e.from === 'manual' ? undefined : traitsFor(kind, e.icon, name, { use: e.use, uses: e.uses, equip: e.equip });
   if (ruled) e = { ...e, use: ruled.use, uses: ruled.uses ?? (itemUses(e.uses) ? e.uses : undefined), equip: ruled.equip ?? '' };
-  const found = liveItems(it, alive).find((x) => sameItemName(x.name, name));
+  // 본문에서 주운 것은 숨긴 진짜 효과가 있는 산 물건 줄에 합치지 않는다: 이름만 같은 평범한 물건이 그 진실을 같이 쓰게 된다 (11-15)
+  const found = liveItems(it, alive).find((x) => sameItemName(x.name, name) && !(e.from === 'story' && x.truth));
   // 상점·쇼핑몰에서 산 것(store)은 같은 이름이 있어도 늘 새 줄로: 「방금 샀다」·다시 굴리기 되돌림이 맞게. 합치기는 사용자가 「합치기」로 (전수검사 11-13)
   if (found && e.from !== 'store') {
     if (ruled) e = { ...e, equip: ruled.equip ?? found.equip ?? '' };
@@ -552,6 +553,8 @@ export function sellItem(it: Items, id: string, anchor: string, note?: string): 
 /** 합칠 수 있나 (2026-11-08 사용자): 둘 다 소모성이고 이름에 같은 낱말이 있을 때만 — 같은 소모품이 두 칸으로 갈라진 것을 한 묶음으로 */
 export function canMerge(a: Item, b: Item): boolean {
   if (a.id === b.id || a.uses === undefined || b.uses === undefined) return false;
+  // 숨긴 진짜 효과가 다르면(한쪽만 있어도) 합치지 않는다: 남는 줄 것만 남아 다른 쪽 진실이 사라지거나 옮겨 간다 (11-15)
+  if ((a.truth ?? '') !== (b.truth ?? '')) return false;
   const words = (n: string) => clean(n, 30).toLowerCase().split(/[\s·.,'"「」()\-_/]+/).filter((w) => w.length >= 1);
   const wa = new Set(words(a.name));
   return words(b.name).some((w) => wa.has(w));
