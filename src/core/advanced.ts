@@ -83,6 +83,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('refresh_posts', '새로고침에 참조할 글', 10, 1, 200, '개'),
         num('comments', '답글에 참조할 댓글', 30, 1, 1000, '개'),
         num('dm_history', '답장에 참조할 쪽지', 50, 1, 1000, '통'),
+        num('dm_public', '답장에 참조할 공개 글', 8, 0, 50, '개', { zero: '안 넣음' }),
+        { key: 'activity', label: '지난 글 활동', type: 'pick', def: '1', opts: [['0', '끔'], ['1', '켬']], hint: '켜면 글 쓰기·댓글·글 하나 새로고침 요청에 게시판의 지난 글을 같이 넘겨 새 댓글과 조회·추천을 받아요. 끄면 넘기지 않아 토큰을 덜 써요.' },
         budget,
       ],
     },
@@ -93,6 +95,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('ctx_post_count', '넣을 게시글', 5, 1, 200, '개'),
         num('ctx_comment_count', '글당 댓글', 10, 0, 1000, '개'),
         num('ctx_dm_count', '넣을 쪽지', 30, 1, 200, '통'),
+        num('ctx_recent_posts', '늘 넣을 최근 글', 1, 0, 50, '개', { zero: '없음' }),
+        num('ctx_recent_dms', '늘 넣을 최근 쪽지', 5, 0, 200, '통', { zero: '없음' }),
         num('ctx_tokens', '컨텍스트 토큰 상한', 3000, 0, 200000, TOK, { zero: '제한 없음' }),
       ],
     },
@@ -101,6 +105,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       items: [
         num('incoming_chance', '선쪽지 확률', 100, 0, 100, '%', { v: '$lb_cfg_lb-gn.incoming_chance' }),
         num('cooldown', '받은 뒤 쉬는 턴', 2, 0, 100, '턴', { zero: '안 쉼' }),
+        num('incoming_prev', '선쪽지에 참조할 받은 쪽지', 0, 0, 1000, '통', { zero: '전부' }),
       ],
     },
     {
@@ -269,6 +274,9 @@ export function applyAdvanced(state: State): void {
   GN_HISTORY.dmHistory = g('dm_history');
   GN_HISTORY.turns = g('turns');
   GN_HISTORY.cooldown = g('cooldown');
+  GN_HISTORY.dmPublic = g('dm_public');
+  GN_HISTORY.incomingPrev = g('incoming_prev');
+  GN_HISTORY.activity = advOn(state, 'gn', 'activity');
   GN_CONTEXT.posts = g('ctx_post_count');
   GN_CONTEXT.comments = g('ctx_comment_count');
   GN_CONTEXT.dms = g('ctx_dm_count');
@@ -277,6 +285,8 @@ export function applyAdvanced(state: State): void {
   GN_CONTEXT.includeDms = advOn(state, 'gn', 'ctx_dms');
   GN_CONTEXT.ownOnly = advOn(state, 'gn', 'ctx_own');
   GN_CONTEXT.focus = advOn(state, 'gn', 'ctx_focus');
+  GN_CONTEXT.recentPosts = g('ctx_recent_posts');
+  GN_CONTEXT.recentDms = g('ctx_recent_dms');
   for (const k of PH_LIMIT_KEYS) PH_LIMITS[k] = p(k);
   PH_HISTORY.room = p('room_history');
   PH_HISTORY.turns = p('turns');

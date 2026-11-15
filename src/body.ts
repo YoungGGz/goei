@@ -5,7 +5,7 @@ import { hasStatusTag } from './core/world';
 import { isSceneMessage, isUnsent, renderStartCards, renderUnsentMark, SCENE_MARK, START_MARK, stripSceneMark, stripStartCard, stripUnsentMark, UNSENT_MARK } from './core/dispatch';
 import { readPersona, readUser, USER_MARK } from './host/user';
 import { hasSceneCard, renderSceneCards } from './core/dispatch';
-import { CONTEXT as GN_CONTEXT, GN_RAW, gnetSettings, mainContext, readGnet, userNick } from './core/gnet';
+import { CONTEXT as GN_CONTEXT, GN_RAW, gnetSettings, mainContext, readGnet, shareContextRules, userNick } from './core/gnet';
 import { BOARD_SITES, boardView } from './core/boards';
 import { mainContextRules } from './core/gnetPrompt';
 import { ALWAYS_BOOKS, isVirtual, stripVirtual, withWorldLore } from './core/world/virtual';
@@ -514,11 +514,16 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
   const focus = makeFocus(scene, buildRegistry(char.globalLore));
   // 기능마다 반영 상한 안에서 고르고, 합이 「본편 반영 총 상한」을 넘으면 상한을 나눠 다시 고른다 (core/budget.ts fitTotal)
   const parts: ContextPart[] = [];
+  // 게시판 덩어리의 안내문 (parts 앞쪽과 같은 차례)
+  const boardRules: string[] = [];
   for (const { site, view } of boardsOn) {
     const rule = mainContextRules({ char: src.char, chat: view });
     const st = readGnet(view);
     // 어느 게시판 글인지 이름을 붙인다 (전수검사 11-13: 네 게시판이 모두 feature:'gnet' 으로만 갔다)
-    if (rule && (st.posts.length || st.dms.length)) parts.push({ cap: GN_CONTEXT.tokens, build: (cap) => withCap(GN_CONTEXT, 'tokens', cap, () => mainContext(st, userNick(ss), rule, focus, BOARD_NAME[site])) });
+    if (rule && (st.posts.length || st.dms.length)) {
+      parts.push({ cap: GN_CONTEXT.tokens, build: (cap) => withCap(GN_CONTEXT, 'tokens', cap, () => mainContext(st, userNick(ss), rule, focus, BOARD_NAME[site])) });
+      boardRules.push(rule);
+    }
   }
   if (wantPhone && rules.phone) {
     try {
@@ -531,7 +536,10 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
   }
   if (wantWiki && rules.wiki) parts.push({ cap: advNum(ss, 'nw', 'ctx_tokens'), build: (cap) => wikiMainContext(chat, rules.wiki!, focus, cap) });
   if (wantHs) parts.push({ cap: hsMainSettings(ss).tokens, build: (cap) => hsMainContext(chat, hsMainRules(), focus, cap) });
-  return fitTotal(parts, advNum(ss, 'gen', 'ctx_total')).filter(Boolean);
+  const texts = fitTotal(parts, advNum(ss, 'gen', 'ctx_total'));
+  // 게시판 여럿의 안내문이 글자까지 같으면 처음 붙는 덩어리에만 둔다
+  const n = boardRules.length;
+  return [...shareContextRules(texts.slice(0, n), boardRules), ...texts.slice(n)].filter(Boolean);
 }
 
 /** 공용 상한 상수를 잠깐 바꿔 고르고 되돌린다 */

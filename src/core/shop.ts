@@ -412,6 +412,14 @@ export function turnKeyAt(chat: Chat, index: number): string {
   const list = chat.message ?? [];
   return index > 0 && list[index - 1] ? `t:${messageKey(list[index - 1], index - 1)}` : `t:first:${Math.max(0, index)}`;
 }
+/** 어느 응답에 맞춰 만든 결과인지: 그 응답의 자리·글·턴 열쇠 */
+export interface TurnMark { index: number; data: string; turn: string }
+/** 응답에 맞춰 만든 결과를 아직 써도 되는가: 그 응답이 같은 자리에 같은 글로 있고 턴 열쇠가 같으면 된다.
+ *  뒤에 메시지가 더 붙은 것(채팅이 이어짐)은 괜찮고, 그 응답을 지웠거나 다시 굴렸거나 앞 메시지가 바뀌었으면 안 된다 */
+export function turnResultValid(chat: Chat, made: TurnMark): boolean {
+  const m = chat.message?.[made.index];
+  return !!m && String(m.data ?? '') === made.data && turnKeyAt(chat, made.index) === made.turn;
+}
 export function turnKey(chat: Chat): string {
   const last = lastBot(chat);
   return last ? turnKeyAt(chat, last.index) : '';

@@ -132,10 +132,12 @@ export function boardTable(state: State, busy = false): string {
     R('비망록', SW('memo'), '켜면 모델 거부를 줄이는 긴 앞글을 요청마다 붙여요. 토큰을 더 써요.'),
     R('다시 보기', N('reiterate'), '첫 응답 뒤 모델에게 지침과 형식을 지켰는지 다시 보게 하는 횟수예요. 1회마다 호출이 1회 늘어요.'),
     R('한 번에 받을 답글', set([['최소', N('replies_min')], ['최대', N('replies')]]), '내 글이나 댓글에 한 번에 달리는 답글의 수예요.'),
+    R('지난 글 활동', SW('activity'), '켜면 글 쓰기·댓글·글 하나 새로고침 요청에 게시판의 지난 글을 같이 넘겨 새 댓글과 조회·추천을 받아요. 끄면 넘기지 않아 토큰을 덜 써요.'),
   ].join(''));
   const limit = setGroup('길이 상한', [
     R('모델이 쓰는 글', set([['글 본문', N('post_tokens')], ['글 제목', N('title_tokens')], ['댓글', N('comment_tokens')], ['쪽지', N('dm_tokens')]])),
     R('쪽지에 같이 넘기는 글', set([['붙는 글', N('origin_tokens')], ['붙는 댓글', N('quote_tokens')], ['이전 쪽지 한 통', N('history_tokens')]]), '글이나 댓글을 보고 쪽지를 보낼 때 같이 넘기는 글 하나의 길이 상한이에요.'),
+    R('답장에 참조할 공개 글', N('dm_public'), '쪽지 답장 요청에 참고로 같이 넘기는 게시판 글의 수예요. 0이면 넘기지 않아요.'),
   ].join(''));
   const keep = setGroup('게시판에 남기는 것', [
     R('주요 인물 닉네임 보존', C('keyfigures', s0.keyFigures), '켜면 주요 인물이 쓰던 닉네임을 다음 새로고침에도 그대로 써요.'),
@@ -143,10 +145,12 @@ export function boardTable(state: State, busy = false): string {
     R('내 댓글 있는 글 유지', C('keepreplied', s0.keepReplied), '켜면 내가 댓글을 단 남의 글도 남겨요.'),
     R('쪽지 자동 정리', `${setSeg('fam-set', 'b:gn:storage', ret.auto ? '1' : '0', ONOFF, busy)}${ret.auto ? numCtl('b:gn:dmkeep', { n: ret.limit, lo: 1, hi: STORAGE_MAX, step: 5 }, '남길 쪽지', '통', busy) : ''}`, '켜면 상대마다 최근 쪽지를 이 수만큼만 남기고 오래된 것은 지워요.'),
     R('선쪽지 뒤 쉬는 턴', N('cooldown'), '선쪽지를 받은 뒤 새 선쪽지가 오지 않는 턴의 수예요.'),
+    R('선쪽지에 참조할 받은 쪽지', N('incoming_prev'), '같은 쪽지가 또 오지 않게 선쪽지 요청에 같이 넘기는 받은 쪽지의 수예요. 0이면 전부 넘겨요.'),
   ].join(''));
   const attach = setGroup('메인 요청에 붙이는 것', [
     R('붙일 것', advChipsCtl('gn', ['ctx_posts', 'ctx_dms', 'ctx_own'], st0 as never), '「내가 쓴 것만」을 켜면 내가 쓴 글과 내가 댓글을 단 글만 붙여요. 위 격자에서 「컨텍스트 포함」을 켠 게시판에만 붙어요.'),
-    R('장면에 나온 것만 고르기', SW('ctx_focus'), '켜면 최근 글 1개와 쪽지 5통은 늘 붙이고, 나머지는 지금 장면에 이름이 나온 것만 붙여요.'),
+    R('장면에 나온 것만 고르기', SW('ctx_focus'), '켜면 아래 「늘 붙일 최근 것」은 늘 붙이고, 나머지는 지금 장면에 이름이 나온 것만 붙여요.'),
+    R('늘 붙일 최근 것', set([['게시글', N('ctx_recent_posts')], ['쪽지', N('ctx_recent_dms')]]), '「장면에 나온 것만 고르기」를 켰을 때 장면과 상관없이 붙이는 가장 새 글과 쪽지의 수예요.'),
     R('최대 양', set([['게시글', N('ctx_post_count')], ['글마다 댓글', N('ctx_comment_count')], ['쪽지', N('ctx_dm_count')], ['토큰 상한', N('ctx_tokens')]]), '토큰 상한을 넘는 것은 빼요.'),
   ].join(''));
 

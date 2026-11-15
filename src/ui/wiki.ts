@@ -290,7 +290,9 @@ async function pickTitle(ctx: ChatContext): Promise<string> {
     }
   })();
   const s = wikiSettings(ctx.chat.scriptstate);
-  const { value } = await askModel(wikiTitlePrompt(source(ctx), candidates, [...written], names), s.model, (raw) => acceptTitle(raw, candidates), { ...genSettings(ctx.chat.scriptstate), staticModel: featureModel(ctx.chat.scriptstate, 'nw'), state: ctx.chat.scriptstate, label: '위키 제목' });
+  // 제목 고르기 요청에도 위키의 요청 토큰 상한을 건다: 넘으면 챗로그를 줄인다 (core/budget.ts)
+  const messages = fitPrompt(budgetFor(ctx.chat.scriptstate, 'nw'), () => ({ messages: wikiTitlePrompt(source(ctx), candidates, [...written], names) })).messages;
+  const { value } = await askModel(messages, s.model, (raw) => acceptTitle(raw, candidates), { ...genSettings(ctx.chat.scriptstate), staticModel: featureModel(ctx.chat.scriptstate, 'nw'), state: ctx.chat.scriptstate, label: '위키 제목' });
   return value;
 }
 

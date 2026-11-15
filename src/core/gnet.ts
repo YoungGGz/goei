@@ -107,7 +107,8 @@ export function gnetRetention(state: Record<string, unknown> | undefined): { aut
   return { auto: flag !== '0', limit };
 }
 export const LIMITS = { replies_min: 0, replies: 4, post_tokens: 4000, title_tokens: 80, dm_tokens: 1500, comment_tokens: 1000, origin_tokens: 2000, quote_tokens: 1000, history_tokens: 1500 };
-export const HISTORY = { refresh: 10, post: 99999, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2 };
+/** dmPublic: 쪽지 답장에 같이 넘기는 공개 글 수 (0 = 안 넘김). incomingPrev: 선쪽지 겹침 확인용으로 넘기는 받은 쪽지 수 (0 = 전부). activity: 글 쓰기·댓글·글 하나 새로고침에 「다른 글 활동」을 넣는지 */
+export const HISTORY = { refresh: 10, post: 99999, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2, dmPublic: 8, incomingPrev: 0, activity: true };
 export const CONTEXT = { posts: 5, comments: 10, dms: 30, tokens: 3000, includePosts: true, includeDms: true, ownOnly: false, focus: true, recentPosts: 1, recentDms: 5 };
 /** 개수 설정 (2026-11-08 사용자: 단계 고르기 대신 최소·최대 직접). 새로고침 글 수, 새 글마다 댓글 수, 지난 글에 새로 붙는 활동 댓글 수. 내 글·댓글에 달릴 새 답글 수는 고급 설정(replies_min·replies) */
 export const COUNT_RANGE = { post: [1, 20], cmt: [0, 20], act: [0, 20] } as const;
@@ -809,8 +810,19 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
       }
     }
     const raws: string[] = [];
+    // 남긴 글의 댓글 번호 읽기. 지금 지침: 새 댓글만 돌려주고 번호는 「저장 댓글 1..k, 새 댓글 k+1..」.
+    // 옛 지침(저장 댓글을 그대로 다시 쓰고 번호는 돌려준 배열 차례)으로 온 응답도 받는다: 저장 댓글과 같은 줄이 하나라도 있으면 옛 꼴
+    const savedCount = prev ? prev.comments.length : 0;
+    const sameAsSaved = (c: unknown): boolean => {
+      if (!isObj(c)) return false;
+      const a = str(c.author).trim();
+      const t = stripForged(str(c.content));
+      return sigs.has(`${a}\0${t}`) || loose.has(`${a}\0${attachShape(t)}`) || loose.has(`${a}\0${t.trim()}`);
+    };
+    const onlyNew = savedCount > 0 && !comments.some(sameAsSaved);
+    if (onlyNew) for (let k = 1; k <= savedCount; k++) remap.set(k, k);
     comments.forEach((c, i) => {
-      const n = i + 1;
+      const n = onlyNew ? savedCount + i + 1 : i + 1;
       if (!isObj(c)) return void remap.set(n, false);
       const cAuthor = str(c.author).trim();
       const got = stripForged(str(c.content));
@@ -1051,11 +1063,12 @@ export interface ActivityPost {
   id: number;
   author: string;
   title: string;
-  content: string;
+  /** 작업 대상 글이면 없다 (본문·댓글은 작업 입력에 이미 있다) */
+  content?: string;
   date: string;
   views: number;
   upvotes: number;
-  comments: { index: number; parent: number; author: string; time?: string; content: string }[];
+  comments?: { index: number; parent: number; author: string; time?: string; content: string }[];
   commentCount: number;
   commentsAllowed: boolean;
 }
@@ -1083,9 +1096,10 @@ export function activityContext(st: GState, targetId: number | null, posts_ = HI
       }
     }
     const allowed = p.id !== targetId;
+    // 작업 대상 글은 본문·댓글이 작업 입력(post·comments)에 이미 있으므로 여기서는 번호·제목·수치만 넘긴다 (조회·추천 증가는 그대로 받는다)
     posts.push({
-      id: p.id, author: p.nick, title: p.title, content: p.body, date: p.date, views: p.views, upvotes: p.votes,
-      comments: p.comments.map((c, i) => ({ index: i + 1, parent: c.parent, author: c.nick, ...whenField(p, c), content: c.body })).filter((c) => selected.has(c.index)),
+      id: p.id, author: p.nick, title: p.title, ...(allowed ? { content: p.body } : {}), date: p.date, views: p.views, upvotes: p.votes,
+      ...(allowed ? { comments: p.comments.map((c, i) => ({ index: i + 1, parent: c.parent, author: c.nick, ...whenField(p, c), content: c.body })).filter((c) => selected.has(c.index)) } : {}),
       commentCount: p.comments.length, commentsAllowed: allowed,
     });
     snapshots.set(p.id, { head: postHead(p), rows: p.comments.map(commentKey), count: p.comments.length, selected, commentsAllowed: allowed });
@@ -1184,15 +1198,21 @@ export function incomingPlan(
   return { ...plan, allowed: true, post, comment, commentIndex: ci };
 }
 
-/** head: 지침 절 INCOMING.OPTIONS_HEAD 글 (gnetPrompt 가 이 게시판 지침에서 읽어 넘긴다) */
-export function incomingTask(plan: IncomingPlan, head: string, activityPosts?: ActivityPost[]): string {
+/** head: 지침 절 INCOMING.OPTIONS_HEAD 글 (gnetPrompt 가 이 게시판 지침에서 읽어 넘긴다).
+ *  inTask: 선쪽지의 출처 글이 같은 요청의 작업 입력에 이미 있는 경우. 'post' = 작업 대상 글(댓글 달기): 본문 대신 글 번호만 넘긴다.
+ *  'draft' = 지금 쓰는 새 글(글 쓰기): 출처는 이 응답이 완성하는 글이라 incomingOrigin 을 넣지 않는다 (지침 INCOMING.COMBINED 「or the finished new post」) */
+export function incomingTask(plan: IncomingPlan, head: string, activityPosts?: ActivityPost[], inTask?: 'post' | 'draft'): string {
   const body: Record<string, unknown> = { userHandle: plan.userHandle, incomingAllowed: plan.allowed };
   if (plan.allowed && plan.post) {
-    body.incomingOrigin = {
-      title: plan.post.title, author: plan.post.nick, content: plan.post.body,
-      ...(plan.comment ? { comment: { author: plan.comment.nick, content: plan.comment.body } } : {}),
-    };
-    body.previousIncoming = plan.history;
+    if (inTask !== 'draft') {
+      body.incomingOrigin = {
+        ...(inTask === 'post' ? { post: plan.post.id } : {}),
+        title: plan.post.title, author: plan.post.nick, ...(inTask === 'post' ? {} : { content: plan.post.body }),
+        ...(plan.comment ? { comment: { author: plan.comment.nick, content: plan.comment.body } } : {}),
+      };
+    }
+    // 겹침 확인용 받은 쪽지: 수를 정했으면 가장 새 것부터 그만큼만 (같은 발신자·같은 본문은 commitIncoming 이 따로 거른다)
+    body.previousIncoming = HISTORY.incomingPrev > 0 ? plan.history.slice(-HISTORY.incomingPrev) : plan.history;
   }
   if (activityPosts) body.activityPosts = activityPosts;
   return `\n${head}\n${JSON.stringify(body)}`;
@@ -1281,7 +1301,7 @@ export function mainContext(st: GState, nick: string, rules: string, focus?: Foc
       order: p.id,
       pin: p.back !== undefined || p.touch !== undefined,
       related: related(focus, [p.nick, p.title, ...comments.map((c) => c.author)], `${p.title}\n${p.body}\n${comments.map((c) => c.content).join('\n')}`),
-      data: { kind: 'public_post', title: p.title, date: p.date, author: p.nick, content: describe(p.body), comments, access: accessPost },
+      data: { kind: 'public_post', title: p.title, date: p.date, author: p.nick, content: describe(p.body), comments },
     });
   }
   const dms: Pick<Record<string, unknown>>[] = [];
@@ -1292,11 +1312,16 @@ export function mainContext(st: GState, nick: string, rules: string, focus?: Foc
       related: related(focus, [d.nick], d.body),
       data: {
         kind: 'private_message', sender: d.side === 'me' ? nick : d.nick, recipient: d.side === 'me' ? d.nick : nick, content: describe(d.body),
-        ...(d.date ? { date: d.date } : {}), order: i + 1, access: accessDm,
+        ...(d.date ? { date: d.date } : {}), order: i + 1,
       },
     });
   }
-  const payload = (records: unknown[]) => `[MODULE_CONTEXT_BEGIN]\n${rules}\n${JSON.stringify({ feature: 'gnet', ...(site ? { site } : {}), records })}\n[MODULE_CONTEXT_END]`;
+  // access 글은 기록마다 되풀이하지 않고 덩어리에 종류별로 한 번만 (넣은 종류만)
+  const accessOf = (records: unknown[]) => {
+    const kinds = new Set(records.map((r) => (r as { kind?: string }).kind));
+    return { ...(kinds.has('public_post') ? { public_post: accessPost } : {}), ...(kinds.has('private_message') ? { private_message: accessDm } : {}) };
+  };
+  const payload = (records: unknown[]) => `[MODULE_CONTEXT_BEGIN]\n${rules}\n${JSON.stringify({ feature: 'gnet', ...(site ? { site } : {}), records, ...(records.length ? { access: accessOf(records) } : {}) })}\n[MODULE_CONTEXT_END]`;
   const fits = (records: unknown[]) => !(CONTEXT.tokens > 0 && tokens(payload(records)) > CONTEXT.tokens);
   // 기록마다 한 번만 센다 (전수검사 11-13: 후보마다 묶음 전체를 다시 세서 기록이 많으면 몇 초씩 늦었다)
   const cost = (d: unknown) => tokens(JSON.stringify(d)) + 1;
@@ -1304,6 +1329,19 @@ export function mainContext(st: GState, nick: string, rules: string, focus?: Foc
   const keptDms = pickRecords(dms, { focus: CONTEXT.focus, recent: CONTEXT.recentDms, max: CONTEXT.dms, fits: (k) => fits([...keptPosts, ...k]), cost, room: CONTEXT.tokens > 0 ? CONTEXT.tokens - tokens(payload(keptPosts)) : Infinity });
   const kept = [...keptPosts, ...keptDms];
   return kept.length ? payload(kept) : '';
+}
+
+/** 본편에 붙는 게시판 덩어리 여럿: 앞 덩어리와 안내문(rules)이 글자까지 같으면 뒤 덩어리에서는 안내문 줄을 뺀다.
+ *  texts[i] 는 mainContext(…, rules[i], …) 의 결과 (빈 글 = 붙지 않음) */
+export function shareContextRules(texts: string[], rules: string[]): string[] {
+  const seen = new Set<string>();
+  return texts.map((t, i) => {
+    const rule = rules[i];
+    const head = `[MODULE_CONTEXT_BEGIN]\n${rule}\n`;
+    if (!t || !rule || !t.startsWith(head)) return t;
+    if (!seen.has(rule)) return seen.add(rule), t;
+    return `[MODULE_CONTEXT_BEGIN]\n${t.slice(head.length)}`;
+  });
 }
 
 // 화면용 첨부 나누기는 attach.ts (예전 이름 그대로 내보냄)
