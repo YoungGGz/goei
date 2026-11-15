@@ -4,6 +4,11 @@ import { copyBtn } from '../copy';
 import { keepOpen } from '../panels';
 import { ICONS } from '../icons';
 import type { TraceCall, TraceTurn } from '../../host/trace';
+import { isPhone } from '../media';
+
+/** 메인 요청 조립 줄의 단계 이름표 (사용자 2026-11-15). PC 는 역할 바로 뒤, 폰은 좁아서 미리보기 위에 한 줄로 */
+const tagTop = (tag?: string): string => (tag && isPhone() ? `<em class="gw-flow-tag top">${esc(tag)}</em><br>` : '');
+const tagInline = (tag?: string): string => (tag && !isPhone() ? ` <em class="gw-flow-tag">${esc(tag)}</em>` : '');
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -57,7 +62,7 @@ function nodes(t: TraceTurn): Node[] {
       meta: `Risu 메인 모델 · ${hms(m.at)} · 메시지 ${m.shape.length}개(${Object.entries(roles).map(([r, n]) => `${r} ${n}`).join(', ')}) · 보낸 것 전부 ${chars(m.totalChars)}${tok(m.totalTokens)}${m.added === undefined ? '' : ` (이 중 플러그인이 넣은 것 ${m.added.toLocaleString('ko-KR')}토큰)`}${m.failed.length ? ` · 건너뛴 단계 ${m.failed.join(', ')}` : ''}`,
       ok: m.failed.length ? false : true,
       // 메시지 전부 (11-09 사용자). 지난 판 기록은 마지막 셋만 있을 수 있다
-      body: () => `<div class="gw-flow-io"><b>${m.tail.length < m.shape.length ? `마지막 메시지 ${m.tail.length}개 (옛 기록)` : `메시지 ${m.tail.length}개 — 보낸 순서, 눌러서 펼치기`}</b>${m.tail.map((r, i) => `<details class="gw-flow-msg gw-copyto" data-keep="tr:${t.id}:${i}"${keepOpen(`tr:${t.id}:${i}`, false)}><summary><small>[${esc(r.role)}]</small> ${esc(r.content.replace(/\s+/g, ' ').trim().slice(0, 80))}${r.content.length > 80 ? '…' : ''} <i>${chars(r.content.length)}</i>${copyBtn()}</summary><textarea readonly rows="8">${esc(r.content)}</textarea></details>`).join('')}</div>`,
+      body: () => `<div class="gw-flow-io"><b>${m.tail.length < m.shape.length ? `마지막 메시지 ${m.tail.length}개 (옛 기록)` : `메시지 ${m.tail.length}개 — 보낸 순서, 눌러서 펼치기`}</b>${m.tail.map((r, i) => `<details class="gw-flow-msg gw-copyto" data-keep="tr:${t.id}:${i}"${keepOpen(`tr:${t.id}:${i}`, false)}><summary>${tagTop(r.tag)}<small>[${esc(r.role)}]</small>${tagInline(r.tag)} ${esc(r.content.replace(/\s+/g, ' ').trim().slice(0, 80))}${r.content.length > 80 ? '…' : ''} <i>${chars(r.content.length)}</i>${copyBtn()}</summary><textarea readonly rows="8">${esc(r.content)}</textarea></details>`).join('')}</div>`,
     });
   }
   for (const [c, i] of before) out.push(call(c, i));

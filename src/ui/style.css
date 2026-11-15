@@ -3607,6 +3607,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .gw-flow-msg summary { cursor: pointer; font-size: 12px; color: var(--text); line-height: 1.5; padding: 5px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .gw-flow-msg summary small { color: var(--signal); font-weight: 700; }
 .gw-flow-msg summary i { font-style: normal; color: var(--sub); }
+.gw-flow-tag { font-style: normal; font-weight: 500; color: color-mix(in srgb, var(--signal) 65%, var(--sub)); margin-right: 4px; }
+.gw-flow-tag.top { font-size: 11px; }
 .gw-flow-msg textarea { margin: 0 0 8px; }
 /* 호출 기록 복사 단추 (2026-11-10 사용자: 세계 로어북처럼) — 접힌 채로도 누를 수 있게 줄 오른쪽 끝에 */
 .gw-flow-msg { position: relative; }

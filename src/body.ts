@@ -89,6 +89,7 @@ import { progressAbort, progressEnd, progressPlan, progressTurn, progressWatch }
 import { turnPlan } from './core/progplan';
 import { bookText } from './core/refs';
 import { stripMarkers } from './core/sanitize';
+import { contextTag, tagStep } from './core/stagetags';
 
 const PLUGIN_ID = 'goei-plugin';
 const WATCH_MS = 1000;
@@ -172,6 +173,17 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   }
   const input0 = messages;
   const failed: string[] = [];
+  /** 줄마다 어느 조립 단계가 넣거나 고쳤는지 (호출 기록 › 메인 요청 조립의 이름표, core/stagetags.ts). Risu 가 보낸 그대로인 줄은 빈 글 */
+  let tags: string[] = messages.map(() => '');
+  /** 단계 하나가 배열을 바꿨다: prev 는 단계 전 배열. 이름표를 못 붙여도 요청은 그대로 */
+  const mark = <T extends PromptMessage[]>(name: string | ((m: PromptMessage) => string), prev: T, next: T): T => {
+    try {
+      tags = tagStep(prev, tags, next, name);
+    } catch {
+      /* 이름표만 빠진다 */
+    }
+    return next;
+  };
   /** 플러그인이 끼운 글 (호출 기록의 「이 중 플러그인이 넣은 것」, 전수검사 11-13) */
   let added: string[] | undefined;
   /** 한 단계: 던지면 이름·까닭을 모으고 fallback(= 그 단계 이전 모양) */
@@ -224,49 +236,49 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
       const all = chat0?.message ?? [];
       for (let k = all.length - 1; k >= 0 && all[k]?.role === 'user' && !cardFresh; k--) cardFresh = typeof all[k].data === 'string' && hasSceneCard(all[k].data);
       const o = chat0 ? { cardIsLast: hasSceneCard(lastData), cardFresh, callIsLast: hasCall(lastData) } : {};
-      messages = step('지시문·전화 풀기', () => unwrapCalls(unwrapScenes(messages, o).messages, o).messages, messages);
+      messages = mark('지시문·전화 풀기', messages, step('지시문·전화 풀기', () => unwrapCalls(unwrapScenes(messages, o).messages, o).messages, messages));
     }
     const marked = (t: unknown) => typeof t === 'string' && (t.includes(UNSENT_MARK) || t.includes(START_MARK) || t.includes(SCENE_MARK));
     if (messages.some((m) => marked(m?.content))) {
-      messages = step('시작 카드 표식', () => messages.map((m) => (marked(m?.content) ? { ...m, content: stripSceneMark(stripStartCard(stripUnsentMark(m.content))) } : m)), messages);
+      messages = mark('시작 카드 표식', messages, step('시작 카드 표식', () => messages.map((m) => (marked(m?.content) ? { ...m, content: stripSceneMark(stripStartCard(stripUnsentMark(m.content))) } : m)), messages));
     }
     // 오래된 메시지의 이미지 태그는 요청에서 뺀다 (원본 「🖼️에셋리퀘제거」)
     if (liteNow || messages.some((m) => typeof m?.content === 'string' && imgTagsKnown(m.content, modulePicker()))) {
       // 이 채팅의 에셋 출력이 꺼져 있으면 최근 것까지 전부 뺀다. 남기면 모델이 따라 써 태그가 끝없이 이어졌다 (전수검사 11-13)
       // 보조 모델이 태그를 붙이는 방식도 같다: 메인 요청에 이미지 지침이 없으니 태그를 남길 까닭이 없다
       const assetOff = step('에셋 출력 읽기', () => { if (!ctx) return imgHidden(); const b = basicSettings(ctx.char.globalLore, ctx.chat.scriptstate); return !keepImgTagsInRequest(b.assetOn, b.assetModel); }, false);
-      messages = step('옛 이미지 태그', () => (assetOff ? stripAllImgTags(messages) : stripOldImgTags(messages, getPrefs().imgSend ?? IMG_RECENT.def)), messages);
+      messages = mark('옛 이미지 태그', messages, step('옛 이미지 태그', () => (assetOff ? stripAllImgTags(messages) : stripOldImgTags(messages, getPrefs().imgSend ?? IMG_RECENT.def)), messages));
     }
     if (liteNow) {
       // 유저 이름(상태창 지침·명부의 {{user}})은 채팅에 그려진 숨은 칸에서 읽는다. 새로고침 뒤 창을 열지 않고 보내면 비어 있다
       await stepAsync('유저 이름', () => readUser(), undefined);
-      messages = step('기록 태그 정리', () => stripHistoryTags(messages), messages);
+      messages = mark('기록 태그 정리', messages, step('기록 태그 정리', () => stripHistoryTags(messages), messages));
       if (ctx) {
         const c = ctx;
         const pre = messages;
-        messages = step('로어', () => fixLore(messages, c), messages);
-        messages = await stepAsync('주인공', () => withPlayer(messages, c), messages);
-        messages = step('명부 다듬기', () => trimRoster(messages), messages);
+        messages = mark('로어', messages, step('로어', () => fixLore(messages, c), messages));
+        messages = mark('주인공', messages, await stepAsync('주인공', () => withPlayer(messages, c), messages));
+        messages = mark('명부 다듬기', messages, step('명부 다듬기', () => trimRoster(messages), messages));
         const mctx = step('참고 기록', () => moduleContext(sceneText(messages), c), [] as string[]);
         if (mctx.length) {
           // 마지막 사용자 메시지 바로 앞에 (원본은 맨 끝). 모델이 이번 행동보다 참고 기록을 「지금 할 일」로 읽지 않게
           const at = messages.map((m) => m?.role).lastIndexOf('user');
           const add = mctx.map((t) => ({ role: 'system', content: t }) as M);
-          messages = at < 0 ? [...messages, ...add] : [...messages.slice(0, at), ...add, ...messages.slice(at)];
+          messages = mark((m) => contextTag(String(m?.content ?? '')), messages, at < 0 ? [...messages, ...add] : [...messages.slice(0, at), ...add, ...messages.slice(at)]);
         }
         // 지난 응답의 상태창 줄은 지우고 마지막 한 줄만 직전 상태 블록으로 (core/statusctx.ts). 신분 칸이 빠졌으면 아는 값을 채운다
         // 칸 구성(설정)대로 다시 만들고 잔고 칸은 장부 값으로 (core/world/statuscols.ts · core/wallet.ts)
-        messages = step('상태창', () => withStatusBlock(messages, step('신분', () => knownIdentity(c), ''), step('상태창 모양', () => statusShape(c), undefined)), messages);
+        messages = mark('상태창', messages, step('상태창', () => withStatusBlock(messages, step('신분', () => knownIdentity(c), ''), step('상태창 모양', () => statusShape(c), undefined)), messages));
         // 소지품 [Inventory]: 지금 가진 것·한계·이번 턴 사건(사용·새로 산 것·넘침)을 마지막 유저 메시지 앞에 (core/items.ts, 설정 「소지품 → 본편에 넘기기」)
-        messages = step('소지품', () => withInventory(messages, c.chat), messages);
+        messages = mark('소지품', messages, step('소지품', () => withInventory(messages, c.chat), messages));
         // 「다음 메시지에 사용」 칩: 요청에 실려 나갔으니 바로 숨긴다 (host/usebox.ts markUseSent, 2026-11-12 사용자: 보냈는데 안 없어짐)
         await stepAsync('사용 상자', () => markUseSent(c.charIndex, c.chatIndex, c.chat), undefined);
         // 망상홈쇼핑: 할부 호출 턴·방청 신청 턴에만 한 번 (core/homeshop.ts, 평소엔 아무것도 안 넣는다)
-        messages = step('망상홈쇼핑', () => withHomeshop(messages, c.chat), messages);
+        messages = mark('망상홈쇼핑', messages, step('망상홈쇼핑', () => withHomeshop(messages, c.chat), messages));
         // 장면 인물의 살아 있는 기록 (core/people). 절 단위 혼합이면 그 인물의 시트 원문은 빼고 기록으로 대신한다
-        messages = await stepAsync('인물 기록', () => withPeople(messages, c), messages);
+        messages = mark('인물 기록', messages, await stepAsync('인물 기록', () => withPeople(messages, c), messages));
         // 이미지 태그 지침 (core/imgprompt): 카드 로어북 「Asset」 대신 설정으로 조립. 옛 카드의 로어북 본문이 남아 있으면 지운다
-        messages = step('이미지 지침', () => withImgPrompt(messages, c), messages);
+        messages = mark('이미지 지침', messages, step('이미지 지침', () => withImgPrompt(messages, c), messages));
         added = step('더한 글', () => addedTexts(pre, messages), undefined);
       }
     }
@@ -275,7 +287,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
       // 요청 도중에는 채팅을 저장하지 않는다. 응답이 붙기 전에 채팅 객체를 바꾸면 응답이 사라질 수 있다.
       // 남은 seed_lore 변수는 여기서 걸러지므로 두 번째 전송부터는 모델에 가지 않는다.
       const chat = ctx?.chat ?? (await stepAsync('시드 채팅 읽기', async () => (await risuai.getChatFromIndex(await risuai.getCurrentCharacterIndex(), await risuai.getCurrentChatIndex())) as Chat | null, null));
-      if (chat) messages = step('시드', () => processRequest(messages, chat).messages, messages);
+      if (chat) messages = mark('시드', messages, step('시드', () => processRequest(messages, chat).messages, messages));
     }
   } catch (error) {
     // 단계 밖(끼우기·판정)에서 던진 것. 마지막으로 성공한 모양을 그대로 쓴다
@@ -284,7 +296,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   if (failed.length) console.log(`[goei] 요청 조립 실패: 단계 ${failed.join(' · ')} — 그 단계는 건너뛰고 표식만 지워 보냅니다`);
   // 마지막 정리: 어느 단계가 실패했어도 플러그인 표식은 모델에 가지 않게 (정상이면 이미 지워져 있어 바뀌는 것이 없다)
   const out = sanitize(messages);
-  if (liteNow) step('호출 기록', () => traceMain(out, failed, added), undefined);
+  if (liteNow) step('호출 기록', () => traceMain(out, failed, added, tags.length === out.length ? tags : undefined), undefined);
   // 새로 끼운 글만 기억한다. 원래 있던 system 글을 고친 결과(자리 로어북 보정 등)는 다음 새 요청에도 똑같이 들어올 수 있어 뺀다 (11-14 재검토 ①-2)
   lastAdded = new Set(insertedSystemTexts(input0, out));
   return out;

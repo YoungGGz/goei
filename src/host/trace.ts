@@ -32,7 +32,7 @@ export interface TraceMain {
   /** 플러그인이 조립을 끝낸 뒤 요청 전체: 메시지별 역할·글자 수 */
   shape: { role: string; chars: number }[];
   /** 메시지 전부 원문 (아주 긴 것만 잘림). 11-09 사용자: 마지막 셋만 두니 24개 중 21개가 안 보였다 — 다섯 턴 다 전체를 둔다(플러그인 저장소라 용량 문제 없음) */
-  tail: { role: string; content: string }[];
+  tail: { role: string; content: string; tag?: string }[];
   /** 조립 단계 중 실패한 것 */
   failed: string[];
   totalChars: number;
@@ -201,13 +201,14 @@ export async function traceBegin(): Promise<void> {
 }
 
 /** 본편 요청 조립 끝: 최종 모양을 적는다 */
-export function traceMain(messages: { role?: string; content?: unknown }[], failed: string[], added?: string[]): void {
+/** tags: 줄마다 어느 조립 단계가 넣거나 고쳤는지 (core/stagetags.ts). Risu 가 보낸 그대로인 줄은 빈 글 */
+export function traceMain(messages: { role?: string; content?: unknown }[], failed: string[], added?: string[], tags?: string[]): void {
   if (!open) return;
   const rows = messages.map((m) => ({ role: String(m?.role ?? ''), content: typeof m?.content === 'string' ? m.content : '' }));
   open.main = {
     at: new Date().toISOString(),
     shape: rows.map((r) => ({ role: r.role, chars: r.content.length })),
-    tail: rows.map((r) => ({ role: r.role, content: clip(r.content, TRACE_MAIN_TEXT) })),
+    tail: rows.map((r, i) => ({ role: r.role, content: clip(r.content, TRACE_MAIN_TEXT), ...(tags?.[i] ? { tag: tags[i] } : {}) })),
     failed: [...failed],
     totalChars: rows.reduce((n, r) => n + r.content.length, 0),
   };
