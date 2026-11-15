@@ -338,3 +338,14 @@ test('위키 자동 작성: 제목 고르기 요청이 요청 토큰 상한을 �
   assert.ok(W.wiki.notice.includes('토큰 상한'));
   assert.ok(renders > 0);
 });
+
+test('다양성 강화: 확률이 더 낮은 벌을 쓰고, 확률이 없거나 같으면 두 번째 벌', () => {
+  const A = [{ id: 1 }], B = [{ id: 2 }];
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: 0.08, alternativeProb: 0.03 }), B);
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: 0.02, alternativeProb: 0.07 }), A, '순서가 거꾸로면 첫 벌');
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: 0.05, alternativeProb: 0.05 }), B);
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: B }), B, '확률 없음');
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: 'x', alternativeProb: 0.1 }), B);
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: [] }), A, '두 번째 벌이 비면 첫 벌');
+  assert.equal(C.sampledBoard({ posts: [], alternativePosts: B, postsProb: 0.01, alternativeProb: 0.09 }), B, '첫 벌이 비면 두 번째 벌');
+});

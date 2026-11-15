@@ -748,11 +748,23 @@ const attachShape = (text: string) => attachSwap(text, '\u0001');
 /** 첨부를 모두 지운 함께 쓴 글만 */
 const attachText = (text: string) => attachSwap(text, '').trim();
 
+/** 다양성 강화: 두 벌 가운데 모델이 적은 확률(postsProb·alternativeProb)이 더 낮은 쪽을 쓴다.
+ *  확률이 없거나 같으면 지침이 정한 차례대로 두 번째 벌(alternativePosts). 한 벌만 왔으면 그 벌 */
+export function sampledBoard(value: Record<string, unknown>): unknown {
+  const alt = Array.isArray(value.alternativePosts) && value.alternativePosts.length ? value.alternativePosts : null;
+  if (!alt) return value.posts;
+  const posts = Array.isArray(value.posts) && value.posts.length ? value.posts : null;
+  const p = Number(value.postsProb);
+  const a = Number(value.alternativeProb);
+  if (posts && Number.isFinite(p) && Number.isFinite(a) && p < a) return posts;
+  return alt;
+}
+
 /** 새로고침 응답 반영 (원본 normalize + applyNode). before: 요청할 때의 게시판, current: 지금 게시판 */
 export function applyBoard(before: GState, current: GState, value: unknown, o: BoardOptions): BoardResult {
   if (snapshotKey(before) !== snapshotKey(current)) throw new GnetError('생성하는 동안 게시판이 바뀌어서 새로고침 결과를 적용하지 않았어요.');
   if (!isObj(value)) throw new GnetError('게시판 JSON 객체가 아니에요.');
-  const rows = o.settings.sampling && Array.isArray(value.alternativePosts) && value.alternativePosts.length ? value.alternativePosts : value.posts;
+  const rows = o.settings.sampling ? sampledBoard(value) : value.posts;
   if (!Array.isArray(rows) || !rows.length) throw new GnetError('posts 배열에 게시글이 없어서 기존 게시판을 유지했어요.');
   const st: GState = structuredClone(current);
   const old = new Map(st.posts.map((p) => [p.id, p]));
