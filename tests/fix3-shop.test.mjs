@@ -153,15 +153,21 @@ test('문의로 물건 바꾸기: 기본(켬)은 전과 같고, 끄면 문의 �
   assert.match(off, /the stock on the shelf is fixed: never add an item and never re-stock/);
   assert.match(off, /<change mode="none\|partial\|all">/, '값 흥정·빼기는 그대로 돌려줄 수 있다');
   assert.ok(off.length < on.length);
-  // 우주 쇼핑몰: 맞춤 주문 견적 줄이 같은 칸을 쓰므로 물건 줄 꼴은 남기고 나머지 진열 규칙만 뺀다. 팔기 중에는 줄 꼴도 뺀다
+  // 우주 쇼핑몰: 진열 규칙(SHELF·SHELF_SECRET) 대신 맞춤 주문 견적 줄의 칸 설명만 짧게 넣는다. 팔기 중에는 그것도 뺀다
   const cos = { ...live, shop: '우주 쇼핑몰', owner: '운영자' };
   const cosOn = sysOf(S.talkPrompt(src(cos), S.shopSettings({}), 'Cos'));
   const cosOff = sysOf(S.talkPrompt(src(cos), S.shopSettings({ [S.SHOP_TALK_STOCK_VAR]: '0' }), 'Cos'));
-  assert.match(cosOff, /Shelf size:/);
+  assert.doesNotMatch(cosOff, /Shelf size:/, '진열 규칙이 빠진다');
+  assert.doesNotMatch(cosOff, /Vary it from item to item across the whole shelf/, '진열용 효과·진실 규칙이 빠진다');
+  assert.match(cosOff, /Columns of the order line\. 쓰임:/);
+  for (const w of ['소모N', '종류/물건말/english', '잡동사니', '무게:', '진실 ≤ 60 chars']) assert.ok(cosOff.includes(w), w);
+  assert.match(cosOff, /<order>이름\|값\|납기시간\|쓰임\|그림\|무게\|설명\|효과\|진실<\/order>/, '견적 줄은 그대로 받을 수 있다');
+  assert.ok(cosOn.length - cosOff.length > 1500, `우주 쇼핑몰도 요청이 뚜렷이 짧아진다 (${cosOn.length} → ${cosOff.length})`);
+  assert.doesNotMatch(cosOn, /Columns of the order line/, '켜 두면 전과 같다');
   assert.match(cosOff, /A custom-order quote, where this shop takes custom orders, is still allowed\./);
   assert.ok(cosOff.length < cosOn.length);
   const selling = S.startSell(cos, { itemId: 'i_1', name: '낡은 칼', desc: '', use: false, effect: '' });
-  assert.doesNotMatch(sysOf(S.talkPrompt(src(selling), S.shopSettings({ [S.SHOP_TALK_STOCK_VAR]: '0' }), 'Cos')), /Shelf size:/);
+  assert.doesNotMatch(sysOf(S.talkPrompt(src(selling), S.shopSettings({ [S.SHOP_TALK_STOCK_VAR]: '0' }), 'Cos')), /Shelf size:|Columns of the order line/);
   // 응답: 꺼 두면 더하기·전체 다시 짜기는 버리고 값 바꾸기·빼기는 받는다
   const reply = S.parseTalk('<owner>있소.</owner>\n<change mode="partial">\n+ 망치|9000|손|도구/망치/hammer|0.6|쇠망치|\n~ 생수|1000\n</change>');
   const names = (x) => S.shelfItems(x).map((i) => `${i.name}:${i.price}`);

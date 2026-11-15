@@ -88,6 +88,10 @@ The protagonist speaks to the owner. Read what they mean from context — do not
 In this reply the stock on the shelf is fixed: never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines). When the protagonist asks for something not on the shelf or for a different selection, the owner answers in words only. A custom-order quote, where this shop takes custom orders, is still allowed.
 @@END
 
+@@SECTION ORDER_COLUMNS
+Columns of the order line. 쓰임: how the item is handled, using only these words joined with 「·」 — 손 (held in the hand to be used or fought with), 장비 (worn or strapped on the body; not something merely kept in a pocket or bag), 사용 (operated or applied for an effect and kept afterwards; something merely worn is 장비 only), 소모N (anything spent by using it; N is how many uses this one item holds, counting everything in a set or pack); write - when none fits. 그림: for picture lookup, `종류/물건말/english` — 종류 is exactly one of 옷·음식·도구·기기·의료·소모품·부적·무기·서류·귀중품·열쇠·봉인·괴이·성인·신체·잡동사니 (what the thing physically is, not what it is for), 물건말 is the plain Korean common noun for the object itself in one or two words, english is that same noun in English (옷/코트/coat). 무게: how much one of it weighs in kg, a number only, to the gram; for 소모N, one use's worth. 설명 ≤ 60 chars: what it is and how to use it, never limits, side effects or warnings. 효과 ≤ 40 chars: what the catalogue claims, never a limit, side effect, danger or origin. 진실 ≤ 60 chars, plain Korean, not 왈도체: what the item really does when used, including its catch or side effect, written precisely and concretely.
+@@END
+
 @@SECTION TALK_FEATURE
 Shelf lines end with 구분: 「희귀」 marks the one rare piece on display — the owner knows exactly what it is, where it came from and why it is special, and prizes it (discounts on it are rare and grudging). 「특가:N」 marks goods put out today below their usual price N — the owner knows why (재고 정리, 흠집, 유통기한 등) and can say so. When adding or re-stocking, keep 구분 the same way: at most one 희귀 on the shelf, 특가 only with the usual price.
 @@END

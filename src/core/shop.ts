@@ -971,14 +971,12 @@ export interface ShopSource {
 // 지침 글은 플러그인 내장 지침 「Shop」(지침/상점.txt, 설정 → 지침 → 상점에서 고침). 여기는 절을 골라 자리만 채운다 (2026-11-07 사용자: 지침은 전부 지침 메뉴에서)
 const G = (name: GuideName = 'Shop') => guideSections(name);
 
-const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, guide: GuideName = 'Shop', truthMode: TruthMode = 'mix', talk = false, lineOnly = false) => {
+const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, guide: GuideName = 'Shop', truthMode: TruthMode = 'mix', talk = false) => {
   const r = s.size;
   const v = { size: r[0] === r[1] ? guideTxt(guide, 'SIZE_EXACT', { n: r[0] }) : guideTxt(guide, 'SIZE_RANGE', { min: r[0], max: r[1] }), line: lineOf(guide), price: s.price, prev: st.prev.join(', '), truth_rule: guideTxt(guide, `TRUTH_${truthMode.toUpperCase()}`) };
   return [
     fillGuide(g.SHELF, v),
     guide === 'Cos' ? fillGuide(g.SHELF_SECRET, v) : '',
-    // 물건 줄 꼴만 (「문의로 물건 바꾸기」를 끈 우주몰 문의: 맞춤 주문 견적 줄이 같은 칸을 쓴다)
-    ...(lineOnly ? [] : [
     // 대화 요청은 TALK_FEATURE/TALK_PLAIN 이 구분을 말하므로 진열대용 구분 규칙은 빼기 (전수검사 11-13)
     talk ? '' : fillGuide(s.feature ? g.SHELF_FEATURE : g.SHELF_PLAIN, v),
     fillGuide(g.STOCK, v),
@@ -986,7 +984,6 @@ const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, 
     fillGuide(s.price ? g.PRICE_GUIDE : g.PRICE_DEFAULT, v),
     fillGuide(g.PRICING, v),
     s.avoidPrev && st.prev.length ? fillGuide(g.AVOID_PREV, v) : '',
-    ]),
   ].filter(Boolean).join('\n');
 };
 
@@ -1059,8 +1056,8 @@ export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 
     guide === 'Cos' && !o ? fillGuide(g.ORDER, v) : '',
     st.identity.points ? fillGuide(g.POINT_SHOP, v) : '',
     [fillGuide(g.TALK_OUTPUT, v), o ? fillGuide(g.TALK_OUTPUT_OFFER, v) : '', guide === 'Cos' && !o ? fillGuide(g.TALK_OUTPUT_INFO, v) : '', guide === 'Cos' && !o ? fillGuide(g.TALK_OUTPUT_ORDER, v) : '', s.kick ? fillGuide(g.TALK_OUTPUT_END, v) : ''].filter(Boolean).join('\n'),
-    // 「문의로 물건 바꾸기」를 끄면 진열 규칙을 넣지 않는다. 우주몰 문의(팔기 중이 아닐 때)는 맞춤 주문 견적 줄 때문에 물건 줄 꼴만 남긴다
-    s.talkStock ? SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true) : guide === 'Cos' && !o ? SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true, true) : '',
+    // 「문의로 물건 바꾸기」를 끄면 진열 규칙을 넣지 않는다. 우주몰 문의(팔기 중이 아닐 때)는 맞춤 주문 견적 줄에 쓰는 칸 설명만 짧게 넣는다 (지침 ORDER_COLUMNS 절)
+    s.talkStock ? SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true) : guide === 'Cos' && !o ? guideTxt(guide, 'ORDER_COLUMNS') : '',
     src.language ?? '',
   ].filter(Boolean).join('\n\n');
   // 내가 방금 한 말(마지막 줄)은 늘 넘긴다
