@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { lore, withWorldLore, readDirectory } from '../dist-test/core.mjs';
+import { lore, withWorldLore, readDirectory, tokens } from '../dist-test/core.mjs';
 
 const books = withWorldLore([{ comment: 'Directory', key: '', mode: 'normal', content: readFileSync(new URL('../src/data/install/directory.json', import.meta.url), 'utf8') }]);
 const dir = readDirectory(books);
@@ -66,7 +66,7 @@ test('플러그인 설정의 검색 깊이·토큰 예산: 0이면 카드 설정
   assert.deepEqual([base.depth, base.budget], [7, 4500]);
   assert.deepEqual(lore.loreOptions(card, chat, 'plugin', '', { depth: 0, budget: 0 }), base, '0 = 전과 같음');
   const own = lore.loreOptions(card, chat, 'plugin', '', { depth: 3, budget: 2000 });
-  assert.deepEqual([own.depth, own.budget], [3, 1800]);
+  assert.deepEqual([own.depth, own.budget], [3, 2000], '설정값이 그대로 상한');
   const risu = lore.loreOptions(card, chat, 'risu', '', { depth: 3, budget: 2000 });
   assert.deepEqual([risu.depth, risu.budget], [7, 4500], 'Risu가 직접 고를 때는 카드 설정');
   const none = lore.loreOptions({ globalLore: [] }, chat, 'plugin');
@@ -77,4 +77,24 @@ test('플러그인 설정의 검색 깊이·토큰 예산: 0이면 카드 설정
   const got = (over) => lore.computeLore(books, old, lore.loreOptions({ globalLore: books }, old, 'plugin', '', over)).picks.map((p) => p.entry.name);
   assert.ok(got(undefined).includes(name), name);
   assert.ok(!got({ depth: 2 }).includes(name), '깊이 2: 세 번째 전 메시지는 보지 않는다');
+});
+
+test('로어북 토큰 예산 설정: 늘 켜진 가상 항목이 있어도 설정값이 그대로 고른 로어북의 상한이다', () => {
+  const chat = { message: [{ role: 'char', data: '사무실은 조용했다.' }, { role: 'user', data: '관리국 건물로 들어갔다.' }], scriptstate: {} };
+  const run = (over) => {
+    const o = lore.loreOptions({ globalLore: books }, chat, 'plugin', '', over);
+    return { budget: o.budget, picks: lore.computeLore(books, chat, o).picks };
+  };
+  const all = run(undefined);
+  assert.ok(all.picks.length > 0, '카드 설정으로는 골라진다');
+  const size = (p) => tokens(p.entry.content);
+  const small = Math.min(...all.picks.map(size));
+  for (const budget of [3000, 5000, 8000]) {
+    const r = run({ budget });
+    assert.equal(r.budget, budget);
+    if (small <= budget) assert.ok(r.picks.length > 0, `예산 ${budget}: 들어갈 수 있는 로어북은 골라진다`);
+    assert.ok(r.picks.reduce((n, p) => n + size(p), 0) <= budget, `예산 ${budget} 안`);
+  }
+  assert.ok(small <= 3000, '작은 로어북은 3000 안에 든다');
+  assert.deepEqual(run({ budget: 0 }).budget, all.budget, '0 = 카드 설정');
 });
