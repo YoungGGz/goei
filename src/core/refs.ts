@@ -9,6 +9,7 @@ import type { Chat, LoreEntry } from './types';
 import { cleanOutput, hasWorldTags } from './world/tags';
 import { buildRegistry, referenceEntries, type Registry } from './world/registry';
 import { stripThoughts } from './thoughts';
+import { auxLoreRisu, keyedHits, outsideEntries } from './auxlore';
 
 export type RefKind = 'base' | 'primary' | 'active' | 'direct' | 'secondary';
 
@@ -20,7 +21,8 @@ export interface RefRow {
 }
 
 export interface RefSource {
-  char: { name?: string; desc?: string; globalLore?: LoreEntry[] };
+  /** moduleLore: 켜진 모듈의 로어북. 「보조 호출 로어북 = Risu와 같게」일 때만 host/risu.ts 가 채운다 */
+  char: { name?: string; desc?: string; globalLore?: LoreEntry[]; moduleLore?: LoreEntry[] };
   chat: Chat;
   /** 사용자 페르소나 설명 ({{persona}}, 창을 열 때 읽어 둔 값) */
   persona?: string;
@@ -186,9 +188,20 @@ export function collectRefs(src: RefSource, o: CollectOptions): RefRow[] {
   for (const x of o.extra ?? []) add('active', x.source, x.content);
   if (o.active !== false) for (const n of activeBooks(src.chat.scriptstate)) pull('active', n);
   if (o.related !== false) for (const e of referenceEntries(registry, o.text)) if (e.lore) pull('direct', e.lore);
+  // 「Risu와 같게」: 플러그인 틀 밖의 로어북(카드에 넣은 항목·채팅·모듈)을 Risu 규칙으로 더한다 (core/auxlore.ts). 위의 고르기는 그대로다
+  const outside = auxLoreRisu(src.chat.scriptstate)
+    ? outsideEntries({ card: src.char.globalLore, local: Array.isArray(src.chat.localLore) ? (src.chat.localLore as LoreEntry[]) : [], modules: src.char.moduleLore }, allowedBook)
+    : [];
+  const put = (kind: RefKind, name: string, content: string) => {
+    if (seen.has(name.trim().toLowerCase())) return;
+    add(kind, name, stripModules(evaluate(content, env)));
+  };
+  if (o.active !== false) for (const e of outside) if (e.always) put('active', e.name, e.content);
+  if (o.related !== false) for (const e of keyedHits(outside, o.text)) put('direct', e.name, e.content);
   if (o.secondary) {
     const hop = rows.filter((r) => r.kind === 'primary' || r.kind === 'direct').map((r) => r.content).join('\n');
     for (const e of referenceEntries(registry, hop)) if (e.lore) pull('secondary', e.lore);
+    for (const e of keyedHits(outside, hop)) put('secondary', e.name, e.content);
   }
   return rows;
 }

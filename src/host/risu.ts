@@ -4,6 +4,7 @@ import { setIconAliases, setIconPool } from '../core/iconmatch';
 import { ITEM_ICON_ALIAS_VAR, itemIconPoolOn, setItemRules } from '../core/items';
 import type { Chat, LoreEntry } from '../core/types';
 import { applyAdvanced } from '../core/advanced';
+import { auxLoreRisu } from '../core/auxlore';
 
 export interface CharacterSnapshot {
   name?: string;
@@ -11,6 +12,8 @@ export interface CharacterSnapshot {
   chaId?: string;
   alternateGreetings?: string[];
   globalLore?: LoreEntry[];
+  /** 켜진 모듈의 로어북 (「보조 호출 로어북 = Risu와 같게」일 때만 채운다. core/auxlore.ts) */
+  moduleLore?: LoreEntry[];
   [key: string]: unknown;
 }
 
@@ -21,6 +24,30 @@ export interface ChatContext {
   chat: Chat;
 }
 
+/** 켜진 모듈의 로어북. Risu 가 주는 「지금 봇 + 이 채팅 + 켜진 모듈」 목록에서 봇·채팅 것을 뺀 나머지.
+ *  그 기능이 없는 Risu 면 전역으로 켠 모듈의 로어북을 읽는다. 못 읽으면 빈 목록 (참고 자료가 줄 뿐 요청은 그대로 간다) */
+async function moduleLore(char: CharacterSnapshot, chat: Chat): Promise<LoreEntry[]> {
+  const isEntry = (e: unknown): e is LoreEntry => !!e && typeof e === 'object';
+  const print = (e: LoreEntry) => `${String(e.key ?? '')}\u0000${String(e.comment ?? '')}\u0000${String(e.content ?? '')}`;
+  try {
+    if (typeof risuai.getCurrentLorebookEntries === 'function') {
+      const all = ((await risuai.getCurrentLorebookEntries()) ?? []).filter(isEntry);
+      const mine = new Map<string, number>();
+      for (const e of [...(char.globalLore ?? []), ...(Array.isArray(chat.localLore) ? (chat.localLore as LoreEntry[]) : [])]) mine.set(print(e), (mine.get(print(e)) ?? 0) + 1);
+      return all.filter((e) => {
+        const n = mine.get(print(e)) ?? 0;
+        if (n > 0) mine.set(print(e), n - 1);
+        return n <= 0;
+      });
+    }
+    const db = await risuai.getDatabase(['modules', 'enabledModules']);
+    const on = new Set(db?.enabledModules ?? []);
+    return (db?.modules ?? []).filter((m) => on.has(m.id)).flatMap((m) => (Array.isArray(m.lorebook) ? m.lorebook.filter(isEntry) : []));
+  } catch {
+    return [];
+  }
+}
+
 export async function loadContext(): Promise<ChatContext | null> {
   const charIndex = await risuai.getCurrentCharacterIndex();
   const chatIndex = await risuai.getCurrentChatIndex();
@@ -28,6 +55,7 @@ export async function loadContext(): Promise<ChatContext | null> {
   const char = (await risuai.getCharacterFromIndex(charIndex)) as CharacterSnapshot | null;
   const chat = (await risuai.getChatFromIndex(charIndex, chatIndex)) as Chat | null;
   if (!char || !chat) return null;
+  if (auxLoreRisu(chat.scriptstate)) char.moduleLore = await moduleLore(char, chat);
   // 세계 데이터(기본 + 카드 덧쓰기)를 가상 로어북으로 붙인다. 저장할 때는 updateCharacterLore 가 뺀다
   char.globalLore = withWorldLore(char.globalLore);
   chat.message ??= [];
