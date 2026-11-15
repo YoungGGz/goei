@@ -272,7 +272,7 @@ const wtMark = (it: Item, left: number | undefined) => {
 const stateCls = (it: Item) => (it.state === 'broken' ? ' broken' : it.state === 'damaged' ? ' damaged' : '');
 /** 칸 위 표시: 남은 횟수 · 손상(노란 금) · 고장(붉은 표시) */
 function marks(it: Item, left: number | undefined): string {
-  return `${left !== undefined ? `<span class="it-left" title="남은 횟수">${left}</span>` : ''}${it.state === 'damaged' ? '<span class="it-crack" title="손상" aria-hidden="true"></span>' : it.state === 'broken' ? '<span class="it-brk" title="고장">고장</span>' : ''}`;
+  return `${left !== undefined ? `<span class="it-left" title="남은 횟수">${left}</span>` : ''}${it.state === 'damaged' ? '<span class="it-dmg" title="손상">손상</span>' : it.state === 'broken' ? '<span class="it-brk" title="고장">고장</span>' : ''}`;
 }
 function tipOf(it: Item, left: number | undefined, w: When): string {
   const tr = traitsLine(it, left);

@@ -3298,9 +3298,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .it-ulab { font-size: 12px; font-weight: 700; color: var(--sub); letter-spacing: .02em; }
 .sh-body .it-eqbox.sell .it-eqin { --slot: min(97px, calc((100cqw - 2 * var(--zp) - 2px - 128px - 14px - 3 * 8px) / 4)); } /* 상점 팔기: 소지품 화면과 같은 [아바타 | 장착 칸 4열 2줄], 칸 크기도 소지품 화면 장착 칸(97)과 같게 — 아래 소지품 구획의 물건 카드와 크기가 달라야 구분된다 (2026-11-12 사용자) */
 .sh-body .it-eqbox.sell { padding: var(--zp); }
-/* 칸 위 표시: 남은 횟수(오른쪽 위 숫자) · 손상(노란 금) · 고장(흐림 + 붉은 띠) · 사용 예정(흐림 + 띠) */
+/* 칸 위 표시: 남은 횟수(오른쪽 위 숫자) · 손상(노란 「손상」 도장, 고장 도장과 짝, 2026-11-15 사용자) · 고장(흐림 + 붉은 띠) · 사용 예정(흐림 + 띠) */
 .it-left { position: absolute; top: 9px; right: 9px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: color-mix(in srgb, var(--void) 78%, transparent); color: var(--text); font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; pointer-events: none; }
-.it-crack { position: absolute; left: 9px; top: 9px; width: 22px; height: 22px; pointer-events: none; background: linear-gradient(135deg, transparent 44%, var(--amber) 45% 52%, transparent 53%) 0 0 / 12px 12px no-repeat, linear-gradient(60deg, transparent 44%, var(--amber) 45% 52%, transparent 53%) 7px 6px / 12px 14px no-repeat; filter: drop-shadow(0 0 1px rgba(0,0,0,.7)); }
+.it-dmg { position: absolute; left: 10px; top: 11px; transform: rotate(-8deg); padding: 1px 5px; border: 1px solid color-mix(in srgb, var(--amber) 70%, transparent); border-radius: 5px; background: color-mix(in srgb, var(--amber) 22%, var(--void)); color: color-mix(in srgb, var(--amber) 75%, var(--text)); font-size: 10px; font-weight: 800; line-height: 1.4; pointer-events: none; }
 .it-c.broken .it-ic, .it-slot.broken .it-ic { opacity: .45; filter: grayscale(.7); }
 .it-brk { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) rotate(-8deg); padding: 2px 7px; border: 1px solid color-mix(in srgb, var(--danger) 70%, transparent); border-radius: 6px; background: color-mix(in srgb, var(--danger) 22%, var(--void)); color: color-mix(in srgb, var(--danger) 70%, var(--text)); font-size: 11px; font-weight: 800; pointer-events: none; }
 .it-c.queued .it-ic { opacity: .4; }
@@ -3346,6 +3346,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .it-eqslots { grid-template-columns: repeat(2, var(--slot)); }
   .it-eqslots .it-slot:nth-child(4n) .it-tip { left: 0; right: auto; }
   .it-slot { padding: 4px; border-radius: 10px; }
+  .it-slot .it-dmg { left: 4px; top: 4px; padding: 0 3px; font-size: 9px; } /* 폰 장착 칸: 칸이 작아 도장도 작게 구석에 */
   .it-slot .it-wt { display: none; } /* 폰 장착 칸: 칸이 작아 무게 글자가 그림을 가린다 → 숨김, 무게는 물건을 누르면 뜨는 창에 (2026-11-12 사용자) */
   /* 상점 팔기 (폰): 아바타 옆 2열 4줄이 상점 본문 폭(cqw) 안에 들어가게 */
   .sh-body .it-eqbox.sell .it-eqin { --slot: min(59px, calc((100cqw - 2 * var(--zp) - 2px - 128px - 10px - 8px) / 2)); flex-wrap: nowrap; }
