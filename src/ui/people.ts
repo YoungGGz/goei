@@ -584,7 +584,7 @@ export function peopleListView(ctx: ChatContext): string {
   const docsN = Object.values(store.docs).reduce((a, d) => a + liveEntries(d.entries, live).length, 0);
   const empty = !Object.keys(store.people).length && !pending.length ? '<div class="ph-blank"><p>아직 기록된 인물이 없어요.<br>메인 응답에서 요원·인물이 등장하면 기록이 생겨요.</p></div>' : '';
   const undoN = store.lastRun ? store.lastRun.entries.length + store.lastRun.docs.length + store.lastRun.changes.length + store.lastRun.observations.length + store.lastRun.newPeople.length : 0;
-  const undoBtn = undoN ? `<button class="ph-tool" data-action="pp-undo-run" title="마지막 갱신이 만든 ${undoN}개(항목·계기·문서·관찰·새 인물)를 취소해요. 취소한 항목·계기는 인물 상세에서, 문서는 기록 문서에서 다시 살릴 수 있어요. 관찰은 되살릴 수 없고 새 인물은 지워져요" aria-label="마지막 갱신 되돌리기" ${peopleUi.busy ? 'disabled' : ''}>↶</button>` : '';
+  const undoBtn = undoN ? `<button class="ph-tool" data-action="pp-undo-run" title="마지막 갱신이 만든 ${undoN}개(항목·계기·문서·관찰·새 인물)를 취소해요. 취소한 항목·계기는 인물 상세에서, 문서는 기록 문서에서 다시 살릴 수 있어요. 관찰은 되살릴 수 없고 새 인물은 지워져요" aria-label="마지막 갱신 되돌리기" ${peopleUi.busy ? 'disabled' : ''}>${ICONS.undo}</button>` : '';
   const newN = store.lastRun?.newPeople.length ?? 0;
   const undoAsk = undoN && peopleUi.undoAsk && peopleUi.undoAsk === undoKey(ctx, store)
     ? `<div class="gx-hint">마지막 갱신 ${undoN}개를 취소할까요?${newN ? ` 새 인물 ${newN}명은 지워져요.` : ''} <button class="gx-mini danger" data-action="pp-undo-run-yes" ${peopleUi.busy ? 'disabled' : ''}>취소하기</button><button class="gx-mini" data-action="pp-undo-run-no">그만</button></div>`
