@@ -83,7 +83,7 @@ for (const [vp, size] of VPS) {
   await click('[data-action="hs-pop"][data-value="call"]'); await page.waitForTimeout(300); await shot('call');
   assert.equal(await page.locator('[data-action="hs-pay"]').count(), 4, '결제 네 가지');
   assert.ok((await page.textContent('.hs-pop')).includes('380,000원'), '원 값');
-  assert.ok((await page.textContent('.hs-pop')).includes('무이자 출연 6회'), '출연');
+  assert.ok((await page.textContent('.hs-pop')).includes('출연 6회'), '출연');
   assert.ok((await page.textContent('.hs-op')).includes('주문 도와드리겠습니다'), '상담원 인사');
   // 흥정: 상담원(사람이 아닌 채널 직원) 요청 한 번
   await click('[data-action="hs-pay"][data-value="talk"]'); await page.waitForTimeout(200);

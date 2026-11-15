@@ -692,20 +692,24 @@ function ordersPage(ctx: ChatContext): string {
 const popShell = (title: string, body: string, foot = '', cls = '') =>
   `<div class="hs-dim"><button class="hs-dimx" data-action="hs-pop" data-value="" aria-label="닫기"></button><div class="hs-pop${cls ? ` ${cls}` : ''}" role="dialog" aria-label="${esc(title)}"><header><b>${esc(title)}</b><button data-action="hs-pop" data-value="" aria-label="닫기">✕</button></header><div class="pb">${body}</div>${foot ? `<footer>${foot}</footer>` : ''}</div></div>`;
 
-/** 결제 방법 네 가지의 이름·설명 (PC 는 가로 한 줄, 폰은 세로 목록) */
-function payInfo(part: HsPart, pay: HsPay): { title: string; sub: string } {
-  if (pay === 'won') return { title: part.item.price > 0 ? `${part.item.price.toLocaleString('en-US')}원` : '돈으로 결제', sub: '가계부에서 바로 결제' };
-  if (pay === 'appear') return { title: part.inst ? `무이자 출연 ${part.inst}회` : '출연으로 결제', sub: '지금 내는 돈 없음 · 나중에 방송 출연' };
-  if (pay === 'barter') return { title: '물건 맞교환', sub: '가진 물건을 내밀고 감정' };
-  return { title: '상담원과 흥정', sub: '조건을 말로 정하기' };
+/** 결제 방법 네 가지의 이름·설명. 폰 칩은 짧은 이름 (설명은 PC 단추의 풍선 글) */
+function payInfo(part: HsPart, pay: HsPay): { title: string; short: string; sub: string } {
+  if (pay === 'won') { const t = part.item.price > 0 ? `${part.item.price.toLocaleString('en-US')}원` : '돈으로 결제'; return { title: t, short: t, sub: '가계부에서 바로 결제' }; }
+  if (pay === 'appear') return { title: part.inst ? `무이자 출연 ${part.inst}회` : '출연으로 결제', short: part.inst ? `출연 ${part.inst}회` : '출연', sub: '지금 내는 돈 없음 · 나중에 방송 출연' };
+  if (pay === 'barter') return { title: '물건 맞교환', short: '맞교환', sub: '가진 물건을 내밀고 감정' };
+  return { title: '상담원과 흥정', short: '흥정', sub: '조건을 말로 정하기' };
 }
 /** 상담원과 정한 조건 카드 */
 const termsCard = (t: HsTerms | null): string => (t ? `<div class="hs-terms"><small>상담원 조건</small><b>${esc(termsText(t))}</b></div>` : '');
 
+/** 전화 주문 창 (11-15 사용자: 통화 칸이 너무 작다) — 창을 높이 가득 띄우고 통화 칸이 남는 자리를 다 쓴다.
+ *  PC: 얇은 결제 단추 한 줄 → [맞교환이면 내 물건 좁은 칸 | 통화 칸 + 입력칸] → 아래 한 줄 [조건 | 주문 | 끊기].
+ *  폰: 화면 가득, 결제 칩 한 줄 → (맞교환이면 물건 가로 줄) → 통화 칸이 끝까지 → 입력칸 → 조건 · 주문 단추 */
 function callPop(ctx: ChatContext, s: HsSettings): string {
   const { show, part, ordered } = nowPart(ctx);
   if (!part) return '';
   const mobile = isPhone();
+  const title = `☎ ${part.item.name}`;
   const head = `<div class="hs-pi"><span class="pic">${itemPic(part.item)}</span><span class="tx"><b>${esc(part.item.name)}</b><small>${esc(hsPayText(part))}</small></span></div>`;
   const op = (t: string) => (t ? `<p class="hs-op"><i>상담원</i>${esc(t)}</p>` : '');
   if (ui.done || ordered) {
@@ -717,28 +721,28 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   const btn = (p: HsPay) => {
     const ok = payOk(ctx, part, s, p);
     const i = payInfo(part, p);
-    return `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}"${ok ? '' : ' disabled'}><b>${esc(i.title)}</b><small>${ok ? esc(i.sub) : p === 'won' && part.item.price > 0 ? '가계부가 꺼져 있음' : '이 상품은 안 됨'}</small></button>`;
+    const why = ok ? i.sub : p === 'won' && part.item.price > 0 ? '가계부가 꺼져 있음' : '이 상품은 안 됨';
+    return `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}" title="${esc(why)}"${ok ? '' : ' disabled'}>${esc(mobile ? i.short : i.title)}</button>`;
   };
-  // 통화 (맞교환·흥정이 같이 쓴다): 상담원 첫 말부터 주고받은 말
-  const lines = (call?.lines ?? []).map((l) => (l.who === 'op' ? op(l.text) : `<p class="hs-me">${esc(l.text)}</p>`)).join('') + (ui.calling ? '<p class="hs-op wait"><i>상담원</i>…</p>' : '');
-  const talkIn = `<div class="hs-in op"><input name="hs-op" data-input="hs-op" data-enter="hs-op" value="${esc(ui.opInput)}" maxlength="200" placeholder="${pay === 'barter' ? '한마디 덧붙이기 (없어도 됨)' : '상담원에게 할 말'}" aria-label="상담원에게 할 말"${ui.calling ? ' disabled' : ''}>${pay === 'talk' ? `<button data-action="hs-op"${needAttr('hs-op', ui.opInput, ui.calling)}>말하기</button>` : ''}</div>`;
-  const mine = pay === 'barter' ? barterItems(ctx) : [];
-  const pick = pay === 'barter' ? (mine.length ? `<div class="hs-pick">${mine.map((x) => `<button class="${ui.offer.includes(x.id) ? 'on' : ''}" data-action="hs-offer" data-value="${esc(x.id)}" aria-pressed="${ui.offer.includes(x.id)}"><span class="pic">${itemPic(x)}</span>${esc(x.name)}</button>`).join('')}</div><button class="hs-appraise" data-action="hs-appraise"${ui.calling || !ui.offer.length ? ' disabled' : ''}>감정 받기</button>` : '<p class="hs-none">내밀 물건이 없습니다.</p>') : '';
+  // 통화: 상담원 첫 말부터 주고받은 말. 값·출연만 고른 동안에도 상담원 인사가 여기 있다
+  const said = call?.lines.length ? call.lines : show.ops?.hello ? [{ who: 'op' as const, text: show.ops.hello }] : [];
+  const lines = said.map((l) => (l.who === 'op' ? op(l.text) : `<p class="hs-me">${esc(l.text)}</p>`)).join('') + (ui.calling ? '<p class="hs-op wait"><i>상담원</i>…</p>' : '');
   const dealPanel = pay === 'barter' || pay === 'talk';
-  const panel = dealPanel
-    ? (mobile
-      ? `<div class="hs-deal">${pick}<div class="hs-callog">${lines}</div>${talkIn}</div>`
-      : `<div class="hs-deal two">${pay === 'barter' ? `<div class="l">${pick}</div>` : ''}<div class="r"><div class="hs-callog">${lines}</div>${talkIn}</div></div>`)
-    : op(call?.lines.find((l) => l.who === 'op')?.text ?? show.ops?.hello ?? '');
+  const talkIn = dealPanel ? `<div class="hs-in op"><input name="hs-op" data-input="hs-op" data-enter="hs-op" value="${esc(ui.opInput)}" maxlength="200" placeholder="${pay === 'barter' ? '한마디 덧붙이기 (없어도 됨)' : '상담원에게 할 말'}" aria-label="상담원에게 할 말"${ui.calling ? ' disabled' : ''}>${pay === 'talk' ? `<button data-action="hs-op"${needAttr('hs-op', ui.opInput, ui.calling)}>말하기</button>` : ''}</div>` : '';
+  const mine = pay === 'barter' ? barterItems(ctx) : [];
+  const pick = pay === 'barter' ? (mine.length ? `<div class="hs-pick">${mine.map((x) => `<button class="${ui.offer.includes(x.id) ? 'on' : ''}" data-action="hs-offer" data-value="${esc(x.id)}" aria-pressed="${ui.offer.includes(x.id)}"><span class="pic">${itemPic(x)}</span><span class="nm">${esc(x.name)}</span></button>`).join('')}</div><button class="hs-appraise" data-action="hs-appraise"${ui.calling || !ui.offer.length ? ' disabled' : ''}>감정 받기</button>` : '<p class="hs-none">내밀 물건이 없습니다.</p>') : '';
+  const log = `<div class="hs-callog" aria-live="polite">${lines}</div>`;
   const terms = termsFor(part, pay);
   const block = terms ? termsBlock(ctx, terms) : '';
   const label = pay === 'won' ? `${part.item.price.toLocaleString('en-US')}원 결제` : pay === 'appear' ? `출연 ${part.inst ?? 0}회로 주문` : '이 조건으로 주문';
-  const foot = `${dealPanel ? termsCard(terms) : ''}${block ? `<p class="hs-warn">${esc(block)}</p>` : ''}<div class="hs-ft"><button class="pri" data-action="hs-order"${terms && !block && !ui.calling ? '' : ' disabled'}>${esc(label)}</button>${mobile ? '' : '<button data-action="hs-pop" data-value="">끊기</button>'}</div>`;
-  // PC: 결제 방법 네 개를 가로 한 줄, 그 아래 고른 방법의 칸. 폰: 세로 목록에서 고른 줄 바로 아래로 펼친다
-  const body = mobile
-    ? `${head}<div class="hs-pays col">${PAYS.map((p) => `${btn(p)}${p === pay ? `<div class="hs-paybody">${panel}</div>` : ''}`).join('')}</div>`
-    : `${head}<div class="hs-pays row">${PAYS.map(btn).join('')}</div>${panel}`;
-  return popShell('☎ 전화 주문', body, foot, mobile ? 'call m' : 'call');
+  const orderBtn = `<button class="pri" data-action="hs-order"${terms && !block && !ui.calling ? '' : ' disabled'}>${esc(label)}</button>`;
+  const warn = block ? `<p class="hs-warn">${esc(block)}</p>` : '';
+  if (mobile) {
+    const body = `<div class="hs-pays chips">${PAYS.map(btn).join('')}</div>${pick ? `<div class="hs-offer">${pick}</div>` : ''}${log}${talkIn}`;
+    return popShell(title, body, `${dealPanel ? termsCard(terms) : ''}${warn}${orderBtn}`, 'call m');
+  }
+  const body = `<div class="hs-pays row">${PAYS.map(btn).join('')}</div><div class="hs-deal">${pick ? `<div class="l">${pick}</div>` : ''}<div class="r">${log}${talkIn}</div></div>`;
+  return popShell(title, body, `${warn}<div class="hs-ft">${dealPanel ? termsCard(terms) || '<div class="hs-terms none"><small>상담원 조건</small><b>아직 없음</b></div>' : '<span class="sp"></span>'}${orderBtn}<button data-action="hs-pop" data-value="">끊기</button></div>`, 'call');
 }
 
 /** 상품 스티커: 모서리를 들추면(PC 끌기·누르기, 폰 누르기) 밑에 찍힌 원래 용도 몇 글자만 보인다 (11-15 사용자). DOM 에는 조각과 고정 무늬(■)만 — 진실 전체는 넣지 않는다 */
