@@ -1,5 +1,5 @@
 // 망상홈쇼핑 모서리 확인 (작업용): node tests/homeshop-edge-browser.mjs
-// 두 번 누르기 · 응답 다시 굴리기(주문·상자·맞교환이 되돌아가나) · 상자 두 번 열기 · 본편 턴이 넘어가면 편성 한 칸
+// 두 번 누르기 · 응답 다시 굴리기(주문·상자·맞교환이 되돌아가나) · 상자 두 번 열기 · 본편 턴이 넘어가면 편성 한 칸 · 정말 다 팔린 상품만 매진(다시 열어도 매진)
 import assert from 'node:assert/strict';
 import { boot, closeEditor, closeWin, launch, loadFixture, openWin } from './qc-settings-harness.mjs';
 import { distPack } from './data-init.mjs';
@@ -25,14 +25,16 @@ await page.evaluate((r) => { window.__llm = [{ type: 'success', result: r }]; },
 await goHs();
 await page.waitForSelector('.hs-l3', { timeout: 15000 });
 console.log('anchor sample', JSON.stringify(await page.evaluate(() => window.__chat.scriptstate.$hs_show_at)));
-// ① 주문 확정 두 번 누르기 → 한 건
+// ① 출연으로 주문 확정 두 번 누르기 → 한 건
 await click('[data-action="hs-pop"][data-value="call"]'); await page.waitForTimeout(200);
+await click('[data-action="hs-pay"][data-value="appear"]'); await page.waitForTimeout(200);
 await page.evaluate(() => { const b = document.querySelector('[data-action="hs-order"]'); b.click(); b.click(); });
 await page.waitForFunction(() => (window.__chat.scriptstate.$hs_orders || '').includes('무전기')); await page.waitForTimeout(500);
 let st = await ss();
 assert.equal(JSON.parse(st.$hs_orders).length, 1, '주문 한 건');
 assert.equal(JSON.parse(st.$st_items).list.filter((x) => x.name.includes('택배 상자')).length, 1, '상자 한 개');
 const o1 = JSON.parse(st.$hs_orders)[0];
+assert.deepEqual([o1.pay, o1.n, o1.dues.length], ['appear', 6, 6]);
 console.log('① ok', o1.anchor, o1.boxId);
 // ② 응답 다시 굴리기 → 주문·상자 사라짐, 다시 주문 가능
 await click('.hs-pop header [data-action="hs-pop"]');
@@ -49,13 +51,16 @@ console.log('② ok');
 // ③ 맞교환 주문 → 물건 빠짐·호출 없음, 다시 굴리면 물건 돌아옴
 await click('[data-action="hs-pop"][data-value="call"]'); await page.waitForTimeout(200);
 await click('[data-action="hs-pay"][data-value="barter"]'); await page.waitForTimeout(200);
-assert.equal(await page.locator('[data-action="hs-order"][disabled]').count(), 1, '물건 고르기 전에는 확정 못 함');
-await click('[data-action="hs-barter"][data-value="i_old"]'); await page.waitForTimeout(200);
+assert.equal(await page.locator('[data-action="hs-order"][disabled]').count(), 1, '감정 받기 전에는 확정 못 함');
+await click('[data-action="hs-offer"][data-value="i_old"]'); await page.waitForTimeout(200);
+await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<operator>그거면 됩니다, 고객님.</operator>\n<terms>\nitems|낡은 손전등\n</terms>' }]; });
+await click('[data-action="hs-appraise"]');
+await page.waitForSelector('.hs-terms', { timeout: 15000 });
 await click('[data-action="hs-order"]');
-await page.waitForFunction(() => JSON.parse(window.__chat.scriptstate.$hs_orders || '[]').some((o) => o.barter)); await page.waitForTimeout(400);
+await page.waitForFunction(() => JSON.parse(window.__chat.scriptstate.$hs_orders || '[]').some((o) => o.pay === 'barter')); await page.waitForTimeout(400);
 st = await ss();
-const o2 = JSON.parse(st.$hs_orders).find((o) => o.barter);
-assert.deepEqual([o2.n, o2.dues.length, o2.barter], [0, 0, '낡은 손전등']);
+const o2 = JSON.parse(st.$hs_orders).find((o) => o.pay === 'barter');
+assert.deepEqual([o2.n, o2.dues.length, o2.how.includes('낡은 손전등')], [0, 0, true]);
 await click('.hs-pop header [data-action="hs-pop"]');
 await toItems();
 assert.equal(await page.locator('[data-action="items-open"][data-value="i_old"]').count(), 0, '맞교환한 물건은 소지품에 없음');
@@ -78,6 +83,7 @@ console.log('⑤ ok');
 // ⑥ 다음 턴에 연 상자: 그 턴을 다시 굴리면 미개봉 상자로 돌아옴
 await goHs();
 await click('[data-action="hs-pop"][data-value="call"]'); await page.waitForTimeout(200);
+await click('[data-action="hs-pay"][data-value="appear"]'); await page.waitForTimeout(200);
 await click('[data-action="hs-order"]');
 await page.waitForFunction(() => JSON.parse(window.__chat.scriptstate.$hs_orders || '[]').some((o) => o.anchor.includes('c1c') && o.n > 0)); await page.waitForTimeout(300);
 const o3 = JSON.parse((await ss()).$hs_orders).find((o) => o.anchor.includes('c1c'));
@@ -103,6 +109,17 @@ assert.equal(at1, at0 + 1, `편성 한 칸 (${at0} → ${at1})`);
 await toItems(); await goHs(); await page.waitForTimeout(800);
 assert.equal(JSON.parse((await ss()).$hs_show).at, at1, '같은 턴에 다시 열어도 그대로');
 console.log('⑦ ok');
+// ⑧ 매진은 정말 다 팔린 상품만: 3번 상품이 마지막 줄에서 매진 → 주문 잠김, 다시 열어도 매진. 지난 부는 매진이 아니다
+await page.evaluate((r) => { window.__chat.message.push({ role: 'user', data: '또', chatId: 'u3' }, { role: 'char', data: r, chatId: 'c3' }); }, REPLY);
+await reopen(); await goHs();
+await page.waitForFunction(() => (document.querySelector('.hs-ord .call')?.textContent || '').includes('매진'), null, { timeout: 30000 });
+assert.equal(await page.locator('.hs-ord .call[disabled]').count(), 1, '매진이면 전화 주문 잠김');
+await page.waitForFunction(() => JSON.parse(window.__chat.scriptstate.$hs_show).parts[2].out === true, null, { timeout: 8000 });
+await reopen(); await goHs(); await page.waitForTimeout(600);
+assert.ok((await page.textContent('.hs-ord .call')).includes('매진'), '다시 열어도 매진');
+{ const st8 = await page.evaluate(() => [...document.querySelectorAll('.hs-sec .st')].map((e) => e.textContent));
+  assert.equal(st8.filter((t) => t === '매진').length, 1, `편성표 매진은 하나: ${st8}`); }
+console.log('⑧ ok');
 assert.deepEqual(errors, []);
 console.log('edge ok');
 await browser.close();

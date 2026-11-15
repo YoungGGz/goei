@@ -2,6 +2,7 @@
 // 모양은 11-10 도트 시안(site_mock_dot: 도트 글꼴·2px 테두리·판 색)을 그대로. 방송 칸은 재생기(ui/hsplayer.ts)가 그린다.
 // 편성 호출은 상점 요청문(core/shop.ts shelfPrompt)에 방송 절(지침 「망상홈쇼핑」 BROADCAST)을 붙여 한 번에: 상품·상품마다 큐시트·채팅.
 // 설정은 우주몰·포인트몰과 같은 틀(설정 → 인터넷 → 망상홈쇼핑). 재생 규칙·효과·속도 모두 설정에서 고친다.
+import { needAttr } from './needfill';
 import { shopGive, type ShopFn } from '../core/shopfn';
 import { defGroups, type Wire } from './setrow';
 import { HOMESHOP_SET, HS_DEF_TEXT, HS_FLAG, HS_PAIRS, HS_RETRY_KEY, HS_TEL_KEY } from '../core/setdef/homeshop';
@@ -664,7 +665,7 @@ function schedPage(show: HsShow, s: HsSettings): string {
   return `<section class="hs-sec"><h4>편성표<small>${esc(show.title)}</small></h4>${lineup(show, s, true)}</section>`;
 }
 
-/** 주문 조회: 위 할부 장부, 아래 배송. 방청 접수가 있으면 맨 위 한 줄. 누르는 것 없음 */
+/** 주문 조회: 위 출연 장부(무이자 출연), 아래 배송. 방청 접수가 있으면 맨 위 한 줄. 누르는 것 없음 */
 function ordersPage(ctx: ChatContext): string {
   const alive = aliveAnchors(ctx.chat);
   const list = liveOrders(ctx.chat.scriptstate, alive).slice().reverse();
@@ -682,7 +683,7 @@ function ordersPage(ctx: ChatContext): string {
     return `<li><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(o.how)}</small></span><span class="st${opened ? '' : ' on'}">${opened ? '수령 확인' : '배송 완료 · 미개봉'}</span></li>`;
   }).join('');
   return `<section class="hs-sec"><h4>주문 조회</h4>${audRow}
-<h5>할부 내역</h5>${debtRows ? `<ul class="hs-ol">${debtRows}</ul>` : '<p class="hs-none">할부 내역이 없습니다.</p>'}
+<h5>출연 내역</h5>${debtRows ? `<ul class="hs-ol">${debtRows}</ul>` : '<p class="hs-none">출연 내역이 없습니다.</p>'}
 <h5>배송</h5>${shipRows ? `<ul class="hs-ol">${shipRows}</ul><p class="hs-tip">택배 상자는 소지품에서 「열기」로 엽니다.</p>` : '<p class="hs-none">주문 내역이 없습니다.</p>'}</section>`;
 }
 
@@ -720,7 +721,7 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   };
   // 통화 (맞교환·흥정이 같이 쓴다): 상담원 첫 말부터 주고받은 말
   const lines = (call?.lines ?? []).map((l) => (l.who === 'op' ? op(l.text) : `<p class="hs-me">${esc(l.text)}</p>`)).join('') + (ui.calling ? '<p class="hs-op wait"><i>상담원</i>…</p>' : '');
-  const talkIn = `<div class="hs-in op"><input name="hs-op" data-input="hs-op" data-enter="hs-op" value="${esc(ui.opInput)}" maxlength="200" placeholder="${pay === 'barter' ? '한마디 덧붙이기 (없어도 됨)' : '상담원에게 할 말'}" aria-label="상담원에게 할 말"${ui.calling ? ' disabled' : ''}>${pay === 'talk' ? `<button data-action="hs-op"${ui.calling || !ui.opInput.trim() ? ' disabled' : ''}>말하기</button>` : ''}</div>`;
+  const talkIn = `<div class="hs-in op"><input name="hs-op" data-input="hs-op" data-enter="hs-op" value="${esc(ui.opInput)}" maxlength="200" placeholder="${pay === 'barter' ? '한마디 덧붙이기 (없어도 됨)' : '상담원에게 할 말'}" aria-label="상담원에게 할 말"${ui.calling ? ' disabled' : ''}>${pay === 'talk' ? `<button data-action="hs-op"${needAttr('hs-op', ui.opInput, ui.calling)}>말하기</button>` : ''}</div>`;
   const mine = pay === 'barter' ? barterItems(ctx) : [];
   const pick = pay === 'barter' ? (mine.length ? `<div class="hs-pick">${mine.map((x) => `<button class="${ui.offer.includes(x.id) ? 'on' : ''}" data-action="hs-offer" data-value="${esc(x.id)}" aria-pressed="${ui.offer.includes(x.id)}"><span class="pic">${itemPic(x)}</span>${esc(x.name)}</button>`).join('')}</div><button class="hs-appraise" data-action="hs-appraise"${ui.calling || !ui.offer.length ? ' disabled' : ''}>감정 받기</button>` : '<p class="hs-none">내밀 물건이 없습니다.</p>') : '';
   const dealPanel = pay === 'barter' || pay === 'talk';
@@ -750,8 +751,10 @@ function peekPop(ctx: ChatContext, s: HsSettings): string {
   const under = s.peek ? `<div class="hs-und" aria-hidden="true"><div class="emb"><span>■■■ ■■■■ ■■</span>${frag ? `<b>${esc(frag)}</b>` : '<b class="none">■■■■</b>'}</div></div>` : '';
   const corner = s.peek ? `<span class="flapw" aria-hidden="true"><span class="flap"></span></span><button class="corner" data-action="hs-lift" aria-label="스티커 모서리 들추기"${ui.lifted ? ' disabled' : ''}></button>` : '';
   const cls = `hs-sticker${ui.lifted ? ' lifted anim' : ''}`;
-  const hint = s.peek && !ui.lifted ? `<p class="hs-peelhint">${mobile ? '모서리를 <i>눌러</i> 들춰 보세요' : '모서리를 <i>잡아 끌거나 눌러</i> 들춰 보세요'}</p>` : '';
-  return popShell('상품 스티커', `<div class="${cls}" style="--from:${ui.peelFrom || 0.12}">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
+  const hint = s.peek && !ui.lifted ? `<p class="hs-peelhint">${mobile ? '스티커를 <i>눌러</i> 들춰 보세요' : '모서리를 <i>잡아 끌거나 눌러</i> 들춰 보세요'}</p>` : '';
+  // 폰은 모서리가 작고 화면 끝이라 스티커 어디를 눌러도 모서리부터 젖힌다
+  const tap = mobile && s.peek && !ui.lifted ? ' data-action="hs-lift"' : '';
+  return popShell('상품 스티커', `<div class="${cls}"${tap} style="--from:${ui.peelFrom || 0.12}">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
 }
 
 function audPop(): string {
@@ -786,6 +789,8 @@ export function homeshopMounted(root: HTMLElement): void {
   if (root.querySelector('[data-hs-mount="stage"]')) mountPlayer(root);
   else stopPlayer();
   // 스티커 모서리 끌기 (PC 만. 폰은 누르기만): 끄는 만큼 젖히고, 절반 넘게 끌고 놓으면 그 자리부터 마저 젖힌다(hs-lift 에 끈 만큼을 넘김). 덜 끌면 도로 붙는다
+  // 통화 기록: 다시 그리면 맨 위로 돌아가므로 늘 마지막 말(방금 상담원 답)이 보이게 맨 아래로
+  root.querySelectorAll<HTMLElement>('.hs .hs-callog').forEach((el) => { el.scrollTop = el.scrollHeight; });
   const corner = root.querySelector<HTMLButtonElement>('.hs .hs-sticker .corner');
   if (corner && !isPhone() && !corner.dataset.drag) peelDrag(corner);
 }

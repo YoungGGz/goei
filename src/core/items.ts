@@ -373,7 +373,8 @@ export function addItem(it: Items, alive: Set<string>, e: ItemInput): Items {
   if (!name) return it;
   const desc = clean(e.desc, 80);
   const effect = clean(e.effect, 60);
-  const truth = e.truth ? clean(e.truth, 60) : '';
+  // 숨긴 진짜 효과: 모델이 지은 것은 지침대로 짧지만, 우주몰 고정 상품처럼 사용자가 적은 것(200자까지)은 자르지 않는다. 화면에는 안 보이고 메인 모델만 본다
+  const truth = e.truth ? clean(e.truth, 200) : '';
   const text = e.text ? clean(e.text, 400) : '';
   const quote = e.quote ? clean(e.quote, 120) : undefined;
   // 갈래는 종류 + 판정 표로 코드가 정한다 (모델이 적은 사용·장착 깃발은 표에 줄이 없을 때만). 손으로 넣은 것·시작 소지품(manual)은 적힌 대로

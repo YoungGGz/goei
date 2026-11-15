@@ -357,7 +357,7 @@ function readOffer(v: unknown): ShopOffer | null {
     desc: clean(o.desc, 120),
     effect: clean(o.effect, 60),
     ...traitsOf(o),
-    ...(typeof o.truth === 'string' && o.truth ? { truth: clean(o.truth, 60) } : {}),
+    ...(typeof o.truth === 'string' && o.truth ? { truth: clean(o.truth, 200) } : {}),
     ...(Number.isSafeInteger(o.paid) ? { paid: o.paid as number } : {}),
     ...(o.price === null ? { price: null } : Number.isSafeInteger(o.price) ? { price: o.price as number } : {}),
     ...(Number.isSafeInteger(o.first) ? { first: o.first as number } : {}),
@@ -845,7 +845,7 @@ export function buyNote(st: ShopState, id: string, key = ''): ShopState | null {
 
 /** 팔기 시작: 소지품 한 줄을 들고 주인에게 보인다 (값은 아직 없음). 내 말은 부르는 쪽이 sayToOwner 로 적는다 */
 export function startSell(st: ShopState, it: Omit<ShopOffer, 'price' | 'first'>): ShopState {
-  return { ...st, sell: { itemId: it.itemId, name: clean(it.name, 30), desc: clean(it.desc, 120), effect: clean(it.effect, 60), ...traitsOf(it), ...(it.truth ? { truth: clean(it.truth, 60) } : {}), ...(Number.isSafeInteger(it.paid) ? { paid: it.paid } : {}) } };
+  return { ...st, sell: { itemId: it.itemId, name: clean(it.name, 30), desc: clean(it.desc, 120), effect: clean(it.effect, 60), ...traitsOf(it), ...(it.truth ? { truth: clean(it.truth, 200) } : {}), ...(Number.isSafeInteger(it.paid) ? { paid: it.paid } : {}) } };
 }
 
 /** 기본 상점: 말·판 것에 그때의 기준 응답 키를 적는다 (쇼핑몰은 key 가 비어 stampLastLine 이 적는다) (전수검사 11-13) */

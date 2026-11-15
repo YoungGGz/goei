@@ -5212,7 +5212,12 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs .hs-deal.two > .l { flex: 0 0 44%; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .hs .hs-deal.two > .r { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .hs .hs-callog { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
-.hs .hs-deal.two .hs-callog { flex: 1; min-height: 120px; }
+.hs .hs-deal.two .hs-callog { flex: 1; min-height: 0; max-height: none; }
+/* PC 전화 창이 낮으면 통화 칸만 줄고(안에서 스크롤) 위 결제 칸·아래 입력칸·조건·주문 단추는 그대로 보인다 */
+.hs .hs-pop.call:not(.m) .pb > * { flex-shrink: 0; }
+.hs .hs-pop.call:not(.m) .pb > .hs-deal.two { flex: 1 1 auto; min-height: 150px; max-height: 300px; }
+.hs .hs-deal.two > .l, .hs .hs-deal.two > .r { min-height: 0; }
+.hs .hs-deal.two > .l .hs-pick { min-height: 0; overflow-y: auto; }
 .hs .hs-me { margin: 0 0 0 auto; max-width: 85%; padding: 8px 12px; border-radius: 12px 4px 12px 12px; background: #3a2226; }
 .hs .hs-op.wait { opacity: .6; }
 .hs .hs-in.op { display: flex; gap: 6px; }
