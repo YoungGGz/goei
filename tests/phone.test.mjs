@@ -345,6 +345,8 @@ test('자동 호출 결과: 플러그인이 응답에 붙였다 뗀 것(상점 �
   assert.equal(P.chatPrefixKept({ message: [before.message[0], { role: 'char', data: '가게에 들어갔다.\n[shop: 잡화점|주인]', chatId: 'c1' }] }, next('가게에 들어갔다.')), true, '지난 응답의 상점 표식을 지움');
   assert.equal(P.chatPrefixKept(before, next('가게에 들어갔다.\n')), true, '끝 줄바꿈');
   assert.equal(P.chatPrefixKept(before, next('<img=가게>\n가게에 들어갔다.')), true, '이미지 태그 보충');
+  assert.equal(P.chatPrefixKept({ message: [before.message[0], { role: 'char', data: '가게에 들어갔다.\n[shop-ready: cos|망토]', chatId: 'c1' }] }, next('가게에 들어갔다.')), true, '주문을 받아 완성 표식이 빠짐');
+  assert.equal(P.chatPrefixKept(before, next('가게에 들어갔다.\n[shop-ready: cos|망토]')), true, '완성 표식이 붙음');
   assert.equal(P.chatPrefixKept(before, next('가게에 들어갔다.', 'c9')), false, '같은 글이어도 다른 메시지(다시 굴림)');
   assert.equal(P.chatPrefixKept(before, next('가게를 지나쳤다.')), false, '내용을 고침');
 });

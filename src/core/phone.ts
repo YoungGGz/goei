@@ -1,7 +1,7 @@
 // 괴담톡: 저장 형식(원본 ph_state·ph_contacts·ph_bulletins와 같음), 연락처·탭, 대화 규칙, 모델 응답 검사와 반영.
 // 원칙(원본과 같음): 이미 저장된 말풍선은 모델이 고치거나 지우지 못한다. 모델은 새 말풍선·대기·퇴장(단톡)만 덧붙이고,
 // 초대·방 만들기·공지 채널·시각·기록 번호는 앱이 정한다.
-import type { Chat, LoreEntry } from './types';
+import type { Chat, ChatMessage, LoreEntry } from './types';
 import { readWorld } from './world/output';
 import { phoneTabsSection, readDirectory, rosterOf } from './world/directory';
 import { BUILTIN, extraFactions, extraTabs, factionType, isFactionCode } from './factions';
@@ -11,6 +11,7 @@ import { pickRecords, related, type Focus, type Pick } from './focus';
 import { guideTxt } from './guides';
 import type { ViewRoom } from './phoneView';
 import { messageHash, messageKey } from './people/store';
+import { stripReadyTags } from './orders';
 export { hasAttachment } from './attach';
 
 export class PhoneError extends Error {
@@ -1105,10 +1106,11 @@ export function chatPrefixKept(before: Chat, now: Chat): boolean {
   const a = before.message ?? [];
   const b = now.message ?? [];
   if (b.length < a.length) return false;
-  // 메시지 정체(chatId)와 읽음 판정용 내용 해시로 견준다. 플러그인이 응답 본문에 붙였다 떼는 것(상점 표식·이미지 태그·끝 줄바꿈)은 바뀐 것으로 보지 않는다
+  // 메시지 정체(chatId)와 읽음 판정용 내용 해시로 견준다. 플러그인이 응답 본문에 붙였다 떼는 것(상점 표식·주문 완성 표식·이미지 태그·끝 줄바꿈)은 바뀐 것으로 보지 않는다
+  const body = (m: ChatMessage) => (typeof m?.data === 'string' ? { ...m, data: stripReadyTags(m.data) } : m);
   for (let i = a.length - 1; i >= 0; i--) {
     if (a[i]?.role !== b[i]?.role || messageKey(a[i], i) !== messageKey(b[i], i)) return false;
-    if (a[i]?.data !== b[i]?.data && messageHash(a[i]) !== messageHash(b[i])) return false;
+    if (a[i]?.data !== b[i]?.data && messageHash(body(a[i])) !== messageHash(body(b[i]))) return false;
   }
   return true;
 }
