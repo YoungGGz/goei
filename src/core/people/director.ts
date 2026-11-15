@@ -53,6 +53,8 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
       const es = liveEntries(p.slots[k as SlotId], live).map((e) => ({ text: e.text, ...(e.target ? { target: e.target } : {}), ...(e.kind ? { kind: e.kind } : {}) }));
       if (es.length) slots[k] = es;
     }
+    // record 의 글자 몫은 slots 에 실은 글자만큼 줄인다 (record 가 전용 칸을 싣던 때와 같은 총량: personBlock 과 같은 셈으로 항목당 글자 + 3)
+    const slotChars = Object.values(slots).reduce((m, l) => m + l.reduce((k, e) => k + e.text.length + 3, 0), 0);
     // 꼬리(state·threads)는 재사용 열쇠 계산에만 쓴다. 자료(data)에는 `record` 전문이 같은 글을 싣고 있어 넣지 않는다 (11-14 재검토 gupdp#1)
     tails[n] = { state: slot('state'), threads: slot('threads') };
     return {
@@ -64,7 +66,7 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
       ...(s.directorFeatures && s.features.has('axes') ? { axes: axesLinesEn(p.axes), ...(p.patterns?.length ? { patterns: p.patterns } : {}) } : {}),
       // 성적 욕망·이상성욕 (원본 director people_profile: text + policy sexual_context_only)
       ...(() => { const t = sexualTexts(p, s); return { ...(t.desire ? { sexual_desire: { text: t.desire, policy: SEXUAL_POLICY } } : {}), ...(t.paraphilia ? { paraphilia: { text: t.paraphilia, policy: SEXUAL_POLICY } } : {}) }; })(),
-      record: personBlock(p, store, live, changes, { mode: 'record', unknown: [], speechMarks: true, temper: temperOf(n), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap, maxChars: recordCap, taste: s.features.has('taste'), openness: s.features.has('openness'), axes: false, features: s.features, qual: s.qualitative, omitSlots: new Set(featureSlots) }),
+      record: personBlock(p, store, live, changes, { mode: 'record', unknown: [], speechMarks: true, temper: temperOf(n), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap, maxChars: Math.max(1, recordCap - slotChars), taste: s.features.has('taste'), openness: s.features.has('openness'), axes: false, features: s.features, qual: s.qualitative, omitSlots: new Set(featureSlots) }),
       ...(Object.keys(slots).length ? { slots } : {}),
       unknown_to: unknownTo(p, store, live),
     };

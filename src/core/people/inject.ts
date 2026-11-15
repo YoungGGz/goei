@@ -72,17 +72,23 @@ export const TRIM_ORDER: (keyof Person['slots'])[] = ['history', 'knowledge', 'b
 /** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수 */
 export const OBSERVED_MAX = 4;
 
-/** 한 인물의 블록. 비어 있는 절은 빼고, 보통(무관심) 단계면 관계 줄을 짧게 */
-export function personBlock(p: Person, store: PeopleStore, live: Liveness, changes: Change[], o: BlockOpts = {}): string {
-  const user = o.user ?? '{{user}}';
+/** 블록에 실을 칸 항목 (글자 예산으로 줄이기 전). request.ts 의 넘침 줄이기도 이 항목으로 글자를 센다 */
+export function blockEntries(p: Person, live: Liveness, o: Pick<BlockOpts, 'sheet' | 'mode' | 'omitSlots'> = {}): Partial<Record<keyof Person['slots'], Entry[]>> {
   const kept: Partial<Record<keyof Person['slots'], Entry[]>> = {};
   for (const k of Object.keys(p.slots) as (keyof Person['slots'])[]) kept[k] = o.omitSlots?.has(k as SlotId) ? [] : liveEntries(p.slots[k], live);
-  const mode = o.mode ?? 'split';
   // 시트 전체를 넣는 방식이면 그 시트의 Identity·Character 절에서 옮긴 시작값 항목은 뺀다 (시트 원문에 같은 줄이 있다). 이야기에서 생긴 항목·고친 항목은 남긴다
-  if (o.sheet && mode === 'append') {
+  if (o.sheet && (o.mode ?? 'split') === 'append') {
     const dup = seedTexts(o.sheet);
     for (const k of ['identity', 'personality'] as const) if (kept[k]) kept[k] = kept[k]!.filter((e) => !(e.src === 'seed' && dup.has(e.text)));
   }
+  return kept;
+}
+
+/** 한 인물의 블록. 비어 있는 절은 빼고, 보통(무관심) 단계면 관계 줄을 짧게 */
+export function personBlock(p: Person, store: PeopleStore, live: Liveness, changes: Change[], o: BlockOpts = {}): string {
+  const user = o.user ?? '{{user}}';
+  const kept = blockEntries(p, live, o);
+  const mode = o.mode ?? 'split';
   // 글자 예산: 넘치면 오래된 항목부터 뺀다 (글자 수 기준, 항목 수 상한 없음)
   if (o.maxChars) {
     const size = () => Object.values(kept).reduce((n, l) => n + (l ?? []).reduce((m, e) => m + e.text.length + 3, 0), 0);

@@ -2,7 +2,7 @@
 // 절 단위 혼합(split)이면 요원 자리에 들어간 그 인물의 시트 원문을 요청에서 빼고 기록 블록으로 대신한다.
 import { sexualTexts } from './sexual';
 import type { Chat } from '../types';
-import { peopleBlock, personBlock, rhythmBlock, unknownTo, TRIM_ORDER } from './inject';
+import { blockEntries, peopleBlock, personBlock, rhythmBlock, unknownTo, TRIM_ORDER } from './inject';
 import { nameMatcher, scenePeople, carriedScene, entriesOf } from './select';
 import { liveChanges, liveEntries, liveness, type Liveness } from './store';
 import { latestNote } from './updater';
@@ -143,11 +143,10 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
   // 넘친 만큼을 지금 가장 긴 인물부터 「항목 단위」로 줄인다. 몫을 글자 수로만 깎으면 넘친 글자가 항목 하나(150~200자)보다 작을 때
   // 블록이 그대로라 뒤 인물이 통째로 빠졌다 (11-14 재검토 ①-1 검증). 줄일 항목이 남아 있는 한 아무도 통째로 빼지 않는다.
   /** 인물마다: 칸 글자 합(personBlock 과 같은 셈)과 줄일 수 있는 항목 길이(빼는 순서대로) */
-  const trim = people.map((n) => {
-    const slots = o.store.people[n].slots;
-    const sz = (l: unknown) => liveEntries((l as never) ?? [], live).reduce((m, e) => m + e.text.length + 3, 0);
-    const counted = Object.values(slots).reduce((s, l) => s + sz(l), 0);
-    const items = TRIM_ORDER.flatMap((k) => liveEntries(slots[k] ?? [], live).map((e) => e.text.length + 3));
+  const trim = people.map((n, i) => {
+    const kept = blockEntries(o.store.people[n], live, { sheet: own[i].sheet, mode: o.settings.inject });
+    const counted = Object.values(kept).reduce((s, l) => s + (l ?? []).reduce((m, e) => m + e.text.length + 3, 0), 0);
+    const items = TRIM_ORDER.flatMap((k) => (kept[k] ?? []).map((e) => e.text.length + 3));
     // 처음 블록(몫 = share)에서 이미 빠진 항목 수
     let left = counted;
     let drop = 0;

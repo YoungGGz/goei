@@ -213,3 +213,17 @@ test('모델 Router: 코드가 고른 인물로 자리가 차 있으면 부를 �
   assert.equal(R.sceneFullByCode(five, o({ $pp_always: '사랑' })), true, '항상 포함 1 + 글에 나온 5');
   assert.equal(R.sceneFullByCode(twChat('아무도 없다.'), o()), false);
 });
+
+test('시트 전체+기록: 넘침 줄이기도 블록에서 뺀 시작값 항목을 세지 않아, 줄일 지난 일이 남아 있는 동안 뒤 인물을 통째로 빼지 않는다', () => {
+  const sheetOf = (n) => ['### Character - ' + n, '#### Identity', ...Array.from({ length: 10 }, (_, i) => `- Fact ${i} ` + 'x'.repeat(90)), '#### Character', ...Array.from({ length: 10 }, (_, i) => `- Trait ${i} ` + 'y'.repeat(90))].join('\n');
+  const store = T.emptyStore();
+  for (const n of ['가람', '나루']) {
+    store.people[n] = Seed.seedPerson(n, sheetOf(n), { address: { toUser: '요원', register: '반말' } });
+    store.people[n].slots.history = Array.from({ length: 20 }, (_, i) => ({ id: `${n}h${i}`, text: `${n} 지난 일 ${i} ` + '가'.repeat(190), src: 'story', anchor: 'c1', seq: i + 1, quote: '왔다' }));
+  }
+  const r = R.peopleBlockFor(twChat('가람과 나루가 왔다.'), { settings: St.peopleSettings({ $pp_inject: 'append', $pp_block_cap: '4000' }), store, sheetOf, user: '주인공' });
+  assert.deepEqual(r.people, ['가람', '나루']);
+  assert.ok(r.text.includes('### Character - 나루'), '뒤 인물도 블록에 남는다');
+  const hist = (n) => (r.text.match(new RegExp(`${n} 지난 일`, 'g')) ?? []).length;
+  assert.ok(hist('가람') > 0 && hist('나루') > 0, `두 인물 모두 지난 일이 줄어서 남는다 (${hist('가람')}, ${hist('나루')})`);
+});

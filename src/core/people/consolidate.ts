@@ -137,3 +137,17 @@ export function tidyDue(store: PeopleStore, chat: Parameters<typeof liveness>[0]
   }
   return out;
 }
+
+/** 별도 정리 한 번: tidyDue 가 고른 인물마다 call 을 부른다. 호출이 실패하면(모델 오류·시간 초과·저장 실패) 그 인물의 기억을 지워 다음 턴에 다시 판정한다.
+ *  돌려주는 것은 실패한 인물과 그 안내 */
+export async function runTidy(store: PeopleStore, chat: Parameters<typeof liveness>[0], settings: PeopleSettings, tried: Map<string, number>, call: (name: string) => Promise<{ ok: boolean; message: string }>): Promise<{ name: string; message: string }[]> {
+  const failed: { name: string; message: string }[] = [];
+  for (const { name, chars } of tidyDue(store, chat, settings, tried)) {
+    tried.set(name, chars);
+    const r = await call(name).catch((error) => ({ ok: false, message: String(error) }));
+    if (r.ok) continue;
+    tried.delete(name);
+    failed.push({ name, message: r.message });
+  }
+  return failed;
+}

@@ -170,3 +170,22 @@ test('별도 정리: 고정 항목이 상한을 넘긴 인물에게 매 턴 새 
   part.people.쟈알디.slots.history.push(e('h9', '마'.repeat(290)), e('h10', '바'.repeat(290)));
   assert.deepEqual(C.tidyDue(part, chat, settings, t2).map((d) => d.name), ['쟈알디']);
 });
+
+test('별도 정리(runTidy): 호출이 실패한 인물은 다음 턴에 다시 부르고, 답을 받았는데 줄지 않은 인물은 부르지 않는다', async () => {
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  store.people.쟈알디.slots.history = Array.from({ length: 10 }, (_, i) => e(`h${i}`, `h${i} ` + '가'.repeat(280)));
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
+  const tried = new Map();
+  const calls = [];
+  const fail = async (n) => (calls.push(n), { ok: false, message: '모델 요청에 실패' });
+  const thrown = async (n) => { calls.push(n); throw new Error('시간 초과'); };
+  const same = async (n) => (calls.push(n), { ok: true, message: '바뀐 칸이 없어요' });
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, fail), [{ name: '쟈알디', message: '모델 요청에 실패' }]);
+  assert.equal(tried.has('쟈알디'), false, '실패하면 기억을 남기지 않는다');
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, thrown), [{ name: '쟈알디', message: 'Error: 시간 초과' }]);
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, same), []);
+  assert.deepEqual(calls, ['쟈알디', '쟈알디', '쟈알디'], '항목이 그대로여도 실패 뒤에는 다음 턴에 다시 부른다');
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, same), []);
+  assert.equal(calls.length, 3, '답을 받았는데 줄지 않았으면 다음 턴에는 부르지 않는다');
+});

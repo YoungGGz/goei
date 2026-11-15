@@ -148,3 +148,21 @@ test('기능별 지침: 전용 칸의 글은 slots 에 전부 한 번만, record
   assert.equal(off.people[0].slots, undefined);
   assert.equal(count(off.people[0].record, '호칭 조건 3번'), 1);
 });
+
+test('기능별 지침: record 의 글자 몫은 slots 에 실은 글자만큼 줄어, 둘을 합쳐도 record 가 전용 칸을 싣던 때보다 크지 않다', () => {
+  const store = T.emptyStore();
+  const e = (id, text, extra = {}) => ({ id, text, src: 'story', anchor: 'c1', seq: 1, quote: '명일', ...extra });
+  for (const n of ['쟈알디', '나루']) {
+    store.people[n] = person(n);
+    store.people[n].slots.history = Array.from({ length: 40 }, (_, i) => e(`${n}h${i}`, `지난 일 ${i} ` + '가'.repeat(290)));
+    store.people[n].slots['register.context'] = Array.from({ length: 16 }, (_, i) => e(`${n}r${i}`, `호칭 ${i} ` + '나'.repeat(290), { target: '@user' }));
+  }
+  const s = (v = {}) => settings({ $pp_block_cap: '16000', ...v });
+  const on = D.buildDirector(c, store, ['쟈알디', '나루'], 'x', s(), {}).data.people[0];
+  const off = D.buildDirector(c, store, ['쟈알디', '나루'], 'x', s({ $pp_director_features: '0' }), {}).data.people[0];
+  const slotChars = Object.values(on.slots).flat().reduce((m, x) => m + x.text.length + 3, 0);
+  assert.equal(on.slots['register.context'].length, 16, 'slots 는 살아 있는 항목 전부');
+  assert.ok(on.record.length + slotChars <= off.record.length, `record ${on.record.length} + slots ${slotChars} ≤ 전용 칸을 싣던 record ${off.record.length}`);
+  const hist = (t) => (t.match(/지난 일 \d+/g) ?? []).join(',');
+  assert.equal(hist(on.record), hist(off.record), '지난 일은 전과 같은 만큼 남는다');
+});

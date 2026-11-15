@@ -10,7 +10,7 @@ import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, livene
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
 import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, type ApplyReport } from '../core/people/updater';
-import { applyConsolidate, buildConsolidate, consolidateUserText, parseConsolidate, tidyDue, type ConsolidateReport } from '../core/people/consolidate';
+import { applyConsolidate, buildConsolidate, consolidateUserText, parseConsolidate, runTidy, type ConsolidateReport } from '../core/people/consolidate';
 import { peopleSettings, PP, type PeopleSettings } from '../core/people/settings';
 import { seedPerson } from '../core/people/seed';
 import { nameMatcher, namesWith } from '../core/people/select';
@@ -479,13 +479,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   if (settings.tidy === 'separate' && result.ran) {
     const now = await loadContext().catch(() => null);
     if (now && chatId(now) === id) {
-      // 정리를 불렀는데도 상한 아래로 내려가지 않은 인물은 정리 자료가 충분히 늘 때까지 다시 부르지 않는다 (tidyDue)
+      // 정리를 불렀는데도 상한 아래로 내려가지 않은 인물은 정리 자료가 충분히 늘 때까지 다시 부르지 않는다 (tidyDue). 호출이 실패한 인물은 다음 턴에 다시 (runTidy)
       if (tidyTried.chat !== id) tidyTried = { chat: id, chars: new Map() };
-      for (const { name: n, chars } of tidyDue(peopleStore(now.chat), now.chat, settings, tidyTried.chars)) {
-        tidyTried.chars.set(n, chars);
-        const r = await consolidateInner(now, n, settings).catch((error) => ({ ok: false, message: String(error) }));
-        if (!r.ok) result.skipped.push(`정리(${n}): ${r.message}`);
-      }
+      for (const f of await runTidy(peopleStore(now.chat), now.chat, settings, tidyTried.chars, (n) => consolidateInner(now, n, settings))) result.skipped.push(`정리(${f.name}): ${f.message}`);
     }
   }
   const after = await loadContext().catch(() => null);
