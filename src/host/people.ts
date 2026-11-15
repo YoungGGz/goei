@@ -9,8 +9,8 @@ import { isWaiting, onWaiting } from './waiting';
 import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, pruneScene } from '../core/people/store';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
-import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, recordChars, type ApplyReport } from '../core/people/updater';
-import { applyConsolidate, buildConsolidate, consolidateUserText, parseConsolidate, type ConsolidateReport } from '../core/people/consolidate';
+import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, type ApplyReport } from '../core/people/updater';
+import { applyConsolidate, buildConsolidate, consolidateUserText, parseConsolidate, tidyDue, type ConsolidateReport } from '../core/people/consolidate';
 import { peopleSettings, PP, type PeopleSettings } from '../core/people/settings';
 import { seedPerson } from '../core/people/seed';
 import { nameMatcher, namesWith } from '../core/people/select';
@@ -19,7 +19,7 @@ import { speechVarietyBlock } from '../core/people/speech';
 import { sexualWriterSection } from '../core/people/sexual';
 import { allNames, extraNames, seedBaseFor, temperOf, valuesOf, type RosterRow } from '../core/people/base';
 import { playerAgent } from '../core/player';
-import { peopleBlockFor } from '../core/people/request';
+import { peopleBlockFor, sceneFullByCode } from '../core/people/request';
 import { userInfo } from './user';
 import { promptFor, UPDATER_COMPACT, UPDATER_DETAILED } from '../core/people/prompt';
 import { messageText } from '../core/refs';
@@ -479,10 +479,10 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   if (settings.tidy === 'separate' && result.ran) {
     const now = await loadContext().catch(() => null);
     if (now && chatId(now) === id) {
-      const s = peopleStore(now.chat);
-      const live = liveness(now.chat);
-      for (const n of Object.keys(s.people)) {
-        if (recordChars(s.people[n], live) <= settings.personCap) continue;
+      // 같은 항목들로 이미 정리를 불렀는데도 상한 아래로 내려가지 않은 인물은 다시 부르지 않는다 (항목이 달라지면 다시 부른다)
+      if (tidyTried.chat !== id) tidyTried = { chat: id, keys: new Map() };
+      for (const { name: n, key } of tidyDue(peopleStore(now.chat), now.chat, settings, tidyTried.keys)) {
+        tidyTried.keys.set(n, key);
         const r = await consolidateInner(now, n, settings).catch((error) => ({ ok: false, message: String(error) }));
         if (!r.ok) result.skipped.push(`정리(${n}): ${r.message}`);
       }
@@ -492,6 +492,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   setStatus({ busy: false, label: '', unread: after ? unreadIndexes(after.chat, peopleStore(after.chat)).length : 0 });
   return result;
 }
+
+/** 별도 정리 호출을 이미 해 본 입력 (채팅마다, 인물 이름 → 입력 열쇠). 이 기기 메모리에만 둔다 */
+let tidyTried: { chat: string; keys: Map<string, string> } = { chat: '', keys: new Map() };
 
 const input0Names = (s: PeopleStore) => Object.keys(s.people);
 
@@ -634,6 +637,8 @@ export const routerHintsNow = (): RouterHint[] => routerHints;
 /** 모델이 고른 장면 인물. 실패·지연·빈 결과면 null (코드 Router 로). 입력·최근 글·명단이 같으면 재사용 */
 export async function routerPeople(chat: Chat, store: PeopleStore, input: string, settings: PeopleSettings, exclude: string[] = [], identityOf?: (name: string) => string | null | undefined, roster: RosterRow[] = []): Promise<string[] | null> {
   if (settings.router !== 'model' || !Object.keys(store.people).length) return null;
+  // 항상 포함·글에 나온 사람·동행·장면 유지만으로 장면 인물 자리가 찼으면 모델이 고른 인물은 들어갈 자리가 없다: 부르지 않는다
+  if (sceneFullByCode(chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) return null;
   const names = allNames(roster);
   const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf });
   if (routerCache?.key === built.key) return routerCache.selected;
@@ -730,7 +735,7 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
   const input = messageText(String(lastUser?.data ?? ''));
   const roster = rosterOf(ctx.char.globalLore);
   const names = allNames(roster);
-  if (settings.router === 'model' && Object.keys(store.people).length) {
+  if (settings.router === 'model' && Object.keys(store.people).length && !sceneFullByCode(ctx.chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) {
     const b = buildRouter(ctx.chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf: sheetOf(ctx) });
     out.router = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];
   }

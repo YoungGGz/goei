@@ -208,6 +208,30 @@ test('갱신기 자료: 명부 대조(roster)·호칭 기록(handles)·대기 �
   assert.equal(only.held_names, undefined);
 });
 
+// 토큰 점검 (11-15): 명부 대조 인원 상한 (기본 0 = 제한 없음)
+test('명부 대조 인원 상한: 기본은 전원, 상한을 두면 글에 소속·직급·부서가 나온 사람부터 그 수만큼', () => {
+  const store = T.emptyStore();
+  const all = (s) => U.buildUpdate(chat(['user', '안녕', 'u1'], ['char', '복도에 누군가 서 있었다.', 'c1']), store, [1], { settings: s, system: '', values: {}, names: Sel.namesWith(store, B.allNames(ROSTER)), roster: ROSTER }).data.roster;
+  assert.equal(St.PP_DEFAULTS.roster_cap, '0');
+  assert.equal(all(settings()).length, ROSTER.length, '기본: 전원');
+  const cap = Math.min(5, ROSTER.length - 1);
+  const cut = all(settings({ $pp_roster_cap: String(cap) }));
+  assert.deepEqual(cut.map((r) => r.name), ROSTER.slice(0, cap).map((r) => r.name), '글에 단서가 없으면 명부 차례대로');
+  // 글에 직급이나 부서가 나온 사람이 앞에 온다
+  const target = ROSTER.slice(cap).find((r) => (r.department || r.rank) && !ROSTER.slice(0, cap).some((x) => [x.affiliation, x.rank, x.department].includes(r.department || r.rank)));
+  assert.ok(target, '자료: 상한 뒤쪽에 부서·직급이 다른 사람이 있다');
+  const word = target.department || target.rank;
+  const near = U.buildUpdate(chat(['user', '안녕', 'u1'], ['char', `${word} 사람이 서류를 들고 왔다.`, 'c1']), store, [1], { settings: settings({ $pp_roster_cap: String(cap) }), system: '', values: {}, names: Sel.namesWith(store, B.allNames(ROSTER)), roster: ROSTER }).data.roster;
+  assert.equal(near.length, cap);
+  assert.ok(near.some((r) => r.name === target.name), `${target.name}(${word})이 들어감`);
+  const row = Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === 'roster_cap');
+  assert.ok(row && row.help && row.ctl.opts[0][0] === '0', '정의표: 첫 선택지가 제한 없음');
+  for (const k of ['docs_inject', 'axes_obs_inject']) {
+    assert.equal(St.PP_DEFAULTS[k], '0', `${k} 기본 끔`);
+    assert.deepEqual(Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === k)?.ctl, { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] });
+  }
+});
+
 test('새 인물: 역할·묘사로 된 이름을 코드가 걸러내지 않는다. 호칭(provisional)은 설정이 켜져 있을 때만 받는다', () => {
   const c = chat(['user', '택시를 탔다', 'u1'], ['char', '택시 기사가 백미러로 이쪽을 봤다. 붉은 코트의 여자가 옆자리에 앉았다.', 'c1']);
   const mk = () => {

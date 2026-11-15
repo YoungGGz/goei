@@ -79,6 +79,10 @@ export function renderImgTags(text: string, pick?: (name: string) => string | nu
   });
 }
 
+/** 요청에 이미지 태그를 남기나: 에셋 출력이 켜져 있고 메인 모델이 태그를 쓸 때만.
+ *  꺼져 있거나 보조 모델이 태그를 붙이는 방식이면 메인 요청에 이미지 지침이 없으므로 태그도 전부 뺀다 */
+export const keepImgTagsInRequest = (assetOn: boolean, assetModel: 'main' | 'aux'): boolean => assetOn && assetModel === 'main';
+
 /** 요청: 최근 메시지 recent개 밖의 태그를 지운다 (0이면 그대로). 시스템 글(로어북 등)은 세지 않는다 */
 export function stripOldImgTags<M extends { role?: string; content?: unknown }>(messages: M[], recent = IMG_RECENT.def): M[] {
   if (recent <= 0) return messages;

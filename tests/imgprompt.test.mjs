@@ -53,3 +53,20 @@ test('옛 로어북 블록 제거와 보조 자료 입히기', () => {
   assert.equal(p.imgPrompt, 'T');
   assert.deepEqual([p.imgNamesOff, p.imgNamesExtra, p.imgKeywords], [['A'], ['B'], ['c']]);
 });
+
+// 토큰 점검 (11-15): 설정 「장면 인물만」 — 최근 대화에 이름이 나온 캐릭터만 지침에 넣는다 (기본 끔 = 전체)
+test('장면 인물만: 한글 이름·영문 표기가 글에 나온 사람과 주인공만 남긴다', () => {
+  const cfg = imgPromptConfig({ imgNamesExtra: ['Secriem'] });
+  const all = imgCharacters(bookLore, cfg, { assetPlayer: false });
+  assert.deepEqual(all, ['Jyaldi', 'Avensha', 'Brownie', 'Secriem']);
+  const { imgSceneNames } = imgprompt;
+  assert.deepEqual(imgSceneNames(bookLore, all, ['쟈알디가 문을 열었다.', 'brownie 가 따라왔다']), ['Jyaldi', 'Brownie'], '한글 이름·영문 표기(대소문자 무시)');
+  assert.deepEqual(imgSceneNames(bookLore, all, ['Secriem 이 나타났다']), ['Secriem'], '임의 추가 이름은 이름 그대로');
+  assert.deepEqual(imgSceneNames(bookLore, all, ['아무도 없다'], ['Avensha']), ['Avensha'], '주인공은 글에 없어도 남김');
+  assert.deepEqual(imgSceneNames(bookLore, all, []), []);
+  const few = buildImgPrompt(cfg, imgSceneNames(bookLore, all, ['쟈알디가 왔다']), false);
+  assert.ok(few.includes('Jyaldi') && !few.includes('Avensha') && few.length < buildImgPrompt(cfg, all, false).length);
+  assert.equal(settings.setPrefs({}).imgNamesScene, undefined, '기본 끔');
+  assert.equal(settings.setPrefs({ imgNamesScene: true }).imgNamesScene, true);
+  assert.equal(settings.setPrefs({ imgNamesScene: 'x' }).imgNamesScene, undefined);
+});

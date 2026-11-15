@@ -121,3 +121,30 @@ test('자료가 없는 기능 절(의심·리듬·성적)은 붙이지 않고, �
   gone.people.쟈알디.slots['suspicion.concern'] = [{ id: 'su2', text: 'x', src: 'story', anchor: 'zz', seq: 1, target: '@user', quote: 'x' }];
   assert.ok(!D.buildDirector(c, gone, ['쟈알디'], '서류를 받았다', on, { 쟈알디: '' }).system.includes('## Suspicion'));
 });
+
+// 토큰 점검 (11-15): 기능 전용 칸은 `slots` 에만 싣고 `record` 에서는 뺀다 (같은 글이 두 번 나가지 않게)
+test('기능별 지침: 전용 칸의 글은 slots 에 전부 한 번만, record 에는 기본 칸만', () => {
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  const e = (id, text, extra = {}) => ({ id, text, src: 'story', anchor: 'c1', seq: 1, quote: '명일', ...extra });
+  store.people.쟈알디.slots['register.context'] = Array.from({ length: 6 }, (_, i) => e(`r${i}`, `호칭 조건 ${i}번`, { target: '@user' }));
+  store.people.쟈알디.slots['suspicion.concern'] = [e('q1', '정성 의심 내용', { target: '@user' })];
+  store.people.쟈알디.slots.state = [e('s1', '사무실에 있음')];
+  const count = (t, w) => t.split(w).length - 1;
+  const on = D.buildDirector(c, store, ['쟈알디'], '서류를 받았다', settings(), {}).data;
+  const text = JSON.stringify(on);
+  for (let i = 0; i < 6; i++) assert.equal(count(text, `호칭 조건 ${i}번`), 1, `항목 ${i}: 한 번만`);
+  assert.equal(on.people[0].slots['register.context'].length, 6, '최근 몇 개가 아니라 살아 있는 항목 전부');
+  assert.equal(count(text, '정성 의심 내용'), 1);
+  assert.doesNotMatch(on.people[0].record, /호칭 조건|정성 의심 내용|Address and relationship stage/);
+  assert.match(on.people[0].record, /Current state:\n- 사무실에 있음/, '기본 칸은 record 에 그대로');
+  // 수치 의심 칸: slots 에 종류(kind)까지, record 에는 없음
+  store.people.쟈알디.slots.suspicion = [e('u1', '[+2] 서류가 바뀌어 있었다', { target: '@user', kind: '거짓말' })];
+  const num = D.buildDirector(c, store, ['쟈알디'], 'x', settings({ $pp_num_suspicion: '1' }), {}).data;
+  assert.deepEqual(num.people[0].slots.suspicion, [{ text: '[+2] 서류가 바뀌어 있었다', target: '@user', kind: '거짓말' }]);
+  assert.equal(count(JSON.stringify(num), '서류가 바뀌어 있었다'), 1);
+  // 기능별 지침을 끄면 slots 가 없으니 record 가 전용 칸을 싣는다 (전과 같음)
+  const off = D.buildDirector(c, store, ['쟈알디'], 'x', settings({ $pp_director_features: '0' }), {}).data;
+  assert.equal(off.people[0].slots, undefined);
+  assert.equal(count(off.people[0].record, '호칭 조건 3번'), 1);
+});

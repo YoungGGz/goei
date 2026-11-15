@@ -39,7 +39,8 @@ export function buildConsolidate(store: PeopleStore, chat: Parameters<typeof liv
     for (const e of sorted) ids.set(e.id, { slot, entry: e });
   }
   if (!ids.size) return null;
-  return { system: CONSOLIDATE_PROMPT(settings.lang, enabled), data: { name: who, chars: recordChars(p, live), target: Math.round(settings.personCap * 0.8), slots }, ids };
+  // 칸 설명은 자료에 실린 칸만 (빈 칸·정리에서 빠지는 칸의 설명은 싣지 않는다)
+  return { system: CONSOLIDATE_PROMPT(settings.lang, enabled.filter((s) => slots[s])), data: { name: who, chars: recordChars(p, live), target: Math.round(settings.personCap * 0.8), slots }, ids };
 }
 
 export interface ConsolidateResult { slots?: Record<string, { text?: unknown; target?: unknown; from?: unknown }[]> }
@@ -109,4 +110,22 @@ export function applyConsolidate(store: PeopleStore, who: string, input: Consoli
     report.after += next.length;
   }
   return report;
+}
+
+/** 별도 정리 호출의 입력 열쇠: 정리 자료에 실리는 항목 id 들. 같은 열쇠로 이미 불렀는데도 저장 상한 아래로 내려가지 않았으면 다시 불러도 결과가 같다 */
+export const consolidateKey = (input: ConsolidateInput): string => [...input.ids.keys()].sort().join('|');
+
+/** 별도 정리 호출을 할 인물: 저장 상한을 넘겼고, 정리할 항목이 있고, 같은 항목들로 이미 불러 보지 않은 사람.
+ *  tried = 인물 이름 → 마지막으로 부른 입력 열쇠 (부르는 쪽이 채팅마다 기억한다) */
+export function tidyDue(store: PeopleStore, chat: Parameters<typeof liveness>[0], settings: PeopleSettings, tried: Map<string, string>): { name: string; key: string }[] {
+  const live = liveness(chat);
+  const out: { name: string; key: string }[] = [];
+  for (const name of Object.keys(store.people)) {
+    if (recordChars(store.people[name], live) <= settings.personCap) continue;
+    const input = buildConsolidate(store, chat, name, settings);
+    if (!input) continue;
+    const key = consolidateKey(input);
+    if (tried.get(name) !== key) out.push({ name, key });
+  }
+  return out;
 }

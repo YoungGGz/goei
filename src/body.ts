@@ -46,7 +46,7 @@ import { createFab, type Fab } from './host/overlay';
 import { createProgWin, progressOn, type ProgWin } from './host/progwin';
 import { BRAND } from './ui/brand';
 import { cardPalette as themedCardPalette, currentTheme, onThemeChange, repaintTheme, setCurrentTheme, themeName } from './ui/theme';
-import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
+import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, keepImgTagsInRequest, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
 import { loadModuleAssets, modulePicker } from './host/assets';
 import { getPrefs } from './core/settings';
 import { appShown, openApp, openInstall, openRecords, openShop, openWiki } from './ui/app';
@@ -63,7 +63,7 @@ import { syncDecorators, computeLore, hasUnlockTag, loreOptions, patchSlots, rea
 import { advValue } from './core/advanced';
 import { userInfo } from './host/user';
 import { applyPlayer, hidePlayerTag, playerAgent, playerBlock } from './core/player';
-import { buildImgPrompt, imgCharacters, imgPromptConfig, stripImgLore } from './core/imgprompt';
+import { buildImgPrompt, imgCharacters, imgPromptConfig, imgSceneNames, stripImgLore } from './core/imgprompt';
 import { withStatusBlock, type StatusShape } from './core/statusctx';
 import { settleItemUse, withInventory } from './core/items';
 import { withHomeshop } from './core/homeshop';
@@ -230,7 +230,8 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
     // 오래된 메시지의 이미지 태그는 요청에서 뺀다 (원본 「🖼️에셋리퀘제거」)
     if (liteNow || messages.some((m) => typeof m?.content === 'string' && imgTagsKnown(m.content, modulePicker()))) {
       // 이 채팅의 에셋 출력이 꺼져 있으면 최근 것까지 전부 뺀다. 남기면 모델이 따라 써 태그가 끝없이 이어졌다 (전수검사 11-13)
-      const assetOff = step('에셋 출력 읽기', () => (ctx ? !basicSettings(ctx.char.globalLore, ctx.chat.scriptstate).assetOn : imgHidden()), false);
+      // 보조 모델이 태그를 붙이는 방식도 같다: 메인 요청에 이미지 지침이 없으니 태그를 남길 까닭이 없다
+      const assetOff = step('에셋 출력 읽기', () => { if (!ctx) return imgHidden(); const b = basicSettings(ctx.char.globalLore, ctx.chat.scriptstate); return !keepImgTagsInRequest(b.assetOn, b.assetModel); }, false);
       messages = step('옛 이미지 태그', () => (assetOff ? stripAllImgTags(messages) : stripOldImgTags(messages, getPrefs().imgSend ?? IMG_RECENT.def)), messages);
     }
     if (liteNow) {
@@ -483,6 +484,9 @@ function appendImgPrompt<M extends PromptMessage>(messages: M[], text: string): 
   return end === messages.length || end === 0 ? [...messages, add] : [...messages.slice(0, end), add, ...messages.slice(end)];
 }
 
+/** 요청의 마지막 대화 글 몇 개 (시스템 글 빼고). 이미지 지침의 「장면 인물만」이 이름을 찾는 범위 */
+const recentTexts = (messages: PromptMessage[], n = 4): string[] => messages.filter((m) => m?.role !== 'system' && typeof m?.content === 'string').slice(-n).map((m) => m.content as string);
+
 /** 이미지 태그 지침: 에셋 출력 켬 + 메인 모델일 때 요청 맨 끝에, 끝이 assistant 프리필이면 그 앞에 (로어북 Asset 의 @@depth 0 과 같은 자리). 보조 모델이면 지침 없이 옛 블록만 지운다 */
 function withImgPrompt<M extends PromptMessage>(messages: M[], { char, chat }: ChatContext): M[] {
   const s = basicSettings(char.globalLore, chat.scriptstate);
@@ -490,7 +494,9 @@ function withImgPrompt<M extends PromptMessage>(messages: M[], { char, chat }: C
   if (!s.assetOn || s.assetModel !== 'main') return out;
   const cfg = imgPromptConfig(getPrefs());
   const me = playerAgent(char.globalLore, chat.scriptstate);
-  const names = imgCharacters(char.globalLore, cfg, { assetPlayer: s.assetPlayer, playerEnglish: me?.english || undefined, userName: userInfo().name });
+  const all = imgCharacters(char.globalLore, cfg, { assetPlayer: s.assetPlayer, playerEnglish: me?.english || undefined, userName: userInfo().name });
+  // 설정 「장면 인물만」(기본 끔): 최근 대화에 이름이 나온 캐릭터만 지침에 넣는다. 주인공은 늘 남긴다
+  const names = getPrefs().imgNamesScene ? imgSceneNames(char.globalLore, all, recentTexts(out), [s.assetPlayer ? me?.english || userInfo().name : '']) : all;
   if (!names.length) return out;
   // 지침 속 {{user}}는 Risu 가 다시 풀지 않으니 여기서 푼다 (전수검사 11-13)
   return appendImgPrompt(out, evaluate(buildImgPrompt(cfg, names, s.assetPlayer), { vars: chat.scriptstate ?? {}, char: char.name, user: me?.name || userOrTag() }));

@@ -47,9 +47,10 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
     const slot = (k: 'state' | 'threads') => liveEntries(p.slots[k], live).map((e) => e.text).slice(-6);
     // 성격 계수(temper)도 본편·화면과 같이 넣는다 (전수검사 11-13)
     const aff = affinityView(p, changes, store.folded[n] ?? 0, { temper: temperOf(n), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap });
-    const slots: Record<string, { text: string; target?: string }[]> = {};
+    const slots: Record<string, { text: string; target?: string; kind?: string }[]> = {};
     for (const k of featureSlots) {
-      const es = liveEntries(p.slots[k as SlotId], live).slice(-4).map((e) => ({ text: e.text, ...(e.target ? { target: e.target } : {}) }));
+      // 기능 전용 칸은 여기(`slots`)에만 싣는다: `record` 에서는 같은 칸을 뺀다 (같은 글이 두 번 나가지 않게). 그래서 최근 몇 개가 아니라 살아 있는 항목 전부
+      const es = liveEntries(p.slots[k as SlotId], live).map((e) => ({ text: e.text, ...(e.target ? { target: e.target } : {}), ...(e.kind ? { kind: e.kind } : {}) }));
       if (es.length) slots[k] = es;
     }
     // 꼬리(state·threads)는 재사용 열쇠 계산에만 쓴다. 자료(data)에는 `record` 전문이 같은 글을 싣고 있어 넣지 않는다 (11-14 재검토 gupdp#1)
@@ -63,7 +64,7 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
       ...(s.directorFeatures && s.features.has('axes') ? { axes: axesLinesEn(p.axes), ...(p.patterns?.length ? { patterns: p.patterns } : {}) } : {}),
       // 성적 욕망·이상성욕 (원본 director people_profile: text + policy sexual_context_only)
       ...(() => { const t = sexualTexts(p, s); return { ...(t.desire ? { sexual_desire: { text: t.desire, policy: SEXUAL_POLICY } } : {}), ...(t.paraphilia ? { paraphilia: { text: t.paraphilia, policy: SEXUAL_POLICY } } : {}) }; })(),
-      record: personBlock(p, store, live, changes, { mode: 'record', unknown: [], speechMarks: true, temper: temperOf(n), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap, maxChars: recordCap, taste: s.features.has('taste'), openness: s.features.has('openness'), axes: false, features: s.features, qual: s.qualitative }),
+      record: personBlock(p, store, live, changes, { mode: 'record', unknown: [], speechMarks: true, temper: temperOf(n), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap, maxChars: recordCap, taste: s.features.has('taste'), openness: s.features.has('openness'), axes: false, features: s.features, qual: s.qualitative, omitSlots: new Set(featureSlots) }),
       ...(Object.keys(slots).length ? { slots } : {}),
       unknown_to: unknownTo(p, store, live),
     };

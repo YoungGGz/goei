@@ -431,7 +431,8 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       s.assetOn ? D('asset-model', s.assetModel) : '',
       s.assetOn && s.assetModel === 'aux' ? D('asset-limit', String(s.assetLimit)) : '',
       s.assetOn ? D('asset-player', s.assetPlayer ? '1' : '0') : '',
-      s.assetOn ? D('img-send', '', { ctl: recentControl('img-send', getPrefs().imgSend, '태그를 남길 메시지 수', busy) }) : '',
+      s.assetOn && s.assetModel === 'main' ? D('img-scene', getPrefs().imgNamesScene ? '1' : '0') : '',
+      s.assetOn && s.assetModel === 'main' ? D('img-send', '', { ctl: recentControl('img-send', getPrefs().imgSend, '태그를 남길 메시지 수', busy) }) : '',
     ].join(''))}
     ${scope === 'chat' && s.assetOn && s.assetModel === 'aux' && note ? `<p class="gx-hint">최근 보충: ${esc(note)}</p>` : ''}
     ${s.assetOn ? group('그림 표시', [
@@ -894,7 +895,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       // 고친 지침도 원래 글로 (2026-11-08 사용자: 지침마다 있던 「기본으로」를 없애고 초기화 한 곳으로)
       if (!settingsUi.notice) {
         for (const g of GUIDE_NAMES) setGuideOverride(g, '');
-        await saveDefaults(env, (p) => ({ ...p, basic: {}, world: {}, theme: undefined, vars: {}, guides: undefined, imgPrompt: undefined, imgKeywords: undefined, walletStart: undefined, imgNamesOff: undefined, imgNamesExtra: undefined }));
+        await saveDefaults(env, (p) => ({ ...p, basic: {}, world: {}, theme: undefined, vars: {}, guides: undefined, imgPrompt: undefined, imgKeywords: undefined, walletStart: undefined, imgNamesOff: undefined, imgNamesExtra: undefined, imgNamesScene: undefined }));
         imgUi.template = null;
         imgUi.keywords = null;
         for (const f of resetHooks) f();
@@ -914,6 +915,10 @@ export async function handleSettings(action: string, value: string | undefined, 
   if (action === 'set-img-foldon') {
     await saveDefaults(env, (p) => ({ ...p, imgFoldOn: v === '0' ? false : undefined }));
     repaintTheme();
+    return true;
+  }
+  if (action === 'set-img-scene') {
+    await saveDefaults(env, (p) => ({ ...p, imgNamesScene: v === '1' ? true : undefined }));
     return true;
   }
   if (action === 'set-img-foldlock') {

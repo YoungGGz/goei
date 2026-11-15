@@ -70,3 +70,12 @@ test('imgtag: recent counts from settings (0 = all)', () => {
   assert.equal(p.imgSend, 12);
   assert.equal(settings.setPrefs({ imgShow: 99 }).imgShow, undefined);
 });
+
+// 토큰 점검 (11-15): 보조 모델이 태그를 붙이는 방식이면 메인 요청에 이미지 지침이 없으니 태그도 남기지 않는다
+test('imgtag: 요청에 태그를 남기는 것은 에셋 출력 켬 + 메인 모델일 때만', () => {
+  const { keepImgTagsInRequest } = imgtag;
+  assert.equal(keepImgTagsInRequest(true, 'main'), true);
+  assert.equal(keepImgTagsInRequest(true, 'aux'), false);
+  assert.equal(keepImgTagsInRequest(false, 'main'), false);
+  assert.equal(keepImgTagsInRequest(false, 'aux'), false);
+});

@@ -296,7 +296,10 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   // 다시 읽기(only)는 새 인물·이름 옮기기·장면 인물을 받지 않으니 그 자료도 싣지 않는다
   const fresh = !o.only?.length;
   const excluded = new Set(o.exclude ?? []);
-  const roster = fresh && o.settings.rosterHint ? (o.roster ?? []).filter((r) => r.name && !store.people[r.name] && !excluded.has(r.name)).map((r) => ({ name: r.name, names: [...new Set([r.english, ...r.aliases].filter(Boolean))], affiliation: o.factionNames?.[r.affiliation] ?? r.affiliation, rank: r.rank, department: r.department })) : [];
+  const rosterAll = fresh && o.settings.rosterHint ? (o.roster ?? []).filter((r) => r.name && !store.people[r.name] && !excluded.has(r.name)).map((r) => ({ name: r.name, names: [...new Set([r.english, ...r.aliases].filter(Boolean))], affiliation: o.factionNames?.[r.affiliation] ?? r.affiliation, rank: r.rank, department: r.department })) : [];
+  // 명부 대조 인원 상한 (설정, 0 = 제한 없음): 넘으면 이 묶음의 글에 소속·직급·부서가 나온 사람을 앞에 두고 자른다 (명부 차례는 그대로)
+  const rosterNear = (r: { affiliation: string; rank: string; department: string }) => [r.affiliation, r.rank, r.department].some((w) => !!w && texts.some((t) => t.includes(w)));
+  const roster = o.settings.rosterCap > 0 && rosterAll.length > o.settings.rosterCap ? [...rosterAll.filter(rosterNear), ...rosterAll.filter((r) => !rosterNear(r))].slice(0, o.settings.rosterCap) : rosterAll;
   // 대기 이름: 근거 응답이 채팅에 살아 있는 줄만 싣는다 (다시 굴리거나 지운 응답에서만 나온 이름은 이야기에 없던 이름이다).
   // 설정 「이름 없는 인물 기록」이 꺼져 있으면 호칭으로 올라온 줄도 뺀다 (다시 와도 받지 않는다)
   const waiting = fresh ? Object.entries(store.pending).filter(([, row]) => live.at.has(row.anchor) && (o.settings.newUnnamed || !row.provisional)) : [];

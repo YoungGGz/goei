@@ -388,6 +388,8 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('always', '', { ctl: `<input class="gx-search pp-always" data-change="pp-always" name="pp-always" value="${esc(v('always'))}" placeholder="예: 쟈알디, 스팡달" maxlength="400" aria-label="항상 포함할 인물">` }),
     ppRow('scene_carry', v('scene_carry') === '1' ? '1' : '0'),
     ppRow('block_cap', String(s.blockCap)),
+    (['docs_event', 'docs_location', 'docs_faction', 'docs_item'] as Feature[]).some((f) => s.features.has(f)) ? ppRow('docs_inject', s.docsInject ? '1' : '0') : '',
+    s.features.has('axes') ? ppRow('axes_obs_inject', s.axesObsInject ? '1' : '0') : '',
   ].join('');
   const refRows = [
     ppRow('recent_msgs', String(s.recentMsgs)),
@@ -425,6 +427,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('newpeople', s.newPeople),
     ppRow('twoturn', v('twoturn') === '1' ? '1' : '0'),
     ppRow('roster_hint', v('roster_hint') === '1' ? '1' : '0'),
+    s.rosterHint ? ppRow('roster_cap', String(s.rosterCap)) : '',
     ppRow('new_unnamed', v('new_unnamed') === '1' ? '1' : '0'),
   ].join('');
   const update = [

@@ -129,6 +129,8 @@ export interface Prefs {
   imgNamesOff?: string[];
   imgNamesExtra?: string[];
   imgKeywords?: string[];
+  /** 이미지 지침의 캐릭터 목록을 최근 대화에 이름이 나온 인물로 줄일지 (메인 모델 방식, 없으면 전체) */
+  imgNamesScene?: boolean;
   /** 세계 편집 창 폭 (브라우저 폭의 %, 50~100. 없으면 90) */
   editorWidth?: number;
   /** 고친 지침 (core/guides.ts GuideName → 글). 없으면 기본 */
@@ -202,6 +204,7 @@ export function setPrefs(raw: unknown): Prefs {
   const fold = imgFold(o.imgFold);
   const imgFoldOn = o.imgFoldOn === false ? false : undefined;
   const imgFoldLock = o.imgFoldLock === true ? true : undefined;
+  const imgNamesScene = o.imgNamesScene === true ? true : undefined;
   const show = imgRecent(o.imgShow);
   const send = imgRecent(o.imgSend);
   const strList = (v: unknown, max: number, len: number) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.trim().slice(0, len)).slice(0, max) : []);
@@ -230,7 +233,7 @@ export function setPrefs(raw: unknown): Prefs {
   const walletStart = int(o.walletStart, 0, 1_000_000_000_000);
   // 띄운 보고서 알림 기억도 남긴다. 최근 50개 (전수검사 11-13)
   const noticedReports = Array.isArray(o.noticedReports) ? [...new Set(o.noticedReports.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.slice(0, 80)))].slice(-50) : [];
-  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
+  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
   return prefs;
 }
 

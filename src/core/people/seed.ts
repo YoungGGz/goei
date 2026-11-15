@@ -94,6 +94,12 @@ export function seedPerson(name: string, sheet: string | null, base: SeedBase = 
   return p;
 }
 
+/** 시트의 Identity·Character 절이 시작값 항목으로 옮겨질 때의 글 (seedPerson 과 같은 변환) */
+export function seedTexts(sheet: string): Set<string> {
+  const s = parseSheet(sheet);
+  return new Set(Object.keys(SEED_SECTIONS).flatMap((section) => (s.sections[section] ? bullets(s.sections[section]).map((text) => plain(text, 300)) : [])));
+}
+
 /** 시트의 고정 절만 (본편에 원문으로 넣을 부분) */
 export function fixedSections(sheet: string): { name: string; body: string }[] {
   const s = parseSheet(sheet);

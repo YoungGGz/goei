@@ -431,6 +431,14 @@ new plant allowed ({tiers})
 [People records]
 @@END
 
+@@SECTION DOCS.HEAD
+## Scene-related records (events, places, organizations and items; kept by the system from this chat; background facts, not content to narrate again)
+@@END
+
+@@SECTION DOCS.ITEM
+- {type} · {key}: {text}
+@@END
+
 @@SECTION PEOPLE.BLOCK.HEAD
 ## {name} (living record · updated in this chat)
 @@END
@@ -453,6 +461,14 @@ Personality axes (baseline traits, not current feeling):
 
 @@SECTION PEOPLE.BLOCK.PATTERNS
 Long-term changes:
+@@END
+
+@@SECTION PEOPLE.BLOCK.AXES_OBSERVED
+Seen in recent scenes (not yet a confirmed change; a tendency only):
+@@END
+
+@@SECTION PEOPLE.BLOCK.AXES_OBSERVED_ITEM
+- {axis} ({direction}): {pattern}
 @@END
 
 @@SECTION PEOPLE.BLOCK.SEXUAL

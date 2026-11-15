@@ -89,3 +89,45 @@ test('정리: 수치 모드 의심 칸은 정리 자료에 넣지 않고, 모델
   delete store.people.쟈알디.slots.state;
   assert.equal(C.buildConsolidate(store, chat, '쟈알디', settings), null);
 });
+
+// 토큰 점검 (11-15): 정리 지침의 칸 설명은 자료에 실린 칸만, 별도 정리 호출은 같은 항목들로 다시 부르지 않는다
+test('정리 지침: 자료에 없는 칸(빈 칸·첫인상·수치 의심)의 설명은 싣지 않는다', () => {
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  store.people.쟈알디.slots.state = [e('s1', '본부에 있음'), e('s2', '왼팔 부상')];
+  store.people.쟈알디.slots['affinity.appraisal'] = [e('a1', '첫인상', { target: '@user' })];
+  store.people.쟈알디.slots.suspicion = [e('u1', '[+1] 단서', { target: '@user', kind: '거짓말' })];
+  const settings = St.peopleSettings({ $pp_num_suspicion: '1' });
+  const input = C.buildConsolidate(store, chat, '쟈알디', settings);
+  assert.deepEqual(Object.keys(input.data.slots), ['state']);
+  assert.equal(input.system, C.CONSOLIDATE_PROMPT(settings.lang, ['state']));
+  assert.ok(input.system.includes('state = '));
+  for (const s of ['history = ', 'affinity.appraisal = ', 'suspicion = ', 'knowledge = ']) assert.ok(!input.system.includes(s), s);
+  assert.ok(C.CONSOLIDATE_PROMPT(settings.lang, T.slotsFor(settings.features, settings.qualitative)).includes('history = '), '전에는 켜진 칸 전부의 설명이 실렸다');
+});
+
+test('별도 정리: 상한을 넘긴 인물만, 같은 항목들로 이미 불렀으면 다시 부르지 않고 항목이 달라지면 다시 부른다', () => {
+  const store = T.emptyStore();
+  const long = (id) => e(id, `${id} ` + '가'.repeat(280));
+  store.people.쟈알디 = person('쟈알디');
+  store.people.쟈알디.slots.history = Array.from({ length: 10 }, (_, i) => long(`h${i}`));
+  store.people.나루 = person('나루');
+  store.people.나루.slots.history = [long('n1')];
+  // 정리할 수 없는 항목(고정)만으로 상한을 넘긴 인물: 정리 자료가 없어 부르지 않는다
+  store.people.도윤 = person('도윤');
+  store.people.도윤.slots.history = Array.from({ length: 10 }, (_, i) => ({ ...long(`p${i}`), pin: true }));
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
+  const tried = new Map();
+  const due = C.tidyDue(store, chat, settings, tried);
+  assert.deepEqual(due.map((d) => d.name), ['쟈알디']);
+  // 불렀는데 결과가 줄지 않아 그대로인 경우: 같은 입력이라 다음 턴에는 부르지 않는다
+  tried.set(due[0].name, due[0].key);
+  assert.deepEqual(C.tidyDue(store, chat, settings, tried), []);
+  // 새 항목이 생기면 입력이 달라져 다시 부른다
+  store.people.쟈알디.slots.history.push(long('h10'));
+  assert.deepEqual(C.tidyDue(store, chat, settings, tried).map((d) => d.name), ['쟈알디']);
+  // 정리가 반영되면(항목이 합쳐지면) 상한 아래로 내려가 대상에서 빠진다
+  const input = C.buildConsolidate(store, chat, '쟈알디', settings);
+  C.applyConsolidate(store, '쟈알디', input, { slots: { history: [{ text: '합친 기록', from: [...input.ids.keys()] }] } }, S.liveness(chat), settings);
+  assert.deepEqual(C.tidyDue(store, chat, settings, tried), []);
+});

@@ -118,3 +118,98 @@ test('상한: 무작위 2~6명 — 줄일 지난 일이 남아 있으면 아무�
     assert.ok(body.length <= cap, `${JSON.stringify(spec)}: 합 ${body.length} ≤ 상한 ${cap}`);
   }
 });
+
+// ── 토큰 점검 (11-15): 기록 문서 포함·성격 관찰 포함·시트 전체 방식의 겹침·Router 호출 건너뛰기 ──
+const twStore = (names) => {
+  const store = T.emptyStore();
+  for (const n of names) store.people[n] = Seed.seedPerson(n, null, { address: { toUser: '요원', register: '반말' } });
+  return store;
+};
+const twChat = (text) => ({ message: [{ role: 'user', data: '안녕', chatId: 'u1' }, { role: 'char', data: text, chatId: 'c1' }], scriptstate: {} });
+const twDoc = (type, key, entries) => ({ type, key, entries: entries.map(([id, text, who], i) => ({ id, text, src: 'story', anchor: 'c1', seq: i + 1, ...(who ? { who } : {}) })) });
+
+test('기록 문서 포함: 기본은 넣지 않고, 켜면 장면과 관련된 문서만 컨텍스트 글자 상한 안에서 넣는다', () => {
+  const store = twStore(['나루', '도윤']);
+  store.docs['event:정전 사건'] = twDoc('event', '정전 사건', [['d1', '3층 전체가 정전됐다'], ['d2', '비상 발전기로 복구됐다']]);
+  store.docs['item:은색 열쇠'] = twDoc('item', '은색 열쇠', [['d3', '나루가 주워서 보관 중', ['나루']]]);
+  store.docs['location:옥상'] = twDoc('location', '옥상', [['d4', '출입문이 잠겼다']]);
+  store.docs['rhythm:scene'] = twDoc('rhythm', 'scene', [['d5', '준비 국면']]);
+  const chat = twChat('나루가 정전 사건 보고서를 들고 왔다.');
+  const o = (vars = {}) => ({ settings: St.peopleSettings({ $pp_rhythm: '0', ...vars }), store, sheetOf: () => null, user: '주인공' });
+  assert.equal(St.PP_DEFAULTS.docs_inject, '0');
+  const off = R.peopleBlockFor(chat, o()).text;
+  assert.doesNotMatch(off, /Scene-related records|정전됐다|보관 중/, '기본: 문서는 메인 요청에 없다');
+  const on = R.peopleBlockFor(chat, o({ $pp_docs_inject: '1' })).text;
+  const docLines = on.slice(on.indexOf('## Scene-related records')).split('\n').slice(1);
+  assert.deepEqual([...docLines].sort(), ['- event · 정전 사건: 3층 전체가 정전됐다', '- event · 정전 사건: 비상 발전기로 복구됐다', '- item · 은색 열쇠: 나루가 주워서 보관 중'].sort(), '글에 이름이 나온 문서와 장면 인물이 얽힌 항목');
+  assert.ok(docLines.indexOf('- event · 정전 사건: 3층 전체가 정전됐다') < docLines.indexOf('- event · 정전 사건: 비상 발전기로 복구됐다'), '일어난 차례로');
+  assert.doesNotMatch(on, /출입문이 잠겼다|준비 국면/, '장면과 무관한 문서·리듬 문서는 안 넣음');
+  assert.ok(on.indexOf('## 나루') < on.indexOf('## Scene-related records'), '인물 기록 뒤에');
+  // 꺼진 문서 종류는 안 넣는다
+  assert.doesNotMatch(R.peopleBlockFor(chat, o({ $pp_docs_inject: '1', $pp_docs_event: '0' })).text, /정전됐다/);
+  // 관련 문서가 없으면 블록도 없다
+  assert.doesNotMatch(R.peopleBlockFor(twChat('도윤이 혼자 왔다.'), o({ $pp_docs_inject: '1' })).text, /Scene-related records/);
+  // 상한: 문서 몫은 「상한 ÷ (장면 인물 수 + 1)」, 최근 항목부터 남기고 전체는 컨텍스트 글자 상한을 넘지 않는다
+  store.docs['event:정전 사건'] = twDoc('event', '정전 사건', Array.from({ length: 60 }, (_, i) => [`e${i}`, `기록 ${i} ` + '가'.repeat(200)]));
+  store.people.나루.slots.history = Array.from({ length: 80 }, (_, i) => ({ id: `h${i}`, text: `지난 일 ${i} ` + '나'.repeat(200), anchor: 'c1' }));
+  const s = o({ $pp_docs_inject: '1' });
+  const full = R.peopleBlockFor(chat, s);
+  const docsPart = full.text.slice(full.text.indexOf('## Scene-related records'));
+  assert.ok(docsPart.length <= Math.floor(s.settings.blockCap / (full.people.length + 1)), `문서 몫 ${docsPart.length}`);
+  assert.match(docsPart, /기록 59 /, '가장 새 항목이 남음');
+  assert.doesNotMatch(docsPart, /기록 0 /, '오래된 항목부터 빠짐');
+  assert.ok(full.text.slice(full.text.indexOf('## ')).length <= s.settings.blockCap, '인물 기록 + 문서 ≤ 컨텍스트 글자 상한');
+  assert.match(full.text, /## 나루 /, '인물 기록은 남는다');
+});
+
+test('성격 관찰 포함: 기본은 승인한 것만, 켜면 모으는 중인 관찰도 넣는다 (성적 축·거절한 후보 제외)', () => {
+  const store = twStore(['나루']);
+  const ev = (n) => Array.from({ length: n }, (_, i) => ({ id: `o${i}`, anchor: 'c1', seq: i + 1, quote: '왔다', reason: 'r', strength: 50, confidence: 80 }));
+  store.people.나루.candidates = {
+    k1: { id: 'k1', axis: 'guardedness', direction: 'down', pattern: '먼저 속내를 털어놓았다', evidence: ev(2), status: 'collecting', at: '' },
+    k2: { id: 'k2', axis: 'pattern', direction: 'new', pattern: '위기에서 농담으로 넘긴다', evidence: ev(1), status: 'collecting', at: '' },
+    k3: { id: 'k3', axis: 'impulsivity', direction: 'up', pattern: '거절한 후보', evidence: ev(3), status: 'rejected', at: '' },
+    k4: { id: 'k4', axis: 'sexual_desire', direction: 'replace', pattern: '성적 축 후보', evidence: ev(3), status: 'collecting', at: '' },
+    k5: { id: 'k5', axis: 'impulsivity', direction: 'up', pattern: '근거가 사라진 후보', evidence: [{ ...ev(1)[0], anchor: 'gone' }], status: 'collecting', at: '' },
+  };
+  const chat = twChat('나루가 왔다.');
+  const o = (vars = {}) => ({ settings: St.peopleSettings(vars), store, sheetOf: () => null, user: '주인공' });
+  assert.equal(St.PP_DEFAULTS.axes_obs_inject, '0');
+  assert.doesNotMatch(R.peopleBlockFor(chat, o()).text, /Seen in recent scenes|속내를/, '기본: 승인 전 관찰은 메인 요청에 없다');
+  const on = R.peopleBlockFor(chat, o({ $pp_axes_obs_inject: '1' })).text;
+  assert.match(on, /Seen in recent scenes[^\n]*\n- guardedness \(down\): 먼저 속내를 털어놓았다\n- pattern \(new\): 위기에서 농담으로 넘긴다\n/, '관찰이 많은 것부터');
+  assert.doesNotMatch(on, /거절한 후보|성적 축 후보|근거가 사라진 후보/);
+  assert.doesNotMatch(R.peopleBlockFor(chat, o({ $pp_axes_obs_inject: '1', $pp_axes: '0' })).text, /Seen in recent scenes/, '성격 6축이 꺼져 있으면 안 넣음');
+});
+
+test('시트 전체+기록: 시트에서 옮긴 시작값 항목은 다시 넣지 않고, 이야기에서 생긴 항목은 남긴다', () => {
+  const sheet = ['### Character - Jyaldi', '#### Identity', '- Role: Chief', '- Age band: adult', '#### Character', '[Flaws]', '- Stubborn', '#### Voice', '- Short orders.'].join('\n');
+  const store = T.emptyStore();
+  store.people.쟈알디 = Seed.seedPerson('쟈알디', sheet, { address: { toUser: '요원', register: '반말' } });
+  store.people.쟈알디.slots.identity.push({ id: 'i9', text: '최근 승진했다', src: 'story', anchor: 'c1', seq: 9, quote: '왔다' });
+  const chat = twChat('쟈알디가 왔다.');
+  const block = (inject) => R.peopleBlockFor(chat, { settings: St.peopleSettings({ $pp_inject: inject }), store, sheetOf: () => sheet, user: '주인공' }).text;
+  const count = (t, w) => t.split(w).length - 1;
+  const append = block('append');
+  assert.equal(count(append, 'Role: Chief'), 1, '시트 원문에 한 번만');
+  assert.equal(count(append, 'Stubborn'), 1);
+  assert.match(append, /Identity:\n- 최근 승진했다/, '이야기 항목은 기록으로 남음');
+  assert.doesNotMatch(append, /Personality:\n/, '시작값뿐인 칸은 제목도 없음');
+  // 절 단위 혼합·기록만 방식은 전과 같다 (시트의 그 절이 블록에 없으니 시작값 항목이 그 내용을 싣는다)
+  assert.match(block('split'), /Identity:\n- Role: Chief\n- Age band: adult\n- 최근 승진했다/);
+  assert.match(block('record'), /Personality:\n- \[Flaws\] Stubborn/);
+});
+
+test('모델 Router: 코드가 고른 인물로 자리가 차 있으면 부를 필요가 없다 (sceneFullByCode)', () => {
+  const names = ['가람', '나루', '다온', '라온', '마루', '바다', '사랑'];
+  const store = twStore(names);
+  const o = (vars = {}) => ({ settings: St.peopleSettings({ $pp_router: 'model', ...vars }), store, sheetOf: () => null });
+  const six = twChat(`${names.slice(0, 6).join(', ')}가 모였다.`);
+  assert.equal(R.sceneFullByCode(six, o()), true, '글에 나온 사람만으로 6명');
+  assert.deepEqual(R.peopleBlockFor(six, { ...o(), people: ['사랑'] }).people, names.slice(0, 6), '모델이 고른 사람은 들어갈 자리가 없다');
+  const five = twChat(`${names.slice(0, 5).join(', ')}가 모였다.`);
+  assert.equal(R.sceneFullByCode(five, o()), false, '자리가 남으면 부른다');
+  assert.deepEqual(R.peopleBlockFor(five, { ...o(), people: ['사랑'] }).people, [...names.slice(0, 5), '사랑']);
+  assert.equal(R.sceneFullByCode(five, o({ $pp_always: '사랑' })), true, '항상 포함 1 + 글에 나온 5');
+  assert.equal(R.sceneFullByCode(twChat('아무도 없다.'), o()), false);
+});
