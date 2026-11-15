@@ -941,6 +941,14 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .ph-form-foot { flex: none; display: flex; justify-content: flex-end; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--panel2); background: var(--void); }
 .ph-form-foot .gx-start { width: 100%; min-height: 44px; border-radius: 12px; font-size: 16px; letter-spacing: .08em; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .ph-form-foot .gx-start svg { width: 18px; height: 18px; }
+/* 전화 걸기·연락처 추가 작은 창 (보던 화면 위, 11-15 사용자). 바탕·가운데 놓기는 .gx-agpop */
+.ph-popcard { flex: none; width: min(420px, 100%); max-height: calc(100% - 8px); border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); overflow: hidden; }
+.ph-pop-head { flex: none; display: flex; align-items: flex-start; gap: 10px; padding: 14px 12px 4px 16px; }
+.ph-pop-head .ph-room-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ph-pop-head .ph-room-title b { font-size: 16px; }
+.ph-pop-head .ph-room-title small { color: var(--dim); font-size: 13px; line-height: 1.45; white-space: normal; }
+.ph-popcard .ph-form-foot { padding-bottom: 12px; }
+.ph-popcard .ph-pick-sel { flex: none; width: 100%; }
 .ph-label { display: flex; flex-direction: column; gap: 2px; font-size: 14px; font-weight: 600; margin-bottom: -4px; }
 .ph-label small { font-weight: 400; color: var(--dim); font-size: 13px; }
 .ph-form textarea { resize: vertical; padding: 8px 10px; line-height: 1.5; }

@@ -46,7 +46,9 @@ interface PhoneUi {
   sub: Sub;
   tab: string;
   query: string;
-  view: 'list' | 'room' | 'group' | 'call' | 'add' | 'settings' | 'notice' | 'view';
+  view: 'list' | 'room' | 'group' | 'settings' | 'notice' | 'view';
+  /** 떠 있는 작은 창: 전화 걸기·연락처 추가 (보던 화면 위에 뜬다, 11-15 사용자) */
+  pop: '' | 'call' | 'add';
   /** 열어 둔 보기 전용 방 */
   viewId: string | null;
   /** 작성칸 + 버튼으로 연 첨부 메뉴 */
@@ -81,14 +83,14 @@ interface PhoneUi {
 export const phone: PhoneUi = {
   sub: 'contacts', tab: '', query: '', view: 'list', room: null, invite: null, picked: [], topic: '', gname: '', draft: '', page: 1, call: '', callText: '',
   addName: '', addNote: '', openNotice: null, noticePage: 1, attach: [], confirm: null, notice: '', failure: null, attachMenu: false, pickQuery: '',
-  chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', viewId: null,
+  chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', viewId: null, pop: '',
 };
 
 export function resetPhone() {
   Object.assign(phone, {
     sub: 'contacts', tab: '', query: '', view: 'list', room: null, invite: null, picked: [], topic: '', gname: '', draft: '', page: 1, call: '', callText: '',
     addName: '', addNote: '', openNotice: null, noticePage: 1, attach: [], confirm: null, notice: '', failure: null, attachMenu: false, pickQuery: '',
-    chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '',
+    chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', pop: '',
   });
 }
 
@@ -613,7 +615,7 @@ async function placeCall(ctx: ChatContext, env: PhoneEnv, target: string, purpos
     else message.push(newMessage(record));
     return { ...chat, message };
   });
-  Object.assign(phone, { view: 'list', call: '', callText: '', notice: '' });
+  Object.assign(phone, { pop: '', call: '', callText: '', notice: '' });
   await env.close();
 }
 
@@ -1086,22 +1088,40 @@ function searchView(ctx: ChatContext, st: PState, d: Directory): string {
   return sec('연락처', people.length, contactList(ctx, people, st)) + sec('대화', rooms.length, chatList(ctx, rooms, d)) + sec('공지', notes.length, noticeList(notes, noticeFactionLabel(names(ctx))));
 }
 
-function callView(): string {
-  return `<div class="ph-form">${paneHead('전화 걸기', '기록을 남기고 창을 닫아요. 채팅에서 전송을 누르면 통화 장면이 이어져요.')}
-    <div class="ph-form-body">
-      <label class="ph-label">상대</label><input class="gx-search" data-input="ph-call-to" value="${esc(phone.call)}" placeholder="상대 이름" maxlength="60">
-      <label class="ph-label">할 말·용건 (선택)<small>채팅 입력창에 덧붙여 보내도 돼요</small></label><textarea class="gx-search" data-input="ph-call-text" rows="3" placeholder="예: 방금 본 걸 보고하려고">${esc(phone.callText)}</textarea>
-    </div>
-    <div class="ph-form-foot"><button class="gx-start" data-action="ph-call-place">${ICONS.call} 전화 걸기</button></div></div>`;
+/** 전화 걸기·연락처 추가 창: 보던 화면 위에 뜨고, 창 밖을 누르거나 ✕·Esc 로 닫는다 */
+function popWin(title: string, sub: string, body: string): string {
+  return `<div class="gx-agpop ph-pop" data-action="ph-pop-close"><div class="ph-popcard ph-form" role="dialog" aria-label="${title}" data-action="ph-pop-stay">
+    <header class="ph-pop-head"><div class="ph-room-title"><b>${title}</b><small>${sub}</small></div><button class="gx-x" data-action="ph-pop-close" aria-label="닫기">${ICONS.close}</button></header>
+    ${body}</div></div>`;
 }
 
-function addView(): string {
-  return `<div class="ph-form">${paneHead('연락처 추가', '「기타」 탭에 들어가요. 명부에 있는 이름이면 그 인물로 추가돼요.')}
+/** 명부에서 고르기: 고르면 이름 칸에 들어간다. 명부에 없는 사람은 이름 칸에 직접 적는다 */
+function rosterPick(ctx: ChatContext, cur: string, keep: (c: Contact) => boolean): string {
+  const people = [...new Set(dir(ctx).map.values())].filter(keep);
+  if (!people.length) return '';
+  const groups = new Map<string, Contact[]>();
+  for (const c of people) groups.set(c.group ?? '', [...(groups.get(c.group ?? '') ?? []), c]);
+  const opt = (c: Contact) => `<option value="${esc(c.name)}" ${c.name === cur.trim() ? 'selected' : ''}>${esc(c.name)}${c.rank ? ` · ${esc(c.rank)}` : ''}</option>`;
+  const body = [...groups].map(([g, list]) => (g ? `<optgroup label="${esc(g)}">${list.map(opt).join('')}</optgroup>` : list.map(opt).join(''))).join('');
+  return `<select class="gx-select ph-pick-sel" data-change="ph-pop-pick" aria-label="명부에서 고르기"><option value="">명부에서 고르기</option>${body}</select>`;
+}
+
+function callView(ctx: ChatContext): string {
+  return popWin('전화 걸기', '기록을 남기고 창을 닫아요. 채팅에서 전송을 누르면 통화 장면이 이어져요.', `
     <div class="ph-form-body">
-      <label class="ph-label">이름</label><input class="gx-search" data-input="ph-add-name" value="${esc(phone.addName)}" maxlength="60" placeholder="이름">
+      <label class="ph-label">상대<small>명부에 없는 사람은 이름을 직접 적어요</small></label>${rosterPick(ctx, phone.call, () => true)}<input class="gx-search" data-input="ph-call-to" value="${esc(phone.call)}" placeholder="상대 이름" maxlength="60">
+      <label class="ph-label">할 말·용건 (선택)<small>채팅 입력창에 덧붙여 보내도 돼요</small></label><textarea class="gx-search" data-input="ph-call-text" rows="3" placeholder="예: 방금 본 걸 보고하려고">${esc(phone.callText)}</textarea>
+    </div>
+    <div class="ph-form-foot"><button class="gx-start" data-action="ph-call-place">${ICONS.call} 전화 걸기</button></div>`);
+}
+
+function addView(ctx: ChatContext): string {
+  return popWin('연락처 추가', '「기타」 탭에 들어가요.', `
+    <div class="ph-form-body">
+      <label class="ph-label">이름<small>명부에 없는 사람은 이름을 직접 적어요</small></label>${rosterPick(ctx, phone.addName, (c) => !c.visible)}<input class="gx-search" data-input="ph-add-name" value="${esc(phone.addName)}" maxlength="60" placeholder="이름">
       <label class="ph-label">인물 메모 (선택)<small>어떤 사람인지, 어떻게 아는 사이인지</small></label><textarea class="gx-search" data-input="ph-add-note" rows="3">${esc(phone.addNote)}</textarea>
     </div>
-    <div class="ph-form-foot"><button class="gx-start" data-action="ph-add-save">추가</button></div></div>`;
+    <div class="ph-form-foot"><button class="gx-start" data-action="ph-add-save">추가</button></div>`);
 }
 
 function settingsView(ctx: ChatContext): string {
@@ -1147,8 +1167,6 @@ function listHtml(ctx: ChatContext, st: PState, d: Directory): string {
 function paneHtml(ctx: ChatContext, st: PState, d: Directory, busy: boolean): string {
   if (phone.view === 'room') return roomView(ctx, st, d, busy);
   if (phone.view === 'group') return groupView(ctx, st, d);
-  if (phone.view === 'call') return callView();
-  if (phone.view === 'add') return addView();
   if (phone.view === 'settings') return settingsView(ctx);
   if (phone.view === 'notice') return noticeDetail(ctx);
   if (phone.view === 'view') return viewPane(ctx, d, busy);
@@ -1214,6 +1232,7 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
       ${drawerHtml(tools, '', '', 'phone')}
     </section>
     <section class="ph-pane">${detail ? status : ''}${paneHtml(ctx, st, d, busy)}</section>
+    ${phone.pop === 'call' ? callView(ctx) : phone.pop === 'add' ? addView(ctx) : ''}
     ${note}
   </main>`;
 }
@@ -1221,6 +1240,7 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
 /** 괴담톡 탭 버튼. 처리했으면 true */
 export async function handlePhone(action: string, value: string | undefined, ctx: ChatContext, env: PhoneEnv): Promise<boolean> {
   if (!action.startsWith('ph-')) return false;
+  if (action === 'ph-pop-stay') return true; // 작은 창 안의 빈 곳: 아무 일도 없다 (창 밖 누름과 가르려는 표시)
   liveEnv = env;
   const v = value ?? '';
   // 두 번 눌러 지우는 단추는 여기 다 적어야 한다 — 빠지면 두 번째 「정말 삭제」가 확인을 먼저 지워 버려 먹통이 된다 (11-09 사용자: 사이드스토리 방 삭제 안 됨)
@@ -1275,7 +1295,18 @@ export async function handlePhone(action: string, value: string | undefined, ctx
       if (phone.view === 'room' && phone.room === v && !isPhone()) return handlePhone('ph-back', undefined, ctx, env);
       await openRoom(ctx, env, v);
       return true;
+    case 'ph-pop-pick':
+      if (phone.pop === 'call') phone.call = v;
+      else if (phone.pop === 'add') phone.addName = v;
+      break;
+    case 'ph-pop-close':
+      phone.pop = '';
+      break;
     case 'ph-back':
+      if (phone.pop) {
+        phone.pop = '';
+        break;
+      }
       if (phone.view === 'group' && phone.invite) {
         Object.assign(phone, { view: 'room', room: phone.invite, invite: null, picked: [] });
         break;
@@ -1435,13 +1466,13 @@ export async function handlePhone(action: string, value: string | undefined, ctx
       return true;
     }
     case 'ph-call':
-      Object.assign(phone, { view: 'call', call: v, callText: '' });
+      Object.assign(phone, { pop: 'call', call: v, callText: '' });
       break;
     case 'ph-call-place':
       await placeCall(ctx, env, phone.call, phone.callText);
       return true;
     case 'ph-add':
-      Object.assign(phone, { view: 'add', addName: '', addNote: '' });
+      Object.assign(phone, { pop: 'add', addName: '', addNote: '' });
       break;
     case 'ph-add-save':
       await addContact(ctx, env);
@@ -1510,7 +1541,7 @@ async function addContact(ctx: ChatContext, env: PhoneEnv) {
   }
   const match = found[0];
   if (match?.visible) {
-    Object.assign(phone, { view: 'list', sub: 'contacts', tab: match.tabs[0] ?? '', query: '', notice: '이미 등록된 연락처예요.' });
+    Object.assign(phone, { pop: '', sub: 'contacts', tab: match.tabs[0] ?? '', query: '', notice: '이미 등록된 연락처예요.' });
     return env.render();
   }
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
@@ -1522,7 +1553,7 @@ async function addContact(ctx: ChatContext, env: PhoneEnv) {
     }
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [PH_CONTACTS]: JSON.stringify(data) } };
   });
-  Object.assign(phone, { view: 'list', sub: 'contacts', tab: 'T05', query: '', notice: '연락처를 기타에 추가했어요.' });
+  Object.assign(phone, { pop: '', sub: 'contacts', tab: 'T05', query: '', notice: '연락처를 기타에 추가했어요.' });
   await env.refresh();
 }
 

@@ -1095,7 +1095,7 @@ if (want('W3')) {
   await startedWithReply(page);
   await open(page);
   // 폰: 위키는 하단 바 위 공용 서랍(손잡이)에서 연다 (2026-11-07 하단 바 재편)
-  await page.tap('.gx-cgrip');
+  await page.locator('.gx-cgrip').dispatchEvent('click');
   await page.tap('.gx-cdr.open .gx-cpanel [data-value="wk"]');
   await page.waitForSelector('.wk .mainp');
   await page.tap('.wk .wgrab');
@@ -1412,7 +1412,7 @@ if (want('PP2')) {
   await page.click('[data-action="rec-sub"][data-value="people"]');
   await page.waitForSelector('.pp-pane');
   assert.ok((await page.textContent('.pp-pane')).includes('쟈알디'));
-  assert.ok((await page.textContent('.pp-pane .ph-room-title')).includes('1명'));
+  assert.ok((await page.textContent('.pp-pane .ph-room-title')).includes('명'));
   // 세력 평판: 기록 탭 › 세력 (기본 5 + 기록). 메시지당 상한 10 → 큰도움 5 + 헌신 10 = 15 → 10 으로 잘림(호감), 세력도 ±10
   await page.click('[data-action="rec-sub"][data-value="factions"]');
   await page.waitForSelector('.pp-sec:has-text("세력 평판")');

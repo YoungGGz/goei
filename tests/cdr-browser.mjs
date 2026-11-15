@@ -121,12 +121,12 @@ await tapGrip(); await finish();
 const n2 = await geo();
 ok(n2.open && n2.nav.t - n2.lastBottom >= PAD_MIN && n2.hitAbove === 'panel', '인터넷 안: 열림 모습', JSON.stringify([n2.nav.t - n2.lastBottom, n2.hitAbove]));
 await tapGrip(); await finish();
-// 설정 창의 폰 바에는 서랍이 없다 (그대로)
+// 설정 창의 폰 바에는 설정 전용 서랍이 있다 (기능·세계·지침·점검·닫기)
 await tapGrip(); await finish();
 await page.evaluate(() => document.querySelector('.gx-cdr.open .gx-cpanel [data-action="ed-open"]').click());
 await sleep(900);
 const ed = await page.evaluate(() => ({ nav: !!document.querySelector('.gw-nav'), cdr: !!document.querySelector('.gw-nav .gx-cdr') }));
-ok(ed.nav && !ed.cdr, '설정 창: 폰 바가 있고 서랍은 없다', JSON.stringify(ed));
+ok(ed.nav && ed.cdr, '설정 창: 폰 바와 설정 전용 서랍이 있다', JSON.stringify(ed));
 await closeEditor(page, true).catch(() => {});
 await sleep(400);
 
