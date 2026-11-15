@@ -163,7 +163,6 @@ export function flowNodes(ctx: ChatContext): { pre: Node[]; main: Node; post: No
     return { calls: `1회${why}`, sure: 1 };
   };
   const wikiOn = nw.auto === 'turn';
-  const wikiTitle = wikiOn && nw.autoTitle === 'model';
   const post: Node[] = [
     { name: '인물 갱신', sub: '응답을 읽어 인물·세력·문서 기록', kind: 'aux', on: updateOn, model: updateOn ? ppModel('update') : undefined, calls: updateOn ? `1회${pp.tidy === 'same' ? ' (정리 얹음)' : ''}` : pp.on ? '수동 (「새 응답 읽기」 때만)' : '호출 없음 (인물 기록 끔)', page: 'set:people', to: 'r:자동 호출', sure: updateOn ? 1 : 0, maybe: 0 },
     // 상점 판단 (11-09 사용자): 누가 「지금 상점이 있나」를 보는지. 따로 호출하지 않는다 (메인 응답 표식 또는 인물 갱신에 얹음)
@@ -185,7 +184,7 @@ export function flowNodes(ctx: ChatContext): { pre: Node[]; main: Node; post: No
       return { name: `${BOARD_NAME[site]} 새로고침`, sub: site === 'sm' ? '매물·댓글·쪽지' : '게시판 글·댓글·쪽지', kind: 'aux', on, model: on ? id(featureModel(sv, 'gn')) || mm(g.model) : undefined, calls: !g.enabled ? '호출 없음 (사이트 끔)' : g.auto ? jointText(site).calls : g.autoOpen ? '창 열 때 1회' : '수동 (새로고침 때만)', page: 'set:net', to: 'r:자동 호출', sure: on ? jointText(site).sure : 0, maybe: 0 };
     }),
     { name: '관전', sub: `${VIEW_PRESETS[vw.preset]} 이어 쓰기`, kind: 'aux', on: vw.auto === 'turn', model: vw.auto === 'turn' ? phoneModel : undefined, calls: vw.auto === 'turn' ? '1회' : vw.auto === 'open' ? '괴담톡 열 때 1회' : '수동 (「관전」 단추)', page: 'set:phone', to: 'r:자동 호출@보기 전용 방', sure: vw.auto === 'turn' ? 1 : 0, maybe: 0 },
-    { name: '위키 자동 작성', sub: '이번 턴 소재로 문서 한 편', kind: 'aux', on: wikiOn, model: wikiOn ? id(featureModel(ss, 'nw')) || mm(nw.model) : undefined, calls: wikiOn ? (wikiTitle ? '2회 (제목 고르기 + 본문)' : '1회 (제목은 설정에 적은 것)') : nw.auto === 'open' ? '위키 열 때' : '수동', page: 'set:wiki', to: 'r:자동 호출', sure: wikiOn ? (wikiTitle ? 2 : 1) : 0, maybe: 0 },
+    { name: '위키 자동 작성', sub: '이번 턴 소재로 문서 한 편', kind: 'aux', on: wikiOn, model: wikiOn ? id(featureModel(ss, 'nw')) || mm(nw.model) : undefined, calls: wikiOn ? '2회 (제목 고르기 + 본문)' : nw.auto === 'open' ? '위키 열 때' : '수동', page: 'set:wiki', to: 'r:자동 호출', sure: wikiOn ? 2 : 0, maybe: 0 },
     ...(['cos', 'bm'] as MallSite[]).map((site): Node => {
       const m = mallSettings(ss, site);
       const login = site !== 'bm' || String(ss?.['$br_login'] ?? '') === '1';

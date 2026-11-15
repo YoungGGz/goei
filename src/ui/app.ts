@@ -937,7 +937,7 @@ async function handle(action: string, value?: string): Promise<void> {
     // 시작 뒤엔 이 채팅 값. 시작 전엔 기능 페이지가 열려 있지 않아도 기능 동작(pp-·ph-·wiki-·hs-·ms-)이 이 채팅에 닿게 한다
     const cut = (value ?? '').indexOf('|');
     const inner = cut > 0 ? (value ?? '').slice(0, cut) : '';
-    if (!/^(pp-set|ph-cfg|wiki-(auto|model|auto_title)|fam-set|hs-(cfg|retry)|ms-cfg|adv-set|set-(asset|asset-model|shop-on|shop-model|shop-judge|wallet-on|inv-on))$/.test(inner)) return;
+    if (!/^(pp-set|ph-cfg|wiki-(auto|model)|fam-set|hs-(cfg|retry)|ms-cfg|adv-set|set-(asset|asset-model|shop-on|shop-model|shop-judge|wallet-on|inv-on))$/.test(inner)) return;
     if (!(view.kind === 'started' || (view.kind === 'picker' && pickerPrefs))) return;
     const keep = { scope: settingsUi.scope, page: settingsUi.page };
     if (view.kind === 'started') settingsUi.scope = 'chat';
