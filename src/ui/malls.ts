@@ -10,7 +10,9 @@ import { updateChat } from '../host/risu';
 import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
-import { pointsOn, pointsVars, readPoints } from '../core/points';
+import { hqState, pointsOn, pointsOrg, pointsVars, readPoints } from '../core/points';
+import { readDirectory } from '../core/world/directory';
+import type { LoreEntry } from '../core/types';
 import { addItem, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
@@ -239,6 +241,14 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
   await env.refresh();
 }
 
+/** 포인트몰은 본사 안에서만 열린다 (2026-11-15 사용자). 거점은 명부 「거점」에서 포인트 조직에 묶인 곳(사용자가 고친 명부 그대로). 그런 거점이 없거나 위치 칸이 없으면 막지 않는다 */
+export function bmAtHq(ctx: ChatContext): boolean {
+  const org = pointsOrg();
+  const bases = readDirectory((ctx.char.globalLore ?? []) as LoreEntry[]).bases.filter((b) => b.org && b.org === org);
+  if (!bases.length) return true;
+  return hqState(ctx.chat, bases.flatMap((b) => [b.name, b.english, ...b.aliases])) !== 'out';
+}
+
 /** 사이트를 열 때: 「창을 열 때」이고 마지막 응답 뒤로 아직 안 짰으면 한 번 (처음이면 늘) */
 let liveEnv: MallEnv | null = null;
 export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): void {
@@ -246,7 +256,7 @@ export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): v
   sync(ctx);
   const s = mallSettings(ctx.chat.scriptstate, site);
   if (!s.on || s.auto === 'manual' || ui[site].loading) return;
-  if (site === 'bm' && !loggedNick(ctx)) return;
+  if (site === 'bm' && (!loggedNick(ctx) || !bmAtHq(ctx))) return;
   const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
   // 받아 둔 진열을 본 것으로 적는다 (「매 턴」이 안 본 진열을 다시 받지 않게)
   if (mallUnseen(ctx.chat.scriptstate, site, st.loaded)) {
@@ -265,7 +275,7 @@ export async function autoRefreshMall(ctx: ChatContext, site: MallSite): Promise
   const env: MallEnv = live && chatKey(live) === chatKey(ctx) ? liveEnv! : { render() {}, refresh: async () => {}, current: () => ctx };
   const s = mallSettings(ctx.chat.scriptstate, site);
   if (!s.on || s.auto !== 'turn') return;
-  if (site === 'bm' && !pointsOn(ctx.chat)) return;
+  if (site === 'bm' && (!pointsOn(ctx.chat) || !bmAtHq(ctx))) return;
   if (String(ctx.chat.scriptstate?.[atKey(site)] ?? '') === turnKey(ctx.chat)) return;
   const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
   // 받아 둔 진열을 아직 한 번도 안 열어 봤으면 새로 받지 않는다 (사용자 2026-11-15). 열면 그 진열이 보이고, 본 다음 턴부터 다시 받는다
@@ -382,11 +392,11 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
     }
     case 'mall-buy': {
       // 포인트몰: 정가로 바로 구매 (로그인해야)
-      if (site !== 'bm' || !loggedNick(ctx) || v.loading) return true;
+      if (site !== 'bm' || !loggedNick(ctx) || !bmAtHq(ctx) || v.loading) return true;
       const it = st.items.find((x) => x.id === value && !x.sold);
       if (!it) return true;
       const got = await buy(ctx, site, [it.id]);
-      v.info = got ? `「${it.name}」 구매가 완료되었습니다. 소지품에 들어갔습니다.` : '포인트가 부족하거나 품절된 상품입니다.';
+      v.info = got ? `「${it.name}」 구매가 완료되었습니다. 지급 창구에서 받아 소지품에 들어갔습니다.` : '포인트가 부족하거나 품절된 상품입니다.';
       await env.refresh();
       return true;
     }
@@ -864,12 +874,14 @@ function bmHtml(ctx: ChatContext, mobile: boolean): string {
   const s = mallSettings(ctx.chat.scriptstate, site);
   const nick = loggedNick(ctx);
   const bal = balanceOf(ctx, site);
+  const hq = bmAtHq(ctx);
   const list = onShelf(st);
   const gnb = `<div class="bp-gnb"><b>백일몽 사내망</b><span>공지</span><span>포인트몰</span>${mobile ? '' : '<span class="r">보안 등급 C · 외부 반출 금지</span>'}</div>`;
   const me = nick ? `<div class="bp-me"><b>${esc(nick)}</b><div class="bp-pt"><small>보유 포인트</small>${pts(bal)}</div></div>` : '<button class="bp-login" data-action="br-login">로그인</button>';
   const hd = `<div class="bp-hd"><span class="bp-lg">${siteLogo('bm', 'bp-logo')}${esc(MALL_NAME.bm)}<small>임직원 복지</small></span>${me}</div>`;
   let body: string;
   if (!s.on) body = '<div class="bp-box">소지품·가계부가 꺼져 있어 이용할 수 없습니다.</div>';
+  else if (!hq) body = '<div class="bp-box bp-need"><b>사내망에 연결할 수 없습니다</b><p>포인트몰은 본사 안에서만 접속됩니다.</p></div>';
   else if (!nick) body = '<div class="bp-box bp-need"><b>로그인이 필요합니다</b><p>포인트몰은 임직원 계정으로 로그인한 뒤 이용할 수 있습니다.</p><button class="bp-buy" data-action="br-login">로그인</button></div>';
   else {
     const cats: [string, string][] = [['', '전체'], ...(s.feature ? [['rare', '이달의 한정'], ['sale', '특가']] as [string, string][] : [])];
@@ -884,7 +896,7 @@ function bmHtml(ctx: ChatContext, mobile: boolean): string {
       : `<div class="bp-grid">${shown.map((x) => bmCard(x, bal, v, !!v.loading)).join('') || '<p class="bp-none">이 분류에는 상품이 없습니다.</p>'}</div>`;
     body = `<div class="bp-wrap">${side}<div class="bp-main">${banner}${info}${failBox(v, 'bp-fail')}<h2>${v.page === 'rare' ? '이달의 한정' : v.page === 'sale' ? '특가' : '전체 상품'}${v.loading === 'shelf' && list.length ? ' <small>새 상품을 불러오는 중…</small>' : ''}</h2>${grid}</div></div>`;
   }
-  const deskWin = v.ask && s.on && nick && deskSettings(ctx.chat.scriptstate).on ? bmDesk(ctx, v, mobile) : '';
+  const deskWin = v.ask && s.on && hq && nick && deskSettings(ctx.chat.scriptstate).on ? bmDesk(ctx, v, mobile) : '';
   return `<main class="ms ms-bm${mobile ? ' ms-m' : ''}">${gnb}${hd}${body}${deskWin}</main>`;
 }
 

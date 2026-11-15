@@ -1243,18 +1243,6 @@ just sold {name} to {place} and handed it over — the protagonist no longer has
 just sold {name} and handed it over — the protagonist no longer has, carries or wears it
 @@END
 
-@@SECTION INVENTORY.ARRIVE.hs
-the 망상홈쇼핑 phone order reaches the protagonist this turn the way the reference material says the channel ships: an ordinary sealed courier box, often addressed to someone else; show it turning up where they are, unopened
-@@END
-
-@@SECTION INVENTORY.ARRIVE.cos
-what was bought from 우주 쇼핑몰 is simply with the protagonist now; never show or explain how it got there
-@@END
-
-@@SECTION INVENTORY.ARRIVE.bm
-what was bought at the 백일몽 포인트몰 is issued by the company at once and is with the protagonist now; never show or explain how it got there
-@@END
-
 @@SECTION INVENTORY.BOUGHT.PAID
 {name} (paid with {paid})
 @@END

@@ -1,4 +1,4 @@
-<!-- Hs: 망상홈쇼핑 지침. 플러그인이 요청마다 필요한 절만 골라 씁니다. 절 구분 줄은 그대로 두세요. COMMON·KNOWS·SHELF·BROADCAST·HOST·VIEWERS 는 편성 요청, COMMON·KNOWS·SAY·HOST·VIEWERS 는 내 채팅 뒤 반응, KNOWS·OPERATOR* 는 전화 주문 상담원(물건 맞교환·흥정) 요청이 읽습니다. MAIN_CONTEXT 는 메인 요청에 넘기는 시청 기록의 머리말, CALL·AUDIENCE 는 그 턴에만 메인 요청에 붙는 글입니다. -->
+<!-- Hs: 망상홈쇼핑 지침. 플러그인이 요청마다 필요한 절만 골라 씁니다. 절 구분 줄은 그대로 두세요. COMMON·KNOWS·SHELF·BROADCAST·HOST·VIEWERS 는 편성 요청, COMMON·KNOWS·SAY·HOST·VIEWERS 는 내 채팅 뒤 반응, KNOWS·OPERATOR* 는 전화 주문 상담원(물건 맞교환·흥정) 요청이 읽습니다. MAIN_CONTEXT 는 메인 요청에 넘기는 시청 기록의 머리말, CALL·AUDIENCE 는 그 턴에만 메인 요청에 붙는 글, ARRIVE 는 물건을 산 턴에 한 번 메인 요청에 붙는 받는 법입니다. -->
 
 @@SECTION COMMON
 You run the live feed of 망상홈쇼핑 inside an ongoing Korean urban-horror roleplay (괴이). You are the backend for its broadcast screen, not the narrator: you decide today's program, what the host says on air, and what scrolls in the viewer chat. The channel, its host, its payment and its goods follow the reference material. Write everything in Korean unless told otherwise. Never mention the player's money or inventory (you do not know them). Do not write anything outside the required blocks.
@@ -438,4 +438,8 @@ watched by the user on the broadcast
 
 @@SECTION LOG_OPERATOR_NICK
 상담원
+@@END
+
+@@SECTION ARRIVE
+the 망상홈쇼핑 phone order reaches the protagonist this turn the way the reference material says the channel ships: an ordinary sealed courier box, often addressed to someone else; show it turning up where they are, unopened
 @@END

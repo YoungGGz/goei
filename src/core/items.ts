@@ -5,7 +5,7 @@
 // 종류 14개는 없앴다 (2026-11-07 밤 사용자). 물건마다 판정: 사용 가능 · 소모성(남은 횟수 숫자 하나, 사용마다 1 빼고 0이면 없어짐) · 장착(손·장비, 사용자 2026-11-14 무기 → 손).
 // 비소모 물건은 숫자 없이 상태만 설명 글로. 상태 4단계(멀쩡·손상·고장·파괴)는 보조 모델만 본문을 보고 바꾼다 (memory goei-equip-design).
 import type { Chat } from './types';
-import { guideTxt } from './guides';
+import { guideTxt, type GuideName } from './guides';
 import { aliveAnchors } from './wallet';
 import { messageKey } from './people/store';
 import type { PromptMessage } from './request';
@@ -820,10 +820,11 @@ export interface BlockUse {
 }
 
 /** 면대면이 아닌 곳(망상홈쇼핑·우주 쇼핑몰·포인트몰)에서 산 물건이 어떻게 손에 들어왔는지: 산 턴에 한 번, 곳마다 한 줄 (11-15 사용자: 상자가 소지품에 갑자기 생겨 본편이 씹는다).
- *  글은 지침 「메인 요청에 붙는 글」 INVENTORY.ARRIVE.<곳> 절. 절이 비었거나 없는 곳(면대면 상점)은 아무것도 안 붙인다. 우주몰 맞춤 주문 수령은 우주몰과 같다 */
+ *  글은 그 몰 지침의 ARRIVE 절(본편에 보내는 받는 법, 11-15 사용자: 소지품 지침에 넣지 말고 몰마다 자기 지침에). 절이 비었거나 몰이 아닌 곳(면대면 상점)은 아무것도 안 붙인다. 우주몰 맞춤 주문 수령은 우주몰과 같다 */
+const ARRIVE_GUIDE: Record<string, GuideName> = { hs: 'Hs', cos: 'Cos', bm: 'Bm' };
 export function arrivals(bought: Item[]): string[] {
-  const stores = [...new Set(bought.map((e) => (e.store === 'cos-order' ? 'cos' : e.store ?? '')).filter(Boolean))];
-  return stores.map((st) => guideTxt('Main', `INVENTORY.ARRIVE.${st}`).trim()).filter(Boolean);
+  const stores = [...new Set(bought.map((e) => (e.store === 'cos-order' ? 'cos' : e.store ?? '')).filter((st) => ARRIVE_GUIDE[st]))];
+  return stores.map((st) => guideTxt(ARRIVE_GUIDE[st], 'ARRIVE').trim()).filter(Boolean);
 }
 
 /** 본편에 넘기는 글. 비면 빈 문자열 (붙이지 않는다). 전부 넘김 — 자르지 않는다. 칸 수는 소지품 격자만 센다 (장착 칸에 놓인 건 빼고) */
