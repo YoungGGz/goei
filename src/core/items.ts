@@ -819,6 +819,13 @@ export interface BlockUse {
   after?: number;
 }
 
+/** 면대면이 아닌 곳(망상홈쇼핑·우주 쇼핑몰·포인트몰)에서 산 물건이 어떻게 손에 들어왔는지: 산 턴에 한 번, 곳마다 한 줄 (11-15 사용자: 상자가 소지품에 갑자기 생겨 본편이 씹는다).
+ *  글은 지침 「메인 요청에 붙는 글」 INVENTORY.ARRIVE.<곳> 절. 절이 비었거나 없는 곳(면대면 상점)은 아무것도 안 붙인다. 우주몰 맞춤 주문 수령은 우주몰과 같다 */
+export function arrivals(bought: Item[]): string[] {
+  const stores = [...new Set(bought.map((e) => (e.store === 'cos-order' ? 'cos' : e.store ?? '')).filter(Boolean))];
+  return stores.map((st) => guideTxt('Main', `INVENTORY.ARRIVE.${st}`).trim()).filter(Boolean);
+}
+
 /** 본편에 넘기는 글. 비면 빈 문자열 (붙이지 않는다). 전부 넘김 — 자르지 않는다. 칸 수는 소지품 격자만 센다 (장착 칸에 놓인 건 빼고) */
 export function itemsBlock(list: Item[], opts: { slots: number; limit: string; carry?: number; left?: (e: Item) => number | undefined; use?: BlockUse[]; bought?: string[]; events?: string[]; always?: boolean; detail?: ItemDetail; recent?: string[] }): string {
   const lines = list.map((e) => itemLine(e, opts.left?.(e), isEquipped(e, list), opts.detail));
@@ -1037,14 +1044,15 @@ export function inventoryText(chat: Chat): string {
   const use: BlockUse[] = usesToSend(chat, it, alive);
   const resumed = invJustResumed(chat);
   const soldOff = [...soldNow(it, lastBotKey(chat), currentShop(chat)?.shop, (place, plain) => soldPasses(vars, place, plain)), ...mallEvents(chat)];
+  const boughtNow = newlyBought(live, lastBotKey(chat)).filter((e) => (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store)));
   const text = itemsBlock(live, {
     slots: itemSlots(vars),
     limit: itemLimit(vars),
     carry: itemCarry(vars),
     left,
     use,
-    bought: newlyBought(live, lastBotKey(chat)).filter((e) => (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store))).map(boughtLine),
-    events: [...(resumed ? [resumedEvent()] : []), ...mergedNow(it, lastBotKey(chat)), ...movedNow(it, lastBotKey(chat)), ...droppedNow(it, lastBotKey(chat), keysAfterLastBot(chat)), ...soldOff, ...(shop ? shopEvents(chat) : [])],
+    bought: boughtNow.map(boughtLine),
+    events: [...arrivals(boughtNow), ...(resumed ? [resumedEvent()] : []), ...mergedNow(it, lastBotKey(chat)), ...movedNow(it, lastBotKey(chat)), ...droppedNow(it, lastBotKey(chat), keysAfterLastBot(chat)), ...soldOff, ...(shop ? shopEvents(chat) : [])],
     always: shop || resumed || soldOff.length > 0,
     detail: itemDetail(vars),
     recent: recentItemLog(chat, it, itemLogTurns(vars), vars),

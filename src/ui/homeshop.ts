@@ -703,7 +703,7 @@ function payInfo(part: HsPart, pay: HsPay): { title: string; short: string; sub:
 const termsCard = (t: HsTerms | null): string => (t ? `<div class="hs-terms"><small>상담원 조건</small><b>${esc(termsText(t))}</b></div>` : '');
 
 /** 전화 주문 창 (11-15 사용자: 통화 칸이 너무 작다) — 창을 높이 가득 띄우고 통화 칸이 남는 자리를 다 쓴다.
- *  PC: 얇은 결제 단추 한 줄 → [맞교환이면 내 물건 좁은 칸 | 통화 칸 + 입력칸] → 아래 한 줄 [조건 | 주문 | 끊기].
+ *  PC: 좌우로 나눔 — 왼쪽 상품·결제 방법·맞교환 물건·조건·주문, 오른쪽 상담원 통화 칸(위에서 아래까지) + 입력칸.
  *  폰: 화면 가득, 결제 칩 한 줄 → (맞교환이면 물건 가로 줄) → 통화 칸이 끝까지 → 입력칸 → 조건 · 주문 단추 */
 function callPop(ctx: ChatContext, s: HsSettings): string {
   const { show, part, ordered } = nowPart(ctx);
@@ -722,7 +722,9 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
     const ok = payOk(ctx, part, s, p);
     const i = payInfo(part, p);
     const why = ok ? i.sub : p === 'won' && part.item.price > 0 ? '가계부가 꺼져 있음' : '이 상품은 안 됨';
-    return `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}" title="${esc(why)}"${ok ? '' : ' disabled'}>${esc(mobile ? i.short : i.title)}</button>`;
+    return mobile
+      ? `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}" title="${esc(why)}"${ok ? '' : ' disabled'}>${esc(i.short)}</button>`
+      : `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}"${ok ? '' : ' disabled'}><b>${esc(i.title)}</b><small>${esc(why)}</small></button>`;
   };
   // 통화: 상담원 첫 말부터 주고받은 말. 값·출연만 고른 동안에도 상담원 인사가 여기 있다
   const said = call?.lines.length ? call.lines : show.ops?.hello ? [{ who: 'op' as const, text: show.ops.hello }] : [];
@@ -741,8 +743,10 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
     const body = `<div class="hs-pays chips">${PAYS.map(btn).join('')}</div>${pick ? `<div class="hs-offer">${pick}</div>` : ''}${log}${talkIn}`;
     return popShell(title, body, `${dealPanel ? termsCard(terms) : ''}${warn}${orderBtn}`, 'call m');
   }
-  const body = `<div class="hs-pays row">${PAYS.map(btn).join('')}</div><div class="hs-deal">${pick ? `<div class="l">${pick}</div>` : ''}<div class="r">${log}${talkIn}</div></div>`;
-  return popShell(title, body, `${warn}<div class="hs-ft">${dealPanel ? termsCard(terms) || '<div class="hs-terms none"><small>상담원 조건</small><b>아직 없음</b></div>' : '<span class="sp"></span>'}${orderBtn}<button data-action="hs-pop" data-value="">끊기</button></div>`, 'call');
+  // PC: 좌우로 나눈다 (11-15 사용자) — 왼쪽 [상품 · 결제 방법 · 맞교환 물건 · 조건 · 주문], 오른쪽 상담원 통화 칸이 위에서 아래까지
+  const side = `<div class="hs-side"><div class="sc">${head}<div class="hs-pays list">${PAYS.map(btn).join('')}</div>${pick ? `<div class="hs-offer">${pick}</div>` : ''}</div><div class="ft">${dealPanel ? termsCard(terms) || '<div class="hs-terms none"><small>상담원 조건</small><b>아직 없음</b></div>' : ''}${warn}<div class="hs-ft">${orderBtn}<button data-action="hs-pop" data-value="">끊기</button></div></div></div>`;
+  const line = `<div class="hs-line"><h5>상담원</h5>${log}${talkIn}</div>`;
+  return popShell(title, `<div class="hs-split">${side}${line}</div>`, '', 'call');
 }
 
 /** 상품 스티커: 모서리를 들추면(PC 끌기·누르기, 폰 누르기) 밑에 찍힌 원래 용도 몇 글자만 보인다 (11-15 사용자). DOM 에는 조각과 고정 무늬(■)만 — 진실 전체는 넣지 않는다 */
