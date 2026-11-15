@@ -251,6 +251,17 @@ test('넘기는 기간: 기본(0)은 다음 편성까지 계속, N턴이면 마�
   // 턴이 안 적힌 옛 기록은 세지 않고 넘긴다
   const legacy = appendLog({}, show, [host(0, '옛 줄')]);
   assert.ok(hsMainContext({ message: msgs(9), scriptstate: { ...legacy, $hs_main_turns: '1' } }, RULE, null, 0).includes('옛 줄'));
+  // 첫 메시지(앞 메시지 없는 0번 응답)만 있을 때 본 기록('t:first:0')도 그 응답 뒤의 응답 수로 센다
+  const firstMsgs = (n) => [{ role: 'char', data: 'c0', chatId: 'c0' }, ...msgs(n)];
+  const early = appendLog({}, show, [host(0, '첫 화면 줄')], 't:first:0');
+  assert.equal(readLog(early).at, 't:first:0');
+  assert.equal(hslog.hsLogAge({ message: firstMsgs(0) }, readLog(early)), 0);
+  assert.equal(hslog.hsLogAge({ message: firstMsgs(1) }, readLog(early)), 1);
+  assert.equal(hslog.hsLogAge({ message: firstMsgs(10) }, readLog(early)), 10);
+  assert.ok(hsMainContext({ message: firstMsgs(0), scriptstate: { ...early, $hs_main_turns: '1' } }, RULE, null, 0).includes('첫 화면 줄'), '본 턴');
+  assert.equal(hsMainContext({ message: firstMsgs(10), scriptstate: { ...early, $hs_main_turns: '1' } }, RULE, null, 0), '', '10턴 뒤에는 안 넘긴다');
+  // 0번 자리가 응답이 아니면(메시지가 지워져 자리가 바뀜) 세지 않고 넘긴다
+  assert.equal(hslog.hsLogAge({ message: msgs(10) }, readLog(early)), 0);
 });
 
 test('망상홈쇼핑을 꺼 두면 남아 있는 시청 기록을 메인 요청에 넘기지 않는다', () => {

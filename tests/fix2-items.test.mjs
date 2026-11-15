@@ -105,3 +105,21 @@ test('Recently: 다 쓴 것은 used up, 상점 「메인 요청에 붙이는 것
   assert.deepEqual(I.recentItemLog(chat, it, 3, {}), ['used up 붕대', 'sold 코트']);
   assert.deepEqual(I.recentItemLog(chat, it, 3, { $sh_main_sell: '0' }), ['used up 붕대']);
 });
+
+test('Recently: 망상홈쇼핑 주문 턴에 연 택배 상자는 「새로 산 것」에 없으니 도착 줄을 최근 기록에 남긴다', () => {
+  const chat = { message: [msg('user', 'u1'), msg('char', 'c1'), msg('user', 'u2'), msg('char', 'c2')] };
+  const alive = new Set(['u1', 'c1', 'u2', 'c2']);
+  // 주문(상자 도착) → 같은 턴에 열기(상자는 연 응답에 묶어 숨김, ui/homeshop.ts openBox) → 안의 물건
+  let it = I.addItem(empty, alive, { name: '택배 상자(미개봉) · 베개', from: 'store', store: 'hs', anchor: 'c2' });
+  const boxId = it.list[0].id;
+  it = I.addItemLog({ ...it, list: it.list.map((x) => (x.id === boxId ? { ...x, soldAt: 'c2' } : x)) }, { name: '택배 상자(미개봉) · 베개', item: boxId, what: 'use', by: 'manual', anchor: 'c2', note: '상자를 열었다' });
+  it = I.addItem(it, alive, { name: '베개', from: 'store', store: 'hs', anchor: 'c2' });
+  assert.deepEqual(I.newlyBought(I.liveItems(it, alive), 'c2').map((e) => e.name), ['베개']);
+  const recent = I.recentItemLog(chat, it, 3, {});
+  assert.equal(recent.length, 2);
+  assert.ok(recent.some((l) => l.includes('택배 상자') && !l.startsWith('used')), '상자 도착 줄');
+  assert.ok(!recent.some((l) => l.includes('베개') && !l.includes('택배 상자')), '안의 물건은 「새로 산 것」이 넘기므로 되풀이하지 않는다');
+  // 열지 않은 상자는 「새로 산 것」에 있으니 최근 기록에 되풀이하지 않는다
+  const closed = I.addItem(empty, alive, { name: '택배 상자(미개봉) · 베개', from: 'store', store: 'hs', anchor: 'c2' });
+  assert.deepEqual(I.recentItemLog(chat, closed, 3, {}), []);
+});

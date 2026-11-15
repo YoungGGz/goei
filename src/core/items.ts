@@ -891,6 +891,9 @@ export function recentItemLog(chat: Chat, it: Items, n: number, vars?: Record<st
   // 망상홈쇼핑 전화 주문·맞교환: 이 턴의 것은 같은 글의 「새로 산 것」(택배 상자)과 「This turn」(맞교환으로 낸 물건) 줄이 이미 넘기므로 여기서 되풀이하지 않는다
   const nowKey = lastBotKey(chat);
   const hsBarter = guideTxt('Hs', 'ORDER_BARTER_NOTE');
+  // 「새로 산 것」에 실제로 오르는 것(inventoryText 와 같은 newlyBought(liveItems)): 같은 턴에 열어 숨은 택배 상자는 거기 없으니 여기 남긴다
+  let boughtIds: Set<string> | null = null;
+  const inBought = (id: string) => (boughtIds ??= new Set(newlyBought(liveItems(it, aliveAnchors(chat)), nowKey).map((x) => x.id))).has(id);
   return it.log.filter((l) => {
     if (!l.anchor || !keys.has(l.anchor)) return false;
     // 상점 「메인 요청에 붙이는 것」을 끈 판 것·산 것은 뺀다 (soldNow·newlyBought 와 같게, 전수검사 11-13)
@@ -901,7 +904,7 @@ export function recentItemLog(chat: Chat, it: Items, n: number, vars?: Record<st
     }
     if (l.what === 'get' && l.by === 'store') {
       const e = it.list.find((x) => x.id === l.item);
-      if (e && e.store === 'hs' && e.from === 'store' && l.anchor === nowKey && e.anchor === nowKey && !e.outHow) return false;
+      if (e && e.store === 'hs' && l.anchor === nowKey && inBought(e.id)) return false;
       return !e || (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store));
     }
     return true;

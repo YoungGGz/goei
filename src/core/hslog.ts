@@ -165,10 +165,13 @@ export const hsMainOn = (vars: Vars): boolean => !!vars?.[HS_LOG_VAR] && vars?.[
 /** 기록을 마지막으로 적은 턴 뒤로 본편 응답이 몇 번 더 나왔나. 그 턴을 못 찾으면(옛 기록·지워진 메시지) 0 */
 export function hsLogAge(chat: Chat, log: Pick<HsLog, 'at'>): number {
   const m = /^t:(.+)$/.exec(log.at ?? '');
-  if (!m || m[1].startsWith('first:')) return 0;
+  if (!m) return 0;
   const list = chat.message ?? [];
-  const from = list.findIndex((x, i) => messageKey(x, i) === m[1]);
-  if (from < 0) return 0;
+  // 't:first:N' = 앞 메시지가 없는 N번 자리의 응답 (core/shop.ts turnKeyAt). 그 응답 바로 앞 자리부터 센다
+  const first = /^first:(\d+)$/.exec(m[1]);
+  if (first && list[Number(first[1])]?.role !== 'char') return 0;
+  const from = first ? Number(first[1]) - 1 : list.findIndex((x, i) => messageKey(x, i) === m[1]);
+  if (!first && from < 0) return 0;
   let bots = 0;
   for (let i = from + 1; i < list.length; i++) if (list[i].role === 'char') bots++;
   return Math.max(0, bots - 1);
