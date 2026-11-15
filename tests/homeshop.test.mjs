@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { homeshop } from '../dist-test/core.mjs';
-const { scheduleDues, newOrder, ordersVars, liveOrders, paidOf, callNow, homeshopBlock, withHomeshop, boxOrder, HS_AUD_VAR, parseShow, applyShow, readShow, showVars, emptyShow, moodMap, hsSettings, HS_KEY, HS_NUM, parseClipGroups, clipsOf, idleState, nextIdle, moodClip, cueMs, installments } = homeshop;
+const { scheduleDues, newOrder, ordersVars, liveOrders, paidOf, callNow, homeshopBlock, withHomeshop, boxOrder, HS_AUD_VAR, parseShow, applyShow, readShow, showVars, emptyShow, moodMap, hsSettings, HS_KEY, HS_NUM, parseClipGroups, clipsOf, idleState, nextIdle, moodClip, cueMs } = homeshop;
 
 const meta = JSON.parse(readFileSync(new URL('../그림/홈쇼핑/homeshop.json', import.meta.url), 'utf8'));
 const moods = moodMap(meta);
@@ -31,7 +31,9 @@ test('망상홈쇼핑: 편성 응답을 상품·큐시트·채팅으로 읽는�
   const r = parseShow(RAW, moods);
   assert.equal(r.title, '금요 심야 특집');
   assert.deepEqual(r.items.map((i) => i.name), ['행운의 무전기', '잠들지 않는 베개']);
-  assert.equal(installments(r.items[0]), 6);
+  // 값 칸의 「무이자 N회」는 출연으로 읽고 원 값은 0 (돈으로는 안 판다 — 공짜 주문이 되지 않게)
+  assert.deepEqual(r.insts, [6, 3]);
+  assert.equal(r.items[0].price, 0);
   assert.deepEqual(r.cues.map((c) => c.length), [3, 2]);
   assert.deepEqual(r.cues[0].map((c) => c.cut), ['A', 'C', 'B']);
   assert.equal(r.cues[0][1].ev, 'price');
@@ -102,7 +104,7 @@ test('망상홈쇼핑: 호출 턴은 간격 안에서 뽑고 다른 주문과 �
 
 test('망상홈쇼핑: 할부 장부는 턴 수로 납부를 세고, 호출 턴에만 본편에 한 번 넣는다', () => {
   const c2 = chatOf(2);
-  const o = { ...newOrder(c2, ITEM, { call: [3, 3] }, '', () => 0), boxId: 'box1' };
+  const o = { ...newOrder(c2, ITEM, { call: [3, 3] }, 'appear', { money: 0, items: [], appear: 3, other: '' }, () => 0), boxId: 'box1' };
   assert.equal(o.n, 3);
   assert.deepEqual(o.dues, [5, 8, 11]);
   const vars = ordersVars([o]);
@@ -129,7 +131,7 @@ test('망상홈쇼핑: 할부 장부는 턴 수로 납부를 세고, 호출 턴�
 
 test('망상홈쇼핑: 방청 신청은 바로 다음 턴에만 한 줄', () => {
   const c = chatOf(2);
-  const key = (() => { const o = newOrder(c, ITEM, { call: [3, 3] }); return o.anchor; })();
+  const key = (() => { const o = newOrder(c, ITEM, { call: [3, 3] }, 'appear', { money: 0, items: [], appear: 3, other: '' }); return o.anchor; })();
   const vars = { [HS_AUD_VAR]: JSON.stringify({ anchor: key, no: '4821', name: '나' }) };
   const next = { message: [...c.message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars };
   assert.ok(homeshopBlock(next).includes('4821'));
@@ -284,33 +286,74 @@ test('망상홈쇼핑: 큐 낱말은 영어로 주고, 영어·우리말 둘 다
   assert.deepEqual([homeshop.hsSettings({}).sayCue, homeshop.hsSettings({}).sayChat], [[1, 3], [2, 5]]);
 });
 
-test('망상홈쇼핑 편성 요청문: 「스티커 들추기」「물건 맞교환」을 꺼 두면 스티커 밑 글·맞교환 말을 청하지 않는다 (켜 두면 전과 같다)', () => {
-  const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '무이자 N회' }, prev: [] };
+test('망상홈쇼핑 편성 요청문: 누가 무엇을 아는지(KNOWS)가 들어가고, 스티커 밑 글·맞교환 말은 청하지 않는다 (11-15: 스티커는 진실 칸에서, 맞교환은 상담원 요청이 따로)', () => {
+  const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '원 값, 무이자 출연 N회' }, prev: [] };
   const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
   const fill = { cue: '6 to 10', chat: '12 to 18', cuts: '와이드, 바스트', moods: '말하기', moods_b: '-', events: '가격 공개' };
-  const sys = (extra) => core1112.programPrompt(src, core1112.shopSettings({}), { ...fill, ...extra }).find((m) => m.role === 'system').content;
-  const all = sys({});
-  assert.match(all, /<\/chat>\n<peek>\none line per item, in shelf order\n<\/peek>\n<operator>\nhello\|[^\n]+\ndone\|[^\n]+\nbarter\|[^\n]+\n<\/operator>\n<cue>:/);
-  assert.match(all, /\n<peek>: what shows under the usage sticker/);
-  const noPeek = sys({ peek_block: '', peek_rule: '' });
-  assert.doesNotMatch(noPeek, /<peek>|usage sticker when a viewer lifts/);
-  assert.match(noPeek, /<\/chat>\n<operator>\nhello\|/);
-  assert.match(noPeek, /\nbarter\|/);
-  const noBarter = sys({ barter_line: '' });
-  assert.doesNotMatch(noBarter, /barter\|/);
-  assert.match(noBarter, /\ndone\|[^\n]+\n<\/operator>/);
-  assert.match(noBarter, /<peek>\n/);
-  const none = sys({ peek_block: '', peek_rule: '', barter_line: '' });
-  assert.doesNotMatch(none, /<peek>|barter\||\{[a-z_]+\}|\n\n\n/);
-  assert.ok(none.length < all.length);
-  // 스티커 밑 글·맞교환 말이 없는 응답도 그대로 읽는다 (예전 꼴의 응답도 계속 읽는다)
-  const raw = (more) => `<title>밤 편성</title>\n<shelf>\n무전기|무이자 6회|-|기기/무전기/radio|0.3|받는다|\n</shelf>\n<cue>\n#1\nwide|talk|어서 오세요|-\n</cue>\n<chat>\n#1\nㅇㅇ|와\n</chat>\n${more}`;
-  const bare = homeshop.parseShow(raw('<operator>\nhello|네 고객님\ndone|접수했습니다\n</operator>'), new Map());
-  assert.deepEqual(bare.peeks, []);
-  assert.deepEqual(bare.ops, { hello: '네 고객님', done: '접수했습니다', barter: '' });
-  const old = homeshop.parseShow(raw('<peek>\n사실은 받는 쪽\n</peek>\n<operator>\nhello|네\ndone|접수\nbarter|물건 받았습니다\n</operator>'), new Map());
-  assert.deepEqual(old.peeks, ['사실은 받는 쪽']);
-  assert.equal(old.ops.barter, '물건 받았습니다');
+  const sys = core1112.programPrompt(src, homeshop.hsSettings({}).shop, fill).find((m) => m.role === 'system').content;
+  assert.match(sys, /Who knows what: /);
+  assert.match(sys, /<\/chat>\n<operator>\nhello\|[^\n]+\ndone\|[^\n]+\n<\/operator>\n<cue>:/);
+  assert.doesNotMatch(sys, /<peek>|barter\||\{[a-z_]+\}|\n\n\n/);
+  assert.match(sys, /이름\|값\|쓰임\|그림\|무게\|설명\|효과\|출연\|진실/);
+  assert.match(sys, /출연: how many appearances/);
+  const raw = `<title>밤 편성</title>\n<shelf>\n무전기|-|-|기기/무전기/radio|0.3|받는다||4|\n</shelf>\n<cue>\n#1\nwide|talk|어서 오세요|-\n</cue>\n<chat>\n#1\nㅇㅇ|와\n</chat>\n<operator>\nhello|네 고객님\ndone|접수했습니다\n</operator>`;
+  const r = homeshop.parseShow(raw, new Map());
+  assert.deepEqual(r.ops, { hello: '네 고객님', done: '접수했습니다' });
+  assert.equal(r.items[0].price, 0, '값 「-」= 돈으로는 안 팖, 상품은 남는다');
+  assert.deepEqual(r.insts, [4]);
+});
+
+test('망상홈쇼핑 상품 줄: 원 값·출연 칸 (둘 다 없으면 버림) · 값 글', () => {
+  const { hsLine, hsPayText } = homeshop;
+  const a = hsLine('부적|1,200,000|-|부적/부적/talisman|0.01|붉은 종이||3|');
+  assert.equal(a.item.price, 1200000);
+  assert.equal(a.inst, 3);
+  assert.equal(hsPayText({ item: a.item, inst: a.inst }), '1,200,000원 · 무이자 출연 3회');
+  const b = hsLine('부적|800000|-|부적/부적/talisman|0.01|붉은 종이||-|');
+  assert.equal(b.inst, 0);
+  assert.equal(hsPayText({ item: b.item, inst: 0 }), '800,000원');
+  assert.equal(hsLine('부적|-|-|부적/부적/talisman|0.01|붉은 종이||-|'), null);
+  assert.equal(hsLine('부적|피 한 방울|-|부적/부적/talisman|0.01|붉은 종이||-|'), null, '원이 아닌 대가 글만 있으면 버림 (그런 대가는 상담원 흥정에서)');
+});
+
+test('망상홈쇼핑 상담원: 응답의 말·조건 읽기 (내민 물건만 가져간다) · 조건 글', () => {
+  const { parseOperator, termsText } = homeshop;
+  const offered = [{ id: 'i1', name: '은 나침반' }, { id: 'i2', name: '붕대' }];
+  const r = parseOperator('<operator>\n고객님, 이건 저희가 받기 어렵네요.\n</operator>\n<terms>\nmoney|300,000\nitems|은 나침반; 없는 물건\nappear|2\nother|계약서 한 장\n</terms>', offered);
+  assert.equal(r.line, '고객님, 이건 저희가 받기 어렵네요.');
+  assert.deepEqual(r.terms, { money: 300000, items: [{ id: 'i1', name: '은 나침반' }], appear: 2, other: '계약서 한 장' });
+  assert.equal(termsText(r.terms), '300,000원 + 「은 나침반」 맞교환 + 무이자 출연 2회 + 계약서 한 장');
+  assert.equal(termsText(r.terms, false), '「은 나침반」 맞교환 + 무이자 출연 2회 + 계약서 한 장');
+  assert.equal(parseOperator('<operator>안 됩니다</operator><terms>none</terms>', offered).terms, null);
+  assert.throws(() => parseOperator('<terms>none</terms>', offered), /operator/);
+});
+
+test('망상홈쇼핑 상담원 요청문: 상담원은 사람이 아니고 후려친다 · 돈을 못 받으면 그 줄 · 내민 물건·통화가 user 칸에', () => {
+  const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '' }, prev: [] };
+  const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
+  const msgs = core1112.operatorPrompt(src, core1112.shopSettings({}), 'barter', '[내민 물건]\n붕대|소모3|-|-', true);
+  const sys = msgs.find((m) => m.role === 'system').content;
+  assert.match(sys, /not a human/);
+  assert.match(sys, /underpays/);
+  assert.match(sys, /Who knows what: /);
+  assert.match(sys, /cannot take money/);
+  assert.match(sys, /<terms>/);
+  assert.match(msgs.find((m) => m.role === 'user').content, /\[내민 물건\]\n붕대/);
+  const talk = core1112.operatorPrompt(src, core1112.shopSettings({}), 'talk', '-', false).find((m) => m.role === 'system').content;
+  assert.match(talk, /has just spoken/);
+  assert.doesNotMatch(talk, /cannot take money/);
+});
+
+test('스티커 들추기: 진실에서 몇 글자만, 같은 상품이면 늘 같은 조각 · 진실이 없거나 ?면 빈 글', () => {
+  const { peelFragment } = homeshop;
+  const t = '셋째 알 뒤 술을 마시면 잠든 몸이 살아있는 악기가 된다';
+  const f = peelFragment(t, 'ms1_0_ab', 8);
+  assert.ok(f.length > 0 && Array.from(f).length <= 8, f);
+  assert.ok(t.includes(f), '조각은 진실 원문의 일부');
+  assert.ok(f.length < t.length, '전체가 아니다');
+  assert.equal(peelFragment(t, 'ms1_0_ab', 8), f, '다시 열어도 같다');
+  assert.equal(peelFragment('?', 'x', 8), '');
+  assert.equal(peelFragment(undefined, 'x', 8), '');
 });
 
 test('망상홈쇼핑: 진실 칸(숨은 원래 용도)을 받아 상품에 둔다 · 화면용 기록에는 없다 (11-15 사용자: 쓸 때 숨은 효과가 하나도 안 들어감)', () => {

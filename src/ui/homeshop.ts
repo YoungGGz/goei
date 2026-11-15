@@ -10,14 +10,17 @@ import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
 import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
-import { broadcastMaterial, emptyShop, lastBot, programPrompt, turnKey, type ShopState } from '../core/shop';
+import { broadcastMaterial, emptyShop, lastBot, operatorPrompt, programPrompt, shopBlocked, turnKey, type ShopState } from '../core/shop';
+import { addWalletEntry, freshWalletId, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
+import { getPrefs } from '../core/settings';
+import { traitsText } from '../core/itemtraits';
 import { aliveAnchors } from '../core/wallet';
-import { addItem, addItemLog, itemId, liveItemsOf, readItems, itemsVars, removeItem, sellItem, type Item } from '../core/items';
+import { addItem, addItemLog, itemId, itemLeft, liveItemsOf, readItems, itemsVars, removeItem, sellItem, type Item } from '../core/items';
 import { userTurns } from '../core/request';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, HsError, hsNumVars, hsSettings, hsVars, installments, liveOrders, moodMap, newOrder, orderOpened, ordersVars, paidOf, parseCue, parseShow, readAudience, readOrders, readShow, showVars, turnStep, type HsCue, type HsOrder, type HsScale, type HsSettings, type HsShow } from '../core/homeshop';
+import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsSettings, hsVars, liveOrders, moodMap, newOrder, orderOpened, ordersVars, paidOf, parseCue, parseOperator, parseShow, peelFragment, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
 import { mountPlayer, playerCut, playerHold, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
@@ -44,12 +47,17 @@ interface View {
   retried: number;
   /** 떠 있는 창: 전화 주문 · 스티커 보기 · 방청 신청 */
   pop: '' | 'call' | 'peek' | 'aud';
-  /** 전화 주문: 결제 방법 · 맞교환으로 낼 물건 · 끝난 뒤 상담원 말 */
-  pay: 'inst' | 'barter';
-  barter: string;
+  /** 전화 주문: 결제 방법 · 맞교환으로 내밀 물건 · 상담원에게 할 말 · 상담원 답을 기다리는 중 · 끝난 뒤 상담원 말 */
+  pay: HsPay;
+  offer: string[];
+  opInput: string;
+  calling: boolean;
   done: string;
-  /** 스티커를 들췄나 · 방청 규칙 동의 · 방금 접수한 번호 */
+  /** 상담원과의 통화 (지금 부 상품에만. 부가 바뀌면 새로): 주고받은 말 · 상담원이 마지막으로 내놓은 조건 · 마지막으로 감정받은 물건 */
+  call: { pid: string; lines: { who: 'me' | 'op'; text: string }[]; terms: HsTerms | null; offered: string[] } | null;
+  /** 스티커를 들췄나 · 끌다 놓은 자리(그 자리부터 마저 젖힌다) · 방청 규칙 동의 · 방금 접수한 번호 */
   lifted: boolean;
+  peelFrom: number;
   agree: boolean;
   audNo: string;
   /** 채팅 칸 글 · 보내는 중 */
@@ -57,10 +65,11 @@ interface View {
   saying: boolean;
   info: string;
 }
-const fresh = (): View => ({ loading: false, notice: '', failRaw: '', page: '', retried: 0, pop: '', pay: 'inst', barter: '', done: '', lifted: false, agree: false, audNo: '', input: '', saying: false, info: '' });
+const fresh = (): View => ({ loading: false, notice: '', failRaw: '', page: '', retried: 0, pop: '', pay: 'won', offer: [], opInput: '', calling: false, done: '', call: null, lifted: false, peelFrom: 0, agree: false, audNo: '', input: '', saying: false, info: '' });
 /** 채팅 칸에 치는 글 (app.ts 가 넘긴다) */
-export function homeshopInput(text: string): void {
-  ui.input = text;
+export function homeshopInput(text: string, which = 'hs-say'): void {
+  if (which === 'hs-op') ui.opInput = text;
+  else ui.input = text;
 }
 let ui = fresh();
 let uiChat = '';
@@ -104,14 +113,8 @@ function cueWords(): Record<string, string> {
 }
 /** 편성 요청문: 방송 전용 지침(첫 절·물건 줄·방송 꼴·시청자 절·생각 단계). 상점 진열 지침은 빌리지 않는다 (11-12 사용자) */
 const range = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : guideTxt('Hs', 'COUNT_RANGE', { lo: r[0], hi: r[1] }));
-/** 편성 지침의 고를 수 있는 부분: 「스티커 들추기」를 꺼 두면 스티커 밑 한 줄을, 「물건 맞교환」을 꺼 두면 상담원의 맞교환 말을 청하지 않는다 (받아도 화면에 쓰이지 않는다) */
-export const broadcastParts = (s: Pick<HsSettings, 'peek' | 'barter'>): Record<string, string> => ({
-  peek_block: s.peek ? guideTxt('Hs', 'BROADCAST_PEEK') : '',
-  peek_rule: s.peek ? guideTxt('Hs', 'BROADCAST_PEEK_RULE') : '',
-  barter_line: s.barter ? guideTxt('Hs', 'BROADCAST_BARTER') : '',
-});
 function showPrompt(ctx: ChatContext, show: HsShow, s: HsSettings): LlmMessage[] {
-  return programPrompt(showSource(ctx, show, s), s.shop, { ...cueWords(), cue: range(s.cue), chat: range(s.chat), ...broadcastParts(s) }) as LlmMessage[];
+  return programPrompt(showSource(ctx, show, s), s.shop, { ...cueWords(), cue: range(s.cue), chat: range(s.chat) }) as LlmMessage[];
 }
 
 /** 호출 흐름 미리 계산용 (모델은 안 부름). 꺼져 있으면 null */
@@ -143,12 +146,8 @@ async function ask(ctx: ChatContext, env: HsEnv): Promise<void> {
     const show = readShow(ctx.chat.scriptstate);
     const g = genSettings(ctx.chat.scriptstate);
     const moods = moodMap(homeshopArt()?.pack ?? null);
-    const { value } = await generate(showPrompt(ctx, show, s), s.shop.model, (raw) => {
-      const r = parseShow(raw, moods);
-      // 값은 할부(「무이자 N회」)만: 원 값이 오면 그 편성을 다시 받는다 — 주문은 가계부를 건드리지 않아 공짜가 되므로 (전수검사 11-13)
-      if (r.items.some((x) => x.price > 0 && !installments(x))) throw new HsError(guideTxt('Hs', 'ERR_PRICE_WON'));
-      return r;
-    }, { retries: g.retries, retryModel: g.retryModel, concurrent: g.concurrent, state: ctx.chat.scriptstate, label: `${hsName()} 편성` });
+    // 값: 원 값(돈으로 주문)·출연 횟수(무이자 할부) 둘 다 받는다. 원 값 주문은 가계부에서 빠진다 (11-15 사용자: 결제 네 가지)
+    const { value } = await generate(showPrompt(ctx, show, s), s.shop.model, (raw) => parseShow(raw, moods), { retries: g.retries, retryModel: g.retryModel, concurrent: g.concurrent, state: ctx.chat.scriptstate, label: `${hsName()} 편성` });
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
     const key = lastBot(cur.chat)?.key ?? '';
@@ -221,35 +220,53 @@ export async function homeshopAction(action: string, value: string | undefined, 
       ui.pop = '';
       env.render();
       return true;
-    case 'hs-pop':
+    case 'hs-pop': {
       ui.pop = value === 'call' || value === 'peek' || value === 'aud' ? value : '';
-      ui.pay = 'inst';
-      ui.barter = '';
       ui.done = '';
       ui.lifted = false;
+      ui.peelFrom = 0;
       ui.agree = false;
       ui.audNo = '';
-      env.render();
-      // 전화를 걸면 상담원의 첫 말이 화면에 나온다: 시청 기록에 적는다 (설정 「스티커·상담원」을 켠 때만 메인 요청에 간다)
-      if (ui.pop === 'call') {
-        const { show, part, ordered } = nowPart(ctx);
-        if (part && !ordered && show.ops?.hello) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogOperator(), text: show.ops.hello }], show);
+      // 통화는 같은 상품이면 이어 간다 (창을 닫았다 열어도 흥정이 남는다). 상품이 바뀌었으면 새 통화
+      const { show, part, ordered } = nowPart(ctx);
+      if (ui.call && ui.call.pid !== part?.item.id) ui.call = null;
+      if (ui.pop === 'call' && part) {
+        const s = hsSettings(ctx.chat.scriptstate);
+        if (!payOk(ctx, part, s, ui.pay)) ui.pay = firstPay(ctx, part, s);
+        // 전화를 걸면 상담원의 첫 말이 화면에 나온다: 시청 기록에 적는다 (설정 「스티커·상담원」을 켠 때만 메인 요청에 간다)
+        if (!ui.call) {
+          ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello }] : [], terms: null, offered: [] };
+          if (!ordered && show.ops?.hello) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogOperator(), text: show.ops.hello }], show);
+        }
       }
+      env.render();
       return true;
+    }
     case 'hs-pay':
-      ui.pay = value === 'barter' ? 'barter' : 'inst';
+      if (value === 'won' || value === 'appear' || value === 'barter' || value === 'talk') ui.pay = value;
       env.render();
       return true;
-    case 'hs-barter':
-      ui.barter = value ?? '';
+    case 'hs-offer':
+      ui.offer = ui.offer.includes(value ?? '') ? ui.offer.filter((x) => x !== value) : [...ui.offer, value ?? ''].filter(Boolean);
       env.render();
+      return true;
+    case 'hs-appraise':
+      await operatorAsk(ctx, env, 'barter', ui.opInput.trim());
+      return true;
+    case 'hs-op':
+      await operatorAsk(ctx, env, 'talk', (value ?? ui.opInput).trim());
       return true;
     case 'hs-lift': {
+      if (ui.lifted) return true;
       ui.lifted = true;
+      // PC 에서 끌다 놓았으면 그 자리부터 마저 젖힌다 (homeshopMounted 가 끈 만큼을 넘긴다)
+      const from = Number(value);
+      ui.peelFrom = Number.isFinite(from) && from > 0 && from < 1 ? from : 0;
       env.render();
-      // 들춰 본 스티커 밑 한 줄도 시청 기록에 적는다
+      // 들춰 보인 몇 글자도 시청 기록에 적는다 (스티커 밑에 찍힌 원래 용도의 조각)
       const { show, part } = nowPart(ctx);
-      if (part?.peek && hsSettings(ctx.chat.scriptstate).peek) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogSticker(), text: part.peek }], show);
+      const frag = part && hsSettings(ctx.chat.scriptstate).peek ? peelFragment(part.item.truth, part.item.id, peelCap()) : '';
+      if (frag) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogSticker(), text: frag }], show);
       return true;
     }
     case 'hs-agree':
@@ -328,62 +345,180 @@ function nowPart(ctx: ChatContext): { show: HsShow; part: HsShow['parts'][number
   const ordered = part ? liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat)).find((o) => o.id === `ho_${part.item.id}`) ?? null : null;
   return { show, part, ordered };
 }
-/** 맞교환으로 낼 수 있는 내 물건 (택배 상자는 뺀다) */
+/** 맞교환으로 내밀 수 있는 내 물건 (택배 상자는 뺀다) */
 const barterItems = (ctx: ChatContext): Item[] => {
   const alive = aliveAnchors(ctx.chat);
   return liveItemsOf(readItems(ctx.chat.scriptstate), ctx.chat).filter((x) => !boxOrder(ctx.chat.scriptstate, x.id, alive));
 };
 
-/** 전화 주문 확정: 장부에 한 줄, 소지품에 택배 상자. 가계부는 건드리지 않는다. 맞교환이면 고른 물건만 빠지고 장부엔 안 올린다 */
-/** 지금 방송 중인 상품이 매진됐나 (재생기의 매진 딱지와 같은 값). 매진이면 주문을 받지 않는다 (11-15) */
-const soldNow = (show: HsShow): boolean => { const st = playerState(); return !!st && st.part === show.at && st.flags.sold; };
+/** 지금 방송 중인 상품이 매진됐나: 저장된 매진(out) 또는 재생기의 매진 딱지. 매진이면 주문을 받지 않는다 (11-15) */
+const soldNow = (show: HsShow): boolean => {
+  if (show.parts[show.at]?.out) return true;
+  const st = playerState();
+  return !!st && st.part === show.at && st.flags.sold;
+};
+/** 재생기가 매진을 알렸을 때: 바로 다시 그리고(주문 단추·전화 창 잠금), 그 부에 매진을 적는다 (다시 열어도 매진) */
+function soldOut(at: number): void {
+  const env = liveEnv;
+  const ctx = env?.current();
+  if (!env || !ctx) return;
+  env.render();
+  const key = readShow(ctx.chat.scriptstate).key;
+  void whenIdle().then(() => updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    const show = readShow(chat.scriptstate);
+    const part = show.parts[at];
+    if (!show.loaded || show.key !== key || !part || part.out) return null;
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...show, parts: show.parts.map((p, i) => (i === at ? { ...p, out: true as const } : p)) }) } };
+  })).then(() => env.refresh()).catch(() => undefined);
+}
 
+/** 원 값을 낼 수 있나: 가계부가 켜져 있을 때만 (상점과 같은 조건) */
+const walletOn = (ctx: ChatContext): boolean => { const b = shopBlocked(ctx.chat.scriptstate); return b !== 'wallet' && b !== 'both'; };
+const itemsOn = (ctx: ChatContext): boolean => { const b = shopBlocked(ctx.chat.scriptstate); return b !== 'items' && b !== 'both'; };
+const balance = (ctx: ChatContext): number => walletBalance(readWallet(ctx.chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT), aliveAnchors(ctx.chat));
+/** 이 상품에 이 결제 방법이 있나 (원 값 0 = 돈으로 안 팖, 출연 0 = 출연으로 안 팖, 맞교환·흥정은 설정) */
+function payOk(ctx: ChatContext, part: HsPart, s: HsSettings, pay: HsPay): boolean {
+  if (pay === 'won') return part.item.price > 0 && walletOn(ctx);
+  if (pay === 'appear') return (part.inst ?? 0) > 0;
+  if (pay === 'barter') return s.barter && itemsOn(ctx);
+  return s.talk;
+}
+const PAYS: HsPay[] = ['won', 'barter', 'talk', 'appear'];
+const firstPay = (ctx: ChatContext, part: HsPart, s: HsSettings): HsPay => PAYS.find((p) => payOk(ctx, part, s, p)) ?? 'won';
+/** 지금 결제 방법으로 주문할 조건 (원·출연은 상품 값 그대로, 맞교환·흥정은 상담원이 내놓은 조건). 없으면 null */
+function termsFor(part: HsPart, pay: HsPay): HsTerms | null {
+  if (pay === 'won') return part.item.price > 0 ? { money: part.item.price, items: [], appear: 0, other: '' } : null;
+  if (pay === 'appear') return part.inst ? { money: 0, items: [], appear: part.inst, other: '' } : null;
+  return ui.call?.pid === part.item.id ? ui.call.terms : null;
+}
+/** 조건으로 지금 주문할 수 없는 까닭 (없으면 빈 글): 잔고 · 가계부 꺼짐 · 내민 물건이 없어짐 */
+function termsBlock(ctx: ChatContext, t: HsTerms): string {
+  if (t.money > 0 && !walletOn(ctx)) return '가계부가 꺼져 있어 돈으로 낼 수 없습니다.';
+  if (t.money > 0 && balance(ctx) < t.money) return '잔고가 모자랍니다.';
+  const mine = new Set(barterItems(ctx).map((x) => x.id));
+  if (t.items.some((x) => !mine.has(x.id))) return '내민 물건 가운데 이제 없는 것이 있습니다. 다시 감정을 받으세요.';
+  return '';
+}
+
+/** 상담원에게 묻기: 맞교환 감정(내민 물건) 또는 흥정(한 말). 한 번에 1회 호출. 답과 조건은 통화에, 말은 시청 기록에 */
+async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk', said: string): Promise<void> {
+  const s = hsSettings(ctx.chat.scriptstate);
+  const { show, part, ordered } = nowPart(ctx);
+  if (!part || ordered || ui.calling || soldNow(show)) return;
+  if (mode === 'talk' && (!s.talk || !said)) return;
+  if (mode === 'barter' && (!s.barter || !ui.offer.length)) return;
+  if (!ui.call || ui.call.pid !== part.item.id) ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello }] : [], terms: null, offered: [] };
+  const call = ui.call;
+  const mine = barterItems(ctx);
+  // 내민 물건: 맞교환은 지금 고른 것, 흥정은 마지막으로 감정받은 것 (흥정 중에 다른 물건을 원하면 상담원이 내밀라고 말한다)
+  const offered = (mode === 'barter' ? ui.offer : call.offered).map((id) => mine.find((x) => x.id === id)).filter((x): x is Item => !!x);
+  const meLine = mode === 'barter' ? guideTxt('Hs', 'CALL_OFFER', { names: offered.map((x) => x.name).join(', ') }) + (said ? ` ${said}` : '') : said;
+  call.lines.push({ who: 'me', text: meLine.slice(0, 200) });
+  if (mode === 'barter') call.offered = offered.map((x) => x.id);
+  ui.opInput = '';
+  ui.calling = true;
+  env.render();
+  playerFlush();
+  try {
+    const items = readItems(ctx.chat.scriptstate);
+    const alive = aliveAnchors(ctx.chat);
+    const g = (k: string, v: Record<string, string | number> = {}) => guideTxt('Hs', k, v);
+    const offerText = offered.map((x) => {
+      const left = itemLeft(items, x, alive);
+      const state = g(x.state === 'damaged' ? 'OFFERED_DAMAGED' : x.state === 'broken' ? 'OFFERED_BROKEN' : 'OFFERED_INTACT');
+      const truth = x.truth && x.truth !== '?' ? `\n${g('OFFERED_TRUTH', { truth: x.truth })}` : '';
+      return `${g('OFFERED_LINE', { name: x.name, traits: traitsText(x) + (left !== undefined ? ` (${left})` : ''), state, desc: x.desc || '-', effect: x.effect || '-' })}${truth}`;
+    }).join('\n');
+    const src = showSource(ctx, show, s, 'talk');
+    const keep = src.talkMax === undefined ? call.lines : call.lines.slice(-Math.max(1, src.talkMax));
+    const body = [
+      g('HEAD_ON_AIR', { name: part.item.name, pay: hsPayText(part) || '-', desc: part.item.desc || '-', effect: part.item.effect || '-' }),
+      `${g('HEAD_OFFERED')}\n${offerText || '-'}`,
+      `${g('HEAD_TERMS')}\n${call.terms ? termsText(call.terms) : g('TERMS_NONE')}`,
+      `${g('HEAD_CALL')}\n${keep.map((l) => g(l.who === 'me' ? 'CALL_LINE_ME' : 'CALL_LINE_OP', { text: l.text })).join('\n')}`,
+    ].join('\n\n');
+    const gs = genSettings(ctx.chat.scriptstate);
+    const { value } = await generate(operatorPrompt(src, s.shop, mode, body, !walletOn(ctx)) as LlmMessage[], s.shop.model, (raw) => parseOperator(raw, offered.map((x) => ({ id: x.id, name: x.name }))), { retries: gs.retries, retryModel: gs.retryModel, concurrent: gs.concurrent, state: ctx.chat.scriptstate, label: `${hsName()} 상담원` });
+    // 그사이 상품이 바뀌었으면 버린다
+    if (ui.call !== call) return;
+    call.lines.push({ who: 'op', text: value.line });
+    if (call.lines.length > 40) call.lines.splice(0, call.lines.length - 40);
+    call.terms = value.terms && !walletOn(ctx) ? (value.terms.money > 0 ? null : value.terms) : value.terms;
+    const buyer = userInfo().name || guideTxt('Hs', 'SAY_ME_NICK');
+    saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: buyer, text: meLine, me: 1 }, { k: 'aside', p: show.at, who: hsLogOperator(), text: value.line }], show);
+  } catch (error) {
+    // 실패하면 내 말을 되돌린다 (다시 보낼 수 있게)
+    if (ui.call === call) {
+      call.lines.pop();
+      ui.opInput = mode === 'talk' ? said : ui.opInput;
+    }
+    ui.info = `상담원과 연결되지 않았어요. ${error instanceof Error ? error.message.split('\n')[0] : ''}`;
+  } finally {
+    ui.calling = false;
+  }
+  env.render();
+}
+
+/** 전화 주문 확정: 고른 결제 방법의 조건대로 치르고(원은 가계부, 물건은 소지품에서 빠짐, 출연은 장부), 소지품에 택배 상자 */
 async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
   const s = hsSettings(ctx.chat.scriptstate);
-  if (soldNow(readShow(ctx.chat.scriptstate))) return env.render();
-  const barterId = ui.pay === 'barter' ? ui.barter : '';
-  if (ui.pay === 'barter' && (!s.barter || !barterId)) return;
+  const pre = nowPart(ctx);
+  if (!pre.part || soldNow(pre.show) || !payOk(ctx, pre.part, s, ui.pay)) return env.render();
+  const terms = termsFor(pre.part, ui.pay);
+  if (!terms || termsBlock(ctx, terms)) return env.render();
+  const pay = ui.pay;
   let ok = false;
-  let usedBarter = false;
   // 시청 기록: 주문 전에 본 것을 먼저 적고, 주문 줄은 아래 저장에 같이 적는다
   playerFlush();
   const buyer = userInfo().name || guideTxt('Hs', 'SAY_ME_NICK');
+  const start = getPrefs().walletStart ?? WALLET_START_DEFAULT;
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
     const show = readShow(chat.scriptstate);
     const part = show.loaded ? show.parts[show.at] : null;
-    if (!part) return null;
+    if (!part || part.out || part.item.id !== pre.part!.item.id) return null;
     const alive = aliveAnchors(chat);
     if (liveOrders(chat.scriptstate, alive).some((o) => o.id === `ho_${part.item.id}`)) return null;
     let items = readItems(chat.scriptstate);
     const anchor = lastBot(chat)?.key ?? '';
-    const gave = barterId ? liveItemsOf(items, chat).find((x) => x.id === barterId) : undefined;
-    if (barterId && !gave) return null;
-    const o = newOrder(chat, part.item, s, gave?.name ?? '');
+    // 내민 물건이 그사이 없어졌으면 주문하지 않는다
+    const live = liveItemsOf(items, chat);
+    if (terms.items.some((x) => !live.some((y) => y.id === x.id))) return null;
+    let wallet: Record<string, string> = {};
+    let walletId = '';
+    if (terms.money > 0) {
+      const w0 = readWallet(chat.scriptstate, start);
+      if (walletBalance(w0, alive) < terms.money) return null;
+      walletId = freshWalletId(w0, `hs_${part.item.id}`, anchor);
+      wallet = walletVars(addWalletEntry(w0, { id: walletId, anchor, amount: -terms.money, memo: `${part.item.name} (${hsName()})`, src: 'store' }, alive));
+    }
+    const o = newOrder(chat, part.item, s, pay, terms);
     // 기록 글은 지침 「망상홈쇼핑」의 ORDER_* 절 (본편에 판 것·산 것으로 간다)
     const barterNote = guideTxt('Hs', 'ORDER_BARTER_NOTE');
-    if (gave) items = anchor ? sellItem(items, gave.id, anchor, barterNote) : removeItem(items, gave.id, 'sell', 'store', '', { note: barterNote });
+    for (const g of terms.items) items = anchor ? sellItem(items, g.id, anchor, barterNote) : removeItem(items, g.id, 'sell', 'store', '', { note: barterNote });
     // 같은 이름의 상자가 이미 있으면(같은 상품을 다시 주문) 한 줄로 합쳐져 못 열게 되므로 번호를 붙인다
     const mine = liveItemsOf(items, chat);
     let name = HS_BOX.name(part.item.name);
     for (let k = 2; k < 20 && mine.some((x) => x.id === itemId(anchor, name) || x.name === name); k++) name = `${HS_BOX.name(part.item.name).slice(0, 27)} ${k}`;
-    const how = gave ? guideTxt('Hs', 'ORDER_BARTER', { gave: gave.name }) : o.n ? guideTxt('Hs', 'ORDER_INSTALLMENT', { n: o.n }) : part.item.pay || guideTxt('Hs', 'ORDER_SPECIAL');
-    const paidWith = guideTxt('Hs', 'ORDER_PAID', { how });
-    items = addItem(items, alive, { name, desc: HS_BOX.desc, icon: HS_BOX.icon, weight: part.item.weight, from: 'store', store: 'hs', anchor, paidWith });
+    // 상자: 원 몫은 값으로(가계부와 이어짐), 나머지 대가(물건·출연·그 밖)는 결제 글로 — 돈이 두 번 적히지 않게
+    const rest = termsText(terms, false);
+    const paidWith = rest ? guideTxt('Hs', 'ORDER_PAID', { how: rest }) : hsName();
+    items = addItem(items, alive, { name, desc: HS_BOX.desc, icon: HS_BOX.icon, weight: part.item.weight, from: 'store', store: 'hs', anchor, paidWith, ...(terms.money > 0 ? { price: terms.money, walletId } : {}) });
     o.boxId = itemId(anchor, name);
     ok = true;
-    usedBarter = !!gave;
     // 시청 기록의 주문 줄 (본편 참고 기록, core/hslog.ts). 주문 id 를 달아 두어 주문이 없던 일이 되면 본편에도 안 간다
-    // 주문을 받으며 상담원이 한 말(확정·맞교환)도 같이 적는다
-    const opSaid = (gave ? show.ops?.barter : show.ops?.done) ?? '';
-    const bought = appendLog(chat.scriptstate, show, [{ k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how }), ref: o.id }, ...(opSaid ? [{ k: 'aside' as const, p: show.at, who: hsLogOperator(), text: opSaid }] : [])], turnKey(chat));
-    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o]), ...bought } };
+    // 값·출연 주문은 상담원의 확정 말도 같이 적는다 (맞교환·흥정은 통화 말이 이미 적혀 있다)
+    const opSaid = pay === 'won' || pay === 'appear' ? show.ops?.done ?? '' : '';
+    const bought = appendLog(chat.scriptstate, show, [{ k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how: o.how }), ref: o.id }, ...(opSaid ? [{ k: 'aside' as const, p: show.at, who: hsLogOperator(), text: opSaid }] : [])], turnKey(chat));
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...wallet, ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o]), ...bought } };
   });
   if (ok) {
     const ops = readShow(ctx.chat.scriptstate).ops;
-    ui.done = (usedBarter ? ops?.barter : ops?.done) || '주문이 접수되었습니다.';
+    const last = ui.call?.lines.filter((l) => l.who === 'op').pop()?.text;
+    ui.done = (pay === 'won' || pay === 'appear' ? ops?.done : last) || '주문이 접수되었습니다.';
+    ui.offer = [];
     playerSay(guideTxt('Hs', 'PLAYER_SYS_NICK'), guideTxt('Hs', 'PLAYER_SYS_ORDER'), 'sys'); // 안내 줄도 흐른 채팅으로 반응 요청에 간다 (playerRecentChat)
     playerTake(1);
-  }
+  } else ui.info = '주문이 되지 않았어요. 잔고나 내민 물건을 확인해 주세요.';
   await env.refresh();
 }
 
@@ -402,7 +537,7 @@ async function openBox(ctx: ChatContext, env: HsEnv, boxId: string): Promise<voi
       ? addItemLog({ ...items, list: items.list.map((x) => (x.id === boxId ? { ...x, soldAt: anchor } : x)) }, { name: box.name, item: boxId, ...(box.icon ? { icon: box.icon } : {}), what: 'use', by: 'manual', anchor, note: '상자를 열었다' })
       : removeItem(items, boxId, 'use', 'manual', '', { note: '상자를 열었다' });
     const it = o.item;
-    items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: 'hs', anchor, paidWith: box.paidWith ?? hsName() });
+    items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: 'hs', anchor, paidWith: box.paidWith ?? hsName(), ...(box.price !== undefined ? { price: box.price } : {}), ...(box.walletId ? { walletId: box.walletId } : {}) });
     const orders = readOrders(chat.scriptstate).map((x) => (x.id === o.id ? { ...x, openKey: anchor } : x));
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(orders) } };
   });
@@ -438,13 +573,13 @@ async function say(ctx: ChatContext, env: HsEnv, text: string): Promise<void> {
     const art = homeshopArt();
     const g = guideSections('Hs');
     const w = cueWords();
-    const system = [fillGuide(g.COMMON ?? '', {}), fillGuide(g.SAY ?? '', { say_cue: range(s.sayCue), say_chat: range(s.sayChat), cuts: w.cuts, moods: w.moods_all, events: w.say_events }), fillGuide(g.HOST ?? '', {}), fillGuide(g.VIEWERS ?? '', {}), genSettings(ctx.chat.scriptstate).language ?? ''].filter(Boolean).join('\n\n'); // 생성 언어 줄 (방송 편성과 같게, 전수검사 11-13)
+    const system = [fillGuide(g.COMMON ?? '', {}), fillGuide(g.KNOWS ?? '', {}), fillGuide(g.SAY ?? '', { say_cue: range(s.sayCue), say_chat: range(s.sayChat), cuts: w.cuts, moods: w.moods_all, events: w.say_events }), fillGuide(g.HOST ?? '', {}), fillGuide(g.VIEWERS ?? '', {}), genSettings(ctx.chat.scriptstate).language ?? ''].filter(Boolean).join('\n\n'); // 생성 언어 줄 (방송 편성과 같게, 전수검사 11-13)
     const st = playerState();
     // 요청 글은 지침 「망상홈쇼핑」의 SAY_* 절
     const recent = part.cues.slice(Math.max(0, (st?.cue ?? 0) - 3), (st?.cue ?? 0) + 1).map((c) => guideTxt('Hs', 'SAY_HOST_LINE', { text: c.text })).join('\n');
     // 방금까지 흐른 채팅 (내 줄은 playerSay 로 이미 맨 끝에 있다): 같은 닉네임·말투를 잇게
     const flowed = playerRecentChat(24).slice(0, -1).map((c) => guideTxt('Hs', 'SAY_CHAT_LINE', { nick: c.nick, text: c.text })).join('\n');
-    const now = { title: show.title, part: show.at + 1, item: part.item.name, pay: part.item.pay ?? '', desc: part.item.desc };
+    const now = { title: show.title, part: show.at + 1, item: part.item.name, pay: hsPayText(part), desc: part.item.desc };
     const user = guideTxt('Hs', 'SAY_USER', {
       material: broadcastMaterial(showSource(ctx, show, s, 'say'), s.shop),
       now: guideTxt('Hs', show.title ? 'SAY_NOW_TITLED' : 'SAY_NOW', now),
@@ -486,7 +621,8 @@ function scaleOf(s: HsSettings, phone: boolean): number {
 }
 
 const failBox = () => (ui.notice ? `<div class="hs-err" role="alert"><span>${esc(ui.notice).replace(/\n/g, '<br>')}</span>${ui.failRaw ? '<button data-action="hs-raw">받은 글 보기</button>' : ''}<button data-action="hs-refresh">다시 연결</button></div>` : '');
-const payText = (it: { pay?: string }) => { const n = installments(it); return n ? `무이자 ${n}회` : it.pay ?? ''; };
+/** 스티커 밑에 보이는 글자 수: 젖힌 모서리 크기에 맞춘다 (폰은 모서리가 조금 작다) */
+const peelCap = (): number => (isPhone() ? 7 : 8);
 
 /** 편성 카드 줄. 아직 방송 안 한 부는 가린다 (11-09 사용자: 다음 상품은 방송에서 공개) */
 function lineup(show: HsShow, s: HsSettings, col = false): string {
@@ -494,9 +630,10 @@ function lineup(show: HsShow, s: HsSettings, col = false): string {
     const past = i < show.at;
     const now = i === show.at;
     const open = past || now;
-    const state = now ? '<span class="st on">방송 중</span>' : past ? `<span class="st off">${s.lock ? '매진' : '방송 종료'}</span>` : '<span class="st">곧 방송</span>';
+    // 「매진」은 방송에서 정말 다 팔린 상품에만. 지난 부는 잠그기를 켰으면 「판매 종료」, 아니면 「방송 종료」 (11-15 사용자: 매진이 거의 모든 상품에 뜬다)
+    const state = p.out ? `<span class="st off">매진</span>` : now ? '<span class="st on">방송 중</span>' : past ? `<span class="st off">${s.lock ? '판매 종료' : '방송 종료'}</span>` : '<span class="st">곧 방송</span>';
     const pic = open ? itemPic(p.item) : '<span class="q">?</span>';
-    const body = `<span class="pic">${pic}</span><span class="tx"><small>${i + 1}부</small><b>${open ? esc(p.item.name) : '방송에서 공개'}</b>${open ? `<em>${esc(payText(p.item))}</em>` : ''}${col && past ? `<i>${esc(p.item.desc)}</i>` : ''}</span>${state}`;
+    const body = `<span class="pic">${pic}</span><span class="tx"><small>${i + 1}부</small><b>${open ? esc(p.item.name) : '방송에서 공개'}</b>${open ? `<em>${esc(hsPayText(p))}</em>` : ''}${col && past ? `<i>${esc(p.item.desc)}</i>` : ''}</span>${state}`;
     return now && col ? `<button class="hs-lc now" data-action="hs-page" data-value="">${body}</button>` : `<div class="hs-lc${now ? ' now' : past ? ' past' : ' soon'}">${body}</div>`;
   }).join('')}</div>`;
 }
@@ -509,7 +646,7 @@ function onAir(ctx: ChatContext, show: HsShow, s: HsSettings, mobile: boolean): 
   const prod = part
     ? `<div class="hs-prod"><button class="hs-icon" data-action="hs-pop" data-value="peek" aria-label="상품 스티커 보기">${itemPic(part.item)}<span class="hs-stk" aria-hidden="true"></span></button>
 <div class="tx"><small>지금 방송 중 · ${show.at + 1}부</small><b>${esc(part.item.name)}</b><p>${esc(part.item.desc)}</p></div>
-<div class="pr"><small>오늘 방송에서만</small><b>${esc(payText(part.item)) || '방송 특가'}</b></div></div>`
+<div class="pr"><small>오늘 방송에서만</small><b>${esc(hsPayText(part))}</b></div></div>`
     : `<div class="hs-prod none"><div class="tx"><b>${ended ? '오늘 방송은 끝났습니다' : '방송 준비 중입니다'}</b><p>${ended ? '새 편성은 새로 고침으로 받아요.' : '잠시만 기다려 주세요.'}</p></div></div>`;
   const sold = !!part && !ordered && soldNow(show);
   const ord = `<div class="hs-ord"><button class="call" data-action="hs-pop" data-value="call" ${part && !ordered && !sold ? '' : 'disabled'}>☎ ${ordered ? '주문 완료' : sold ? '매진' : '전화 주문'}</button><button data-action="hs-pop" data-value="peek" ${part ? '' : 'disabled'}>상품 스티커 보기</button>${s.aud ? '<button class="aud" data-action="hs-pop" data-value="aud">★ 방청 신청</button>' : ''}</div>`;
@@ -538,11 +675,11 @@ function ordersPage(ctx: ChatContext): string {
   const debtRows = debts.map((o) => {
     const paid = Math.min(o.n, paidOf(o, turn));
     const left = o.n - paid;
-    return `<li class="${left ? '' : 'done'}"><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>무이자 ${o.n}회 · 납부 ${paid}회</small></span><span class="bar"><i style="width:${Math.round((paid / o.n) * 100)}%"></i></span><span class="st${left ? ' on' : ''}">${left ? `${left}회 남음` : '완납'}</span></li>`;
+    return `<li class="${left ? '' : 'done'}"><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>무이자 출연 ${o.n}회 · 다녀옴 ${paid}회</small></span><span class="bar"><i style="width:${Math.round((paid / o.n) * 100)}%"></i></span><span class="st${left ? ' on' : ''}">${left ? `${left}회 남음` : '완납'}</span></li>`;
   }).join('');
   const shipRows = list.map((o) => {
     const opened = orderOpened(o, alive);
-    return `<li><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${o.barter ? `현물 결제 · 「${esc(o.barter)}」` : o.n ? `무이자 ${o.n}회` : esc(o.item.pay ?? '')}</small></span><span class="st${opened ? '' : ' on'}">${opened ? '수령 확인' : '배송 완료 · 미개봉'}</span></li>`;
+    return `<li><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(o.how)}</small></span><span class="st${opened ? '' : ' on'}">${opened ? '수령 확인' : '배송 완료 · 미개봉'}</span></li>`;
   }).join('');
   return `<section class="hs-sec"><h4>주문 조회</h4>${audRow}
 <h5>할부 내역</h5>${debtRows ? `<ul class="hs-ol">${debtRows}</ul>` : '<p class="hs-none">할부 내역이 없습니다.</p>'}
@@ -551,32 +688,70 @@ function ordersPage(ctx: ChatContext): string {
 
 // ── 창 (전화 주문 · 스티커 보기 · 방청 신청: 같은 틀) ──
 
-const popShell = (title: string, body: string, foot = '') =>
-  `<div class="hs-dim"><button class="hs-dimx" data-action="hs-pop" data-value="" aria-label="닫기"></button><div class="hs-pop" role="dialog" aria-label="${esc(title)}"><header><b>${esc(title)}</b><button data-action="hs-pop" data-value="" aria-label="닫기">✕</button></header><div class="pb">${body}</div>${foot ? `<footer>${foot}</footer>` : ''}</div></div>`;
+const popShell = (title: string, body: string, foot = '', cls = '') =>
+  `<div class="hs-dim"><button class="hs-dimx" data-action="hs-pop" data-value="" aria-label="닫기"></button><div class="hs-pop${cls ? ` ${cls}` : ''}" role="dialog" aria-label="${esc(title)}"><header><b>${esc(title)}</b><button data-action="hs-pop" data-value="" aria-label="닫기">✕</button></header><div class="pb">${body}</div>${foot ? `<footer>${foot}</footer>` : ''}</div></div>`;
+
+/** 결제 방법 네 가지의 이름·설명 (PC 는 가로 한 줄, 폰은 세로 목록) */
+function payInfo(part: HsPart, pay: HsPay): { title: string; sub: string } {
+  if (pay === 'won') return { title: part.item.price > 0 ? `${part.item.price.toLocaleString('en-US')}원` : '돈으로 결제', sub: '가계부에서 바로 결제' };
+  if (pay === 'appear') return { title: part.inst ? `무이자 출연 ${part.inst}회` : '출연으로 결제', sub: '지금 내는 돈 없음 · 나중에 방송 출연' };
+  if (pay === 'barter') return { title: '물건 맞교환', sub: '가진 물건을 내밀고 감정' };
+  return { title: '상담원과 흥정', sub: '조건을 말로 정하기' };
+}
+/** 상담원과 정한 조건 카드 */
+const termsCard = (t: HsTerms | null): string => (t ? `<div class="hs-terms"><small>상담원 조건</small><b>${esc(termsText(t))}</b></div>` : '');
 
 function callPop(ctx: ChatContext, s: HsSettings): string {
   const { show, part, ordered } = nowPart(ctx);
   if (!part) return '';
-  const n = installments(part.item);
-  const head = `<div class="hs-pi"><span class="pic">${itemPic(part.item)}</span><span class="tx"><b>${esc(part.item.name)}</b><small>${esc(payText(part.item))}</small></span></div>`;
+  const mobile = isPhone();
+  const head = `<div class="hs-pi"><span class="pic">${itemPic(part.item)}</span><span class="tx"><b>${esc(part.item.name)}</b><small>${esc(hsPayText(part))}</small></span></div>`;
   const op = (t: string) => (t ? `<p class="hs-op"><i>상담원</i>${esc(t)}</p>` : '');
   if (ui.done || ordered) {
     return popShell('☎ 전화 주문', `${head}${op(ui.done || '주문이 접수되었습니다.')}<p class="hs-ok">택배 상자가 소지품에 도착했습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">확인</button><button data-action="hs-page" data-value="orders">주문 조회</button>');
   }
-  const mine = ui.pay === 'barter' ? barterItems(ctx) : [];
-  const pays = `<div class="hs-pays"><button class="${ui.pay === 'inst' ? 'on' : ''}" data-action="hs-pay" data-value="inst" aria-pressed="${ui.pay === 'inst'}"><b>${n ? `무이자 할부 ${n}회` : esc(part.item.pay || '방송 특가')}</b><small>지금 내는 돈 없음</small></button>${s.barter ? `<button class="${ui.pay === 'barter' ? 'on' : ''}" data-action="hs-pay" data-value="barter" aria-pressed="${ui.pay === 'barter'}"><b>물건 맞교환</b><small>가진 물건 하나로 결제</small></button>` : ''}</div>`;
-  const pick = ui.pay === 'barter' ? (mine.length ? `<div class="hs-pick">${mine.map((x) => `<button class="${ui.barter === x.id ? 'on' : ''}" data-action="hs-barter" data-value="${esc(x.id)}" aria-pressed="${ui.barter === x.id}"><span class="pic">${itemPic(x)}</span>${esc(x.name)}</button>`).join('')}</div>` : '<p class="hs-none">맞교환할 물건이 없습니다.</p>') : '';
   if (soldNow(show)) return popShell('☎ 전화 주문', `${head}<p class="hs-none">매진되어 더 이상 주문을 받지 않습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">끊기</button>');
-  const can = ui.pay === 'inst' || !!ui.barter;
-  return popShell('☎ 전화 주문', `${head}${op(show.ops?.hello ?? '')}${pays}${pick}`, `<button class="pri" data-action="hs-order" ${can ? '' : 'disabled'}>주문 확정</button><button data-action="hs-pop" data-value="">끊기</button>`);
+  const call = ui.call?.pid === part.item.id ? ui.call : null;
+  const pay = payOk(ctx, part, s, ui.pay) ? ui.pay : firstPay(ctx, part, s);
+  const btn = (p: HsPay) => {
+    const ok = payOk(ctx, part, s, p);
+    const i = payInfo(part, p);
+    return `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}"${ok ? '' : ' disabled'}><b>${esc(i.title)}</b><small>${ok ? esc(i.sub) : p === 'won' && part.item.price > 0 ? '가계부가 꺼져 있음' : '이 상품은 안 됨'}</small></button>`;
+  };
+  // 통화 (맞교환·흥정이 같이 쓴다): 상담원 첫 말부터 주고받은 말
+  const lines = (call?.lines ?? []).map((l) => (l.who === 'op' ? op(l.text) : `<p class="hs-me">${esc(l.text)}</p>`)).join('') + (ui.calling ? '<p class="hs-op wait"><i>상담원</i>…</p>' : '');
+  const talkIn = `<div class="hs-in op"><input name="hs-op" data-input="hs-op" data-enter="hs-op" value="${esc(ui.opInput)}" maxlength="200" placeholder="${pay === 'barter' ? '한마디 덧붙이기 (없어도 됨)' : '상담원에게 할 말'}" aria-label="상담원에게 할 말"${ui.calling ? ' disabled' : ''}>${pay === 'talk' ? `<button data-action="hs-op"${ui.calling || !ui.opInput.trim() ? ' disabled' : ''}>말하기</button>` : ''}</div>`;
+  const mine = pay === 'barter' ? barterItems(ctx) : [];
+  const pick = pay === 'barter' ? (mine.length ? `<div class="hs-pick">${mine.map((x) => `<button class="${ui.offer.includes(x.id) ? 'on' : ''}" data-action="hs-offer" data-value="${esc(x.id)}" aria-pressed="${ui.offer.includes(x.id)}"><span class="pic">${itemPic(x)}</span>${esc(x.name)}</button>`).join('')}</div><button class="hs-appraise" data-action="hs-appraise"${ui.calling || !ui.offer.length ? ' disabled' : ''}>감정 받기</button>` : '<p class="hs-none">내밀 물건이 없습니다.</p>') : '';
+  const dealPanel = pay === 'barter' || pay === 'talk';
+  const panel = dealPanel
+    ? (mobile
+      ? `<div class="hs-deal">${pick}<div class="hs-callog">${lines}</div>${talkIn}</div>`
+      : `<div class="hs-deal two">${pay === 'barter' ? `<div class="l">${pick}</div>` : ''}<div class="r"><div class="hs-callog">${lines}</div>${talkIn}</div></div>`)
+    : op(call?.lines.find((l) => l.who === 'op')?.text ?? show.ops?.hello ?? '');
+  const terms = termsFor(part, pay);
+  const block = terms ? termsBlock(ctx, terms) : '';
+  const label = pay === 'won' ? `${part.item.price.toLocaleString('en-US')}원 결제` : pay === 'appear' ? `출연 ${part.inst ?? 0}회로 주문` : '이 조건으로 주문';
+  const foot = `${dealPanel ? termsCard(terms) : ''}${block ? `<p class="hs-warn">${esc(block)}</p>` : ''}<div class="hs-ft"><button class="pri" data-action="hs-order"${terms && !block && !ui.calling ? '' : ' disabled'}>${esc(label)}</button>${mobile ? '' : '<button data-action="hs-pop" data-value="">끊기</button>'}</div>`;
+  // PC: 결제 방법 네 개를 가로 한 줄, 그 아래 고른 방법의 칸. 폰: 세로 목록에서 고른 줄 바로 아래로 펼친다
+  const body = mobile
+    ? `${head}<div class="hs-pays col">${PAYS.map((p) => `${btn(p)}${p === pay ? `<div class="hs-paybody">${panel}</div>` : ''}`).join('')}</div>`
+    : `${head}<div class="hs-pays row">${PAYS.map(btn).join('')}</div>${panel}`;
+  return popShell('☎ 전화 주문', body, foot, mobile ? 'call m' : 'call');
 }
 
+/** 상품 스티커: 모서리를 들추면(PC 끌기·누르기, 폰 누르기) 밑에 찍힌 원래 용도 몇 글자만 보인다 (11-15 사용자). DOM 에는 조각과 고정 무늬(■)만 — 진실 전체는 넣지 않는다 */
 function peekPop(ctx: ChatContext, s: HsSettings): string {
   const { part } = nowPart(ctx);
   if (!part) return '';
   const it = part.item;
-  const under = part.peek && s.peek ? (ui.lifted ? `<p class="hs-under">${esc(part.peek)}</p>` : '<button class="hs-lift" data-action="hs-lift">스티커 모서리 들추기</button>') : '';
-  return popShell('상품 스티커', `<div class="hs-sticker"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}${under}</div>`);
+  const mobile = isPhone();
+  const frag = s.peek ? peelFragment(it.truth, it.id, peelCap()) : '';
+  const under = s.peek ? `<div class="hs-und" aria-hidden="true"><div class="emb"><span>■■■ ■■■■ ■■</span>${frag ? `<b>${esc(frag)}</b>` : '<b class="none">■■■■</b>'}</div></div>` : '';
+  const corner = s.peek ? `<span class="flapw" aria-hidden="true"><span class="flap"></span></span><button class="corner" data-action="hs-lift" aria-label="스티커 모서리 들추기"${ui.lifted ? ' disabled' : ''}></button>` : '';
+  const cls = `hs-sticker${ui.lifted ? ' lifted anim' : ''}`;
+  const hint = s.peek && !ui.lifted ? `<p class="hs-peelhint">${mobile ? '모서리를 <i>눌러</i> 들춰 보세요' : '모서리를 <i>잡아 끌거나 눌러</i> 들춰 보세요'}</p>` : '';
+  return popShell('상품 스티커', `<div class="${cls}" style="--from:${ui.peelFrom || 0.12}">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
 }
 
 function audPop(): string {
@@ -595,7 +770,7 @@ export function homeshopTab(ctx: ChatContext, env: HsEnv): string {
   const stt = homeshopStatus();
   const art = homeshopArt();
   const note = !s.on ? '방송 없음' : stt.failed ? '신호 없음' : !art ? stt.progress || '방송 준비 중' : ui.loading ? '방송 연결 중' : ui.notice ? '신호 없음' : show.loaded ? '' : '신호 없음';
-  setPlayerFeed({ art, show: s.on && !ui.loading ? show : { ...show, loaded: false }, s, note, scale: scaleOf(s, mobile), tel: telOf(ctx) }, { advance, redraw: () => liveEnv?.render(), log: (entries, shown) => saveLog(ctx.charIndex, ctx.chatIndex, entries, shown) });
+  setPlayerFeed({ art, show: s.on && !ui.loading ? show : { ...show, loaded: false }, s, note, scale: scaleOf(s, mobile), tel: telOf(ctx) }, { advance, redraw: () => liveEnv?.render(), log: (entries, shown) => saveLog(ctx.charIndex, ctx.chatIndex, entries, shown), soldOut });
   const pending = liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat)).length;
   const tabs: [View['page'], string][] = [['', 'ON AIR'], ['sched', '편성표'], ['orders', `주문 조회${pending ? ` ${pending}` : ''}`]];
   const menu = `<nav class="hs-menu">${tabs.map(([k, l]) => `<button class="${ui.page === k ? 'on' : ''}" data-action="hs-page" data-value="${k}" aria-pressed="${ui.page === k}">${l}</button>`).join('')}${s.aud ? '<button data-action="hs-pop" data-value="aud">방청 신청</button>' : ''}</nav>`;
@@ -610,6 +785,50 @@ export function homeshopTab(ctx: ChatContext, env: HsEnv): string {
 export function homeshopMounted(root: HTMLElement): void {
   if (root.querySelector('[data-hs-mount="stage"]')) mountPlayer(root);
   else stopPlayer();
+  // 스티커 모서리 끌기 (PC 만. 폰은 누르기만): 끄는 만큼 젖히고, 절반 넘게 끌고 놓으면 그 자리부터 마저 젖힌다(hs-lift 에 끈 만큼을 넘김). 덜 끌면 도로 붙는다
+  const corner = root.querySelector<HTMLButtonElement>('.hs .hs-sticker .corner');
+  if (corner && !isPhone() && !corner.dataset.drag) peelDrag(corner);
+}
+function peelDrag(corner: HTMLButtonElement): void {
+  corner.dataset.drag = '1';
+  const st = corner.closest<HTMLElement>('.hs-sticker');
+  if (!st) return;
+  let start: { x: number; y: number } | null = null;
+  let peel = 0;
+  let moved = false;
+  corner.addEventListener('pointerdown', (e) => {
+    if (corner.disabled) return;
+    start = { x: e.clientX, y: e.clientY };
+    peel = 0;
+    moved = false;
+    corner.setPointerCapture(e.pointerId);
+    st.classList.add('drag');
+  });
+  corner.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    // 모서리에서 왼쪽 위(대각선)로 간 거리 / 젖힐 수 있는 최대
+    const d = (start.x - e.clientX + start.y - e.clientY) / Math.SQRT2;
+    if (Math.abs(d) > 4) moved = true;
+    const max = parseFloat(getComputedStyle(st).getPropertyValue('--pmax')) || 132;
+    peel = Math.max(0.12, Math.min(1, 0.12 + d / max));
+    st.style.setProperty('--peel', String(peel));
+  });
+  const end = () => {
+    if (!start) return;
+    start = null;
+    st.classList.remove('drag');
+    if (!moved) return; // 그냥 누른 것: 아래 click 이 hs-lift 로 젖힌다
+    if (peel >= 0.5) corner.dataset.value = String(peel);
+    else {
+      st.style.removeProperty('--peel');
+      // 덜 끌었으면 이번 click 은 들추기가 아니다
+      const eat = (ev: Event) => { ev.stopPropagation(); ev.preventDefault(); };
+      corner.addEventListener('click', eat, { once: true, capture: true });
+      setTimeout(() => corner.removeEventListener('click', eat, { capture: true }), 400);
+    }
+  };
+  corner.addEventListener('pointerup', end);
+  corner.addEventListener('pointercancel', end);
 }
 
 /** 소지품 상세의 「열기」 단추: 이 물건이 안 연 택배 상자일 때만 (ui/items.ts 가 부른다) */
@@ -631,7 +850,7 @@ export function homeshopSettingsPane(ctx: ChatContext): string {
   const b = (x: boolean) => (x ? '1' : '0');
   const n = (k: string) => { const raw = vars?.[HS_NUM[k].key]; return raw === undefined || raw === '' ? HS_NUM[k].def : Number(raw); };
   const vals: Record<string, string> = {
-    net: b(s.net), retry: String(retryOf(ctx)), say: b(s.say), turn: b(s.turn), lock: b(s.lock), drop: b(s.drop.on), barter: b(s.barter), peek: b(s.peek), aud: b(s.aud),
+    net: b(s.net), retry: String(retryOf(ctx)), say: b(s.say), turn: b(s.turn), lock: b(s.lock), drop: b(s.drop.on), barter: b(s.barter), talk: b(s.talk), peek: b(s.peek), aud: b(s.aud),
     clips: s.clipsText, cut: b(s.fx.cut), bulb: b(s.fx.bulb), tear: b(s.fx.tear), scan: b(s.fx.scan), scalePc: s.scalePc, scalePh: s.scalePhone,
     ...Object.fromEntries(Object.entries(HS_DEF_TEXT).map(([k, [name]]) => [k, String(vars?.[name] ?? '')])),
   };

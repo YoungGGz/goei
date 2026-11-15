@@ -11,7 +11,7 @@ const out = await build({
       export { shopGiveOn } from './src/core/shopfn';
       export { dropDoubleSync, syncPointsToStatus, readPoints } from './src/core/points';
       export { mergeLate, lateNow, sendsOrders } from './src/ui/malls';
-      export { broadcastParts } from './src/ui/homeshop';
+      export { guideSections } from './src/core/guides';
       export { mallVarsOf, readMall, mallAtKey, mallSeenKey, mallUnseen } from './src/core/malls';
       export { aliveAnchors } from './src/core/wallet';
       export { markSold } from './src/core/shop';
@@ -127,13 +127,12 @@ test('우주 쇼핑몰: 「진행 중 맞춤 주문」 목록은 문의 요청�
   assert.equal(M.sendsOrders('bm', 'shelf'), false);
 });
 
-test('망상홈쇼핑 편성: 꺼 둔 「스티커 들추기」「물건 맞교환」은 지침에서 빠진다', () => {
-  const all = M.broadcastParts({ peek: true, barter: true });
-  assert.match(all.peek_block, /^<peek>\n[^\n]+\n<\/peek>$/);
-  assert.match(all.peek_rule, /^<peek>: /);
-  assert.match(all.barter_line, /^barter\|/);
-  assert.deepEqual(M.broadcastParts({ peek: false, barter: true }), { peek_block: '', peek_rule: '', barter_line: all.barter_line });
-  assert.deepEqual(M.broadcastParts({ peek: true, barter: false }), { peek_block: all.peek_block, peek_rule: all.peek_rule, barter_line: '' });
+test('망상홈쇼핑 지침: 스티커 밑 글·맞교환 말을 편성에서 따로 청하지 않는다 (스티커는 진실 칸에서 몇 글자, 맞교환은 상담원 요청이 판단)', () => {
+  const g = M.guideSections('Hs');
+  assert.equal(g.BROADCAST_PEEK, undefined);
+  assert.equal(g.BROADCAST_BARTER, undefined);
+  assert.doesNotMatch(g.BROADCAST, /\{peek_|\{barter_/);
+  assert.match(g.OPERATOR, /not a human/);
 });
 
 test('쇼핑몰 「매 턴」: 받아 둔 진열을 아직 안 열어 봤으면 새로 받지 않는다', () => {

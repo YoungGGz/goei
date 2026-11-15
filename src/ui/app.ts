@@ -616,7 +616,7 @@ function panelInput(el: HTMLInputElement): void {
   }
   if (el?.dataset?.input === 'items-q' && view.kind === 'started' && root) return itemsInput(root, view.ctx, el.value);
   if (el?.dataset?.input === 'shop-say') return shopInput(el.value);
-  if (el?.dataset?.input === 'hs-say') return void homeshopInput(el.value);
+  if (el?.dataset?.input === 'hs-say' || el?.dataset?.input === 'hs-op') return void homeshopInput(el.value, el.dataset.input);
   if (el?.dataset?.input === 'mall-say') { const ms = curTab().site; if (isMallSite(ms)) mallInput(ms, el.value); return; }
   if (el?.dataset?.input === 'rec-q' && view.kind === 'started') {
     // 기록 › 일지 찾기: 목록만 다시 그린다 (입력칸 포커스 유지)

@@ -7,7 +7,7 @@ const { appendLog, readLog, hsMainContext, hsMainSettings, hsMainOn, hsMainRules
 const item = (id, name, pay, desc) => ({ id, name, pay, desc, price: 0 });
 const showOf = (key, ids = ['a1', 'a2']) => ({
   loaded: true, key, title: '금요 심야 특집', at: 0, prev: [], chat: [],
-  parts: [{ item: item(ids[0], '행운의 무전기', '무이자 6회', '건전지 없이도 누군가 받습니다.'), cues: [] }, { item: item(ids[1], '잠들지 않는 베개', '무이자 3회', '아침까지 눈이 떠 있습니다.'), cues: [] }],
+  parts: [{ item: item(ids[0], '행운의 무전기', '', '건전지 없이도 누군가 받습니다.'), cues: [], inst: 6 }, { item: item(ids[1], '잠들지 않는 베개', '', '아침까지 눈이 떠 있습니다.'), cues: [], inst: 3 }],
 });
 // 진행자 줄의 닉 = 지침 「망상홈쇼핑」의 LOG_HOST_NICK 절 (적는 쪽과 가려내는 쪽이 같은 절)
 const HS_LOG_HOST = hsLogHost();
@@ -38,7 +38,7 @@ test('시청 기록: 덧붙이기 · 같은 대본 줄은 한 번만 · 본 부�
   assert.equal(log.entries.length, 2);
   assert.deepEqual(Object.keys(log.items), ['0'], '아직 안 본 2부 상품은 없다');
   assert.equal(log.items[0].name, '행운의 무전기');
-  assert.equal(log.items[0].pay, '무이자 6회');
+  assert.equal(log.items[0].pay, '무이자 출연 6회');
   // 같은 부를 다시 틀어도 대본 줄은 한 번만, 내 채팅은 같은 말이어도 다시 적는다
   vars = { ...vars, ...appendLog(vars, show, [host(0, '첫 줄'), chat(0, 'ㅇㅇ', '와'), me(0, '안녕'), me(0, '안녕')]) };
   log = readLog(vars);
@@ -104,7 +104,7 @@ test('본편 참고 기록: 머리말 + 상품(부)마다 묶은 기록', () => 
   assert.equal(j.feature, 'homeshop');
   assert.equal(j.program, '금요 심야 특집');
   assert.equal(j.records.length, 2);
-  assert.deepEqual({ part: j.records[0].part, item: j.records[0].item, payment: j.records[0].payment, description: j.records[0].description }, { part: 1, item: '행운의 무전기', payment: '무이자 6회', description: '건전지 없이도 누군가 받습니다.' });
+  assert.deepEqual({ part: j.records[0].part, item: j.records[0].item, payment: j.records[0].payment, description: j.records[0].description }, { part: 1, item: '행운의 무전기', payment: '무이자 출연 6회', description: '건전지 없이도 누군가 받습니다.' });
   assert.deepEqual(j.records[0].lines, [
     { type: 'host', text: '고객님들, 잘 오셨습니다.' },
     { type: 'viewer', nick: 'ㅇㅇ', text: '재입고 되나요' },

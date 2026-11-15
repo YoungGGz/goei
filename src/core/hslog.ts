@@ -5,7 +5,7 @@ import { tokens } from './gnet';
 import { related, type Focus } from './focus';
 import { guideTxt } from './guides';
 import { aliveAnchors } from './wallet';
-import { HS_KEY, liveOrders, type HsShow } from './homeshop';
+import { HS_KEY, hsPayText, liveOrders, type HsShow } from './homeshop';
 import { messageKey } from './people/store';
 import type { Chat } from './types';
 
@@ -85,7 +85,7 @@ const showPid = (show: Pick<HsShow, 'parts'>): string => String(show.parts[0]?.i
 export const sameProgram = (a: Pick<HsShow, 'key' | 'parts'>, b: Pick<HsShow, 'key' | 'parts'>): boolean => a.key === b.key && showPid(a) === showPid(b);
 
 /** 내 채팅·주문: 한계·상한에 걸려도 맨 나중에 버린다 */
-const mine = (e: HsLogEntry) => e.k === 'buy' || (e.k === 'say' && !!e.me);
+const mine = (e: HsLogEntry) => e.k === 'buy' || ((e.k === 'say' || e.k === 'aside') && !!e.me);
 
 /**
  * 화면에 나온 줄을 덧붙인다. 다른 편성이면 기록을 갈아 끼운다 (지금 편성 하나만).
@@ -99,7 +99,8 @@ export function appendLog(vars: Vars, show: Pick<HsShow, 'key' | 'title' | 'part
   const same = old.key === show.key && old.pid === showPid(show);
   const log: HsLog = same ? { ...old, title: clean(show.title, 60), items: { ...old.items }, entries: [...old.entries] } : { key: show.key, pid: showPid(show), title: clean(show.title, 60), items: {}, entries: [] };
   const id = (e: HsLogEntry) => `${e.k}\u0001${e.p}\u0001${e.who}\u0001${e.text}`;
-  const once = (e: HsLogEntry) => e.k === 'show' || e.k === 'chat' || e.k === 'aside';
+  // 상담원에게 한 내 말(aside + me)은 같은 말을 다시 해도 적는다
+  const once = (e: HsLogEntry) => e.k === 'show' || e.k === 'chat' || (e.k === 'aside' && !e.me);
   const seen = new Set(log.entries.filter(once).map(id));
   let changed = !same;
   for (const e of add) {
@@ -109,8 +110,8 @@ export function appendLog(vars: Vars, show: Pick<HsShow, 'key' | 'title' | 'part
     }
     log.entries.push(e);
     changed = true;
-    const it = show.parts[e.p]?.item;
-    if (it && !log.items[e.p]) log.items[e.p] = { name: clean(it.name, 60), pay: clean(it.pay || (it.price > 0 ? guideTxt('Hs', 'LOG_PAY_WON', { price: it.price.toLocaleString('en-US') }) : ''), 40), desc: clean(it.desc, 200) };
+    const part = show.parts[e.p];
+    if (part && !log.items[e.p]) log.items[e.p] = { name: clean(part.item.name, 60), pay: clean(hsPayText(part), 40), desc: clean(part.item.desc, 200) };
   }
   // 같은 줄을 다시 본 것뿐이어도 본 턴은 새로 적는다 (「넘기는 기간」이 마지막으로 본 턴부터 세게)
   if (turn && log.at !== turn) { log.at = turn; changed = true; }
@@ -187,7 +188,7 @@ function lineOf(e: HsLogEntry): Line {
   if (e.k === 'show') return { type: 'host', text: e.text };
   if (e.k === 'chat') return { type: 'viewer', nick: e.who, text: e.text };
   if (e.k === 'buy') return { type: 'user_order', text: e.text };
-  if (e.k === 'aside') return e.who === hsLogSticker() ? { type: 'under_the_usage_sticker', text: e.text } : { type: 'phone_order_operator', text: e.text };
+  if (e.k === 'aside') return e.me ? { type: 'user_to_phone_order_operator', text: e.text } : e.who === hsLogSticker() ? { type: 'under_the_usage_sticker', text: e.text } : { type: 'phone_order_operator', text: e.text };
   if (e.me) return { type: 'user_chat', nick: e.who, text: e.text };
   return e.who === hsLogHost() ? { type: 'host_reply_to_user', text: e.text } : { type: 'viewer_reply_to_user', nick: e.who, text: e.text };
 }

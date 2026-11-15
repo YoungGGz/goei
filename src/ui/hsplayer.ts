@@ -4,7 +4,7 @@
 // - 글자·숫자·띠는 그림이 아니라 HTML 로 얹는다 (도트 글꼴, 11-10 도트 시안 site_mock_dot).
 // - 화면을 다시 그려도(app render) 캔버스·채팅 줄은 같은 DOM 을 다시 꽂아 끊기지 않는다. 화면에서 빠지면(탭 닫기·창 닫기) 멈추고, 다시 꽂히면 그 자리부터.
 // - 동작 고르기·길이 계산은 core/homeshop.ts (설정 값). 여기는 시간 흐름과 그리기만.
-import { clipsOf, cueMs, dropEnd, dropRest, nextDrop, moodMap, moodName, CUE_EVENT_LABEL, hsName, idleState, installments, moodClip, nextIdle, parseClipGroups, pickVersion, type CueCut, type CutId, type HsClip, type HsCue, type HsSettings, type HsShow, type IdleState } from '../core/homeshop';
+import { clipsOf, cueMs, dropEnd, dropRest, nextDrop, moodMap, moodName, CUE_EVENT_LABEL, hsName, idleState, hsPayText, moodClip, nextIdle, parseClipGroups, pickVersion, type CueCut, type CutId, type HsClip, type HsCue, type HsSettings, type HsShow, type IdleState } from '../core/homeshop';
 import type { HsArt } from '../host/homeshop';
 import { HS_FONT } from '../host/homeshop';
 import { itemPic } from './items';
@@ -31,6 +31,8 @@ export interface PlayerHooks {
   redraw(): void;
   /** 화면에 나온 줄 묶음 (본편 참고 기록용, core/hslog.ts). 저장은 부른 쪽이. show = 그 줄이 나온 편성 */
   log?(entries: HsLogEntry[], show: HsShow): void;
+  /** 지금 부가 방송에서 매진됐다 (큐시트의 sold 줄). 저장은 부른 쪽이 (다시 열어도 매진 그대로) */
+  soldOut?(part: number): void;
 }
 
 interface Run {
@@ -93,7 +95,15 @@ const now = () => performance.now();
 const cutArt = (c: CueCut): CutId => (c === 'A' || c === 'C' ? 'A' : 'B');
 
 function freshRun(part: number): Run {
-  const left = feed?.s.left ?? 30;
+  // 이미 매진된 부(저장된 out)는 매진인 채로 시작한다
+  if (feed?.show.parts[part]?.out) {
+    const r = freshRunAt(part, 0);
+    r.flags.sold = true;
+    return r;
+  }
+  return freshRunAt(part, feed?.s.left ?? 30);
+}
+function freshRunAt(part: number, left: number): Run {
   return { part, cue: -1, cueAt: 0, cueLen: 0, cut: 'A', clip: null, frame: 0, frameAt: 0, talking: false, left, dropEnd: feed ? dropEnd(left, feed.s.drop) : 1, dropN: 0, dropWait: 0, flags: { price: false, rush: false, soon: false, sold: false, call: false, look: false }, tearUntil: 0, gapUntil: 0, chatAt: 0, chatIdx: 0, bulbStep: 0, bulbAt: 0 };
 }
 
@@ -410,6 +420,9 @@ function tick(): void {
 function applyEvent(r: Run, c: HsCue, f: PlayerFeed, t: number): void {
   r.flags.call = c.ev === 'call';
   r.flags.look = c.ev === 'look';
+  if (c.ev === 'tear' && f.s.fx.tear) r.tearUntil = t + TEAR_MS[0] + Math.random() * (TEAR_MS[1] - TEAR_MS[0]);
+  // 매진 뒤에는 수량·가격·폭주·임박이 다시 뜨지 않는다 (판매가 끝났다)
+  if (r.flags.sold) return;
   if (c.ev === 'price') r.flags.price = true;
   if (c.ev === 'rush') r.flags.rush = true;
   if (c.ev === 'soon') r.flags.soon = true;
@@ -417,10 +430,10 @@ function applyEvent(r: Run, c: HsCue, f: PlayerFeed, t: number): void {
   if (c.ev === 'sold' && !r.flags.sold) {
     r.left = 0;
     r.flags.sold = true;
-    // 매진이면 주문을 못 받는다: 주문 단추·열린 전화 창을 다시 그린다 (재생 틱 밖에서)
-    setTimeout(() => hooks.redraw(), 0);
+    // 매진이면 주문을 못 받는다: 저장하고(다시 열어도 매진), 주문 단추·열린 전화 창을 다시 그린다 (재생 틱 밖에서)
+    const part = r.part;
+    setTimeout(() => (hooks.soldOut ? hooks.soldOut(part) : hooks.redraw()), 0);
   }
-  if (c.ev === 'tear' && f.s.fx.tear) r.tearUntil = t + TEAR_MS[0] + Math.random() * (TEAR_MS[1] - TEAR_MS[0]);
 }
 
 function pushChat(nick: string, text: string, cls: string, kind?: HsLogKind): void {
@@ -575,11 +588,13 @@ function drawCg(f: PlayerFeed, r: Run, t: number): void {
   if (!part) return;
   const it = part.item;
   const cue = said && r.talking ? said : r.talking && r.cue >= 0 && r.cue < part.cues.length ? part.cues[r.cue] : null;
-  const n = installments(it);
-  const pay = it.pay || (it.price > 0 ? guideTxt('Hs', 'LOG_PAY_WON', { price: it.price.toLocaleString('en-US') }) : ''); // 값 글: 시청 기록(core/hslog.ts)과 같은 절
+  // 가격판: 원 값을 크게, 무이자 출연은 작게 (둘 중 하나만 있으면 그것을 크게). 값 글은 시청 기록과 같은 절 (core/homeshop.ts hsPayText)
+  const n = part.inst ?? 0;
+  const won = it.price > 0 ? guideTxt('Hs', 'PAY_WON', { won: it.price.toLocaleString('en-US') }) : '';
+  const pay = hsPayText(part);
   const art = cutArt(r.cut);
   const board = r.flags.price && r.cut !== 'C' && r.cut !== 'D'
-    ? `<div class="hs-board hs-b${art}">${n ? `<span><span class="sm">무이자 </span><span class="big">${n}회</span></span>` : `<span class="big">${esc(pay)}</span>`}<span class="sm">오늘 방송에서만</span></div>` : '';
+    ? `<div class="hs-board hs-b${art}">${won ? `<span class="big">${esc(won)}</span>${n ? `<span class="sm">무이자 출연 ${n}회</span>` : ''}` : `<span><span class="sm">무이자 출연 </span><span class="big">${n}회</span></span>`}<span class="sm">오늘 방송에서만</span></div>` : '';
   const tag = r.flags.sold ? '매진' : r.flags.rush ? CUE_EVENT_LABEL.rush : '';
   const key = [r.part, r.cut, r.flags.price, r.flags.soon, r.flags.sold, r.flags.rush, r.flags.call, r.left, f.tel, stage?.classList.contains('sm')].join('|');
   if (cg.dataset.h !== key) {
@@ -592,7 +607,7 @@ ${board}
 ${r.flags.call ? '<div class="hs-call">☎ 전화 연결 중</div>' : ''}
 <div class="hs-band hs-k${r.cut}${tag ? ' hs-t' : ''}">
 <div class="hs-sub"></div>
-<div class="hs-l3"><div class="nm">${tag ? `<span class="tag">${esc(tag)}</span>` : ''}<div class="n">${esc(it.name)}</div><div class="p2">${n ? `무이자 할부 <span class="p">${n}회</span>` : esc(pay)}</div></div><div class="ph"><small>☎ 전화 주문</small><b>${esc(f.tel)}</b></div></div>
+<div class="hs-l3"><div class="nm">${tag ? `<span class="tag">${esc(tag)}</span>` : ''}<div class="n">${esc(it.name)}</div><div class="p2">${esc(pay)}</div></div><div class="ph"><small>☎ 전화 주문</small><b>${esc(f.tel)}</b></div></div>
 </div>`;
   }
   const sub = cg.querySelector<HTMLElement>('.hs-sub');

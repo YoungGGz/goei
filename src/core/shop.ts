@@ -579,13 +579,13 @@ export function parseOrderLine(line: string): Omit<ShopQuote, 'id'> | null {
 }
 
 /** 물건 줄 → 칸. 글머리표·번호(「1. 」「2) 」)·마크다운 표 앞뒤 「|」를 뗀다 (전수검사 11-13) */
-function lineCells(line: string): string[] {
+export function lineCells(line: string): string[] {
   let t = line.trim().replace(/^[-*•+]\s*/, '').replace(/^\d{1,3}[.)]\s+/, '');
   if (t.startsWith('|')) t = t.slice(1).replace(/\|\s*$/, '');
   return t.split('|').map((c) => c.trim());
 }
 
-function parseLine(line: string): Omit<ShopItem, 'id'> | null {
+export function parseLine(line: string): Omit<ShopItem, 'id'> | null {
   const cells = lineCells(line);
   if (cells.length < 2) return null;
   // 따라 쓴 칸 이름 줄·표 구분선은 물건이 아니다 (전수검사 11-13)
@@ -1112,13 +1112,17 @@ export const genLanguage = (vars: Vars): string | null => genSettings(vars).lang
 /** 망상홈쇼핑 편성 (지침 「망상홈쇼핑」): 방송 첫 절 + 물건 줄 절 + 방송 절(꼴) + 시청자 절. 가게 정체·주인 첫 대사는 없다 */
 export function programPrompt(src: ShopSource, s: ShopSettings, fill: Record<string, string>): CraftMessage[] {
   const g = G('Hs');
-  // 방송 절의 고를 수 있는 부분 ({peek_block}·{peek_rule}·{barter_line}): 따로 주지 않으면 지침 절 그대로 넣는다 (전부 켬)
-  const v = { peek_block: guideTxt('Hs', 'BROADCAST_PEEK'), peek_rule: guideTxt('Hs', 'BROADCAST_PEEK_RULE'), barter_line: guideTxt('Hs', 'BROADCAST_BARTER'), ...fill, line: lineOf('Hs') };
-  // 빈 값으로 채우는 자리(꺼 둔 「스티커 들추기」「물건 맞교환」)가 한 줄을 통째로 차지하면 그 줄째 뺀다
-  let broadcast = g.BROADCAST ?? '';
-  for (const [k, val] of Object.entries(v)) if (val === '') broadcast = broadcast.replace(new RegExp(`^[ \\t]*\\{${k}\\}[ \\t]*\\r?\\n?`, 'm'), '');
-  const system = [fillGuide(g.COMMON, v), SHELF_RULES(g, s, src.st, 'Hs'), fillGuide(broadcast, v), fillGuide(g.HOST ?? '', v), fillGuide(g.VIEWERS ?? '', v), src.language ?? ''].filter(Boolean).join('\n\n');
+  const v = { ...fill, line: lineOf('Hs') };
+  // KNOWS: 누가 무엇을 아는지 (편성·채팅 반응·상담원이 같이 읽는다, 11-15 사용자)
+  const system = [fillGuide(g.COMMON, v), fillGuide(g.KNOWS ?? '', v), SHELF_RULES(g, s, src.st, 'Hs'), fillGuide(g.BROADCAST ?? '', v), fillGuide(g.HOST ?? '', v), fillGuide(g.VIEWERS ?? '', v), src.language ?? ''].filter(Boolean).join('\n\n');
   return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${guideTxt('Hs', 'TASK_PROGRAM')}` }], s, fillGuide(g.THOUGHTS_PROGRAM ?? '', v));
+}
+/** 망상홈쇼핑 전화 주문 상담원 (물건 맞교환 감정·흥정, 11-15 사용자: 상담원은 사람이 아니고 채널 몫부터 챙겨 후려친다).
+ *  system: 누가 무엇을 아는지(KNOWS) + 상담원 + 맞교환/흥정 + 출력 꼴. user: 참고 자료·맥락(편성과 같은 길) + 지금 상품 + 내민 물건 + 지금 조건 + 통화 */
+export function operatorPrompt(src: ShopSource, s: ShopSettings, mode: 'barter' | 'talk', body: string, noMoney: boolean): CraftMessage[] {
+  const g = G('Hs');
+  const system = [fillGuide(g.KNOWS ?? '', {}), [fillGuide(g.OPERATOR ?? '', {}), fillGuide(mode === 'barter' ? g.OPERATOR_BARTER ?? '' : g.OPERATOR_TALK ?? '', {}), noMoney ? fillGuide(g.OPERATOR_NO_MONEY ?? '', {}) : ''].filter(Boolean).join(' '), fillGuide(g.OPERATOR_OUTPUT ?? '', {}), src.language ?? ''].filter(Boolean).join('\n\n');
+  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${body}\n\n${guideTxt('Hs', 'TASK_OPERATOR')}` }], s, fillGuide(g.THOUGHTS_OPERATOR ?? '', {}));
 }
 /** 망상홈쇼핑 머리 (지침 「망상홈쇼핑」의 HEAD_CHANNEL · HEAD_CHANNEL_HOST 절) */
 const channelHead = (st: ShopState): string => (st.owner ? guideTxt('Hs', 'HEAD_CHANNEL_HOST', { shop: st.shop, owner: st.owner }) : guideTxt('Hs', 'HEAD_CHANNEL', { shop: st.shop }));

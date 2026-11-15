@@ -21,7 +21,7 @@ const mm = (k: string): SetCtl => pair(...HS_PAIRS[k]);
 export const HS_TEL_KEY = '$hs_tel';
 export const HS_RETRY_KEY = '$hs_retry';
 /** 켬/끔 줄 */
-export const HS_FLAG: Record<string, string> = { net: HS_KEY.net, cut: HS_KEY.cut, bulb: HS_KEY.bulb, tear: HS_KEY.tear, scan: HS_KEY.scan, turn: HS_KEY.turn, lock: HS_KEY.lock, drop: HS_KEY.drop, aud: HS_KEY.aud, peek: HS_KEY.peek, say: HS_KEY.say, barter: HS_KEY.barter };
+export const HS_FLAG: Record<string, string> = { net: HS_KEY.net, cut: HS_KEY.cut, bulb: HS_KEY.bulb, tear: HS_KEY.tear, scan: HS_KEY.scan, turn: HS_KEY.turn, lock: HS_KEY.lock, drop: HS_KEY.drop, aud: HS_KEY.aud, peek: HS_KEY.peek, say: HS_KEY.say, barter: HS_KEY.barter, talk: HS_KEY.talk };
 /** 기본값이 든 글 줄: [변수, 기본값, 글자 수 상한] (core/deftext: 기본값과 같거나 비우면 저장하지 않는다) */
 export const HS_DEF_TEXT: Record<string, [string, string, number]> = { tel: [HS_TEL_KEY, HS_TEL_DEFAULT, 20], get forms(): [string, string, number] { return [HS_KEY.forms, hsFormsDefault(), 200]; }, read: [HS_KEY.read, HS_READ_DEFAULT, 200] };
 /** 그 밖의 줄 */
@@ -63,7 +63,7 @@ export const HOMESHOP_SET: SetPage = {
         row('chatGap', '채팅 간격', num('chatGap'), '채팅 한 줄이 올라오는 평균 간격이에요(22 = 2.2초).'),
         row('next', '다음 부까지', num('next'), '큐시트가 끝난 뒤 다음 상품으로 넘어가기까지예요. 0이면 스스로 넘어가지 않아요.'),
         row('turn', '턴이 넘어가면 다음 부로', on, '켜면 턴이 한 번 진행될 때마다 편성이 한 칸 넘어가요. 놓친 상품은 편성표에서 보기만 해요.'),
-        row('lock', '지난 부 잠그기', on, '켜면 지난 부에 「매진」 딱지가 붙어요.'),
+        row('lock', '지난 부 잠그기', on, '켜면 지난 부에 「판매 종료」 딱지가 붙어요. 「매진」은 방송에서 정말 다 팔린 상품에만 붙어요.'),
       ],
     },
     {
@@ -81,16 +81,17 @@ export const HOMESHOP_SET: SetPage = {
     {
       title: '주문',
       rows: [
-        row('barter', '물건 맞교환', on, '전화 주문에서 가진 물건 하나로 결제할 수 있어요. 맞교환은 할부 장부에 오르지 않아요.'),
-        row('peek', '스티커 들추기', on, '상품 스티커 창에서 모서리를 들춰 아래 한 줄을 볼 수 있어요.'),
+        row('barter', '물건 맞교환', on, '전화 주문에서 가진 물건을 내밀면 상담원이 감정해 받거나, 거절하거나, 더 내라고 해요. 감정할 때마다 한 번 호출해요.'),
+        row('talk', '상담원과 흥정', on, '전화 주문에서 상담원에게 말로 조건을 정할 수 있어요. 한 마디마다 한 번 호출해요.'),
+        row('peek', '스티커 들추기', on, '상품 스티커 창에서 모서리를 들추면 스티커 밑에 찍힌 원래 용도가 몇 글자만 보여요.'),
       ],
     },
     {
       title: '컨텍스트 포함',
       rows: [
-        row('call', '할부 호출 간격', mm('call'), '주문한 뒤 이만큼 턴이 지날 때마다 메인 요청에 출연 호출을 한 번 넘기고 1회 납부로 쳐요. 평소에는 메인 요청에 아무것도 보내지 않아요.'),
+        row('call', '출연 호출 간격', mm('call'), '출연(무이자 할부)이 걸린 주문만, 주문한 뒤 이만큼 턴이 지날 때마다 메인 요청에 출연 호출을 한 번 넘기고 1회 다녀온 것으로 쳐요. 평소에는 메인 요청에 아무것도 보내지 않아요.'),
         row('forms', '출연 형태', { t: 'text', ph: '', get def() { return hsFormsDefault(); }, max: 200 }, '호출 때 이 가운데 하나를 골라 넘겨요. 쉼표로 나눠요. 호출 글은 지침 → 망상홈쇼핑의 CALL 절에서 고쳐요.'),
-        row('aud', '방청 신청', on, '신청하면 다음 턴 메인 요청에 한 줄만 넘겨요. 글은 지침의 AUDIENCE 절에서 고쳐요.'),
+        row('aud', '방청 신청', on, '결제와는 따로예요. 신청하면 다음 턴 메인 요청에 방송 객석으로 불려 간다는 글을 한 번 넘겨요. 글은 지침의 AUDIENCE 절에서 고쳐요.'),
       ],
     },
     {

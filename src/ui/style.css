@@ -5193,11 +5193,39 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs .hs-pi .tx small { color: var(--y); font-weight: 700; }
 .hs .hs-op { margin: 0; padding: 9px 12px; border-radius: 4px 12px 12px 12px; background: #2a171b; }
 .hs .hs-op i { display: block; font-style: normal; font-size: 11.5px; font-weight: 700; color: var(--pink); }
-.hs .hs-pays { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.hs .hs-pays button { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 8px; background: var(--card2); }
+.hs .hs-pays { display: grid; gap: 8px; }
+.hs .hs-pays.row { grid-template-columns: repeat(4, 1fr); }
+.hs .hs-pays.col { grid-template-columns: 1fr; }
+.hs .hs-pays button { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border: 2px solid var(--line); border-radius: 8px; background: var(--card2); text-align: left; }
+.hs .hs-pays.row button { padding: 9px 10px; }
 .hs .hs-pays button small { color: var(--sub); font-size: 12px; }
 .hs .hs-pays button.on { border-color: var(--y); background: #ffd4000f; }
 .hs .hs-pays button.on b { color: var(--y); }
+.hs .hs-pays button:disabled { opacity: .45; cursor: default; }
+/* 전화 주문 창: 결제 네 가지가 가로 한 줄이라 PC 는 넓게, 맞교환·흥정은 [내 물건 | 통화] 두 칸 (폰은 고른 줄 아래로 펼침) */
+.hs .hs-pop.call { width: min(640px, 100%); max-height: min(680px, 100%); }
+.hs .hs-pop.call > footer { flex-direction: column; align-items: stretch; gap: 8px; }
+.hs .hs-ft { display: flex; gap: 8px; }
+.hs .hs-paybody { padding: 2px 2px 6px; }
+.hs .hs-deal { display: flex; flex-direction: column; gap: 8px; }
+.hs .hs-deal.two { flex-direction: row; align-items: stretch; }
+.hs .hs-deal.two > .l { flex: 0 0 44%; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.hs .hs-deal.two > .r { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.hs .hs-callog { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.hs .hs-deal.two .hs-callog { flex: 1; min-height: 120px; }
+.hs .hs-me { margin: 0 0 0 auto; max-width: 85%; padding: 8px 12px; border-radius: 12px 4px 12px 12px; background: #3a2226; }
+.hs .hs-op.wait { opacity: .6; }
+.hs .hs-in.op { display: flex; gap: 6px; }
+.hs .hs-in.op input { flex: 1; min-width: 0; }
+.hs .hs-appraise { padding: 8px 0; border: 1px solid var(--y); border-radius: 6px; font-weight: 800; color: var(--y); text-align: center; }
+.hs .hs-appraise:disabled { opacity: .45; }
+.hs .hs-terms { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border: 1px dashed var(--y); border-radius: 8px; background: #ffd4000a; }
+.hs .hs-terms small { font-size: 11.5px; color: var(--sub); }
+.hs .hs-terms b { color: var(--y); }
+.hs .hs-warn { margin: 0; font-size: 12.5px; color: var(--pink); }
+.hs.hs-m .hs-pop.call { max-height: 92%; }
+.hs.hs-m .hs-pop.call .hs-pick { flex-direction: row; overflow-x: auto; max-height: none; }
+.hs.hs-m .hs-pop.call .hs-pick button { flex: none; }
 .hs .hs-pick { display: flex; flex-direction: column; gap: 4px; max-height: 190px; overflow-y: auto; }
 .hs .hs-pick button { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 2px solid transparent; border-radius: 6px; background: var(--card2); }
 .hs .hs-pick button.on { border-color: var(--y); }
@@ -5207,14 +5235,32 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs .hs-ok { margin: 0; text-align: center; font-weight: 700; color: var(--y); }
 .hs .hs-no { margin: 0; text-align: center; color: var(--sub); }
 .hs .hs-no b { display: block; font: 900 30px ui-monospace, monospace; color: #fff; letter-spacing: 3px; }
-.hs .hs-sticker { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 16px; border-radius: 4px; background: #ffe45c; color: #2a1a00; text-align: center; box-shadow: 0 4px 0 #b99a00, 0 10px 20px #0006; transform: rotate(-1.2deg); }
+/* 상품 스티커: 노란 앞면 + 모서리를 들추면 밑에 찍힌 원래 용도 몇 글자 (11-15 사용자: 정말 들추는 느낌으로). --peel 0~1 = 젖힌 정도 */
+@property --peel { syntax: '<number>'; inherits: true; initial-value: 0.12; }
+.hs .hs-sticker { position: relative; --peel: .12; --pmax: 132px; --p: calc(var(--peel) * var(--pmax)); transform: rotate(-1.2deg); filter: drop-shadow(0 4px 0 #b99a00) drop-shadow(0 10px 20px #0006); }
+.hs.hs-m .hs-sticker { --pmax: 124px; }
+.hs .hs-sticker.lifted { --peel: 1; }
+.hs .hs-sticker.anim { animation: hs-peel .45s cubic-bezier(.2,.8,.25,1.15); }
+@keyframes hs-peel { from { --peel: var(--from, .12); } to { --peel: 1; } }
+.hs .hs-sticker .face { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 16px 22px; border-radius: 4px; background: #ffe45c; color: #2a1a00; text-align: center; clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--p)), calc(100% - var(--p)) 100%, 0 100%); }
 .hs .hs-sticker .pic { width: 72px; height: 72px; background: #fff7c2; }
 .hs .hs-sticker .pic img { max-width: 64px; max-height: 64px; }
-.hs .hs-sticker b { font-size: 17px; font-weight: 900; }
-.hs .hs-sticker p { margin: 0; font-size: 13.5px; font-weight: 500; }
-.hs .hs-sticker .ef { font-weight: 800; color: #b00020; }
-.hs .hs-lift { margin-top: 6px; padding: 5px 12px; border: 1px dashed #7a6400; border-radius: 4px; font-size: 12.5px; font-weight: 700; color: #5a4a00; }
-.hs .hs-under { margin-top: 6px !important; padding: 6px 10px; border-top: 1px dashed #7a6400; font-size: 12.5px !important; color: #5a4a00; font-style: italic; }
+.hs .hs-sticker .face b { font-size: 17px; font-weight: 900; }
+.hs .hs-sticker .face p { margin: 0; font-size: 13.5px; font-weight: 500; }
+.hs .hs-sticker .face .ef { font-weight: 800; color: #b00020; }
+.hs .hs-und { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; padding: 10px 12px 9px; background: radial-gradient(120% 90% at 100% 100%, #3b1219 0, #24090e 60%, #1a0609 100%); }
+.hs .hs-und::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, #ffffff06 0 2px, transparent 2px 5px); }
+.hs .hs-und .emb { position: relative; text-align: right; font-size: 13.5px; line-height: 1.5; font-weight: 800; letter-spacing: .4px; color: #5d3a22; text-shadow: 0 1px 0 #000a, 0 -1px 0 #ffffff14; }
+.hs .hs-und .emb b { display: block; font-size: 15px; color: #e3b96b; text-shadow: 0 1px 0 #000, 0 -1px 0 #fff3, 0 0 6px #e3b96b33; white-space: nowrap; }
+.hs .hs-und .emb b.none { color: #5d3a22; text-shadow: inherit; }
+.hs .hs-sticker .flapw { position: absolute; right: 0; bottom: 0; width: var(--p); height: var(--p); pointer-events: none; filter: drop-shadow(-3px -3px 3px #0008); }
+.hs .hs-sticker .flap { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 0, 0 100%); border-top-left-radius: 6px; background: linear-gradient(315deg, #000 0 50%, #b6a75c 50%, #efe5b0 56%, #fffbe6 66%, #f4ecc2 82%, #d9cd8f 100%); }
+.hs .hs-sticker .corner { position: absolute; right: 0; bottom: 0; width: 48px; height: 48px; border-radius: 0 0 4px 0; cursor: grab; touch-action: none; }
+.hs .hs-sticker.drag .corner { cursor: grabbing; }
+.hs .hs-sticker .corner:disabled { cursor: default; }
+.hs.hs-m .hs-sticker .corner { width: 64px; height: 64px; }
+.hs .hs-peelhint { margin: 2px 0 0; text-align: center; font-size: 12px; color: var(--sub); }
+.hs .hs-peelhint i { font-style: normal; color: var(--y); }
 .hs .hs-f { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--sub); }
 .hs .hs-f input { height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: #170d10; color: var(--tx); font: inherit; font-size: 14px; }
 .hs .hs-chk { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card2); }
