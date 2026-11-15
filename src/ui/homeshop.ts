@@ -98,7 +98,9 @@ function cueWords(): Record<string, string> {
   const names = (cut: 'A' | 'B') => [...new Set((art?.pack.cuts[cut].clips ?? []).filter((c) => c.group !== 'off' && c.group !== 'base').map((c) => c.name))];
   const a = names('A');
   const b = names('B').filter((x) => !a.includes(x));
-  return { cuts: Object.values(CUE_CUT_WORD).join(', '), moods: a.join(', ') || 'talk', moods_b: b.join(', ') || '-', moods_all: [...a, ...b].join(', ') || 'talk', events: Object.values(CUE_EVENT_WORD).join(', ') };
+  // 내 채팅 반응(SAY)에는 매진을 주지 않는다: 매진은 그 상품 대본의 마지막 줄에서만 (11-15 사용자: 매진이 아무 때나 뜬다)
+  const words = Object.entries(CUE_EVENT_WORD);
+  return { cuts: Object.values(CUE_CUT_WORD).join(', '), moods: a.join(', ') || 'talk', moods_b: b.join(', ') || '-', moods_all: [...a, ...b].join(', ') || 'talk', events: words.map(([, w]) => w).join(', '), say_events: words.filter(([k]) => k !== 'sold').map(([, w]) => w).join(', ') };
 }
 /** 편성 요청문: 방송 전용 지침(첫 절·물건 줄·방송 꼴·시청자 절·생각 단계). 상점 진열 지침은 빌리지 않는다 (11-12 사용자) */
 const range = (r: [number, number]) => (r[0] === r[1] ? `${r[0]}` : guideTxt('Hs', 'COUNT_RANGE', { lo: r[0], hi: r[1] }));
@@ -333,8 +335,12 @@ const barterItems = (ctx: ChatContext): Item[] => {
 };
 
 /** 전화 주문 확정: 장부에 한 줄, 소지품에 택배 상자. 가계부는 건드리지 않는다. 맞교환이면 고른 물건만 빠지고 장부엔 안 올린다 */
+/** 지금 방송 중인 상품이 매진됐나 (재생기의 매진 딱지와 같은 값). 매진이면 주문을 받지 않는다 (11-15) */
+const soldNow = (show: HsShow): boolean => { const st = playerState(); return !!st && st.part === show.at && st.flags.sold; };
+
 async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
   const s = hsSettings(ctx.chat.scriptstate);
+  if (soldNow(readShow(ctx.chat.scriptstate))) return env.render();
   const barterId = ui.pay === 'barter' ? ui.barter : '';
   if (ui.pay === 'barter' && (!s.barter || !barterId)) return;
   let ok = false;
@@ -432,7 +438,7 @@ async function say(ctx: ChatContext, env: HsEnv, text: string): Promise<void> {
     const art = homeshopArt();
     const g = guideSections('Hs');
     const w = cueWords();
-    const system = [fillGuide(g.COMMON ?? '', {}), fillGuide(g.SAY ?? '', { say_cue: range(s.sayCue), say_chat: range(s.sayChat), cuts: w.cuts, moods: w.moods_all, events: w.events }), fillGuide(g.HOST ?? '', {}), fillGuide(g.VIEWERS ?? '', {}), genSettings(ctx.chat.scriptstate).language ?? ''].filter(Boolean).join('\n\n'); // 생성 언어 줄 (방송 편성과 같게, 전수검사 11-13)
+    const system = [fillGuide(g.COMMON ?? '', {}), fillGuide(g.SAY ?? '', { say_cue: range(s.sayCue), say_chat: range(s.sayChat), cuts: w.cuts, moods: w.moods_all, events: w.say_events }), fillGuide(g.HOST ?? '', {}), fillGuide(g.VIEWERS ?? '', {}), genSettings(ctx.chat.scriptstate).language ?? ''].filter(Boolean).join('\n\n'); // 생성 언어 줄 (방송 편성과 같게, 전수검사 11-13)
     const st = playerState();
     // 요청 글은 지침 「망상홈쇼핑」의 SAY_* 절
     const recent = part.cues.slice(Math.max(0, (st?.cue ?? 0) - 3), (st?.cue ?? 0) + 1).map((c) => guideTxt('Hs', 'SAY_HOST_LINE', { text: c.text })).join('\n');
@@ -505,7 +511,8 @@ function onAir(ctx: ChatContext, show: HsShow, s: HsSettings, mobile: boolean): 
 <div class="tx"><small>지금 방송 중 · ${show.at + 1}부</small><b>${esc(part.item.name)}</b><p>${esc(part.item.desc)}</p></div>
 <div class="pr"><small>오늘 방송에서만</small><b>${esc(payText(part.item)) || '방송 특가'}</b></div></div>`
     : `<div class="hs-prod none"><div class="tx"><b>${ended ? '오늘 방송은 끝났습니다' : '방송 준비 중입니다'}</b><p>${ended ? '새 편성은 새로 고침으로 받아요.' : '잠시만 기다려 주세요.'}</p></div></div>`;
-  const ord = `<div class="hs-ord"><button class="call" data-action="hs-pop" data-value="call" ${part && !ordered ? '' : 'disabled'}>☎ ${ordered ? '주문 완료' : '전화 주문'}</button><button data-action="hs-pop" data-value="peek" ${part ? '' : 'disabled'}>상품 스티커 보기</button>${s.aud ? '<button class="aud" data-action="hs-pop" data-value="aud">★ 방청 신청</button>' : ''}</div>`;
+  const sold = !!part && !ordered && soldNow(show);
+  const ord = `<div class="hs-ord"><button class="call" data-action="hs-pop" data-value="call" ${part && !ordered && !sold ? '' : 'disabled'}>☎ ${ordered ? '주문 완료' : sold ? '매진' : '전화 주문'}</button><button data-action="hs-pop" data-value="peek" ${part ? '' : 'disabled'}>상품 스티커 보기</button>${s.aud ? '<button class="aud" data-action="hs-pop" data-value="aud">★ 방청 신청</button>' : ''}</div>`;
   const chatIn = s.say ? `<div class="hs-in"><input name="hs-say" data-input="hs-say" data-enter="hs-say" value="${esc(ui.input)}" maxlength="80" placeholder="${ui.saying ? '보내는 중…' : '채팅 보내기'}" aria-label="채팅 보내기"${ui.saying || !part ? ' disabled' : ''}><button data-action="hs-say"${ui.saying || !part ? ' disabled' : ''}>보내기</button></div>` : '';
   const chat = `<aside class="hs-chat"><h5>실시간 채팅</h5><div class="hs-mount ch-b" data-hs-mount="chat"></div>${chatIn}</aside>`;
   const sched = show.loaded ? `<section class="hs-sec"><h4>오늘 편성<small>지난 상품은 다시 주문할 수 없습니다 · 다음 상품은 방송에서 공개</small></h4>${lineup(show, s)}</section>` : '';
@@ -559,6 +566,7 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   const mine = ui.pay === 'barter' ? barterItems(ctx) : [];
   const pays = `<div class="hs-pays"><button class="${ui.pay === 'inst' ? 'on' : ''}" data-action="hs-pay" data-value="inst" aria-pressed="${ui.pay === 'inst'}"><b>${n ? `무이자 할부 ${n}회` : esc(part.item.pay || '방송 특가')}</b><small>지금 내는 돈 없음</small></button>${s.barter ? `<button class="${ui.pay === 'barter' ? 'on' : ''}" data-action="hs-pay" data-value="barter" aria-pressed="${ui.pay === 'barter'}"><b>물건 맞교환</b><small>가진 물건 하나로 결제</small></button>` : ''}</div>`;
   const pick = ui.pay === 'barter' ? (mine.length ? `<div class="hs-pick">${mine.map((x) => `<button class="${ui.barter === x.id ? 'on' : ''}" data-action="hs-barter" data-value="${esc(x.id)}" aria-pressed="${ui.barter === x.id}"><span class="pic">${itemPic(x)}</span>${esc(x.name)}</button>`).join('')}</div>` : '<p class="hs-none">맞교환할 물건이 없습니다.</p>') : '';
+  if (soldNow(show)) return popShell('☎ 전화 주문', `${head}<p class="hs-none">매진되어 더 이상 주문을 받지 않습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">끊기</button>');
   const can = ui.pay === 'inst' || !!ui.barter;
   return popShell('☎ 전화 주문', `${head}${op(show.ops?.hello ?? '')}${pays}${pick}`, `<button class="pri" data-action="hs-order" ${can ? '' : 'disabled'}>주문 확정</button><button data-action="hs-pop" data-value="">끊기</button>`);
 }

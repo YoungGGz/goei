@@ -345,31 +345,31 @@ export interface HsShow {
 export const emptyShow = (): HsShow => ({ loaded: false, key: '', title: '', parts: [], chat: [], at: 0, prev: [] });
 
 const CUT_IN: [RegExp, CueCut][] = [[/^(a|와이드|wide|전체|스튜디오)/i, 'A'], [/^(b|바스트|bust|정면|진행자)/i, 'B'], [/^(c|상품|클로즈|close|product)/i, 'C'], [/^(d|전화|call|phone)/i, 'D']];
-function eventOf(cell: string): { ev: CueEvent; n?: number } {
-  const s = cell.replace(/\s+/g, '').toLowerCase();
+/** 화면 사건 칸 → 사건. 칸 전체가 사건 낱말(영어 낱말 또는 화면 딱지 글)과 똑같을 때만 받는다.
+ *  낱말 일부만 맞춰 「곧 매진」「매진 직전」「nearly sold out」까지 매진으로 읽던 것을 막는다 (11-15 사용자: 매진이 거의 모든 상품에 뜬다) */
+const EVENT_EXACT = new Map<string, Exclude<CueEvent, '' | 'left'>>(
+  (Object.keys(CUE_EVENT_WORD) as Exclude<CueEvent, ''>[]).filter((k): k is Exclude<CueEvent, '' | 'left'> => k !== 'left').flatMap((k) => [[CUE_EVENT_WORD[k], k], [CUE_EVENT_LABEL[k].replace(/\s+/g, ''), k]] as [string, Exclude<CueEvent, '' | 'left'>][]),
+);
+export function eventOf(cell: string): { ev: CueEvent; n?: number } {
+  const s = cell.replace(/[\s"'`「」『』\[\]()]+/g, '').toLowerCase();
   if (!s || s === '-') return { ev: '' };
-  const left = /(?:left|남은수량|수량)[-−–]?(\d+)/.exec(s);
+  const left = /^(?:left|남은수량)[-−–]?(\d+)$/.exec(s);
   if (left) return { ev: 'left', n: Math.max(1, Math.min(99, Number(left[1]))) };
-  if (/price|가격/.test(s)) return { ev: 'price' };
-  if (/rush|폭주/.test(s)) return { ev: 'rush' };
-  if (/soon|임박/.test(s)) return { ev: 'soon' };
-  if (/sold|매진|완판/.test(s)) return { ev: 'sold' };
-  if (/call|phone|전화/.test(s)) return { ev: 'call' };
-  if (/tear|찢김|신호|끊김/.test(s)) return { ev: 'tear' };
-  if (/look|stare|응시|시선|쳐다/.test(s)) return { ev: 'look' };
-  return { ev: '' };
+  return { ev: EVENT_EXACT.get(s) ?? '' };
 }
 /** 큐 한 줄 「컷|표정|대사|화면 사건」. 대사가 없으면 null */
 export function parseCue(line: string, moods: Map<string, string>): HsCue | null {
   const cells = line.split('|').map((x) => x.trim());
   if (cells.length < 3) return null;
-  const text = clean(cells[2], 160);
+  // 대사 안에 「|」가 섞이면 칸이 밀린다: 사건은 늘 맨 끝 칸, 그 사이는 모두 대사
+  const ev = cells.length >= 4 ? cells[cells.length - 1] : '';
+  const text = clean(cells.slice(2, cells.length >= 4 ? -1 : undefined).join(' '), 160);
   if (!text) return null;
   const cut = CUT_IN.find(([re]) => re.test(cells[0]))?.[1] ?? 'B';
   // 그림 묶음이 아직 안 왔으면(표정 표가 비었으면) 낱말 그대로 두고 재생 때 찾는다 (moodName)
   const word = cells[1].replace(/\s+/g, '').toLowerCase();
   const mood = moods.get(word) ?? (moods.size ? 'talk' : word || 'talk');
-  return { cut, mood, text, ...eventOf(cells[3] ?? '') };
+  return { cut, mood, text, ...eventOf(ev) };
 }
 /** 저장된 표정(동작 이름 또는 그림이 늦어 남은 낱말) → 동작 이름 */
 export const moodName = (mood: string, moods: Map<string, string>): string => moods.get(mood.replace(/\s+/g, '').toLowerCase()) ?? (moods.size ? 'talk' : mood);

@@ -414,9 +414,11 @@ function applyEvent(r: Run, c: HsCue, f: PlayerFeed, t: number): void {
   if (c.ev === 'rush') r.flags.rush = true;
   if (c.ev === 'soon') r.flags.soon = true;
   if (c.ev === 'left') r.left = Math.max(1, r.left - (c.n ?? 1));
-  if (c.ev === 'sold') {
+  if (c.ev === 'sold' && !r.flags.sold) {
     r.left = 0;
     r.flags.sold = true;
+    // 매진이면 주문을 못 받는다: 주문 단추·열린 전화 창을 다시 그린다 (재생 틱 밖에서)
+    setTimeout(() => hooks.redraw(), 0);
   }
   if (c.ev === 'tear' && f.s.fx.tear) r.tearUntil = t + TEAR_MS[0] + Math.random() * (TEAR_MS[1] - TEAR_MS[0]);
 }
@@ -445,7 +447,8 @@ export function playerTake(n: number): void {
 export const playerSay = (nick: string, text: string, cls = 'me'): void => pushChat(nick, text, cls);
 /** 내 채팅에 대한 반응: 진행자 큐 몇 줄(지금 대사 뒤에 끼움)과 다른 시청자 줄 */
 export function playerCut(cues: HsCue[], chat: { nick: string; text: string }[]): void {
-  extra.push(...cues);
+  // 반응 줄은 뒤에 대본이 얼마나 남았는지 모르고 끼어든다: 매진은 대본에서만 (11-15)
+  extra.push(...cues.map((c) => (c.ev === 'sold' ? { ...c, ev: '' as const } : c)));
   extraChat.push(...chat);
   if (!cues.length) extraChat.splice(0).forEach((c) => pushChat(c.nick, c.text, '', 'say'));
 }

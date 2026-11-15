@@ -265,6 +265,15 @@ test('망상홈쇼핑: 큐 낱말은 영어로 주고, 영어·우리말 둘 다
   assert.equal(parseCue('bust|whisper|둘|left -7', moods).mood, 'whisper');
   assert.equal(parseCue('바스트|속삭임|둘|남은 수량 -12', moods).n, 12);
   assert.equal(parseCue('상품|신남|셋|매진 임박', moods).ev, 'soon');
+  // 11-15 사용자: 매진이 거의 모든 상품에 뜬다 → 칸 전체가 사건 낱말일 때만, 낱말 일부(곧 매진·매진 직전·nearly sold out)는 사건이 아니다
+  for (const cell of ['곧 매진', '매진 직전', 'nearly sold out', 'almost sold', '매진 아님', '완판', 'sold out']) assert.equal(parseCue(`bust|talk|대사|${cell}`, moods).ev, '', cell);
+  assert.equal(parseCue('bust|talk|대사|매진', moods).ev, 'sold');
+  assert.equal(parseCue('bust|talk|대사| SOLD ', moods).ev, 'sold');
+  // 대사 안의 「|」: 사건은 맨 끝 칸, 사이는 대사로 잇는다
+  const pipe = parseCue('bust|talk|하나|둘 매진 얘기|rush', moods);
+  assert.equal(pipe.ev, 'rush');
+  assert.equal(pipe.text, '하나 둘 매진 얘기');
+  assert.equal(parseCue('bust|talk|사건 칸 없음', moods).ev, '');
   const g = core1112.guideSections('Hs');
   assert.match(g.HOST, /# Host on air/);
   assert.doesNotMatch(g.HOST, /[「」"“”]|e\.g\.|[가-힣ㄱ-ㅎ]/);
