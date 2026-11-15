@@ -312,3 +312,13 @@ test('망상홈쇼핑 편성 요청문: 「스티커 들추기」「물건 맞�
   assert.deepEqual(old.peeks, ['사실은 받는 쪽']);
   assert.equal(old.ops.barter, '물건 받았습니다');
 });
+
+test('망상홈쇼핑: 진실 칸(숨은 원래 용도)을 받아 상품에 둔다 · 화면용 기록에는 없다 (11-15 사용자: 쓸 때 숨은 효과가 하나도 안 들어감)', () => {
+  const raw = RAW.replace('누군가 받는다|\n', '누군가 받는다||받는 쪽이 대신 말을 시작한다 · 밤 열두 시 넘어 켜면\n');
+  const r = parseShow(raw, moods);
+  assert.equal(r.items[0].truth, '받는 쪽이 대신 말을 시작한다 · 밤 열두 시 넘어 켜면');
+  assert.equal(r.items[1].truth, undefined);
+  const g = core1112.guideSections('Hs');
+  assert.match(g.LINE, /\|진실$/);
+  assert.match(g.BROADCAST, /진실/);
+});

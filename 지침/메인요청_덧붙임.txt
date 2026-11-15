@@ -62,7 +62,7 @@ item tracking was switched off for a while and just came back on — this list m
 @@END
 
 @@SECTION INVENTORY.REALLY
-Really (what these actually do — decided by no one in advance, known to no one in the story; let it happen and show only what is experienced):
+Really (what these actually do beneath what the label claims; no one in the story knows it unless they have learned it. Where a line says what sets it off, it happens only then; otherwise let it happen now. Show only what is experienced):
 @@END
 
 @@SECTION INVENTORY.REALLY_UNKNOWN

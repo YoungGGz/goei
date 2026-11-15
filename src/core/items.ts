@@ -807,6 +807,8 @@ export function itemLine(e: Item, left: number | undefined, equipped: boolean, d
 }
 
 export interface BlockUse {
+  /** 쓰는 물건 줄 (있으면 숨긴 진짜 효과를 이 줄 것만 붙인다. 이름이 같은 다른 물건 것까지 가지 않게, 11-15) */
+  id?: string;
   name: string;
   n: number;
   /** 소모성이면 이번에 쓰고 난 뒤 남는 횟수 */
@@ -839,7 +841,7 @@ export function itemsBlock(list: Item[], opts: { slots: number; limit: string; c
   if (carried > opts.slots) events.push(g('INVENTORY.EVENT.OVER_LIMIT'));
   if (events.length) out.push(g('INVENTORY.THIS_TURN', { events: events.join('; ') }));
   // 숨긴 진짜 효과: 이번 턴에 쓰는 물건, 몸에 걸친 장비만 (11-09 사용자: 평소엔 광고 문구만 가고, 쓰는 순간에 「이번에 일어나는 일」로 받는다)
-  const reveal = list.filter((e) => e.truth && (use.some((u) => u.name === e.name) || isEquipped(e, list)));
+  const reveal = list.filter((e) => e.truth && (use.some((u) => (u.id ? u.id === e.id : u.name === e.name)) || isEquipped(e, list)));
   if (reveal.length) {
     // 글은 지침 「메인 요청에 붙는 글」 INVENTORY.REALLY · INVENTORY.REALLY_UNKNOWN(_LABEL) · INVENTORY.REALLY_LINE(_LABEL) 절
     out.push(g('INVENTORY.REALLY'));
@@ -1028,7 +1030,7 @@ export function inventoryText(chat: Chat): string {
   const left = (e: Item) => itemLeft(it, e, alive);
   // 상점(core/shop.ts): 켜져 있으면 물건이 없어도 블록을 보내 표식 지침을 넘기고, 이번 방문의 사건(주인과 나눈 말·쫓겨남)을 This turn 에 더한다
   const shop = shopOn(vars);
-  const use = usesToSend(chat, it, alive).map(({ id: _id, ...u }): BlockUse => u);
+  const use: BlockUse[] = usesToSend(chat, it, alive);
   const resumed = invJustResumed(chat);
   const soldOff = [...soldNow(it, lastBotKey(chat), currentShop(chat)?.shop, (place, plain) => soldPasses(vars, place, plain)), ...mallEvents(chat)];
   const text = itemsBlock(live, {
