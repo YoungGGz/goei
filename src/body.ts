@@ -988,14 +988,14 @@ function startWatcher(fab: Fab | null): () => void {
       // 접속 효과는 버튼 자리에서 버튼이 나타나며 (v0.16.22)
       if (next.changed) await fab?.setVisible(next.fabVisible, next.intro);
       // 호출 진행 창 (11-09): 유령 단추와 같은 화면에서만, 설정 「화면 → 호출 진행 창」이 켜져 있을 때
-      // 상황판이 떠 있어도 그 위에 보인다 (11-11 사용자: 보조 기능은 대부분 상황판을 연 채로 쓰니 숨기면 의미가 없다). 닫기 X 를 덮지 않게 기본 자리를 내렸고 단추를 끌어 옮길 수 있다 (host/progwin.ts)
+      // PC 는 상황판이 떠 있어도 그 위에 보인다 (11-11 사용자: 보조 기능은 대부분 상황판을 연 채로 쓰니 숨기면 의미가 없다). 닫기 X 를 덮지 않게 기본 자리를 내렸고 단추를 끌어 옮길 수 있다 (host/progwin.ts)
       // 상황판이 떠 있는 동안에는 유령 단추 판정(fabVisible)이 꺼져 있어도 보이게 한다
       const pShow = (next.fabVisible || appShown()) && progressOn();
       const pKey = `${pShow}`;
       if (prog && pKey !== progKey) { progKey = pKey; await prog.setVisible(pShow).catch(() => {}); }
       // 떠 있으면 매 초 폭(폰·PC 모양)·자리를 다시 맞춘다 (릴리스 점검 11-09: 창 크기를 바꿔도 그대로였다)
       else if (prog && pShow) await prog.setVisible(true).catch(() => {});
-      // 상황판이 떠 있으면 PC 카드를 저절로 펴지 않고, 폰 막대는 주소줄 아래로 (닫기 X·탭 수 단추를 가리지 않게, 전수검사 11-13)
+      // 상황판이 떠 있으면 PC 카드를 저절로 펴지 않고(닫기 X 를 가리지 않게, 전수검사 11-13), 폰 막대는 숨긴다 (11-15 사용자)
       if (prog) await prog.setPanel(appShown()).catch(() => {});
       // 턴에 채팅을 붙이고, 채팅을 옮겼으면 앞 채팅의 턴을 치우고, 본편을 너무 오래 기다리면 실패로 닫는다
       progressWatch(`${snap.charIndex}:${snap.chatIndex}`);
