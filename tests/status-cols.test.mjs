@@ -103,6 +103,26 @@ test('직전 상태 블록: 모양이 주어지면 그 칸 구성과 칸 이름�
   assert.ok(block.includes('Fields: 날짜 | 시각 | 위치 | 신분 | 잔고'));
 });
 
+test('직전 상태 블록: 같은 요청의 상태창 지침에 같은 칸 순서 규칙이 있으면 「Fields:」 줄을 또 넣지 않는다', () => {
+  setStatusColumns({});
+  const cols = ['date', 'time', 'place', 'identity', 'wallet'];
+  const tail = [{ role: 'assistant', content: '글\n[▣|2025.01.01|02:47 AM|☀️|4°C|서울 종로구 거리|없음|없음|없음]' }, { role: 'user', content: '입력' }];
+  const blockOf = (head) => withStatusBlock([...head, ...tail], '관리국/신입', { cols, wallet: 300000 }).find((m) => m.content.startsWith(STATUS_HEAD)).content;
+  const same = blockOf([{ role: 'system', content: `앞글\n${statusSection(cols)}\n뒷글` }]);
+  assert.ok(same.includes('[▣|2025.01.01|02:47 AM|서울 종로구 거리|관리국/신입|300000]'));
+  assert.ok(!same.includes('Fields:'), same);
+  assert.ok(same.includes('output exactly one new [▣] line'), '이어 쓰기 안내는 그대로');
+  // 다른 칸 구성의 지침이면 블록이 칸 이름을 알려 준다
+  assert.ok(blockOf([{ role: 'system', content: statusSection(['date', 'time', 'place']) }]).includes('Fields: 날짜 | 시각 | 위치 | 신분 | 잔고'));
+  // 첫 턴 블록도 같다
+  const first = (head) => withStatusBlock([...head, { role: 'user', content: '입력' }], '', { cols, wallet: 1000 }).find((m) => m.content.startsWith(STATUS_HEAD)).content;
+  assert.ok(first([]).includes('Fields: '));
+  assert.ok(!first([{ role: 'system', content: statusSection(cols) }]).includes('Fields: '));
+  // 지침 절은 이어 쓰기 안내를 블록에 맡긴다 (같은 말을 두 번 하지 않는다)
+  assert.ok(!statusSection(cols).includes('advance the time'));
+  assert.ok(statusSection(cols).includes('follow the note in that block'));
+});
+
 // 11-08 전수점검: 기본값과 다른 구성으로 시작한 채팅에서 처음 바꿀 때 옛 구성을 0번부터로 남긴다. 기록 변수는 설정 변수가 아니다
 test('구성 기록: 비어 있으면 바뀌기 전 구성을 먼저 남김, $st_col_log 는 설정 변수 아님', async () => {
   const { settings } = await import('../dist-test/core.mjs');

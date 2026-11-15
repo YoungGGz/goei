@@ -306,7 +306,7 @@ async function ask(d: ConsultDeps, ctx: ChatContext): Promise<void> {
     };
     const call = async (wantNow: string[]): Promise<ConsultReply> => {
       fit(wantNow);
-      return (await generate(consultPrompt(src(openMenus(menus, wantNow, base, budget))), modelOf(), parseConsult, { retries: gen.retries, retryModel: gen.retryModel, label: 'AI 상담' })).value;
+      return (await generate(consultPrompt(src(openMenus(menus, wantNow, base, budget))), modelOf(), parseConsult, { retries: gen.retries, retryModel: gen.retryModel, transientRetries: gen.transientRetries, label: 'AI 상담' })).value;
     };
     let value = await call(want);
     // <open>: 모델이 메뉴를 더 달라고 하면 그 메뉴를 더해 한 번만 다시 묻는다 (그 답은 화면에 내지 않는다). 없는 메뉴 이름은 버린다

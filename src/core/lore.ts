@@ -601,10 +601,12 @@ export const sameVars = (ss: Record<string, unknown> | undefined, vars: Record<s
   Object.entries(vars).every(([k, v]) => String(ss?.[k] ?? '') === v);
 
 /** 카드 로어북 설정(검색 깊이·토큰 예산)으로 고르기 설정. 예산은 늘 켜진 다른 로어북 몫을 뺀 나머지 (Risu가 자리 항목을 통째로 빼지 않게) */
-export function loreOptions(char: { name?: string; globalLore?: LoreEntry[]; loreSettings?: unknown }, chat: Chat, mode: LoreMode, user = ''): LoreOptions & { mode: LoreMode } {
+export function loreOptions(char: { name?: string; globalLore?: LoreEntry[]; loreSettings?: unknown }, chat: Chat, mode: LoreMode, user = '', over?: { depth?: number; budget?: number }): LoreOptions & { mode: LoreMode } {
   const ls = (char.loreSettings ?? {}) as { scanDepth?: unknown; tokenBudget?: unknown };
-  const depth = Number(ls.scanDepth) > 0 ? Number(ls.scanDepth) : DEFAULT_DEPTH;
-  const total = Number(ls.tokenBudget) > 0 ? Number(ls.tokenBudget) : DEFAULT_BUDGET;
+  // over: 플러그인 설정 「검색 깊이」·「로어북 토큰 예산」 (core/advanced.ts loreLimits). 플러그인이 고를 때만 쓰고, 0·없음이면 카드 설정
+  const own = mode === 'plugin' ? over : undefined;
+  const depth = Number(own?.depth) > 0 ? Number(own?.depth) : Number(ls.scanDepth) > 0 ? Number(ls.scanDepth) : DEFAULT_DEPTH;
+  const total = Number(own?.budget) > 0 ? Number(own?.budget) : Number(ls.tokenBudget) > 0 ? Number(ls.tokenBudget) : DEFAULT_BUDGET;
   const slots = new Set(LORE_KINDS.map((k) => SLOTS[k].comment));
   const always = (char.globalLore ?? []).filter((e) => e.alwaysActive && e.mode !== 'folder' && !slots.has(str(e.comment))).reduce((n, e) => n + tokens(str(e.content)), 0);
   return {

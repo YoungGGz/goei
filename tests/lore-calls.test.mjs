@@ -58,3 +58,23 @@ test('확증·두 글자 규칙은 그대로: 흔한 낱말은 그냥 나와서�
   assert.ok(!picked('병원에 다녀왔다.').includes('병원'));
   assert.ok(!picked('도형을 그렸다.').includes('이도형'));
 });
+
+test('플러그인 설정의 검색 깊이·토큰 예산: 0이면 카드 설정, 값이 있으면 플러그인이 고를 때만 그 값', () => {
+  const chat = { message: [], scriptstate: {} };
+  const card = { globalLore: [], loreSettings: { scanDepth: 7, tokenBudget: 5000 } };
+  const base = lore.loreOptions(card, chat, 'plugin');
+  assert.deepEqual([base.depth, base.budget], [7, 4500]);
+  assert.deepEqual(lore.loreOptions(card, chat, 'plugin', '', { depth: 0, budget: 0 }), base, '0 = 전과 같음');
+  const own = lore.loreOptions(card, chat, 'plugin', '', { depth: 3, budget: 2000 });
+  assert.deepEqual([own.depth, own.budget], [3, 1800]);
+  const risu = lore.loreOptions(card, chat, 'risu', '', { depth: 3, budget: 2000 });
+  assert.deepEqual([risu.depth, risu.budget], [7, 4500], 'Risu가 직접 고를 때는 카드 설정');
+  const none = lore.loreOptions({ globalLore: [] }, chat, 'plugin');
+  assert.deepEqual([none.depth, none.budget], [lore.DEFAULT_DEPTH, Math.floor(lore.DEFAULT_BUDGET * 0.9)]);
+  // 깊이를 줄이면 오래된 메시지의 이름으로는 고르지 않는다
+  const name = entries.find((e) => hangul(e.name) && e.name.length >= 3)?.name;
+  const old = { message: [{ role: 'user', data: plain(name) }, { role: 'char', data: '조용했다.' }, { role: 'user', data: '계속.' }], scriptstate: {} };
+  const got = (over) => lore.computeLore(books, old, lore.loreOptions({ globalLore: books }, old, 'plugin', '', over)).picks.map((p) => p.entry.name);
+  assert.ok(got(undefined).includes(name), name);
+  assert.ok(!got({ depth: 2 }).includes(name), '깊이 2: 세 번째 전 메시지는 보지 않는다');
+});

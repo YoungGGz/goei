@@ -50,7 +50,7 @@ Balance = {{user}}'s current cash in won, digits only (e.g. `1230000`, no symbol
 @@END
 
 @@SECTION STATUS.RULE.PREVIOUS
-- The status line of the previous scene is provided in a `[Previous status]` block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.
+- The status line of the previous scene is provided in a `[Previous status]` block just before the latest user input; follow the note in that block.
 @@END
 
 @@SECTION INVENTORY.NOTE

@@ -56,6 +56,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       items: [
         { key: 'lang', label: '생성 언어', type: 'pick', def: 'auto', opts: [['auto', '대화 언어'], ['ko', '한국어'], ['en', '영어'], ['ja', '일본어']], hint: '괴담넷·괴담톡·위키·상점·쇼핑몰·망상홈쇼핑이 쓸 언어' },
         num('retries', '형식 오류 재시도', 1, 0, 3, '회'),
+        // 모델 쪽 일시 오류(빈 응답·시간 초과·과부하)에 같은 요청을 다시 보내는 횟수. 기본 2 = 전에 코드에 고정돼 있던 값
+        num('transient', '모델 오류 재시도', 2, 0, 5, '회', { zero: '안 함', hint: '빈 응답·시간 초과·과부하처럼 모델 쪽 일시 오류일 때 같은 요청을 그대로 다시 보내는 횟수예요. 형식 오류 재시도와 따로 세요' }),
         { key: 'retry_model', label: '재시도 모델', type: 'pick', def: 'same', opts: [['same', '같은 모델'], ['main', '메인 모델'], ['aux', '보조 모델']] },
         num('budget', '요청 토큰 상한', 0, 0, 200000, TOK, { zero: '제한 없음', hint: '괴담넷·괴담톡·위키 요청 하나의 상한. 기능마다 따로 정할 수도 있어요' }),
         num('ctx_total', '컨텍스트 총 상한', 0, 0, 200000, TOK, { zero: '제한 없음', hint: '게시판(괴담넷 등)·괴담톡·위키 기록과 망상홈쇼핑 시청 기록이 메인 요청에 붙는 양의 합. 넘치면 기능별 컨텍스트 토큰 상한 비율로 나눠요' }),
@@ -70,6 +72,12 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       items: [
         { key: 'lore_mode', label: '로어북 보내기', type: 'pick', def: 'plugin', opts: [['plugin', '플러그인이 고름'], ['risu', 'Risu가 직접']], hint: '세력·특수·괴이·요원 로어북을 요청에 넣을지 누가 정할지예요. 「플러그인이 고름」은 최근 대화에 호출 단어가 나온 것·상태창 목표·부록 조건으로 플러그인이 고르고, 「Risu가 직접」은 Risu 로어북 기능이 고르는데 낱말 속 글자에도 걸려요' },
         { key: 'aux_lore', label: '보조 호출 로어북', type: 'pick', def: 'plugin', opts: [['plugin', '플러그인 기준'], ['risu', '로어북 포함']], hint: '괴담넷·괴담톡·위키·상점 요청에 참고로 넣을 로어북을 고르는 기준이에요. 「플러그인 기준」은 명부에 있는 이름이 글에 나온 것과 「상시 로어북」만 넣어요. 「로어북 포함」는 거기에 더해 카드에 직접 넣은 로어북·채팅 로어북·켜진 모듈의 로어북도 본편처럼 넣어요(항상 활성화는 늘, 그 밖에는 활성화 키가 글에 나올 때)' },
+        // 플러그인이 고를 때의 검색 깊이·토큰 예산. 0 = 카드의 Risu 로어북 설정(없으면 10 · 99999)
+        num('lore_depth', '검색 깊이', 0, 0, 100, '메시지', { zero: '카드 설정 따름', hint: '「플러그인이 고름」일 때 호출 단어를 찾을 최근 메시지 수예요. 줄이면 이름이 나온 뒤 로어북이 요청에 남는 턴이 줄어요' }),
+        num('lore_budget', '로어북 토큰 예산', 0, 0, 200000, TOK, { zero: '카드 설정 따름', hint: '「플러그인이 고름」일 때 고른 로어북 전체의 상한이에요. 넘으면 점수가 낮은 것부터 빼요' }),
+        // 본편 요청에 늘 붙는 세력 요약(📜Faction)·요원 명단(🙂Roster). 기본 켬
+        { key: 'lore_faction', label: '세력 요약 보내기', type: 'pick', def: '1', opts: [['1', '켬'], ['0', '끔']], hint: '모든 세력의 소개·관계표·공통 규칙을 본편 요청마다 넣어요. 끄면 호출된 세력 로어북만 가요' },
+        { key: 'lore_roster', label: '요원 명단 보내기', type: 'pick', def: '1', opts: [['1', '켬'], ['0', '끔']], hint: '모든 요원의 한 줄 소개를 본편 요청마다 넣어요. 끄면 호출된 요원 로어북만 가요' },
       ],
     },
   ],
@@ -255,6 +263,8 @@ export interface GenSettings {
   userMessages: boolean;
   /** 동시 요청 수 (0 = 제한 없음) */
   concurrent: number;
+  /** 모델 쪽 일시 오류에 같은 요청을 다시 보내는 횟수 */
+  transientRetries: number;
 }
 
 /** 언어를 정해 주는 값 (auto 는 기능의 원래 문장) */
@@ -267,8 +277,15 @@ export function genSettings(state: State): GenSettings {
   return {
     language: langLine(advValue(state, 'gen', 'lang')), retries: advNum(state, 'gen', 'retries'), retryModel: m === 'main' || m === 'aux' ? m : 'same',
     userMessages: advValue(state, 'gen', 'user_msgs') !== '0', concurrent: advNum(state, 'gen', 'concurrent'),
+    transientRetries: advNum(state, 'gen', 'transient'),
   };
 }
+
+/** 플러그인이 로어북을 고를 때의 검색 깊이·토큰 예산 (0 = 카드 설정). core/lore.ts loreOptions 에 넘긴다 */
+export const loreLimits = (state: State): { depth: number; budget: number } => ({ depth: advNum(state, 'gen', 'lore_depth'), budget: advNum(state, 'gen', 'lore_budget') });
+
+/** 본편 요청에 늘 붙는 지침 가운데 세력 요약·요원 명단을 넣을지 (🏷️Tag 는 늘 넣는다) */
+export const alwaysBookOn = (state: State, kind: 'tag' | 'faction' | 'roster'): boolean => kind === 'tag' || advValue(state, 'gen', kind === 'faction' ? 'lore_faction' : 'lore_roster') !== '0';
 
 // 깊은 곳(응답 검사, 저장 정리)에서 쓰는 상수 묶음은 지금 채팅 값으로 맞춰 둔다.
 // 창을 열거나 고칠 때, 채팅 요청 전, 자동 새로고침 전에 부른다 (모두 한 번에 한 채팅만 다룬다).

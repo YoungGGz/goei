@@ -60,7 +60,8 @@ import { landingHtml as renderLanding } from './ui/landing';
 import { loadPrefs } from './host/prefs';
 import { isWaiting, setWaiting } from './host/waiting';
 import { syncDecorators, computeLore, hasUnlockTag, loreOptions, patchSlots, readUnlocked, sameVars, stripDecorators, stripUnlockTags, trimRoster, unlockedValue, unlockTags, UNLOCK_VAR, type LoreMode, hasSlots, insertLoreBlock, joinLoreBlock, LORE_KINDS, slotParts, slotTexts, slotVar, type LoreBlockPart, type LoreKind } from './core/lore';
-import { advValue } from './core/advanced';
+import { advValue, alwaysBookOn, loreLimits } from './core/advanced';
+import { isOwnMainCall } from './host/llm';
 import { userInfo } from './host/user';
 import { applyPlayer, hidePlayerTag, playerAgent, playerBlock } from './core/player';
 import { buildImgPrompt, imgCharacters, imgPromptConfig, imgSceneNames, stripImgLore } from './core/imgprompt';
@@ -161,6 +162,8 @@ function addedTexts(before: PromptMessage[], after: PromptMessage[]): string[] {
 
 async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: string): Promise<M[]> {
   if (type !== 'model' || !Array.isArray(messages)) return messages;
+  // 플러그인이 메인 모델로 보낸 보조 호출(괴담넷·위키 등)이 여기로 들어오면 본편용 로어·기록을 붙이지 않고 그대로 보낸다 (host/llm.ts)
+  if (isOwnMainCall(messages)) return messages;
   if (faultOn('beforeRequest')) throw new Error('시험용 예외 주입(beforeRequest)');
   // 자동 재시도: 이미 조립한 요청이 다시 들어왔다. 참고 기록·인물 기록이 두 번 끼고 호출 기록 턴이 새로 열리지 않게 그대로 보낸다 (전수검사 11-13)
   if (lastAdded.size && sysTexts(messages).some((t) => lastAdded.has(t))) {
@@ -315,7 +318,7 @@ function loreFor(char: LoreChar, chat0: Chat, input?: string) {
   const chat = chat0.message?.some((m) => isSceneMessage(m.data)) ? { ...chat0, message: chat0.message.filter((m) => !isSceneMessage(m.data)) } : chat0;
   const mode = advValue(chat.scriptstate, 'gen', 'lore_mode') as LoreMode;
   const player = playerAgent(char.globalLore, chat.scriptstate);
-  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, userOrTag()), input, ...(player ? { exclude: [player.lore] } : {}) });
+  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, userOrTag(), loreLimits(chat.scriptstate)), input, ...(player ? { exclude: [player.lore] } : {}) });
 }
 
 /** 고른 로어북을 자리 항목이 읽는 채팅 변수에 적는다 (요청 전이라 Risu가 세고 넘치면 오래된 채팅을 지운다).
@@ -383,6 +386,8 @@ function fixLore<M extends PromptMessage>(messages: M[], { char, chat }: ChatCon
   // 🏷️Tag 의 상태창 절은 이 채팅의 칸 구성에서 만든다 (`{status_section}` 자리)
   const cols = usedCols(colConfig(chat.scriptstate));
   for (const b of ALWAYS_BOOKS) {
+    // 설정 「세력 요약 보내기」·「요원 명단 보내기」를 끈 채팅은 그 지침을 넣지 않는다
+    if (!alwaysBookOn(chat.scriptstate, b.kind)) continue;
     const e = (char.globalLore ?? []).find((x) => isVirtual(x) && x.comment === b.name);
     if (e && typeof e.content === 'string') parts.push({ order: b.order, text: evaluate(b.kind === 'tag' ? fillStatusSection(e.content, cols) : e.content, env) });
   }

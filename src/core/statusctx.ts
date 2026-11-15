@@ -27,6 +27,13 @@ export const STATUS_HEAD = statusHead();
 /** 「Fields: 칸 | 칸」 줄 (끝 줄바꿈 포함). 칸이 없으면 빈 글 */
 const fieldsLine = (cols?: ColId[]): string => (cols?.length ? `${guideTxt('Main', 'STATUS.FIELDS_LINE', { labels: colPromptLabels(cols) })}\n` : '');
 
+/** 같은 요청의 🏷️Tag 상태창 절에 같은 칸 구성의 칸 순서 규칙(STATUS.RULE.FIELDS)이 이미 있는가. 있으면 「Fields:」 줄을 한 번 더 넣지 않는다 */
+function fieldsTold(messages: PromptMessage[], cols?: ColId[]): boolean {
+  if (!cols?.length) return false;
+  const rule = guideTxt('Main', 'STATUS.RULE.FIELDS', { labels: colPromptLabels(cols) }).trim();
+  return !!rule && messages.some((m) => typeof m?.content === 'string' && m.content.includes(rule));
+}
+
 /** 요청 속 마지막 상태창 줄 (원문). 없으면 null */
 export function lastStatusLine(messages: PromptMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -94,6 +101,7 @@ export function withStatusBlock<M extends PromptMessage>(messages: M[], identity
   const head = statusHead();
   if (messages.some((m) => typeof m?.content === 'string' && m.content.startsWith(head))) return messages;
   const line0 = lastStatusLine(messages);
+  const fieldCols = fieldsTold(messages, shape?.cols) ? undefined : shape?.cols;
   if (!line0) {
     // 첫 턴(상태창 줄이 아직 없음): 지난 줄은 없어도 장부 값은 넘긴다. 안 넘기면 모델이 잔고를 지어내(0) 장부가 그 값으로 맞춰졌다
     // (2026-11-09 사용자: 시작 잔고 1,140,000이 첫 응답 뒤 0으로)
@@ -103,7 +111,7 @@ export function withStatusBlock<M extends PromptMessage>(messages: M[], identity
     ].filter(Boolean);
     if (!starts.length) return messages;
     // 글은 지침 「메인 요청에 붙는 글」 STATUS.FIRST 절
-    const first = guideTxt('Main', 'STATUS.FIRST', { starts: starts.join(', '), fields: fieldsLine(shape?.cols) });
+    const first = guideTxt('Main', 'STATUS.FIRST', { starts: starts.join(', '), fields: fieldsLine(fieldCols) });
     const block = { role: 'system', content: `${head}\n${first}` } as M;
     const at = messages.map((m) => m?.role).lastIndexOf('user');
     return at < 0 ? [...messages, block] : [...messages.slice(0, at), block, ...messages.slice(at)];
@@ -116,6 +124,6 @@ export function withStatusBlock<M extends PromptMessage>(messages: M[], identity
   // 거래 내역 줄은 지침 「Main」 STATUS.RECENT_CASH·STATUS.RECENT_POINT 절 (전수검사 11-13)
   const cash = recent.length ? `\n${guideTxt('Main', 'STATUS.RECENT_CASH', { list: recent.join('; ') })}` : '';
   const points = recentP.length ? `\n${guideTxt('Main', 'STATUS.RECENT_POINT', { list: recentP.join('; ') })}` : '';
-  const block = { role: 'system', content: `${statusBlock(line, shape?.cols)}${cash}${points}` } as M;
+  const block = { role: 'system', content: `${statusBlock(line, fieldCols)}${cash}${points}` } as M;
   return at < 0 ? [...out, block] : [...out.slice(0, at), block, ...out.slice(at)];
 }
