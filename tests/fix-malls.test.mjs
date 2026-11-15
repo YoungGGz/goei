@@ -12,7 +12,7 @@ const out = await build({
       export { dropDoubleSync, syncPointsToStatus, readPoints } from './src/core/points';
       export { mergeLate, lateNow, sendsOrders } from './src/ui/malls';
       export { broadcastParts } from './src/ui/homeshop';
-      export { mallVarsOf, readMall } from './src/core/malls';
+      export { mallVarsOf, readMall, mallAtKey, mallSeenKey, mallUnseen } from './src/core/malls';
       export { aliveAnchors } from './src/core/wallet';
       export { markSold } from './src/core/shop';
     `,
@@ -134,4 +134,13 @@ test('망상홈쇼핑 편성: 꺼 둔 「스티커 들추기」「물건 맞교�
   assert.match(all.barter_line, /^barter\|/);
   assert.deepEqual(M.broadcastParts({ peek: false, barter: true }), { peek_block: '', peek_rule: '', barter_line: all.barter_line });
   assert.deepEqual(M.broadcastParts({ peek: true, barter: false }), { peek_block: all.peek_block, peek_rule: all.peek_rule, barter_line: '' });
+});
+
+test('쇼핑몰 「매 턴」: 받아 둔 진열을 아직 안 열어 봤으면 새로 받지 않는다', () => {
+  const at = M.mallAtKey('cos'), seen = M.mallSeenKey('cos');
+  assert.equal(M.mallUnseen({ [at]: 't:a' }, 'cos', true), true, '받기만 하고 안 열어 봄');
+  assert.equal(M.mallUnseen({ [at]: 't:a', [seen]: 't:a' }, 'cos', true), false, '열어 봄');
+  assert.equal(M.mallUnseen({ [at]: 't:b', [seen]: 't:a' }, 'cos', true), true, '본 뒤 새로 받은 진열은 아직 안 봄');
+  assert.equal(M.mallUnseen({}, 'cos', false), false, '진열이 없으면 받는다');
+  assert.equal(M.mallUnseen({ [at]: 't:a' }, 'bm', true), false, '몰마다 따로');
 });

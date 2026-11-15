@@ -20,7 +20,7 @@ import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
 import { carryDesk, DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
-import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
+import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallSeenKey, mallUnseen, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
 import { SHOP_SIZE_HI, SHOP_SIZE_LO } from '../core/shop';
 import { onOffSwitch } from './controls';
 import { shopSource } from './shop';
@@ -246,6 +246,11 @@ export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): v
   if (!s.on || s.auto === 'manual' || ui[site].loading) return;
   if (site === 'bm' && !loggedNick(ctx)) return;
   const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
+  // 받아 둔 진열을 본 것으로 적는다 (「매 턴」이 안 본 진열을 다시 받지 않게)
+  if (mallUnseen(ctx.chat.scriptstate, site, st.loaded)) {
+    const at = String(ctx.chat.scriptstate?.[atKey(site)] ?? '');
+    void updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[mallSeenKey(site)] ?? '') === at ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [mallSeenKey(site)]: at } })).catch(() => null);
+  }
   if (st.loaded && String(ctx.chat.scriptstate?.[atKey(site)] ?? '') === turnKey(ctx.chat)) return;
   if (st.loaded && s.auto === 'turn') return;
   void ask(ctx, env, site, 'shelf', st);
@@ -260,7 +265,10 @@ export async function autoRefreshMall(ctx: ChatContext, site: MallSite): Promise
   if (!s.on || s.auto !== 'turn') return;
   if (site === 'bm' && !pointsOn(ctx.chat)) return;
   if (String(ctx.chat.scriptstate?.[atKey(site)] ?? '') === turnKey(ctx.chat)) return;
-  await ask(ctx, env, site, 'shelf', readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat)));
+  const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
+  // 받아 둔 진열을 아직 한 번도 안 열어 봤으면 새로 받지 않는다 (사용자 2026-11-15). 열면 그 진열이 보이고, 본 다음 턴부터 다시 받는다
+  if (mallUnseen(ctx.chat.scriptstate, site, st.loaded)) return;
+  await ask(ctx, env, site, 'shelf', st);
 }
 
 /** 호출 흐름 미리 계산 (editor/flow.ts): 지금 설정으로 이 쇼핑몰이 보낼 진열대 요청 (모델은 안 부름). 꺼져 있으면 null */

@@ -72,6 +72,13 @@ export const mallNoteKey = (site: MallSite) => `${MALL_VAR[site]}_note`;
 export const mallNote = (vars: Vars, site: MallSite): string => String(vars?.[mallNoteKey(site)] ?? '');
 /** 진열대를 마지막으로 받은 턴 (core/shop.ts turnKey). 「이 턴에 이미 짰나」와 「이 턴에 받은 진열인가」를 가린다 */
 export const mallAtKey = (site: MallSite) => `${MALL_VAR[site]}_at`;
+/** 진열대를 마지막으로 연(본) 때의 진열 표식(mallAtKey 값). 「매 턴」은 받아 둔 진열을 아직 안 열어 봤으면 새로 받지 않는다 (사용자 2026-11-15) */
+export const mallSeenKey = (site: MallSite) => `${MALL_VAR[site]}_seen`;
+/** 받아 둔 진열을 아직 한 번도 안 열어 봤나 */
+export function mallUnseen(vars: Record<string, unknown> | undefined, site: MallSite, loaded: boolean): boolean {
+  const at = String(vars?.[mallAtKey(site)] ?? '');
+  return loaded && !!at && String(vars?.[mallSeenKey(site)] ?? '') !== at;
+}
 
 /** 이번 턴에 쇼핑몰을 새로 짤지 (자동 호출 「매 턴」) */
 export const mallTurnRefresh = (chat: Chat, site: MallSite): boolean => mallSettings(chat.scriptstate, site).on && mallSettings(chat.scriptstate, site).auto === 'turn' && readMall(chat.scriptstate, site).loaded;
