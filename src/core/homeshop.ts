@@ -527,6 +527,63 @@ export function peelFragment(truth: string | undefined, seed: string, cap: numbe
   return Array.from(words.slice(i, j).join(' ')).slice(0, cap).join('');
 }
 
+export type StickerCorner = 'tl' | 'tr' | 'bl' | 'br';
+export type StickerGrip = 'easy' | 'sticky' | 'tear';
+export interface StickerLook {
+  /** 들리는 모서리 */
+  corner: StickerCorner;
+  /** 모양 (모서리 둥글기) */
+  shape: 'sharp' | 'round' | 'pill';
+  /** 종이 */
+  paper: 'yellow' | 'white' | 'kraft' | 'foil' | 'pink' | 'mint';
+  /** 기울기 (도) */
+  tilt: number;
+  /** 붙은 자리 (상자 안에서 밀린 만큼, px) */
+  dx: number;
+  dy: number;
+  /** 떨어지는 정도: 잘 떨어짐 · 들러붙음 · 찢어짐 */
+  grip: StickerGrip;
+  /** 끝까지 들췄을 때 젖혀지는 몫 (0~1, 1 이면 다 떨어짐 — 늘 1 보다 작다) */
+  lim: number;
+  /** 보이는 글자 수 */
+  cap: number;
+}
+/** 상품 스티커 생김새 (11-15 사용자: 상품마다 모양·종이·기울기·자리·들리는 모서리·떨어지는 정도가 다르고, 끝까지는 안 떨어져 늘 일부만).
+ *  seed = 상품 id 라 다시 열어도 같다. 보이는 글자 수(cap)는 떨어지는 정도를 따라 phone 이면 하나 적게 */
+export function stickerLook(seed: string, phone = false): StickerLook {
+  const pick = <T,>(salt: string, list: readonly T[]): T => list[fnv(`${salt}:${seed}`) % list.length];
+  const span = (salt: string, lo: number, hi: number): number => lo + (fnv(`${salt}:${seed}`) % 1000) / 999 * (hi - lo);
+  const grip = pick('grip', ['easy', 'easy', 'sticky', 'tear'] as const);
+  const lim = grip === 'easy' ? span('lim', 0.55, 0.68) : grip === 'tear' ? span('lim', 0.38, 0.48) : span('lim', 0.24, 0.32);
+  const cap = (grip === 'easy' ? 8 : grip === 'tear' ? 6 : 4) - (phone ? 1 : 0);
+  const tilt = Math.round(span('tilt', -7, 7) * 10) / 10;
+  return {
+    corner: pick('corner', ['tl', 'tr', 'bl', 'br'] as const),
+    shape: pick('shape', ['sharp', 'round', 'pill'] as const),
+    paper: pick('paper', ['yellow', 'white', 'kraft', 'foil', 'pink', 'mint'] as const),
+    tilt: tilt === 0 ? 0.6 : tilt,
+    dx: Math.round(span('dx', -14, 14)),
+    dy: Math.round(span('dy', -6, 6)),
+    grip,
+    lim: Math.round(lim * 100) / 100,
+    cap,
+  };
+}
+
+/** 스티커 밑에 찍힌 글 (11-15 사용자: ■ 가림 말고 밑에 진짜 글이 찍혀 있고 젖힌 만큼만 보이게).
+ *  들리는 모서리에 가장 가까운 줄에 보이는 조각(peelFragment)이 오고, 그 너머 줄에는 이웃 낱말이 이어진다(모서리에서 멀어 젖혀도 안 보이는 자리).
+ *  진실 전체는 넣지 않는다: 조각 앞뒤로 한 줄씩만. 아래쪽 모서리면 조각이 마지막 줄, 위쪽이면 첫 줄 */
+export function stickerPrint(truth: string | undefined, seed: string, cap: number, corner: StickerCorner): string[] {
+  const frag = peelFragment(truth, seed, cap);
+  if (!frag) return [];
+  const t = String(truth ?? '').replace(/\s+/g, ' ').trim();
+  const at = t.indexOf(frag);
+  const width = 14;
+  const before = at > 0 ? Array.from(t.slice(0, at).trim()).slice(-width).join('') : '';
+  const after = at >= 0 ? Array.from(t.slice(at + frag.length).trim()).slice(0, width).join('') : '';
+  return corner === 'bl' || corner === 'br' ? [before || after, frag].filter(Boolean) : [frag, after || before].filter(Boolean);
+}
+
 // ── 동작 고르기 (재생 규칙. 기본값은 그림/홈쇼핑/homeshop.json 과 HS_NUM, 전부 설정에서 고친다) ──
 
 export interface IdleState {

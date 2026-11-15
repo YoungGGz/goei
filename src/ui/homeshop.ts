@@ -21,7 +21,7 @@ import { userTurns } from '../core/request';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsSettings, hsVars, liveOrders, moodMap, newOrder, orderOpened, ordersVars, paidOf, parseCue, parseOperator, parseShow, peelFragment, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
+import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsSettings, hsVars, liveOrders, moodMap, newOrder, orderOpened, ordersVars, paidOf, parseCue, parseOperator, parseShow, peelFragment, readAudience, stickerLook, stickerPrint, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
 import { mountPlayer, playerCut, playerHold, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
@@ -266,7 +266,7 @@ export async function homeshopAction(action: string, value: string | undefined, 
       env.render();
       // 들춰 보인 몇 글자도 시청 기록에 적는다 (스티커 밑에 찍힌 원래 용도의 조각)
       const { show, part } = nowPart(ctx);
-      const frag = part && hsSettings(ctx.chat.scriptstate).peek ? peelFragment(part.item.truth, part.item.id, peelCap()) : '';
+      const frag = part && hsSettings(ctx.chat.scriptstate).peek ? peelFragment(part.item.truth, part.item.id, stickerLook(part.item.id, isPhone()).cap) : '';
       if (frag) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogSticker(), text: frag }], show);
       return true;
     }
@@ -623,7 +623,6 @@ function scaleOf(s: HsSettings, phone: boolean): number {
 
 const failBox = () => (ui.notice ? `<div class="hs-err" role="alert"><span>${esc(ui.notice).replace(/\n/g, '<br>')}</span>${ui.failRaw ? '<button data-action="hs-raw">받은 글 보기</button>' : ''}<button data-action="hs-refresh">다시 연결</button></div>` : '');
 /** 스티커 밑에 보이는 글자 수: 젖힌 모서리 크기에 맞춘다 (폰은 모서리가 조금 작다) */
-const peelCap = (): number => (isPhone() ? 7 : 8);
 
 /** 편성 카드 줄. 아직 방송 안 한 부는 가린다 (11-09 사용자: 다음 상품은 방송에서 공개) */
 function lineup(show: HsShow, s: HsSettings, col = false): string {
@@ -749,20 +748,25 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   return popShell(title, `<div class="hs-split">${side}${line}</div>`, '', 'call');
 }
 
-/** 상품 스티커: 모서리를 들추면(PC 끌기·누르기, 폰 누르기) 밑에 찍힌 원래 용도 몇 글자만 보인다 (11-15 사용자). DOM 에는 조각과 고정 무늬(■)만 — 진실 전체는 넣지 않는다 */
+/** 상품 스티커 (11-15 사용자): 밑에 원래 용도가 진짜 글로 찍혀 있고, 모서리를 들춘 만큼만 보인다. 상품마다 모양·종이·기울기·자리·들리는 모서리·떨어지는 정도가 다르고
+ *  (core/homeshop.ts stickerLook), 끝까지는 안 떨어져 늘 일부만 보인다. 밑글은 보이는 조각 앞뒤 한 줄씩만 (진실 전체는 DOM 에 넣지 않는다) */
 function peekPop(ctx: ChatContext, s: HsSettings): string {
   const { part } = nowPart(ctx);
   if (!part) return '';
   const it = part.item;
   const mobile = isPhone();
-  const frag = s.peek ? peelFragment(it.truth, it.id, peelCap()) : '';
-  const under = s.peek ? `<div class="hs-und" aria-hidden="true"><div class="emb"><span>■■■ ■■■■ ■■</span>${frag ? `<b>${esc(frag)}</b>` : '<b class="none">■■■■</b>'}</div></div>` : '';
+  const look = stickerLook(it.id, mobile);
+  const lines = s.peek ? stickerPrint(it.truth, it.id, look.cap, look.corner) : [];
+  const res = look.grip === 'tear' ? '<i class="res"></i>' : '';
+  const under = s.peek ? `<div class="hs-und" aria-hidden="true"><div class="emb">${lines.length ? lines.map((l) => `<span>${esc(l)}</span>`).join('') : '<span class="none">MADE IN ─────</span>'}</div>${res}</div>` : '';
   const corner = s.peek ? `<span class="flapw" aria-hidden="true"><span class="flap"></span></span><button class="corner" data-action="hs-lift" aria-label="스티커 모서리 들추기"${ui.lifted ? ' disabled' : ''}></button>` : '';
-  const cls = `hs-sticker${ui.lifted ? ' lifted anim' : ''}`;
-  const hint = s.peek && !ui.lifted ? `<p class="hs-peelhint">${mobile ? '스티커를 <i>눌러</i> 들춰 보세요' : '모서리를 <i>잡아 끌거나 눌러</i> 들춰 보세요'}</p>` : '';
-  // 폰은 모서리가 작고 화면 끝이라 스티커 어디를 눌러도 모서리부터 젖힌다
+  const cls = `hs-sticker c-${look.corner} sh-${look.shape} pa-${look.paper} g-${look.grip}${ui.lifted ? ' lifted anim' : ''}`;
+  const hint = s.peek && !ui.lifted ? `<p class="hs-peelhint">${mobile ? '스티커를 <i>눌러</i> 들춰 보세요' : '들뜬 모서리를 <i>잡아 끌거나 눌러</i> 들춰 보세요'}</p>`
+    : s.peek && ui.lifted ? `<p class="hs-peelhint">${look.grip === 'tear' ? '스티커가 찢어져 더는 안 떨어져요' : look.grip === 'sticky' ? '꽉 들러붙어 더는 안 떨어져요' : '더는 안 떨어져요'}</p>` : '';
+  // 폰은 모서리가 작고 화면 끝이라 스티커 어디를 눌러도 그 모서리부터 젖힌다
   const tap = mobile && s.peek && !ui.lifted ? ' data-action="hs-lift"' : '';
-  return popShell('상품 스티커', `<div class="${cls}"${tap} style="--from:${ui.peelFrom || 0.12}">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
+  const style = `--from:${ui.peelFrom || 0.12};--lim:${look.lim};--tilt:${look.tilt}deg;--dx:${look.dx}px;--dy:${look.dy}px`;
+  return popShell('상품 스티커', `<div class="hs-stkbox"><div class="${cls}"${tap} style="${style}">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div></div>${hint}`);
 }
 
 function audPop(): string {
@@ -819,11 +823,15 @@ function peelDrag(corner: HTMLButtonElement): void {
   });
   corner.addEventListener('pointermove', (e) => {
     if (!start) return;
-    // 모서리에서 왼쪽 위(대각선)로 간 거리 / 젖힐 수 있는 최대
-    const d = (start.x - e.clientX + start.y - e.clientY) / Math.SQRT2;
+    // 모서리에서 스티커 안쪽(대각선)으로 간 거리 / 젖힐 수 있는 최대. 들리는 모서리는 상품마다 다르다
+    const sx = st.classList.contains('c-tr') || st.classList.contains('c-br') ? -1 : 1;
+    const sy = st.classList.contains('c-bl') || st.classList.contains('c-br') ? -1 : 1;
+    const d = (sx * (e.clientX - start.x) + sy * (e.clientY - start.y)) / Math.SQRT2;
     if (Math.abs(d) > 4) moved = true;
-    const max = parseFloat(getComputedStyle(st).getPropertyValue('--pmax')) || 132;
-    peel = Math.max(0.12, Math.min(1, 0.12 + d / max));
+    const css = getComputedStyle(st);
+    const max = parseFloat(css.getPropertyValue('--pmax')) || 132;
+    const lim = parseFloat(st.style.getPropertyValue('--lim')) || 0.6;
+    peel = Math.max(0.12, Math.min(lim, 0.12 + d / max));
     st.style.setProperty('--peel', String(peel));
   });
   const end = () => {
@@ -831,7 +839,7 @@ function peelDrag(corner: HTMLButtonElement): void {
     start = null;
     st.classList.remove('drag');
     if (!moved) return; // 그냥 누른 것: 아래 click 이 hs-lift 로 젖힌다
-    if (peel >= 0.5) corner.dataset.value = String(peel);
+    if (peel >= (parseFloat(st.style.getPropertyValue('--lim')) || 0.6) * 0.5) corner.dataset.value = String(peel);
     else {
       st.style.removeProperty('--peel');
       // 덜 끌었으면 이번 click 은 들추기가 아니다
