@@ -726,7 +726,7 @@ const int = (v: unknown): number | null => {
 export interface BoardResult {
   st: GState;
   notice: string;
-  /** 댓글이 하나도 없는 게시판이 왔을 때 (적용은 함) */
+  /** 반영한 뒤 게시판에 댓글이 하나도 없을 때 (적용은 함) */
   emptyComments: boolean;
 }
 
@@ -760,7 +760,6 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
   const seen = new Set<number>();
   let skippedPosts = 0;
   let skippedComments = 0;
-  let commentTotal = 0;
   const day = /^(\d{4}[.-]\d\d[.-]\d\d)/.exec(o.date)?.[1]?.replace(/-/g, '.');
   // 새 글 번호는 요청 때 저장된 최고 번호보다 커야 한다 (원본: > max(100000, seq))
   const floor = Math.max(100000, current.seq);
@@ -779,7 +778,6 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     seen.add(pid);
     st.seq = Math.max(st.seq, pid);
     const comments = Array.isArray(raw.comments) ? raw.comments : [];
-    commentTotal += comments.length;
     let date = validDate(raw.date);
     if (!date) date = day && str(raw.time).trim() ? `${day} ${str(raw.time).trim()}` : o.date;
     const q: GPost = {
@@ -811,7 +809,8 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     }
     const raws: string[] = [];
     // 남긴 글의 댓글 번호 읽기. 지금 지침: 새 댓글만 돌려주고 번호는 「저장 댓글 1..k, 새 댓글 k+1..」.
-    // 옛 지침(저장 댓글을 그대로 다시 쓰고 번호는 돌려준 배열 차례)으로 온 응답도 받는다: 저장 댓글과 같은 줄이 하나라도 있으면 옛 꼴
+    // 옛 지침(저장 댓글을 그대로 다시 쓰고 번호는 돌려준 배열 차례)으로 온 응답도 받는다: 앞 k줄이 모두 저장 댓글과 같으면 옛 꼴.
+    // 새 댓글 하나가 저장 댓글과 우연히 같아도(짧은 반응 줄) 새 꼴로 읽어 다른 새 댓글의 parent 번호를 지킨다
     const savedCount = prev ? prev.comments.length : 0;
     const sameAsSaved = (c: unknown): boolean => {
       if (!isObj(c)) return false;
@@ -819,7 +818,7 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
       const t = stripForged(str(c.content));
       return sigs.has(`${a}\0${t}`) || loose.has(`${a}\0${attachShape(t)}`) || loose.has(`${a}\0${t.trim()}`);
     };
-    const onlyNew = savedCount > 0 && !comments.some(sameAsSaved);
+    const onlyNew = savedCount > 0 && !(comments.length >= savedCount && comments.slice(0, savedCount).every(sameAsSaved));
     if (onlyNew) for (let k = 1; k <= savedCount; k++) remap.set(k, k);
     comments.forEach((c, i) => {
       const n = onlyNew ? savedCount + i + 1 : i + 1;
@@ -857,7 +856,8 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
   st.posts = posts;
   trimBoard(st, o.settings);
   const notice = skippedPosts + skippedComments > 0 ? `게시판을 새로 불러왔어요. 사용자 명의로 온 새 글 ${skippedPosts}개와 댓글·연결 답글 ${skippedComments}개는 뺐어요.` : '';
-  return { st, notice, emptyComments: commentTotal === 0 };
+  // 남긴 글은 새 댓글만 돌아오므로 응답이 아니라 반영 뒤 게시판의 댓글로 센다
+  return { st, notice, emptyComments: !st.posts.some((p) => p.comments.length) };
 }
 
 // ── 글·댓글 반응 ──
@@ -1199,7 +1199,7 @@ export function incomingPlan(
 }
 
 /** head: 지침 절 INCOMING.OPTIONS_HEAD 글 (gnetPrompt 가 이 게시판 지침에서 읽어 넘긴다).
- *  inTask: 선쪽지의 출처 글이 같은 요청의 작업 입력에 이미 있는 경우. 'post' = 작업 대상 글(댓글 달기): 본문 대신 글 번호만 넘긴다.
+ *  inTask: 선쪽지의 출처 글이 같은 요청의 작업 입력에 이미 있는 경우. 'post' = 작업 대상 글(댓글 달기): 본문 대신 글 번호만, 출처 댓글은 작업 입력 comments 의 index 만 넘긴다 (commentPrompt 가 그 댓글을 comments 에 꼭 넣는다).
  *  'draft' = 지금 쓰는 새 글(글 쓰기): 출처는 이 응답이 완성하는 글이라 incomingOrigin 을 넣지 않는다 (지침 INCOMING.COMBINED 「or the finished new post」) */
 export function incomingTask(plan: IncomingPlan, head: string, activityPosts?: ActivityPost[], inTask?: 'post' | 'draft'): string {
   const body: Record<string, unknown> = { userHandle: plan.userHandle, incomingAllowed: plan.allowed };
@@ -1208,7 +1208,7 @@ export function incomingTask(plan: IncomingPlan, head: string, activityPosts?: A
       body.incomingOrigin = {
         ...(inTask === 'post' ? { post: plan.post.id } : {}),
         title: plan.post.title, author: plan.post.nick, ...(inTask === 'post' ? {} : { content: plan.post.body }),
-        ...(plan.comment ? { comment: { author: plan.comment.nick, content: plan.comment.body } } : {}),
+        ...(plan.comment ? { comment: inTask === 'post' && plan.commentIndex ? { index: plan.commentIndex } : { author: plan.comment.nick, content: plan.comment.body } } : {}),
       };
     }
     // 겹침 확인용 받은 쪽지: 수를 정했으면 가장 새 것부터 그만큼만 (같은 발신자·같은 본문은 commitIncoming 이 따로 거른다)
@@ -1321,7 +1321,8 @@ export function mainContext(st: GState, nick: string, rules: string, focus?: Foc
     const kinds = new Set(records.map((r) => (r as { kind?: string }).kind));
     return { ...(kinds.has('public_post') ? { public_post: accessPost } : {}), ...(kinds.has('private_message') ? { private_message: accessDm } : {}) };
   };
-  const payload = (records: unknown[]) => `[MODULE_CONTEXT_BEGIN]\n${rules}\n${JSON.stringify({ feature: 'gnet', ...(site ? { site } : {}), records, ...(records.length ? { access: accessOf(records) } : {}) })}\n[MODULE_CONTEXT_END]`;
+  // rules 가 빈 글이면 안내문 줄 없이 (앞 게시판 덩어리와 안내문이 같아 그쪽에만 붙는 경우: shareContextRules)
+  const payload = (records: unknown[]) => `[MODULE_CONTEXT_BEGIN]\n${rules ? `${rules}\n` : ''}${JSON.stringify({ feature: 'gnet', ...(site ? { site } : {}), records, ...(records.length ? { access: accessOf(records) } : {}) })}\n[MODULE_CONTEXT_END]`;
   const fits = (records: unknown[]) => !(CONTEXT.tokens > 0 && tokens(payload(records)) > CONTEXT.tokens);
   // 기록마다 한 번만 센다 (전수검사 11-13: 후보마다 묶음 전체를 다시 세서 기록이 많으면 몇 초씩 늦었다)
   const cost = (d: unknown) => tokens(JSON.stringify(d)) + 1;
@@ -1331,16 +1332,20 @@ export function mainContext(st: GState, nick: string, rules: string, focus?: Foc
   return kept.length ? payload(kept) : '';
 }
 
-/** 본편에 붙는 게시판 덩어리 여럿: 앞 덩어리와 안내문(rules)이 글자까지 같으면 뒤 덩어리에서는 안내문 줄을 뺀다.
- *  texts[i] 는 mainContext(…, rules[i], …) 의 결과 (빈 글 = 붙지 않음) */
+/** 본편에 붙는 게시판 덩어리 여럿: 안내문(rules[i])이 글자까지 같은 덩어리 가운데 처음 붙는 것에만 안내문 줄을 둔다.
+ *  texts[i] 는 mainContext(…, rules[i] 또는 빈 글, …) 의 결과 (빈 글 = 붙지 않음). 같은 안내문의 둘째 이후 게시판은 처음부터
+ *  빈 rules 로 만들어 게시판별·총 상한에서 안내문을 세지 않는다. 앞 덩어리가 붙지 않았으면 처음 붙는 덩어리에 안내문을 넣는다 */
 export function shareContextRules(texts: string[], rules: string[]): string[] {
   const seen = new Set<string>();
+  const begin = '[MODULE_CONTEXT_BEGIN]\n';
   return texts.map((t, i) => {
     const rule = rules[i];
-    const head = `[MODULE_CONTEXT_BEGIN]\n${rule}\n`;
-    if (!t || !rule || !t.startsWith(head)) return t;
-    if (!seen.has(rule)) return seen.add(rule), t;
-    return `[MODULE_CONTEXT_BEGIN]\n${t.slice(head.length)}`;
+    if (!t || !rule || !t.startsWith(begin)) return t;
+    const head = `${begin}${rule}\n`;
+    const has = t.startsWith(head);
+    if (seen.has(rule)) return has ? `${begin}${t.slice(head.length)}` : t;
+    seen.add(rule);
+    return has ? t : `${head}${t.slice(begin.length)}`;
   });
 }
 

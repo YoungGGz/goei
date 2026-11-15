@@ -264,7 +264,17 @@ export async function autoWriteWiki(ctx: ChatContext, messageIndex: number, open
   const target = showing && chatKey(showing) === chatKey(cur) ? env : quietEnv;
   const notice = wiki.notice;
   try {
-    const title = s.autoTitle === 'input' ? (s.autoQuery ? canon(cur)(s.autoQuery) : '') : await pickTitle(cur);
+    let title: string;
+    try {
+      title = s.autoTitle === 'input' ? (s.autoQuery ? canon(cur)(s.autoQuery) : '') : await pickTitle(cur);
+    } catch (error) {
+      // 제목 고르기 요청이 요청 토큰 상한을 넘는 경우 등: 문서 작성 실패와 같이 위키 화면에 까닭을 남긴다
+      if (target !== quietEnv) {
+        wiki.notice = `자동 작성 제목을 고르지 못했어요. ${error instanceof Error ? error.message : String(error)}`;
+        target.render();
+      }
+      throw error;
+    }
     if (!title) {
       if (target !== quietEnv) wiki.notice = '자동 작성 제목이 비어 있어요. 위키 설정에서 적어 주세요.';
       return;

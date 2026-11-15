@@ -240,6 +240,9 @@ export function commentPrompt(
   const selected = new Set<number>();
   for (let i = Math.max(1, total - limit + 1); i <= total; i++) selected.add(i);
   if (replyTo > 0) selected.add(replyTo);
+  // 선쪽지의 출처가 이 글의 댓글이면 그 댓글은 comments 에만 싣고 incomingOrigin 에는 index 만 넣는다
+  const fromHere = plan.allowed && plan.post?.id === p.id;
+  if (fromHere && plan.commentIndex && p.comments[plan.commentIndex - 1]) selected.add(plan.commentIndex);
   for (const i of [...selected]) {
     let n = i;
     const seen = new Set<number>();
@@ -257,7 +260,7 @@ export function commentPrompt(
   const activity = HISTORY.activity ? activityContext(st, p.id) : noActivity();
   const guideline = [b.read('LB'), b.read('ATTACHMENTS'), b.read('REACT.GUIDELINE'), b.read('PUBLIC.GUIDELINE'), incomingRules(b, plan), activityRules(b, activity.posts), boardExtras(src, b, false).guideline].filter(Boolean).join('\n\n');
   // 선쪽지의 출처가 이 글이면 본문은 위 task 의 post 에 이미 있다
-  const extras = task + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts, plan.post?.id === p.id ? 'post' : undefined);
+  const extras = task + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts, fromHere ? 'post' : undefined);
   return { ...pack(src, b, fn, 'THOUGHTS.ACTION', guideline, `${b.read('PUBLIC.REACT_FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}`, extras, factionNames), activity, supplied: selected, total };
 }
 

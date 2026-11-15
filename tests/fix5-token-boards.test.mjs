@@ -3,6 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as C from '../dist-test/core.mjs';
+import { build } from 'esbuild';
 
 const ADV = (k) => `$lb_cfg_lb-gn.adv_${k}`;
 const BODY = '3층 복도 불이 깜빡인다. 어제 밤부터 계속 그런다';
@@ -28,7 +29,10 @@ test('댓글 달기: 대상 글의 본문·댓글은 요청에 한 번만 들어
   assert.equal(count(text, BODY), 1, '대상 글 본문은 작업 입력에만');
   assert.equal(count(text, '저도 봤어요'), 1, '대상 글 댓글은 작업 입력에만');
   const o = optionsOf(text);
-  assert.deepEqual(o.incomingOrigin, { post: 100002, title: '글 100002', author: 'n100002', comment: { author: '나', content: '무섭네요' } });
+  // 출처 댓글은 작업 입력 comments 의 index 로만 (본문은 comments 와 action 에)
+  assert.deepEqual(o.incomingOrigin, { post: 100002, title: '글 100002', author: 'n100002', comment: { index: 2 } });
+  assert.equal(count(text, '무섭네요'), 2);
+  assert.equal(JSON.parse(text.slice(0, text.indexOf('\nCOMBINED OUTPUT OPTIONS:')).split('\n').pop()).comments.find((c) => c.index === 2).content, '무섭네요');
   const target = o.activityPosts.find((x) => x.id === 100002);
   assert.deepEqual(target, { id: 100002, author: 'n100002', title: '글 100002', date: '2025.01.01 10:00', views: 3, upvotes: 1, commentCount: 2, commentsAllowed: false });
   // 다른 글은 그대로 본문·댓글과 함께
@@ -233,4 +237,92 @@ test('위키 지침: 여는 태그에 asset_src 를 쓰게 하지 않고, 옛 �
   const fmt = C.guideDefaultSec('Wiki', 'NW.FORMAT');
   assert.ok(fmt.includes('<lightboard-namuwiki doc_title='));
   assert.ok(!fmt.includes('asset_src'));
+});
+
+test('댓글 달기: 선쪽지 출처 댓글이 보이는 댓글 범위 밖이어도 comments 에 넣고 index 만 가리킨다', () => {
+  const st = board();
+  const p0 = st.posts[1];
+  p0.comments = [cm('나', '맨 처음 내 댓글', 0, true), ...Array.from({ length: 40 }, (_, i) => cm(`n${i}`, `댓글 ${i}`))];
+  const plan = allowed(st, { post: p0, commentIndex: 1 });
+  const p = C.commentPrompt(src(), st, 100002, 41, '댓글 39', plan, '나', {});
+  const text = userText(p);
+  assert.equal(optionsOf(text).incomingOrigin.comment.index, 1);
+  assert.ok(p.supplied.has(1));
+  assert.equal(count(text, '맨 처음 내 댓글'), 1);
+});
+
+test('새로고침: 새 댓글 하나가 저장 댓글과 같아도 다른 새 댓글의 답글 연결은 그대로다', () => {
+  const st = { posts: [post(100002, { comments: [cm('a', 'ㅋㅋㅋ'), cm('b', '진짜?'), cm('c', '무섭다')] })], archive: [], dms: [], sources: {}, seq: 100002 };
+  const o = { nick: '나', settings: C.gnetSettings({}), date: '2025.01.02 10:00' };
+  const got = (comments) => C.applyBoard(st, st, { posts: [{ id: 100002, views: 9, upvotes: 2, comments }] }, o).st.posts[0].comments.map((c) => [c.nick, c.parent]);
+  // 새 꼴: 저장 3개 뒤에 4·5·6. 4번(a:ㅋㅋㅋ)은 저장 1번과 같아 버리고, x 는 3번(c)에, y 는 5번(x)에
+  assert.deepEqual(got([{ author: 'a', content: 'ㅋㅋㅋ', parent: 0 }, { author: 'x', content: 'c에게 답', parent: 3 }, { author: 'y', content: 'x에게 답', parent: 5 }]),
+    [['a', 0], ['b', 0], ['c', 0], ['x', 3], ['y', 4]]);
+  // 옛 꼴(저장 댓글을 앞에 그대로)도 그대로 읽는다
+  assert.deepEqual(got([{ author: 'a', content: 'ㅋㅋㅋ' }, { author: 'b', content: '진짜?' }, { author: 'c', content: '무섭다' }, { author: 'x', content: 'c에게 답', parent: 3 }, { author: 'y', content: 'x에게 답', parent: 4 }]),
+    [['a', 0], ['b', 0], ['c', 0], ['x', 3], ['y', 4]]);
+});
+
+test('새로고침: 남긴 글에 저장 댓글이 있으면 새 댓글이 없어도 「댓글이 하나도 없어요」가 아니다', () => {
+  const st = { posts: [post(100002, { comments: [cm('a', 'ㅋㅋㅋ'), cm('b', '진짜?'), cm('c', '무섭다')] })], archive: [], dms: [], sources: {}, seq: 100002 };
+  const o = { nick: '나', settings: C.gnetSettings({}), date: '2025.01.02 10:00' };
+  const r = C.applyBoard(st, st, { posts: [{ id: 100002, views: 9, upvotes: 2, comments: [] }] }, o);
+  assert.equal(r.emptyComments, false);
+  assert.equal(r.st.posts[0].comments.length, 3);
+  const bare = { posts: [post(100002)], archive: [], dms: [], sources: {}, seq: 100002 };
+  assert.equal(C.applyBoard(bare, bare, { posts: [{ id: 100002, views: 9, upvotes: 2, comments: [] }] }, o).emptyComments, true);
+});
+
+test('메인 요청: 같은 안내문의 둘째 게시판은 안내문 없이 만들어 상한에서 세지 않고, 앞 게시판이 비면 안내문을 옮겨 붙인다', () => {
+  const st = board();
+  C.advanced.applyAdvanced({ [ADV('ctx_focus')]: '0' });
+  const RULE = 'LONGRULE '.repeat(300);
+  const full = C.mainContext(st, '나', RULE, null, '괴담갤');
+  const bare = C.mainContext(st, '나', '', null, '괴담갤');
+  assert.ok(bare.startsWith('[MODULE_CONTEXT_BEGIN]\n{"feature":"gnet","site":"괴담갤"'), '빈 안내문이면 빈 줄도 없다');
+  // 게시판별 상한이 안내문 크기만큼 작으면 안내문을 세는 쪽은 글이 덜 들어간다
+  const cap = C.tokens(bare);
+  C.advanced.applyAdvanced({ [ADV('ctx_focus')]: '0', [ADV('ctx_tokens')]: String(cap) });
+  assert.equal(C.mainContext(st, '나', '', null, '괴담갤'), bare);
+  assert.ok(C.mainContext(st, '나', RULE, null, '괴담갤').length < full.length);
+  C.advanced.applyAdvanced({ [ADV('ctx_focus')]: '0' });
+  const first = C.mainContext(st, '나', RULE, null, '괴담넷');
+  assert.deepEqual(C.shareContextRules([first, bare], [RULE, RULE]), [first, bare]);
+  // 앞 게시판 덩어리가 비면 다음 덩어리가 안내문을 갖는다
+  assert.equal(C.shareContextRules(['', bare], [RULE, RULE])[1], full);
+  C.advanced.applyAdvanced({});
+});
+
+test('위키 자동 작성: 제목 고르기 요청이 요청 토큰 상한을 넘으면 모델을 부르지 않고, 위키 화면에 까닭을 남긴다', async () => {
+  // 채팅 저장·모델 호출만 바꿔 끼운 위키 화면 모듈
+  const stubs = {
+    'host/risu': `let chat = null; export const setChat = (c) => { chat = c; };
+      export async function updateChat(a, b, f) { chat = f(chat); return chat; }
+      export async function getChar() { return null; } export async function updateCharacterLore() { return true; } export async function setAssetCopy() { return []; }
+      export function onLoreSaved() { return () => {}; } export function notifyLoreSaved() {} export async function loadContext() { return null; }`,
+    'host/llm': `export const calls = []; export class LlmError extends Error {}
+      export async function generate(messages) { calls.push(messages); throw new Error('stub'); }
+      export const stripThoughts = (s) => s; export async function runModel() { return ''; }`,
+  };
+  const out = await build({
+    stdin: { contents: "export { autoWriteWiki, wiki, wikiOpenCheck } from './src/ui/wiki'; export { setChat } from './src/host/risu'; export { calls } from './src/host/llm';", resolveDir: process.cwd(), loader: 'ts' },
+    bundle: true, format: 'esm', write: false, platform: 'browser', target: 'es2022', charset: 'utf8', loader: { '.txt': 'text' }, logLevel: 'error',
+    plugins: [{ name: 'stub', setup(b) {
+      b.onResolve({ filter: /host\/(risu|llm)$/ }, (a) => ({ path: a.path.match(/host\/(risu|llm)$/)[0], namespace: 'stub' }));
+      b.onLoad({ filter: /.*/, namespace: 'stub' }, (a) => ({ contents: stubs[a.path], loader: 'js' }));
+    } }],
+  });
+  const W = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
+  const lore = [{ comment: '🚧괴이', key: 'folder:a', mode: 'folder', content: '' }, { comment: '명일 아파트', key: 'Myeongil Apartment, 명일 아파트', content: '설정', mode: 'normal', folder: 'folder:a' }];
+  const chat = { message: [{ role: 'user', data: '가 '.repeat(400), chatId: 'u1' }, { role: 'char', data: '나 '.repeat(400), chatId: 'c1' }], scriptstate: { $nw_auto: 'open', $nw_adv_budget: '50' }, localLore: [] };
+  W.setChat(chat);
+  const ctx = { charIndex: 0, chatIndex: 0, char: { name: '괴이', desc: '', globalLore: lore }, chat };
+  let renders = 0;
+  const env = { render: () => renders++, refresh: async () => {}, current: () => ctx };
+  W.wikiOpenCheck(ctx, env);
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(W.calls.length, 0, '상한을 넘는 요청은 보내지 않는다');
+  assert.ok(W.wiki.notice.startsWith('자동 작성 제목을 고르지 못했어요.'), W.wiki.notice);
+  assert.ok(W.wiki.notice.includes('토큰 상한'));
+  assert.ok(renders > 0);
 });

@@ -525,14 +525,15 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
   const focus = makeFocus(scene, buildRegistry(char.globalLore));
   // 기능마다 반영 상한 안에서 고르고, 합이 「본편 반영 총 상한」을 넘으면 상한을 나눠 다시 고른다 (core/budget.ts fitTotal)
   const parts: ContextPart[] = [];
-  // 게시판 덩어리의 안내문 (parts 앞쪽과 같은 차례)
+  // 게시판 덩어리의 안내문 (parts 앞쪽과 같은 차례). 앞 게시판과 글자까지 같은 안내문은 빈 글로 만들어 상한에서 세지 않는다 (shareContextRules)
   const boardRules: string[] = [];
   for (const { site, view } of boardsOn) {
     const rule = mainContextRules({ char: src.char, chat: view });
     const st = readGnet(view);
     // 어느 게시판 글인지 이름을 붙인다 (전수검사 11-13: 네 게시판이 모두 feature:'gnet' 으로만 갔다)
     if (rule && (st.posts.length || st.dms.length)) {
-      parts.push({ cap: GN_CONTEXT.tokens, build: (cap) => withCap(GN_CONTEXT, 'tokens', cap, () => mainContext(st, userNick(ss), rule, focus, BOARD_NAME[site])) });
+      const own = !boardRules.includes(rule) ? rule : '';
+      parts.push({ cap: GN_CONTEXT.tokens, build: (cap) => withCap(GN_CONTEXT, 'tokens', cap, () => mainContext(st, userNick(ss), own, focus, BOARD_NAME[site])) });
       boardRules.push(rule);
     }
   }
@@ -548,7 +549,7 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
   if (wantWiki && rules.wiki) parts.push({ cap: advNum(ss, 'nw', 'ctx_tokens'), build: (cap) => wikiMainContext(chat, rules.wiki!, focus, cap) });
   if (wantHs) parts.push({ cap: hsMainSettings(ss).tokens, build: (cap) => hsMainContext(chat, hsMainRules(), focus, cap) });
   const texts = fitTotal(parts, advNum(ss, 'gen', 'ctx_total'));
-  // 게시판 여럿의 안내문이 글자까지 같으면 처음 붙는 덩어리에만 둔다
+  // 게시판 여럿의 안내문이 글자까지 같으면 처음 붙는 덩어리에만 둔다 (앞 덩어리가 비었으면 다음 덩어리로 옮긴다)
   const n = boardRules.length;
   return [...shareContextRules(texts.slice(0, n), boardRules), ...texts.slice(n)].filter(Boolean);
 }
