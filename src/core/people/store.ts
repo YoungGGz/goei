@@ -412,13 +412,16 @@ export function unreadIndexes(chat: Chat, store: PeopleStore): number[] {
   return out;
 }
 
-/** 안 읽은 응답을 「지금 갱신」이 읽을 새 것(마지막으로 읽은 응답 뒤, 읽은 적이 없으면 마지막 하나)과 「지난 응답 읽기」 몫(그 앞)으로 나눈다 */
+/** 안 읽은 응답을 「지금 갱신」이 읽을 새 것(마지막으로 읽은 응답 뒤, 읽은 적이 없으면 마지막 하나)과 「지난 응답 읽기」 몫(그 앞)으로 나눈다.
+ *  남은 지난 응답이 첫 장면(채팅 맨 앞의 봇 메시지) 하나뿐이면 새 것과 같이 읽는다: 첫 응답만 읽으면 첫 장면이 「지난 응답 1개 안 읽음」으로 끝까지 남았다 (11-15 사용자) */
 export function splitUnread(chat: Chat, store: PeopleStore): { newer: number[]; older: number[] } {
   const all = unreadIndexes(chat, store);
   const list = msgs(chat);
   const lastRead = Math.max(-1, ...list.map((m, i) => (store.read[messageKey(m, i)] !== undefined ? i : -1)));
   const newer = lastRead < 0 ? all.slice(-1) : all.filter((i) => i > lastRead);
-  return { newer, older: all.filter((i) => !newer.includes(i)) };
+  const older = all.filter((i) => !newer.includes(i));
+  if (newer.length && older.length === 1 && older[0] === 0) return { newer: [0, ...newer], older: [] };
+  return { newer, older };
 }
 
 export function markRead(store: PeopleStore, chat: Chat, indexes: number[]): void {

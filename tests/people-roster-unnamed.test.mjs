@@ -845,3 +845,21 @@ test('메인 요청·Router: 호칭 기록은 이름이 아니라는 표시가 �
   assert.ok(!('provisional' in rows.김철수));
   assert.match(router.system, /`provisional`/);
 });
+
+test('첫 장면은 첫 응답과 같이 읽는다: 「지난 응답 1개 안 읽음」으로 남지 않는다', () => {
+  const m = (role, data, chatId) => ({ role, data, chatId });
+  const fresh = { message: [m('char', '첫 장면', 'o'), m('user', '가자', 'u1'), m('char', '첫 응답', 'c1')] };
+  const st = T.emptyStore();
+  assert.deepEqual(S.splitUnread(fresh, st), { newer: [0, 2], older: [] });
+  // 이미 첫 응답만 읽고 첫 장면이 남은 채팅: 다음 새 응답과 같이 읽는다
+  S.markRead(st, fresh, [2]);
+  assert.deepEqual(S.splitUnread(fresh, st), { newer: [], older: [0] }, '새 응답이 없으면 그대로');
+  const next = { message: [...fresh.message, m('user', '다음', 'u2'), m('char', '둘째 응답', 'c2')] };
+  assert.deepEqual(S.splitUnread(next, st), { newer: [0, 4], older: [] });
+  // 기능을 중간에 켠 긴 채팅: 지난 응답은 사용자가 고르는 몫으로 남는다
+  const long = { message: [m('char', '첫 장면', 'o'), m('user', '1', 'u1'), m('char', 'a', 'c1'), m('user', '2', 'u2'), m('char', 'b', 'c2')] };
+  assert.deepEqual(S.splitUnread(long, T.emptyStore()), { newer: [4], older: [0, 2] });
+  // 맨 앞이 사용자 글이면(첫 장면 없음) 해당 없음
+  const noScene = { message: [m('user', '1', 'u1'), m('char', 'a', 'c1'), m('user', '2', 'u2'), m('char', 'b', 'c2')] };
+  assert.deepEqual(S.splitUnread(noScene, T.emptyStore()), { newer: [3], older: [1] });
+});

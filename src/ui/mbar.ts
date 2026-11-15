@@ -10,7 +10,11 @@ export function mbarHtml(items: string[]): string {
 /** 당긴 거리 → 보이는 거리 (끌수록 무거워진다) */
 const rubber = (dx: number, w: number) => Math.sign(dx) * (Math.abs(dx) / (1 + Math.abs(dx) / (4 * w)));
 
-export function bindMbar(root: HTMLElement, onClose: () => void): void {
+/** 위아래로 이만큼 쓸면 서랍을 연다·닫는다 */
+const SWIPE_Y = 18;
+
+/** onDrawer: 바를 위로 쓸면 true(서랍 열기), 아래로 쓸면 false (11-15 사용자: 작은 손잡이 대신 바를 쓸어서) */
+export function bindMbar(root: HTMLElement, onClose: () => void, onDrawer?: (open: boolean) => void): void {
   const bar = root.querySelector<HTMLElement>('.gx-mbar');
   const track = bar?.querySelector<HTMLElement>('.gx-mtrack');
   if (!bar || !track) return;
@@ -51,7 +55,15 @@ export function bindMbar(root: HTMLElement, onClose: () => void): void {
     if (e.pointerId !== id) return;
     const dx = e.clientX - x0;
     if (!dragging) {
-      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(e.clientY - y0)) return;
+      const dy = e.clientY - y0;
+      if (onDrawer && Math.abs(dy) >= SWIPE_Y && Math.abs(dy) > Math.abs(dx)) {
+        // 한 번 쓸면 한 번만. 놓을 때 그 자리 버튼이 눌리지 않게 dragging 으로 표시해 둔다 (아래 click 이 삼킨다)
+        id = null;
+        dragging = true;
+        onDrawer(dy < 0);
+        return;
+      }
+      if (Math.abs(dx) < 8 || Math.abs(dx) < Math.abs(dy)) return;
       dragging = true;
       bar.setPointerCapture?.(e.pointerId);
     }

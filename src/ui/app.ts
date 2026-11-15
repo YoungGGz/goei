@@ -1681,7 +1681,25 @@ function render(): void {
   root.querySelectorAll<HTMLElement>('[data-sh-log]').forEach((el) => (el.scrollTop = el.scrollHeight));
   labelSwitches(root);
   bindMapZoom(root);
-  bindMbar(root, () => void run('close'));
+  const setDrawer = (open: boolean) => {
+    if (cdrOpen === open) return;
+    cdrOpen = open;
+    syncDrawer();
+  };
+  bindMbar(root, () => void run('close'), setDrawer);
+  // 펼친 서랍 줄을 아래로 쓸어도 닫힌다
+  const cpanel = root.querySelector<HTMLElement>('.gx-cpanel');
+  if (cpanel) {
+    let y0: number | null = null;
+    cpanel.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+    cpanel.addEventListener('pointermove', (e) => {
+      if (y0 === null || e.clientY - y0 < 18) return;
+      y0 = null;
+      setDrawer(false);
+    });
+    cpanel.addEventListener('pointerup', () => { y0 = null; });
+    cpanel.addEventListener('pointercancel', () => { y0 = null; });
+  }
   bindDrawer(root);
   bindWikiSide(root, (v) => void run('wiki-list', v));
   bindFootnotes(root);
@@ -1998,7 +2016,8 @@ function mobileBar(item: NavItem, unreadPhone: boolean, ctx: ChatContext | null,
   return drawer ? commonDrawer(ctx) + bar : bar;
 }
 
-/** 폰 공용 서랍: 바 위 가운데 납작한 손잡이(48×8, 바와 같은 색). 누르면 인터넷 사이트 전부와 설정이 두 줄(4개씩)로 올라온다
+/** 폰 공용 서랍: 바 위 가운데 납작한 손잡이(48×8, 바와 같은 색)는 표시일 뿐 눌리지 않는다 (그 자리를 눌러도 뒤의 기능바가 눌린다).
+ *  하단 바를 위로 쓸면 인터넷 사이트 전부와 설정이 올라오고, 바나 서랍 줄을 아래로 쓸면 내려간다 (11-15 사용자: 손잡이가 작고 기능바와 붙어 잘못 눌렸다)
  *  (2026-11-08 사용자: 인터넷 하나를 두지 말고 하위 사이트를 다 꺼내 둔다. 누르면 그 사이트 탭으로) */
 function commonDrawer(ctx: ChatContext | null): string {
   const here = inBrowser() ? curTab().site : null;

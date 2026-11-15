@@ -630,7 +630,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   /* 하단 바 (v0.16.23): 위키·임무·상황판·괴담톡·괴담넷 다섯 칸, 가운데 상황판이 홈. 닫기는 양 끝 밖에 숨었다가 당기면 나온다 (ui/mbar.ts) */
   .gx-nav { padding: 2px 0 calc(2px + env(safe-area-inset-bottom)); }
   .gx-nav > .gx-nb { display: none; }
-  .gx-mbar { display: block; flex: 1; min-width: 0; overflow: hidden; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+  .gx-mbar { display: block; flex: 1; min-width: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
   .gx-mtrack { position: relative; display: flex; will-change: transform; }
   .gx-mtrack.back { transition: transform .26s cubic-bezier(.2, .9, .3, 1.25); }
   /* 2026-10-19 사용자: 하단 바를 다시 크게 */
@@ -3553,10 +3553,10 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-cdr { --cdr-grip: 8px; --cdr-pad: 10px; --cdr-move: .26s; display: block; position: absolute; left: 0; right: 0; bottom: calc(100% + 1px); height: 0; z-index: 4; pointer-events: none; clip-path: inset(-100vh 0 0 0); }
   .gx-cslide { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; transform: translateY(calc(100% - var(--cdr-grip))); transition: transform var(--cdr-move) cubic-bezier(.22, .8, .3, 1); will-change: transform; }
   .gx-cdr.open .gx-cslide { transform: none; }
-  .gx-cgrip { flex: none; position: relative; z-index: 2; width: 48px; height: var(--cdr-grip); padding: 0; border: 1px solid var(--line); border-bottom: 0; border-radius: 5px 5px 0 0; background: var(--sunk); display: flex; align-items: center; justify-content: center; pointer-events: auto; cursor: pointer; touch-action: none; }
+  .gx-cgrip { flex: none; position: relative; z-index: 2; width: 48px; height: var(--cdr-grip); padding: 0; border: 1px solid var(--line); border-bottom: 0; border-radius: 5px 5px 0 0; background: var(--sunk); display: flex; align-items: center; justify-content: center; pointer-events: none; }
   .gx-cgrip i { width: 18px; height: 2px; border-radius: 2px; background: var(--dim); }
   .gx-cdr.open .gx-cgrip i { background: var(--signal); }
-  .gx-cpanel { align-self: stretch; flex: none; height: 56px; padding: 6px 8px var(--cdr-pad); box-sizing: border-box; display: flex; gap: 4px; background: var(--panel); border-top: 1px solid var(--line2); box-shadow: 0 -10px 20px -14px rgba(0, 0, 0, 0); visibility: hidden; transition: visibility 0s linear var(--cdr-move), box-shadow var(--cdr-move) ease-out; pointer-events: none; }
+  .gx-cpanel { touch-action: none; align-self: stretch; flex: none; height: 56px; padding: 6px 8px var(--cdr-pad); box-sizing: border-box; display: flex; gap: 4px; background: var(--panel); border-top: 1px solid var(--line2); box-shadow: 0 -10px 20px -14px rgba(0, 0, 0, 0); visibility: hidden; transition: visibility 0s linear var(--cdr-move), box-shadow var(--cdr-move) ease-out; pointer-events: none; }
   .gx-cdr.open .gx-cpanel { visibility: visible; box-shadow: 0 -10px 20px -14px rgba(0, 0, 0, .6); transition-delay: 0s; pointer-events: auto; }
   @media (prefers-reduced-motion: reduce) { .gx-cslide, .gx-cpanel { transition: none; } }
   .gx-cpanel .ph-tool { flex: 1; height: 44px; gap: 4px; }
