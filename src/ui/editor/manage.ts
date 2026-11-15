@@ -15,7 +15,8 @@ import { clearTrace, loadTrace, onTraceChange } from '../../host/trace';
 import { tracePage, traceUi } from './trace';
 import { ensureFlow } from './flow';
 import { flowPage, flowView } from './flowpage';
-import { updateCharacterLore, updateChat, type ChatContext } from '../../host/risu';
+import { setAssetCopy, updateCharacterLore, updateChat, type ChatContext } from '../../host/risu';
+import { ASSET_COPY_NAME, assetCopyCount, makeAssetCopy, sameAssetCopy } from '../../core/world/assetcopy';
 import { readDirectoryData, withDirectory, type DirectoryData } from '../../core/world/directory';
 import { boardFailures, clearBoardFailures } from '../gnet';
 import { phone } from '../phone';
@@ -180,6 +181,14 @@ function backupPage(ctx: ChatContext, canChat: boolean): string {
       ${defRow('기본값 불러오기', canChat ? '저장해 둔 기본값을 지금 채팅에 가져와요.' : '채팅을 시작한 뒤에 쓸 수 있어요. 새 채팅은 기본값으로 시작해요.', 'load', '불러오기', !canChat)}
       ${defRow('초기화', '지금 채팅의 설정과 저장해 둔 기본값, 고친 지침, 고친 세계(카드 명부)를 플러그인 원래 값으로 되돌려요. 상황판 켜기·끄기와 추가 규칙은 그대로 둬요.', 'reset', '초기화', !canChat)}
     </div></section>${mainDefaultsConfirm(ctx)}`;
+  // 에셋용 사본 (사용자 2026-11-15): 카드 로어북을 읽는 다른 플러그인용. 이 플러그인은 읽지 않는다 (core/world/assetcopy.ts)
+  const copyNow = ctx.char.assetCopy ?? [];
+  const copyN = assetCopyCount(copyNow);
+  const copyFresh = makeAssetCopy(ctx.char.globalLore ?? []);
+  const agentN = assetCopyCount(copyFresh);
+  const copyOld = copyN > 0 && !sameAssetCopy(copyNow, copyFresh);
+  const copyCtl = `<span class="gw-tokens">${copyN ? `${copyN}명${copyOld ? ' · 지금 설정과 다름' : ''}` : '없음'}</span><button class="gx-mini" data-action="man-asset-put" ${agentN && (!copyN || copyOld) ? '' : 'disabled'}>${copyN ? '다시 넣기' : '넣기'}</button><button class="gx-mini" data-action="man-asset-drop" ${copyN ? '' : 'disabled'}>빼기</button>`;
+  const assetCopy = `<section class="ps-group"><h3>에셋용 사본</h3><div class="ps-rows">${row('요원 로어북 사본', copyCtl, `봇 카드의 로어북을 직접 읽는 다른 플러그인(에셋 메이드 등)이 요원 설정을 볼 수 있게, 요원 ${agentN}명의 로어북 사본을 봇 카드 로어북의 「${ASSET_COPY_NAME}」 폴더에 넣어요. 이 플러그인과 Risu는 이 폴더를 읽지 않아서 대화에 들어가지 않고 토큰도 늘지 않아요. 세계 설정에서 요원을 고친 뒤에는 「다시 넣기」를 눌러야 사본도 바뀌어요. 「빼기」는 이 폴더만 지워요.`)}</div></section>`;
   return `<div class="gw-page gw-set">${head('', '저장·불러오기', '설정은 고치는 즉시 저장돼요. 여기서는 기본값을 저장·불러오기·초기화하고, 설정을 글(JSON)로 내보내고 가져와요.')}
     <div class="gx-settings gw-setbody">
     ${defaults}
@@ -190,6 +199,7 @@ function backupPage(ctx: ChatContext, canChat: boolean): string {
         <div class="ps-ctl"><label class="pp-check"><input type="checkbox" data-change="man-with-chat" ${withChat ? 'checked' : ''}> 넣기</label></div></div>` : ''}
       ${importRows}
     </div></section>
+    ${assetCopy}
     <section class="ps-group"><h3>저장소 사용량 <small>이 기기 플러그인 저장소에 있는 것</small></h3><div class="ps-rows">${store}</div></section>
     </div></div>`;
 }
@@ -345,6 +355,19 @@ export async function manageAction(action: string, root: HTMLElement | null, ctx
         manUi.info = '진단 묶음 내려받기를 시작했어요. 제보할 때 이 파일 하나를 보내면 돼요.';
       } catch (error) {
         manUi.notice = `내려받지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+      }
+      return true;
+    }
+    case 'man-asset-put':
+    case 'man-asset-drop': {
+      if (!ctx) return true;
+      const put = action === 'man-asset-put';
+      try {
+        ctx.char.assetCopy = await setAssetCopy(ctx.charIndex, put);
+        const n = assetCopyCount(ctx.char.assetCopy);
+        manUi.info = put ? `요원 ${n}명의 사본을 봇 카드 로어북 「${ASSET_COPY_NAME}」 폴더에 넣었어요.` : `봇 카드 로어북에서 「${ASSET_COPY_NAME}」 폴더를 뺐어요.`;
+      } catch (error) {
+        manUi.notice = `${put ? '넣지' : '빼지'} 못했어요: ${error instanceof Error ? error.message : String(error)}`;
       }
       return true;
     }

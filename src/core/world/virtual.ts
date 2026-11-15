@@ -9,6 +9,7 @@ import { setActiveWorld, worldDataGen, worldRecords, worldRelations, type WorldO
 import type { WorldKind } from './schema';
 import { GUIDE_NAMES, getUserRules, guidePrompt, guideOverridden, guideText } from '../guides';
 import { FACTION_BOOK, TAG_BOOK } from '../factions';
+import { splitAssetCopy } from './assetcopy';
 
 export const ROSTER_BOOK = '🙂Roster';
 /** 상시 지침 가상 항목: 카드에 같은 이름의 진짜 항목이 없을 때만 (Risu 순서 100·101·102) */
@@ -68,7 +69,8 @@ function entry(kind: WorldKind, name: string, key: string, content: string, fold
  * 1차(명부 읽기)는 카드 로어북만으로 하고, 가상 항목을 더한 뒤 명부를 다시 읽으면 새 요원·괴이가 폴더 항목으로 들어온다.
  */
 export function withWorldLore(lore: LoreEntry[] | undefined): LoreEntry[] {
-  const base = stripVirtual(lore ?? []);
+  // 에셋용 사본 폴더는 다른 플러그인이 읽는 것이라 이 플러그인은 보지 않는다 (core/world/assetcopy.ts)
+  const base = splitAssetCopy(stripVirtual(lore ?? [])).rest;
   // 같은 내용이면 지난번 가상 항목을 그대로 쓴다. 카드 항목은 이번에 받은 것 그대로 (전수검사 11-13)
   const print = fingerprint(base);
   if (memo && memo.print === print) {
