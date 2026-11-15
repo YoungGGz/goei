@@ -810,7 +810,8 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     const raws: string[] = [];
     // 남긴 글의 댓글 번호 읽기. 지금 지침: 새 댓글만 돌려주고 번호는 「저장 댓글 1..k, 새 댓글 k+1..」.
     // 옛 지침(저장 댓글을 그대로 다시 쓰고 번호는 돌려준 배열 차례)으로 온 응답도 받는다: 앞 k줄이 모두 저장 댓글과 같으면 옛 꼴.
-    // 새 댓글 하나가 저장 댓글과 우연히 같아도(짧은 반응 줄) 새 꼴로 읽어 다른 새 댓글의 parent 번호를 지킨다
+    // 새 댓글 하나가 저장 댓글과 우연히 같아도(짧은 반응 줄) 새 꼴로 읽어 다른 새 댓글의 parent 번호를 지킨다.
+    // 앞 k줄이 모두 같아도(저장 댓글 1개, 반복되는 짧은 반응) 어느 댓글의 parent 가 옛 꼴로는 자기 뒤(i+1 이상)이고 새 꼴로는 자기 앞이면 새 꼴
     const savedCount = prev ? prev.comments.length : 0;
     const sameAsSaved = (c: unknown): boolean => {
       if (!isObj(c)) return false;
@@ -818,7 +819,12 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
       const t = stripForged(str(c.content));
       return sigs.has(`${a}\0${t}`) || loose.has(`${a}\0${attachShape(t)}`) || loose.has(`${a}\0${t.trim()}`);
     };
-    const onlyNew = savedCount > 0 && !(comments.length >= savedCount && comments.slice(0, savedCount).every(sameAsSaved));
+    const newOnlyParent = (c: unknown, i: number): boolean => {
+      const p = isObj(c) ? int(c.parent) : null;
+      return p !== null && p >= i + 1 && p < savedCount + i + 1;
+    };
+    const oldShape = comments.length >= savedCount && comments.slice(0, savedCount).every(sameAsSaved) && !comments.some(newOnlyParent);
+    const onlyNew = savedCount > 0 && !oldShape;
     if (onlyNew) for (let k = 1; k <= savedCount; k++) remap.set(k, k);
     comments.forEach((c, i) => {
       const n = onlyNew ? savedCount + i + 1 : i + 1;

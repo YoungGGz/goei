@@ -263,6 +263,18 @@ test('새로고침: 새 댓글 하나가 저장 댓글과 같아도 다른 새 �
     [['a', 0], ['b', 0], ['c', 0], ['x', 3], ['y', 4]]);
 });
 
+test('새로고침: 앞 새 댓글이 모두 저장 댓글과 같아도 parent 가 새 번호로만 맞으면 새 꼴로 읽는다', () => {
+  const st = { posts: [post(100002, { comments: [cm('a', 'ㅋㅋㅋ')] })], archive: [], dms: [], sources: {}, seq: 100002 };
+  const o = { nick: '나', settings: C.gnetSettings({}), date: '2025.01.02 10:00' };
+  const got = (comments) => C.applyBoard(st, st, { posts: [{ id: 100002, views: 9, upvotes: 2, comments }] }, o).st.posts[0].comments.map((c) => [c.nick, c.parent]);
+  // 새 꼴: 저장 1개 뒤에 2·3·4. 2번(a:ㅋㅋㅋ)은 저장 1번과 같아 버리고, x 는 1번(a)에, y 는 3번(x)에
+  assert.deepEqual(got([{ author: 'a', content: 'ㅋㅋㅋ', parent: 0 }, { author: 'x', content: 'a에게 답', parent: 1 }, { author: 'y', content: 'x에게 답', parent: 3 }]),
+    [['a', 0], ['x', 1], ['y', 2]]);
+  // 옛 꼴(저장 댓글을 앞에 그대로, 번호는 배열 차례)은 그대로
+  assert.deepEqual(got([{ author: 'a', content: 'ㅋㅋㅋ' }, { author: 'x', content: 'a에게 답', parent: 1 }, { author: 'y', content: 'x에게 답', parent: 2 }]),
+    [['a', 0], ['x', 1], ['y', 2]]);
+});
+
 test('새로고침: 남긴 글에 저장 댓글이 있으면 새 댓글이 없어도 「댓글이 하나도 없어요」가 아니다', () => {
   const st = { posts: [post(100002, { comments: [cm('a', 'ㅋㅋㅋ'), cm('b', '진짜?'), cm('c', '무섭다')] })], archive: [], dms: [], sources: {}, seq: 100002 };
   const o = { nick: '나', settings: C.gnetSettings({}), date: '2025.01.02 10:00' };
