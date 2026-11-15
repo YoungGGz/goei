@@ -10,7 +10,7 @@ import { setSitePicSource, attachAction, attachBody, attachEditor, attachInput, 
 import {
   applyEvents, bulletinUnread, callRecord, commitAnnouncements, commitInvitations, contactDetails, cooldownMark, directory, LIMITS, listedRooms,
   membership, parseRefresh, parseReply, personOf, phoneSettings, phoneTime, phoneValue, PH, PH_AUTO_LAST, PH_CONTACTS, PhoneError, push, readBulletins,
-  readCustom, readPhone, readRoom, refreshAllowed, roomLabel, unreadCount, unsolicited, keepValid, lastReply, validCallTarget, writeBulletins, writePhone,
+  readCustom, readPhone, readRoom, refreshAllowed, roomLabel, unreadCount, unsolicited, keepValid, lastReply, chatPrefixKept, validCallTarget, writeBulletins, writePhone,
   chancePassed, parseReactions, mergeHabits, parseHabits, type Contact, type Directory, type PRoom, type PState, contactId, splitRecords, noticeSettings, phoneStorage, STORAGE_MAX, hiddenPause, noticeLabel,
   BANTER_ROWS,
 } from '../core/phone';
@@ -403,13 +403,15 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
     });
     let note = '';
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-      if (automatic && (chat.message?.length ?? 0) !== startLength) {
-        note = '채팅이 이어져서 이번 자동 확인 결과는 저장하지 않았어요.';
+      // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
+      if (automatic && !chatPrefixKept(ctx.chat, chat)) {
+        note = '채팅이 바뀌어서 이번 자동 확인 결과는 저장하지 않았어요.';
         return null;
       }
       const cur = readPhone(chat);
       const set = phoneSettings(chat.scriptstate);
-      const time = phoneTime(chat);
+      // 시각은 요청한 턴의 것 (채팅이 이어졌으면 지금 시각은 다음 턴의 것이다)
+      const time = phoneTime((chat.message?.length ?? 0) === startLength ? chat : ctx.chat);
       let received = 0;
       let unsolicitedGot = false;
       for (const u of result.updates) {
@@ -813,14 +815,15 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
     let id = '';
     let roomName = value.name;
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-      if (automatic && (chat.message?.length ?? 0) !== startLength) {
-        note = '채팅이 이어져서 이번 보기 전용 방은 저장하지 않았어요.';
+      // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
+      if (automatic && !chatPrefixKept(ctx.chat, chat)) {
+        note = '채팅이 바뀌어서 이번 보기 전용 방은 저장하지 않았어요.';
         return null;
       }
       const list = readViews(chat.scriptstate);
       // 같은 인물들의 방이 있으면 거기에 이어 쓰고, 인물이 다르면 새 방 (11-07·11-15 사용자, core/phoneView.ts matchView)
       const cur = matchView(list, value);
-      const time = phoneTime(chat);
+      const time = phoneTime((chat.message?.length ?? 0) === startLength ? chat : ctx.chat);
       // 창이 닫혀 있으면 마지막 화면이 목록이어도 안 본 것 (전수검사 11-13)
       const seen = !automatic || (env.visible() && phone.sub === 'chats' && (phone.view === 'list' || (phone.view === 'view' && phone.viewId === cur?.id)));
       if (cur) {

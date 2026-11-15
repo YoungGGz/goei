@@ -129,11 +129,21 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
     {
       title: '참조',
       chips: [chip('desc', '봇 설명', 1), chip('authors', '작가 노트', 1), chip('persona', '페르소나', 1), chip('active', '상시 로어북', 1), chip('related', '인물 로어북', 1, '$ph_related'), chip('secondary', '2차 참조', 0)],
-      items: [turns(8), num('room_history', '방마다 참조할 말풍선', 100, 10, 1000, '개'), budget],
+      items: [
+        turns(8), num('room_history', '방마다 참조할 말풍선', 100, 10, 1000, '개'), budget,
+        // 답장·새 메시지 확인에 붙는 자료의 양 (기본값 = 전과 같은 동작)
+        num('board_posts', '괴담넷 글 참조', 8, 0, 8, '개', { zero: '안 넣음', hint: '답장·새 메시지 확인 요청에 참고로 넣는 괴담넷 글 수예요.' }),
+        num('cross_history', '다른 방 말풍선 참조', 1000, 0, 1000, '개', { zero: '안 넣음', hint: '참여자가 다른 방에서 주고받은 말을 한 사람당 몇 개까지 넣을지예요. 「지난 기록」 수를 넘지 않아요.' }),
+        num('check_contacts', '선톡·초대 후보', 0, 0, 500, '명', { zero: '제한 없음', hint: '새 메시지를 확인할 때 아직 대화한 적 없는 연락처를 몇 명까지 후보로 넣을지예요. 최근 챗로그에 이름이 나온 사람을 먼저 넣어요.' }),
+      ],
     },
     {
       title: '컨텍스트 포함',
-      chips: [chip('ctx_focus', '장면에 나온 것만', 1), chip('ctx_messages', '메시지', 1, '$ph_context_messages'), chip('ctx_notices_on', '공지', 1, '$ph_context_announcements')],
+      chips: [
+        chip('ctx_focus', '장면에 나온 것만', 1), chip('ctx_messages', '메시지', 1, '$ph_context_messages'), chip('ctx_notices_on', '공지', 1, '$ph_context_announcements'),
+        // 기본 끔: 켜면 메인 요청에 같이 붙는다 (컨텍스트 토큰 상한 안에서)
+        chip('ctx_views', '보기 전용 방', 0), chip('ctx_reactions', '이모지 반응', 0), chip('ctx_habits', '말버릇', 0),
+      ],
       items: [
         num('ctx_history', '넣을 말풍선', 200, 1, 1000, '개'),
         num('ctx_notices', '넣을 공지', 1, 0, 50, '개'),
@@ -294,6 +304,9 @@ export function applyAdvanced(state: State): void {
   PH_HISTORY.contextNotices = p('ctx_notices');
   PH_HISTORY.contextTokens = p('ctx_tokens');
   PH_HISTORY.focus = advOn(state, 'ph', 'ctx_focus');
+  PH_HISTORY.contextViews = advOn(state, 'ph', 'ctx_views');
+  PH_HISTORY.contextReactions = advOn(state, 'ph', 'ctx_reactions');
+  PH_HISTORY.contextHabits = advOn(state, 'ph', 'ctx_habits');
   PH_COOLDOWN.incoming = p('cd_incoming');
   PH_COOLDOWN.invitation = p('cd_invite');
 }

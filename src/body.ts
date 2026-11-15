@@ -14,8 +14,8 @@ import { evaluate } from './core/cbs';
 import { shouldKeepSeed } from './core/request';
 import { messageText } from './core/refs';
 import { insertedSystemTexts, processRequest, unwrapCalls, unwrapScenes, type PromptMessage } from './core/request';
-import { HISTORY as PH_HISTORY, hasCall, mainContext as phoneMainContext, phoneSettings, PH_STATE, PH_BULLETINS, readBulletins, readPhone, renderCalls } from './core/phone';
-import { viewSettings } from './core/phoneView';
+import { HISTORY as PH_HISTORY, hasCall, mainContext as phoneMainContext, phoneSettings, PH_STATE, PH_BULLETINS, readBulletins, readHabits, readPhone, renderCalls } from './core/phone';
+import { PH_VIEWS, readViews, viewSettings } from './core/phoneView';
 import { mainContextRules as phoneRules } from './core/phonePrompt';
 import { advNum, applyAdvanced, genSettings } from './core/advanced';
 import { fitTotal, type ContextPart } from './core/budget';
@@ -503,7 +503,7 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
   // 게시판 사이트마다 따로 (괴담넷·괴담갤·세정게·연어 마켓, 2026-11-08)
   const boardsOn = BOARD_SITES.map((site) => ({ site, view: boardView(chat, site) })).filter(({ view }) => !!view.scriptstate?.[GN_RAW] && gnetSettings(view.scriptstate).context);
   const wantGnet = boardsOn.length > 0;
-  const wantPhone = (!!ss?.[PH_STATE] || !!ss?.[PH_BULLETINS]) && phoneSettings(ss).context;
+  const wantPhone = (!!ss?.[PH_STATE] || !!ss?.[PH_BULLETINS] || !!ss?.[PH_VIEWS]) && phoneSettings(ss).context;
   const wantWiki = wikiContextOn(ss);
   // 망상홈쇼핑 시청 기록 (core/hslog.ts): 방송에서 실제로 본 것·친 채팅·주문. 기록이 있고 「본편에 넘기기」($hs_main)가 켜져 있을 때
   const wantHs = hsMainOn(ss);
@@ -529,7 +529,7 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
     try {
       const st = readPhone(chat);
       const notices = readBulletins(chat);
-      parts.push({ cap: PH_HISTORY.contextTokens, build: (cap) => withCap(PH_HISTORY, 'contextTokens', cap, () => phoneMainContext(st, notices, phoneSettings(ss), rules.phone!, focus)) });
+      parts.push({ cap: PH_HISTORY.contextTokens, build: (cap) => withCap(PH_HISTORY, 'contextTokens', cap, () => phoneMainContext(st, notices, phoneSettings(ss), rules.phone!, focus, { views: readViews(ss), habits: readHabits(ss) })) });
     } catch (error) {
       console.log(`[goei] 괴담톡 기록을 읽지 못했어요: ${error instanceof Error ? error.message : String(error)}`);
     }

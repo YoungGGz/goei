@@ -615,9 +615,8 @@ if (want('P1')) {
   await page.click('[data-action="ph-refresh"]');
   await idle(page);
   const body = JSON.parse(await page.evaluate(() => window.__calls.llm.at(-1).messages[1].content));
-  assert.equal(body.activityCheck.incoming, false, '선톡 대기 중');
   assert.equal(body.announcementCheck.allowed, true);
-  assert.equal(body.rooms.length, 0, '대화 없고 선톡 불가면 방 후보 없음');
+  assert.equal(body.rooms.length, 0, '선톡 대기 중: 대화 없고 선톡 불가면 방 후보 없음');
   assert.deepEqual(errors, []);
   console.log('PASS 괴담톡: 깨진 JSON 재시도·빈 응답·실패·검사 실패·확률 0·대기 턴·공지만');
   await page.close();

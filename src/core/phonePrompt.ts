@@ -8,9 +8,9 @@ import {
   refreshAllowed, roomLabel, PhoneError, type AnnouncementCheck, type Contact, type Directory, type InvitationCheck, type PMsg, type PPerson, type PRoom,
   type PState, phoneTime, hiddenPause, cooldownReady, readHabits,
 } from './phone';
-import { applyAdvanced, genSettings, type RefToggles } from './advanced';
+import { advNum, applyAdvanced, genSettings, type RefToggles } from './advanced';
 import { fnHistory, fnNum, fnRefs } from './reffn';
-import { viewRooms, viewSettings, type ViewRoom } from './phoneView';
+import { viewRooms, viewSettings, VIEW_LIMITS, type ViewRoom } from './phoneView';
 import { craftMessages, craftSettings, memoTexts, retryAnalyze, type CraftMessage } from './craft';
 import { fillVars, guideDefaultSec, guideTxt, GUIDE_LABEL } from './guides';
 import { trimRelated, trimSecondary, trimTurns } from './budget';
@@ -54,14 +54,14 @@ interface Body {
   narratorOnly: Narrator;
   crossRoomMessages?: unknown[];
   publicBoard?: unknown;
-  announcementCheck?: Omit<AnnouncementCheck, 'channel'>;
-  activityCheck?: { incoming: boolean; groupInvites: boolean };
-  invitationCheck?: InvitationCheck;
+  /** 이번에 받을 수 없으면 allowed:false 만 (지난 공지·후보 목록은 받을 수 있을 때만 쓰인다) */
+  announcementCheck?: Pick<AnnouncementCheck, 'allowed'> & Partial<Omit<AnnouncementCheck, 'channel'>>;
+  invitationCheck?: Pick<InvitationCheck, 'allowed'> & Partial<InvitationCheck>;
   textingHabits?: { sender: string; note: string }[];
 }
 
 /** 원본 ruleBuilder: 실제 요청에 해당하는 섹션만 */
-function rules(src: RefSource, body: Body, mode: 'REPLY' | 'REFRESH'): string {
+function rules(src: RefSource, body: Body, mode: 'REPLY' | 'REFRESH', named = false): string {
   const p = sections(src);
   const keys = ['COMMON'];
   let direct = false;
@@ -91,6 +91,8 @@ function rules(src: RefSource, body: Body, mode: 'REPLY' | 'REFRESH'): string {
     const action = body.room?.action?.type ?? 'refresh';
     const map: Record<string, string> = { send: 'ACTION_SEND', invite_initial: 'ACTION_INVITE_INITIAL', invite_more: 'ACTION_INVITE_MORE', refresh: 'ACTION_REFRESH' };
     keys.push(map[action] ?? 'ACTION_REFRESH');
+    // 방 이름을 지어도 된다는 글은 이름 없이 만든 단톡에만 (직접 적은 이름은 바뀌지 않는다). 옛 지침에 절이 없으면 붙이지 않는다
+    if (action === 'invite_initial' && !named && p.ACTION_INVITE_NAME !== undefined) keys.push('ACTION_INVITE_NAME');
   } else {
     if (body.rooms?.some((x) => x.banter) && p.BANTER !== undefined) keys.push('BANTER');
     if (body.invitationCheck?.allowed) keys.push('GROUP_INVITES');
@@ -115,12 +117,11 @@ interface RoomPacket {
   name: string;
   privateDirection: string;
   activeMembers: string[];
-  participants: { id: string; name?: string }[];
-  pov: 'me';
+  /** 지금은 방에 없지만 기록에 나오는 사람 (지금 있는 사람은 맨 위 participants 에 있다) */
+  formerMembers?: { id: string; name: string }[];
   messages: { sender: string; type: string; time: string; content: string; audience: string[]; recordID: number; reactions?: string }[];
   conversationState: ReturnType<typeof conversationState> & { directReplyPending?: boolean; followupAlreadySent?: boolean; defaultNextAction?: string };
   candidateOnly: boolean;
-  directoryEstablishesRelationship: false;
   action: { type: string; invited?: string[] };
   receiveMessages?: boolean;
   /** 단톡 수다를 꼭 만들 방 */
@@ -145,15 +146,15 @@ export function roomPacket(r: PRoom, reactions = false, limit = HISTORY.room): R
       recordID: m.id,
       ...(reactions && m.kind === 'message' ? { reactions: m.reactions || '-' } : {}),
     }));
-  const participants: RoomPacket['participants'] = [{ id: 'me' }, ...Object.entries(r.people).map(([id, c]) => ({ id, name: c.name }))];
+  const former = Object.entries(r.people).filter(([id]) => !r.members.includes(id)).map(([id, c]) => ({ id, name: c.name }));
   const hasTalk = !!r.conversationBaseline?.lastSender || r.messages.some((m) => m.kind === 'message');
   const conv: RoomPacket['conversationState'] = conversationState(r);
   conv.directReplyPending = r.kind === 'dm' && !!conv.ownerHasNotReplied;
   conv.followupAlreadySent = conv.directReplyPending ? !!r.followupSent : false;
   if (conv.directReplyPending) conv.defaultNextAction = 'wait_for_owner';
   return {
-    id: r.id, kind: r.kind, name: roomLabel(r), privateDirection: r.topic ?? '', activeMembers: r.members, participants, pov: 'me', messages,
-    conversationState: conv, candidateOnly: !hasTalk && r.kind === 'dm', directoryEstablishesRelationship: false, action: r.pending?.action ?? { type: 'refresh' },
+    id: r.id, kind: r.kind, name: roomLabel(r), privateDirection: r.topic ?? '', activeMembers: r.members, ...(former.length ? { formerMembers: former } : {}), messages,
+    conversationState: conv, candidateOnly: !hasTalk && r.kind === 'dm', action: r.pending?.action ?? { type: 'refresh' },
   };
 }
 
@@ -164,7 +165,6 @@ interface Participant {
   factionDisplayName?: string;
   rank?: string;
   department?: string;
-  source: string;
   lore: string;
   hasCharacterLore: boolean;
   manuallySavedContact: boolean;
@@ -175,20 +175,18 @@ interface Participant {
 
 function participant(src: RefSource, c: PPerson, related: boolean, status: boolean, names: Record<string, string>): Participant {
   let lore = '';
-  let title = '';
   if (related) {
     const candidates = c.custom ? [c.name] : c.lore ? [c.lore] : [`${c.english} ${c.name}`, `${c.name} ${c.english}`, c.name, c.english ?? ''];
     for (const n of candidates) {
       const t = bookText(src, n);
       if (t) {
         lore = t;
-        title = n;
         break;
       }
     }
   }
   return {
-    sender: c.id, name: c.name, faction: c.group, factionDisplayName: names[c.group ?? ''] ?? c.group, rank: c.rank, department: c.department, source: title, lore,
+    sender: c.id, name: c.name, faction: c.group, factionDisplayName: names[c.group ?? ''] ?? c.group, rank: c.rank, department: c.department, lore,
     hasCharacterLore: !!lore.trim(), manuallySavedContact: !!c.custom, contactMemo: c.custom ? c.note ?? '' : undefined,
     narratorOnlyAgentStatus: status && c.agentId ? agentStatus(src.chat, c.agentId) : undefined,
   };
@@ -197,9 +195,7 @@ function participant(src: RefSource, c: PPerson, related: boolean, status: boole
 interface Narrator {
   owner: { name: string; faction: string; factionDisplayName: string; character?: string; rank?: string };
   recentStory: { role: string; text: string; turn: number }[];
-  currentSceneEntries: number;
   currentSceneTime: string;
-  factionLabels: Record<string, string>;
   universe: { characterDescription: string; authorsNote: string; userPersona?: string; activeLoreBooks: { source: string; content: string; kind: string }[] };
 }
 
@@ -219,7 +215,6 @@ function narrator(src: RefSource, names: Record<string, string>, fn: string, t: 
     if (t.user) recentStory.push({ role: 'user', text: t.user, turn: i + 1 });
     for (const c of t.char) recentStory.push({ role: 'char', text: c, turn: i + 1 });
   });
-  const last = turns[turns.length - 1];
   const faction = String(src.chat.scriptstate?.['$st_faction'] ?? '') || 'none';
   const rows = collectRefs(src, {
     scope: 'phone', text: `${text}\n${recentStory.map((m) => m.text).join('\n')}`, description: t.description, authors: t.authors, persona: t.persona,
@@ -234,7 +229,7 @@ function narrator(src: RefSource, names: Record<string, string>, fn: string, t: 
   }
   return {
     owner: { name: guideTxt('Common', 'REFS.USER_NAME'), faction, factionDisplayName: names[faction] ?? faction, ...ownerCharacter(src) },
-    recentStory, currentSceneEntries: last ? (last.user ? 1 : 0) + last.char.length : 0, currentSceneTime: phoneTime(src.chat), factionLabels: names, universe,
+    recentStory, currentSceneTime: phoneTime(src.chat), universe,
   };
 }
 
@@ -288,7 +283,7 @@ function firstContact(p: Participant, body: Body, st: PState): boolean {
   return !Object.values(st.rooms).some((r) => r.messages.some((m) => m.kind === 'message' && m.sender === p.sender));
 }
 
-function finish(src: RefSource, st: PState, body: Body, mode: 'REPLY' | 'REFRESH', names: Record<string, string>): PhonePrompt {
+function finish(src: RefSource, st: PState, body: Body, mode: 'REPLY' | 'REFRESH', names: Record<string, string>, named = false): PhonePrompt {
   // 인물 로어북이 participants[].lore 와 universe.activeLoreBooks 에 똑같이 두 번 실리지 않게 참여자 쪽만 남긴다 (전수검사 11-13, 확인 1회 약 1.7만 토큰)
   const ownLore = body.participants.map((p) => p.lore).filter((l): l is string => typeof l === 'string' && !!l);
   if (ownLore.length) body.narratorOnly.universe.activeLoreBooks = body.narratorOnly.universe.activeLoreBooks.filter((b) => !ownLore.some((l) => l.includes(b.content)));
@@ -298,7 +293,7 @@ function finish(src: RefSource, st: PState, body: Body, mode: 'REPLY' | 'REFRESH
     const rows = readHabits(src.chat.scriptstate).filter((h) => ids.has(h.id)).map((h) => ({ sender: h.id, note: h.note }));
     if (rows.length) body.textingHabits = rows;
   }
-  const system = rules(src, body, mode);
+  const system = rules(src, body, mode, named);
   const p = sections(src);
   const read = (k: string) => (p[k] === undefined ? '' : section(p, k));
   const messages: CraftMessage[] = [
@@ -311,8 +306,11 @@ function finish(src: RefSource, st: PState, body: Body, mode: 'REPLY' | 'REFRESH
 }
 
 function gnetBoard(src: RefSource, query: string): unknown {
+  // 「괴담넷 글 참조」 수 (0 = 안 넣음)
+  const max = advNum(src.chat.scriptstate, 'ph', 'board_posts');
+  if (!max) return undefined;
   try {
-    return publicBoard(readGnet(src.chat), query, publicAccess(src)) ?? undefined;
+    return publicBoard(readGnet(src.chat), query, publicAccess(src), max) ?? undefined;
   } catch {
     return undefined;
   }
@@ -326,9 +324,9 @@ export function replyPrompt(src: RefSource, st: PState, r: PRoom, dir: Directory
   const packet = roomPacket(r, set.reactions, history);
   const participants = r.members.map((cid) => participant(src, dir.map.get(cid) ?? r.people[cid] ?? { id: cid, name: cid }, t.related && !trimRelated(), set.status, names));
   const body: Body = { room: packet, participants, narratorOnly: narrator(src, names, 'reply', t, JSON.stringify(packet)) };
-  crossRoom(body, st, history);
+  crossRoom(body, st, Math.min(history, advNum(src.chat.scriptstate, 'ph', 'cross_history')));
   body.publicBoard = gnetBoard(src, JSON.stringify(packet));
-  return finish(src, st, body, 'REPLY', names);
+  return finish(src, st, body, 'REPLY', names, !!r.name);
 }
 
 export interface RefreshPlan {
@@ -362,10 +360,21 @@ export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names:
     }
   }
   if (incomingOn || inviteOn) {
+    // 「선톡·초대 후보」 수: 대화한 적 없는 연락처가 그보다 많으면 최근 챗로그에 이름이 나온 사람 먼저, 나머지는 무작위로 그 수만큼만
+    const max = advNum(chat.scriptstate, 'ph', 'check_contacts');
+    const blank = dir.contacts.filter((c) => !st.rooms[`dm_${c.id}`]);
+    let picked: Set<string> | null = null;
+    if (max > 0 && blank.length > max) {
+      const story = recentTurns(chat, fnNum(chat.scriptstate, 'ph', 'check', 'turns'), true).map((x) => `${x.user ?? ''}\n${x.char.join('\n')}`).join('\n');
+      const ranked = blank.map((c) => ({ id: c.id, hit: c.name.trim().length >= 2 && story.includes(c.name.trim()), r: rng() }));
+      ranked.sort((a, b) => (a.hit !== b.hit ? (a.hit ? -1 : 1) : a.r - b.r));
+      picked = new Set(ranked.slice(0, max).map((x) => x.id));
+    }
     for (const c of dir.contacts) {
       const rid = `dm_${c.id}`;
       const existing = st.rooms[rid];
       if (seen.has(rid) || existing?.pending) continue;
+      if (!existing && picked && !picked.has(c.id)) continue;
       if (existing && !(refreshAllowed(chat, existing, set, incomingOn)[0] || inviteOn)) continue;
       candidates.push(existing ?? { id: rid, kind: 'dm', members: [c.id], people: { [c.id]: personOfContact(c) }, messages: [], draft: '', unread: 0 });
       seen.add(rid);
@@ -402,10 +411,11 @@ export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names:
   void _channel;
   const invite = invitationPacket(st, participants.map((p) => p.sender), inviteOn);
   const body: Body = {
-    rooms, participants, narratorOnly: narrator(src, names, 'check', t, JSON.stringify(rooms)), announcementCheck: publicAnnounce,
-    activityCheck: { incoming: incomingOn, groupInvites: inviteOn }, invitationCheck: invite,
+    rooms, participants, narratorOnly: narrator(src, names, 'check', t, JSON.stringify(rooms)),
+    // 이번에 받을 수 없는 공지·초대는 자료(지난 공지, 후보·기존 단톡 목록)를 싣지 않는다: 그 자료를 쓰는 지침 절이 그때는 붙지 않는다
+    announcementCheck: announce.allowed ? publicAnnounce : { allowed: false }, invitationCheck: invite.allowed ? invite : { allowed: false },
   };
-  crossRoom(body, st, history);
+  crossRoom(body, st, Math.min(history, advNum(src.chat.scriptstate, 'ph', 'cross_history')));
   body.publicBoard = gnetBoard(src, JSON.stringify(rooms));
   return { prompt: finish(src, st, body, 'REFRESH', names), selected, receive, announce, invite, reason: '', cap: eventCap(chat.scriptstate, rooms.some((x) => x.banter)) };
 }
@@ -436,10 +446,12 @@ export function refreshRetry(prompt: PhonePrompt, reason: string): PhonePrompt['
 export function viewPrompt(src: RefSource, names: Record<string, string>, views: ViewRoom[]): PhonePrompt {
   const set = viewSettings(src.chat.scriptstate);
   const p = sections(src);
-  const opt = (k: string) => (p[k] === undefined ? '' : section(p, k));
+  const opt = (k: string) => (p[k] === undefined ? '' : section(p, k).replace(/__VIEW_LIMIT_(messages|text)__/g, (_, k2: 'messages' | 'text') => String(VIEW_LIMITS[k2])));
   const keys = ['VIEW.COMMON'];
   if (set.preset === 'side') keys.push('VIEW.SIDE', `VIEW.SIDE.SPEAK.${set.speak ? 1 : 0}`, `VIEW.SCOPE.${set.scope}`, ...(set.size === '0' ? [] : [`VIEW.SIZE.${set.size}`]));
   else keys.push('VIEW.MIND', set.preset === 'mono' ? 'VIEW.MONO' : 'VIEW.MULTI', ...(set.preset === 'multi' ? [`VIEW.MULTI.SPEAK.${set.speak ? 1 : 0}`] : []));
+  // 반응 칸은 「이모지 반응」이 켜져 있고 참여자가 둘 이상일 수 있는 종류에만 요청한다 (혼잣말은 한 명이라 반응이 저장되지 않는다)
+  if (set.preset !== 'mono' && phoneSettings(src.chat.scriptstate).reactions) keys.push('VIEW.REACTIONS');
   keys.push('VIEW.OUTPUT');
   // 지침 속 낱말이 아니라 절이 있는지로 본다 (전수검사 11-13)
   if (p['VIEW.OUTPUT'] === undefined) throw new PhoneError(`${GUIDE_LABEL.Phone} 지침에 보기 전용 방 섹션이 없어요.`);

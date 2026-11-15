@@ -45,6 +45,10 @@ const ANSWERED = [
   [" Reuse labels already used on the board when they fit; supplied tags on retained posts are records, never change them.", " Reuse labels already used on the board when they fit. A retained post keeps its saved tag; return a tag for it only when it has none."],
   ["Keep asset_src=\"\". ", ""],
   [" asset_src=\"\"", ""],
+  // 11-15 사용자(토큰 낭비 점검): 관전 출력의 반응 칸은 따로 절(VIEW.REACTIONS)로 — 이모지 반응이 꺼져 있거나 혼잣말이면 요청하지 않는다. 저장 상한(말풍선 수·글자 수)을 지침에 적는다
+  [',"reactions":"-"}]}.', '}]}.'],
+  [' reactions is "-" or space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants.', ' At most 30 messages; each text content at most 600 characters.'],
+  ['OUTPUT CONTRACT\nReturn exactly {"name":"room name"', 'EMOJI REACTIONS\nA text message in the output may also carry "reactions": space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants. Omit it when there are none.\n\nOUTPUT CONTRACT\nReturn exactly {"name":"room name"'],
 ];
 const moved = Object.entries(OLD.sections).flatMap(([file, list]) => list.map(([name, body]) => ({ file, name, body })));
 

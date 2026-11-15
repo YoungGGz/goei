@@ -198,8 +198,11 @@ test('main context lists messages and the latest notice', () => {
   assert.match(out, /^\[MODULE_CONTEXT_BEGIN\]\nRULES\n/);
   const json = JSON.parse(out.split('\n')[2]);
   assert.equal(json.feature, 'phone');
-  assert.deepEqual(json.records.map((x) => x.kind), ['message', 'message', 'announcement']);
+  // 보통 말풍선은 종류를 싣지 않는다. 방 이름·받는 사람은 rooms 에 한 번만, 기록에는 방 ID 만
+  assert.deepEqual(json.records.map((x) => x.kind), [undefined, undefined, 'announcement']);
   assert.equal(json.records[0].sender, '주인공');
+  assert.deepEqual(json.rooms, { dm_c_1: { title: '상대', recipients: ['상대'] } });
+  assert.deepEqual(Object.keys(json.records[0]), ['room', 'sender', 'text', 'time']);
   assert.equal(P.mainContext(st, b, P.phoneSettings({ '$ph_context': '0' }), 'R'), '');
 });
 
@@ -230,4 +233,174 @@ test('이름을 정하지 않은 단톡방은 남은 사람 이름으로 부른�
   const st = P.readPhone({ scriptstate: { [P.PH_STATE]: JSON.stringify({ version: 2, seq: 1, mid: 0, rooms: { g_1: room }, order: ['g_1'] }) } });
   assert.equal(P.roomLabel(st.rooms.g_1), '송주익');
   assert.equal(P.roomLabel({ ...room, name: '야간조' }), '야간조');
+});
+
+// ── 토큰 낭비 점검 (2026-11-15) ──
+const { advanced: ADV, tokens: countTokens, G_POST_BASE: POST_BASE, addUserPost: userPost, writeGnet: saveGnet } = await import('../dist-test/core.mjs');
+
+test('메인 요청 기록: 받는 사람이 방의 것과 다를 때만 기록에 따로 싣는다', () => {
+  ADV.applyAdvanced({});
+  const st = P.blankState();
+  const g = { id: 'g_1', kind: 'group', name: '모임', members: ['c_1', 'c_2'], people: { c_1: { id: 'c_1', name: '가' }, c_2: { id: 'c_2', name: '나' }, c_3: { id: 'c_3', name: '다' } }, messages: [], draft: '', unread: 0 };
+  st.rooms[g.id] = g;
+  P.push(st, g, 'c_1', '하나', 't1');
+  P.push(st, g, 'c_2', '둘', 't2');
+  g.members.push('c_3');
+  P.push(st, g, 'c_3', '셋', 't3');
+  const json = JSON.parse(P.mainContext(st, { items: [] }, P.phoneSettings({}), 'R').split('\n')[2]);
+  assert.deepEqual(json.rooms, { g_1: { title: '모임', recipients: ['가', '나'] } });
+  assert.deepEqual(json.records.map((x) => x.recipients), [undefined, undefined, ['가', '나', '다']]);
+  assert.deepEqual(json.records.map((x) => x.text), ['하나', '둘', '셋'], '시간 순 그대로');
+  assert.ok(!/"title":"모임".*"title":"모임"/.test(JSON.stringify(json)), '방 이름은 한 번만');
+});
+
+test('메인 요청 기록: 보기 전용 방·이모지 반응·말버릇은 칩을 켰을 때만, 토큰 상한 안에서', () => {
+  const st = P.blankState();
+  const r = dmRoom('c_1');
+  st.rooms[r.id] = r;
+  P.push(st, r, 'me', '안녕', 't');
+  P.push(st, r, 'c_1', '응', 't');
+  r.messages[0].reactions = '👍1';
+  const views = [{ id: 'v_1', preset: 'side', name: '퇴근길', pov: 'p1', people: [{ id: 'p1', name: '에일린' }, { id: 'p2', name: '동료' }], time: 't',
+    unread: false, messages: [{ sender: '-', type: 'time', text: 't' }, ...Array.from({ length: 40 }, (_, i) => ({ sender: i % 2 ? 'p1' : 'p2', type: 'text', text: `관전 말 ${i} ${'가나다라'.repeat(10)}` }))] }];
+  const extra = { views, habits: [{ id: 'c_1', name: '상대', note: '마침표를 안 찍는다' }, { id: 'c_9', name: '남', note: '기록에 없는 사람' }] };
+  const set = P.phoneSettings({});
+  try {
+    ADV.applyAdvanced({});
+    const off = P.mainContext(st, { items: [] }, set, 'R', null, extra);
+    assert.doesNotMatch(off, /viewOnlyRooms|관전 말|textingHabits|reactions|👍/, '기본은 끔: 전과 같다');
+    assert.equal(P.mainContext(P.blankState(), { items: [] }, set, 'R', null, extra), '', '끄면 관전 방만 있어도 아무것도 안 붙는다');
+
+    ADV.applyAdvanced({ '$ph_adv_ctx_views': '1', '$ph_adv_ctx_reactions': '1', '$ph_adv_ctx_habits': '1' });
+    const on = P.mainContext(st, { items: [] }, set, 'R', null, extra);
+    const lines = on.split('\n');
+    const json = JSON.parse(lines[lines.length - 2]);
+    assert.match(on, /viewOnlyRooms are not messenger traffic/, '관전 방 설명 글이 같이 붙는다');
+    assert.match(on, /textingHabits are preserved notes/);
+    assert.equal(json.viewOnlyRooms[0].kind, 'side');
+    assert.equal(json.viewOnlyRooms[0].viewpoint, '에일린');
+    assert.equal(json.viewOnlyRooms[0].messages.at(-1).text, views[0].messages.at(-1).text, '최근 말부터');
+    assert.equal(json.viewOnlyRooms[0].messages.at(-1).sender, '에일린', '말한 사람은 이름으로');
+    assert.equal(json.records[0].reactions, '👍1');
+    assert.deepEqual(json.textingHabits, [{ sender: '상대', note: '마침표를 안 찍는다' }], '기록에 말한 사람 것만');
+    assert.ok(P.mainContext(P.blankState(), { items: [] }, set, 'R', null, extra).includes('관전 말 39'), '톡 기록이 없어도 관전 방은 붙는다');
+    // 기능을 꺼 두면 칩이 켜져 있어도 반응·말버릇은 붙지 않는다
+    const plain = P.mainContext(st, { items: [] }, P.phoneSettings({ '$ph_reactions': '0', '$ph_habits': '0' }), 'R', null, extra);
+    assert.doesNotMatch(plain, /textingHabits|👍/);
+
+    // 컨텍스트 토큰 상한을 지킨다
+    ADV.applyAdvanced({ '$ph_adv_ctx_views': '1', '$ph_adv_ctx_tokens': '600' });
+    const capped = P.mainContext(st, { items: [] }, set, 'R', null, extra);
+    assert.ok(countTokens(capped) <= 600, `상한 안 (${countTokens(capped)})`);
+    const cj = JSON.parse(capped.split('\n').at(-2));
+    assert.ok(cj.viewOnlyRooms[0].messages.length > 0 && cj.viewOnlyRooms[0].messages.length < json.viewOnlyRooms[0].messages.length, '상한에 맞춰 줄인다');
+    assert.equal(cj.records.length, 2, '톡 기록이 먼저');
+  } finally {
+    ADV.applyAdvanced({});
+  }
+});
+
+test('자동 호출 결과: 채팅 뒤에 메시지가 붙기만 했으면 쓰고, 앞 메시지가 바뀌었으면 버린다', () => {
+  const before = { message: [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }] };
+  assert.equal(P.chatPrefixKept(before, { message: [...before.message] }), true);
+  assert.equal(P.chatPrefixKept(before, { message: [...before.message, { role: 'user', data: 'c' }, { role: 'char', data: '' }] }), true, '다음 말을 보냈어도 그 턴의 결과는 그대로');
+  assert.equal(P.chatPrefixKept(before, { message: [before.message[0], { role: 'char', data: '다시 굴린 응답' }] }), false, '다시 굴림');
+  assert.equal(P.chatPrefixKept(before, { message: [before.message[0]] }), false, '지움');
+  const ui = readFileSync(new URL('../src/ui/phone.ts', import.meta.url), 'utf8');
+  assert.equal(ui.match(/if \(automatic && !chatPrefixKept\(ctx\.chat, chat\)\)/g)?.length, 2, '자동 확인·자동 관전 둘 다 이 판정을 쓴다');
+  assert.doesNotMatch(ui, /automatic && \(chat\.message\?\.length \?\? 0\) !== startLength/);
+});
+
+test('답장·확인 요청: 괴담넷 글·다른 방 말풍선·후보 수를 설정으로 줄이거나 끈다 (기본은 전과 같다)', { skip: !realLore }, () => {
+  const gst = { seq: POST_BASE, posts: [], dms: [], sources: {} };
+  for (let i = 0; i < 3; i++) userPost(gst, '나', `글 ${i}`, '본문', '2025.05.13 14:00');
+  const base = saveGnet(chatOf({}, [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }]), gst);
+  const d = P.directory(realLore, base);
+  const [a, b] = d.contacts;
+  const make = () => {
+    const st = P.blankState();
+    for (const c of [a, b]) { const r = dmRoom(c.id, { people: { [c.id]: P.personOf(c) } }); st.rooms[r.id] = r; }
+    const g = { id: 'g_1', kind: 'group', name: '모임', members: [a.id, b.id], people: { [a.id]: P.personOf(a), [b.id]: P.personOf(b) }, messages: [], draft: '', unread: 0 };
+    st.rooms[g.id] = g;
+    for (let i = 0; i < 3; i++) P.push(st, g, a.id, `단톡 말 ${i}`, '');
+    const r = st.rooms[`dm_${a.id}`];
+    P.push(st, r, 'me', '안녕', '');
+    r.pending = { status: 'error', action: { type: 'send' } };
+    return { st, r };
+  };
+  const reply = (vars) => { const { st, r } = make(); const chat = { ...base, scriptstate: { ...base.scriptstate, ...vars } }; return JSON.parse(PP.replyPrompt({ char: { globalLore: realLore }, chat }, st, r, d, {}).messages[1].content); };
+  const def = reply({});
+  assert.equal(def.publicBoard.posts.length, 3);
+  assert.equal(def.crossRoomMessages.length, 3);
+  assert.equal(reply({ '$ph_adv_board_posts': '1' }).publicBoard.posts.length, 1);
+  assert.equal(reply({ '$ph_adv_board_posts': '0' }).publicBoard, undefined);
+  assert.equal(reply({ '$ph_adv_cross_history': '1' }).crossRoomMessages.length, 1);
+  assert.equal(reply({ '$ph_adv_cross_history': '0' }).crossRoomMessages, undefined);
+  // 선톡·초대 후보 수
+  const check = (vars, rng = () => 0) => JSON.parse(PP.refreshPrompt({ char: { globalLore: realLore }, chat: { ...base, scriptstate: { ...base.scriptstate, ...vars } } }, P.blankState(), d, {}, rng).prompt.messages[1].content);
+  assert.equal(check({}).rooms.length, d.contacts.length, '기본은 전원');
+  const three = check({ '$ph_adv_check_contacts': '3' });
+  assert.equal(three.rooms.length, 3);
+  assert.equal(three.participants.length, 3);
+  // 최근 챗로그에 이름이 나온 사람이 먼저
+  const last = d.contacts.at(-1);
+  const named = { ...base, message: [{ role: 'user', data: 'a' }, { role: 'char', data: `${last.name}에게서 연락이 올 것 같다.` }] };
+  const one = JSON.parse(PP.refreshPrompt({ char: { globalLore: realLore }, chat: { ...named, scriptstate: { ...named.scriptstate, '$ph_adv_check_contacts': '1' } } }, P.blankState(), d, {}, Math.random).prompt.messages[1].content);
+  assert.equal(d.contacts.filter((c) => last.name.includes(c.name)).length, 1, '시험 전제: 이름이 겹치는 연락처가 없다');
+  assert.deepEqual(one.rooms.map((x) => x.id), [`dm_${last.id}`]);
+});
+
+test('확인 요청: 이번에 받을 수 없는 공지·초대의 자료와 쓰이지 않는 칸은 싣지 않는다', { skip: !realLore }, () => {
+  const chat = chatOf({ '$ph_announcements': '0', '$ph_group_invites': '0' }, [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }]);
+  const bulletins = { version: 2, seq: 1, items: [{ id: 1, order: 1, read: true, channel: 'A00', channelName: '관리국', issuer: '총무과', category: '공지', title: '지난 공지 제목', text: '지난 공지 본문', time: '' }], checks: {}, seen: {} };
+  chat.scriptstate['$ph_bulletins'] = JSON.stringify(bulletins);
+  const d = P.directory(realLore, chat);
+  const st = P.blankState();
+  const [a, b] = d.contacts;
+  const g = { id: 'g_1', kind: 'group', name: '모임', members: [a.id], people: { [a.id]: P.personOf(a), [b.id]: P.personOf(b) }, messages: [], draft: '', unread: 0 };
+  st.rooms[g.id] = g; st.order = [g.id];
+  P.push(st, g, b.id, '먼저 나갈게', '');
+  const plan = PP.refreshPrompt({ char: { globalLore: realLore }, chat }, st, d, { A00: '관리국' }, () => 0);
+  const text = plan.prompt.messages[1].content;
+  const body = JSON.parse(text);
+  assert.deepEqual(body.announcementCheck, { allowed: false });
+  assert.deepEqual(body.invitationCheck, { allowed: false });
+  assert.doesNotMatch(text, /지난 공지/);
+  assert.equal(plan.announce.recent.length, 1, '저장·검사에 쓰는 쪽은 그대로');
+  for (const k of ['activityCheck']) assert.ok(!(k in body), k);
+  for (const k of ['currentSceneEntries', 'factionLabels']) assert.ok(!(k in body.narratorOnly), k);
+  const room = body.rooms.find((x) => x.id === 'g_1');
+  for (const k of ['pov', 'directoryEstablishesRelationship', 'participants']) assert.ok(!(k in room), k);
+  assert.deepEqual(room.formerMembers, [{ id: b.id, name: b.name }], '나간 사람의 이름은 남긴다');
+  assert.ok(body.participants.every((x) => !('source' in x) && 'factionDisplayName' in x && 'manuallySavedContact' in x));
+  // 받을 수 있을 때는 전과 같이 싣는다
+  const on = JSON.parse(PP.refreshPrompt({ char: { globalLore: realLore }, chat: { ...chat, scriptstate: { ...chat.scriptstate, '$ph_announcements': '1', '$ph_group_invites': '1' } } }, st, d, { A00: '관리국' }, () => 0).prompt.messages[1].content);
+  assert.equal(on.announcementCheck.recent[0].title, '지난 공지 제목');
+  assert.ok(on.invitationCheck.candidates.length >= 2 && on.invitationCheck.existingGroups.length === 1);
+});
+
+test('단톡 만들기: 방 이름을 지어도 된다는 글은 이름을 비우고 만들 때만', { skip: !realLore }, () => {
+  const chat = chatOf({}, [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }]);
+  const d = P.directory(realLore, chat);
+  const [a, b] = d.contacts;
+  const sys = (name) => {
+    const st = P.blankState();
+    const g = { id: 'g_1', kind: 'group', name, members: [a.id, b.id], people: { [a.id]: P.personOf(a), [b.id]: P.personOf(b) }, messages: [], draft: '', unread: 0, pending: { status: 'error', action: { type: 'invite_initial', invited: [a.id, b.id] } } };
+    st.rooms[g.id] = g;
+    return PP.replyPrompt({ char: { globalLore: realLore }, chat }, st, g, d, {}).messages[0].content;
+  };
+  assert.match(sys(undefined), /"path":"\/name"/);
+  assert.match(sys('내가 지은 이름'), /invite_initial: the group and invitations already exist/);
+  assert.doesNotMatch(sys('내가 지은 이름'), /"path":"\/name"/);
+});
+
+test('관전: 반응 칸은 이모지 반응이 켜져 있고 혼잣말이 아닐 때만 요청하고, 저장 상한을 지침에 적는다', () => {
+  const src = (v) => ({ char: { name: '괴이', desc: '', globalLore: [] }, chat: { message: [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }], scriptstate: v, localLore: [] } });
+  const sys = (v) => PP.viewPrompt(src(v), {}, []).messages[0].content;
+  assert.match(sys({}), /may also carry "reactions"/);
+  assert.match(sys({ '$ph_view_preset': 'multi' }), /may also carry "reactions"/);
+  assert.doesNotMatch(sys({ '$ph_view_preset': 'mono' }), /reactions/);
+  assert.doesNotMatch(sys({ '$ph_reactions': '0' }), /reactions/);
+  assert.match(sys({ '$ph_view_preset': 'mono' }), /At most 30 messages; each text content at most 600 characters\./);
+  assert.doesNotMatch(sys({}), /__VIEW_LIMIT/);
 });
