@@ -232,6 +232,32 @@ test('명부 대조 인원 상한: 기본은 전원, 상한을 두면 글에 소
   }
 });
 
+// 토큰 점검 (11-15): 갱신기 자료의 문서 항목 상한 (기본 0 = 제한 없음)
+test('기록 문서 항목 상한: 기본은 전부, 상한을 두면 장면과 관련된 항목과 최근 항목부터 그 수만큼 (차례는 그대로)', () => {
+  const store = T.emptyStore();
+  store.people.나루 = npc('나루');
+  const c = chat(['user', '안녕', 'u1'], ['char', '옛일.', 'c1'], ['user', '다음', 'u2'], ['char', '나루가 창고 열쇠를 꺼냈다.', 'c2']);
+  const doc = (type, key, id, anchor, extra = {}) => ((store.docs[`${type}:${key}`] ??= { type, key, entries: [] }).entries.push({ id, text: `${key} 기록 ${id}`, src: 'story', anchor, seq: 1, ...extra }));
+  doc('event', '정전 사고', 'd1', 'c1');
+  doc('event', '회의', 'd2', 'c1', { who: ['나루'] });
+  doc('location', '옥상', 'd3', 'c1');
+  doc('item', '창고 열쇠', 'd4', 'c1');
+  doc('faction', '상인회', 'd5', 'c2');
+  doc('event', '지워진 일', 'd6', 'gone');
+  const now = (s) => U.buildUpdate(c, store, [3], { settings: s, system: '', values: {}, names: Sel.namesWith(store, []) }).data.docs_now.map((d) => d.id);
+  assert.equal(St.PP_DEFAULTS.docs_cap, '0');
+  assert.deepEqual(now(settings()), ['d1', 'd2', 'd3', 'd4', 'd5'], '기본: 살아 있는 항목 전부');
+  assert.deepEqual(now(settings({ $pp_docs_cap: '20' })), ['d1', 'd2', 'd3', 'd4', 'd5'], '상한 안이면 그대로');
+  // 2개: 장면 인물(나루)이 얽힌 d2, 이름이 글에 나온 d4
+  assert.deepEqual(now(settings({ $pp_docs_cap: '2' })), ['d2', 'd4']);
+  // 3개: 남는 자리는 최근 항목(d5)
+  assert.deepEqual(now(settings({ $pp_docs_cap: '3' })), ['d2', 'd4', 'd5']);
+  // 꺼진 종류는 상한과 무관하게 빠진다
+  assert.deepEqual(now(settings({ $pp_docs_cap: '3', $pp_docs_item: '0' })), ['d1', 'd2', 'd5']);
+  const row = Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === 'docs_cap');
+  assert.ok(row && row.help && row.ctl.opts[0][0] === '0', '정의표: 첫 선택지가 제한 없음');
+});
+
 test('새 인물: 역할·묘사로 된 이름을 코드가 걸러내지 않는다. 호칭(provisional)은 설정이 켜져 있을 때만 받는다', () => {
   const c = chat(['user', '택시를 탔다', 'u1'], ['char', '택시 기사가 백미러로 이쪽을 봤다. 붉은 코트의 여자가 옆자리에 앉았다.', 'c1']);
   const mk = () => {

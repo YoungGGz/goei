@@ -479,10 +479,10 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   if (settings.tidy === 'separate' && result.ran) {
     const now = await loadContext().catch(() => null);
     if (now && chatId(now) === id) {
-      // 같은 항목들로 이미 정리를 불렀는데도 상한 아래로 내려가지 않은 인물은 다시 부르지 않는다 (항목이 달라지면 다시 부른다)
-      if (tidyTried.chat !== id) tidyTried = { chat: id, keys: new Map() };
-      for (const { name: n, key } of tidyDue(peopleStore(now.chat), now.chat, settings, tidyTried.keys)) {
-        tidyTried.keys.set(n, key);
+      // 정리를 불렀는데도 상한 아래로 내려가지 않은 인물은 정리 자료가 충분히 늘 때까지 다시 부르지 않는다 (tidyDue)
+      if (tidyTried.chat !== id) tidyTried = { chat: id, chars: new Map() };
+      for (const { name: n, chars } of tidyDue(peopleStore(now.chat), now.chat, settings, tidyTried.chars)) {
+        tidyTried.chars.set(n, chars);
         const r = await consolidateInner(now, n, settings).catch((error) => ({ ok: false, message: String(error) }));
         if (!r.ok) result.skipped.push(`정리(${n}): ${r.message}`);
       }
@@ -493,8 +493,8 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   return result;
 }
 
-/** 별도 정리 호출을 이미 해 본 입력 (채팅마다, 인물 이름 → 입력 열쇠). 이 기기 메모리에만 둔다 */
-let tidyTried: { chat: string; keys: Map<string, string> } = { chat: '', keys: new Map() };
+/** 별도 정리 호출을 이미 해 본 입력 (채팅마다, 인물 이름 → 그때의 정리 자료 글자 수). 이 기기 메모리에만 둔다 */
+let tidyTried: { chat: string; chars: Map<string, number> } = { chat: '', chars: new Map() };
 
 const input0Names = (s: PeopleStore) => Object.keys(s.people);
 

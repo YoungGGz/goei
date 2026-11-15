@@ -111,6 +111,18 @@ export function cleanSpan(raw: string, cap: number): string {
   return `${head}\n${guideTxt('UpdaterExtra', 'SPAN.FOLD')}\n${tail}`;
 }
 
+/** 갱신기 자료의 문서 항목 (docs_now): 켜진 종류의 살아 있는 항목.
+ *  설정 「기록 문서 항목 상한」(0 = 제한 없음)을 넘으면 장면과 관련된 항목(문서 이름이 이 묶음의 글에 나왔거나 장면 인물이 얽힘)을 최근 것부터, 남는 자리는 나머지를 최근 것부터 채운다. 싣는 차례는 그대로 */
+export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[]) {
+  const rows = Object.values(store.docs).filter((d) => settings.features.has(docFeature(d.type) as Feature)).flatMap((d) => {
+    const named = !!d.key && texts.some((t) => t.includes(d.key));
+    return liveEntries(d.entries, live).map((e) => ({ near: named || (e.who ?? []).some((n) => scene.includes(n)), pos: live.at.get(e.anchor) ?? -1, seq: e.seq, item: { type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) } }));
+  });
+  if (settings.docsCap <= 0 || rows.length <= settings.docsCap) return rows.map((r) => r.item);
+  const keep = new Set([...rows].sort((a, b) => Number(b.near) - Number(a.near) || b.pos - a.pos || b.seq - a.seq).slice(0, settings.docsCap));
+  return rows.filter((r) => keep.has(r)).map((r) => r.item);
+}
+
 /** 인물 기록을 자료용으로 (칸별 id·본문, 상한을 넘으면 오래된 history·scene 부터 뺀다) */
 /** 인물의 살아 있는 기록 글자 수 (저장 상한 판정) */
 export function recordChars(p: Person, live: Liveness): number {
@@ -348,9 +360,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     ...(sceneBefore.length ? { scene_before: sceneBefore } : {}),
     ...(o.hints?.length ? { name_hints: o.hints.filter((h) => !store.people[h.name]).slice(0, 12) } : {}),
     ...(o.memory?.length ? { memory: o.memory } : {}),
-    docs_now: DOC_TYPES.some((t) => o.settings.features.has(docFeature(t) as Feature))
-      ? Object.values(store.docs).filter((d) => o.settings.features.has(docFeature(d.type) as Feature)).flatMap((d) => liveEntries(d.entries, live).map((e) => ({ type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) })))
-      : undefined,
+    docs_now: DOC_TYPES.some((t) => o.settings.features.has(docFeature(t) as Feature)) ? docsNow(store, live, o.settings, texts, chosen) : undefined,
     suspicion_now: o.settings.features.has('suspicion') && !o.settings.qualitative.has('suspicion') ? chosen.flatMap((n) => suspicionCases(store.people[n], live)) : undefined,
     npc_relations: o.settings.features.has('npc_emotion') ? true : undefined,
     ...(clock ? { rhythm_clock: rhythmClockLines(clock) } : {}),

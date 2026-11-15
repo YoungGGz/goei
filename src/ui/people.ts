@@ -388,13 +388,15 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('always', '', { ctl: `<input class="gx-search pp-always" data-change="pp-always" name="pp-always" value="${esc(v('always'))}" placeholder="예: 쟈알디, 스팡달" maxlength="400" aria-label="항상 포함할 인물">` }),
     ppRow('scene_carry', v('scene_carry') === '1' ? '1' : '0'),
     ppRow('block_cap', String(s.blockCap)),
-    (['docs_event', 'docs_location', 'docs_faction', 'docs_item'] as Feature[]).some((f) => s.features.has(f)) ? ppRow('docs_inject', s.docsInject ? '1' : '0') : '',
-    s.features.has('axes') ? ppRow('axes_obs_inject', s.axesObsInject ? '1' : '0') : '',
+    // 이 두 줄은 딸린 기능(문서 기록·성격)이 꺼져 있어도 보인다: 기능 줄이 이 칸보다 아래에 있어, 숨기면 한 번에 바꾼 값을 되돌릴 때 이 줄을 찾지 못한다
+    ppRow('docs_inject', s.docsInject ? '1' : '0'),
+    ppRow('axes_obs_inject', s.axesObsInject ? '1' : '0'),
   ].join('');
   const refRows = [
     ppRow('recent_msgs', String(s.recentMsgs)),
     ppRow('prev_pairs', String(s.prevPairs)),
     ppRow('span_cap', String(s.spanCap)),
+    ppRow('docs_cap', String(s.docsCap)),
     ppRow('hypa', v('hypa') === '1' ? '1' : '0'),
     s.hypa ? ppRow('hypa_items', String(s.hypaItems)) : '',
     s.hypa ? ppRow('hypa_cap', String(s.hypaCap)) : '',
