@@ -15,7 +15,7 @@ import {
   BANTER_ROWS,
 } from '../core/phone';
 import { refreshPrompt, refreshRetry, replyPrompt, viewPrompt } from '../core/phonePrompt';
-import { parseView, PH_VIEW_LAST, readViews, VIEW_HISTORY, VIEW_PRESETS, viewSettings, viewUnread, writeViews, type ViewRoom } from '../core/phoneView';
+import { matchView, parseView, PH_VIEW_LAST, readViews, VIEW_HISTORY, VIEW_PRESETS, viewSettings, viewUnread, writeViews, type ViewRoom } from '../core/phoneView';
 import { agentFace, imageUrl, stChip } from './images';
 import { readWorld, worldOn } from '../core/world/output';
 import { ICONS } from './icons';
@@ -809,19 +809,21 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
     });
     let note = '';
     let id = '';
+    let roomName = value.name;
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
       if (automatic && (chat.message?.length ?? 0) !== startLength) {
         note = '채팅이 이어져서 이번 보기 전용 방은 저장하지 않았어요.';
         return null;
       }
       const list = readViews(chat.scriptstate);
-      // 11-07 사용자: 매 턴 새 방을 파지 않는다 — 같은 종류는 한 방에 이어 쓴다
-      const cur = [...list].reverse().find((x) => x.preset === set.preset);
+      // 같은 인물들의 방이 있으면 거기에 이어 쓰고, 인물이 다르면 새 방 (11-07·11-15 사용자, core/phoneView.ts matchView)
+      const cur = matchView(list, value);
       const time = phoneTime(chat);
       // 창이 닫혀 있으면 마지막 화면이 목록이어도 안 본 것 (전수검사 11-13)
       const seen = !automatic || (env.visible() && phone.sub === 'chats' && (phone.view === 'list' || (phone.view === 'view' && phone.viewId === cur?.id)));
       if (cur) {
         id = cur.id;
+        roomName = cur.name;
         // 모델은 매번 p1, p2…를 새로 매긴다: 사람은 이름으로 맞추고, 번호가 겹치는 새 인물은 새 번호로 (전수검사 11-13)
         const remap = new Map<string, string>();
         const used = new Set([...cur.people, ...value.people].map((x) => x.id));
@@ -844,6 +846,9 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
         cur.unread = !seen;
         cur.messages.push({ sender: '-', type: 'time', text: time }, ...value.messages);
         if (cur.messages.length > VIEW_HISTORY) cur.messages.splice(0, cur.messages.length - VIEW_HISTORY);
+        // 방금 이어 쓴 방이 목록 맨 위로 (목록은 뒤에서부터 보인다)
+        list.splice(list.indexOf(cur), 1);
+        list.push(cur);
       } else {
         id = `v_${Date.now().toString(36)}`;
         list.push({ ...value, id, time, unread: !seen });
@@ -851,7 +856,7 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
       return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...writeViews(list) } };
     });
     if (id && !automatic) Object.assign(phone, { sub: 'chats', view: 'view', viewId: id });
-    else if (id) note = `「${value.name}」 방에 새 글이 왔어요.`;
+    else if (id) note = `「${roomName}」 방에 새 글이 왔어요.`;
     return note;
   });
 }

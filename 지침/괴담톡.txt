@@ -163,7 +163,7 @@ After the output contract block, and only there, you may append one <ph-habits>J
 VIEW-ONLY ROOM
 Generate one view-only room for the phone owner to read. The owner does not take part unless the owner is the viewpoint character; nobody in it can see the owner reading.
 Use viewpoint.name as the viewpoint character. Include that character in participants and set pov to that participant's ID. Give each participant a short stable ID such as p1, p2.
-Keep all content within the narrative's current endpoint (narratorOnly.recentStory and currentSceneTime). Leave pending choices, actions and outcomes unresolved. Limit each participant to what that participant could have witnessed, learned or received. Do not repeat earlier output; when previousRoom is given, continue from it and reuse its identities and names where they still fit.
+Keep all content within the narrative's current endpoint (narratorOnly.recentStory and currentSceneTime). Leave pending choices, actions and outcomes unresolved. Limit each participant to what that participant could have witnessed, learned or received. Do not repeat earlier output. rooms, when given, lists the existing view-only rooms of this kind with their recent messages. A room belongs to its participants: output with the same participants as a listed room is appended to that room, so continue from where that room stopped and keep its participant names exactly as listed. Output with different participants becomes a separate new room.
 Write each bubble as one immediate beat. Use as many messages as the moment warrants; six to twelve text rows is a typical range, not a target.
 @@END
 

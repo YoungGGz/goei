@@ -31,6 +31,8 @@ const ANSWERED = [
   [' Empty comments is [] only for a quiet thread.', ''],
   [' do not copy identical counts or treat every topic as a silent thread.', ' do not copy identical counts.'],
   [' Zero comments is valid for an individual quiet post, not a default for every topic.', ''],
+  // 11-15 사용자: 관전 방은 참여 인물마다 하나 (같은 인물들이면 이어 쓰고, 다르면 새 방)
+  ['Do not repeat earlier output; when previousRoom is given, continue from it and reuse its identities and names where they still fit.', 'Do not repeat earlier output. rooms, when given, lists the existing view-only rooms of this kind with their recent messages. A room belongs to its participants: output with the same participants as a listed room is appended to that room, so continue from where that room stopped and keep its participant names exactly as listed. Output with different participants becomes a separate new room.'],
 ];
 const moved = Object.entries(OLD.sections).flatMap(([file, list]) => list.map(([name, body]) => ({ file, name, body })));
 

@@ -10,7 +10,7 @@ import {
 } from './phone';
 import { applyAdvanced, genSettings, type RefToggles } from './advanced';
 import { fnHistory, fnNum, fnRefs } from './reffn';
-import { previousView, viewSettings, type ViewRoom } from './phoneView';
+import { viewRooms, viewSettings, type ViewRoom } from './phoneView';
 import { craftMessages, craftSettings, memoTexts, retryAnalyze, type CraftMessage } from './craft';
 import { fillVars, guideDefaultSec, guideTxt, GUIDE_LABEL } from './guides';
 import { trimRelated, trimSecondary, trimTurns } from './budget';
@@ -444,13 +444,13 @@ export function viewPrompt(src: RefSource, names: Record<string, string>, views:
   // 지침 속 낱말이 아니라 절이 있는지로 본다 (전수검사 11-13)
   if (p['VIEW.OUTPUT'] === undefined) throw new PhoneError(`${GUIDE_LABEL.Phone} 지침에 보기 전용 방 섹션이 없어요.`);
   const system = [...keys.map(opt).filter(Boolean), genSettings(src.chat.scriptstate).language ?? languageLine()].join('\n\n');
-  const previousRoom = previousView(views, set.preset, fnHistory(src.chat.scriptstate, 'ph', 'view'));
+  const rooms = viewRooms(views, set.preset, fnHistory(src.chat.scriptstate, 'ph', 'view'));
   const owner = ownerCharacter(src).character;
   const body = {
     viewpoint: { name: set.pov || owner || guideTxt('Common', 'REFS.USER_NAME'), isPhoneOwner: !set.pov || set.pov === owner },
     kind: set.preset,
-    ...(previousRoom ? { previousRoom } : {}),
-    narratorOnly: narrator(src, names, 'view', fnRefs(src.chat.scriptstate, 'ph', 'view'), `${set.pov}\n${JSON.stringify(previousRoom ?? '')}`),
+    ...(rooms.length ? { rooms } : {}),
+    narratorOnly: narrator(src, names, 'view', fnRefs(src.chat.scriptstate, 'ph', 'view'), `${set.pov}\n${rooms.length ? JSON.stringify(rooms) : ''}`),
   };
   const read = (k: string) => opt(k);
   const messages: CraftMessage[] = [
