@@ -65,11 +65,8 @@ export const shopAmountNone = (fn: ShopFn, key: ShopAmount): boolean => key === 
 
 /** 기능 표·양 표 한 칸의 변수 (세 가게가 같이 쓴다) */
 export const shopFnVar = (fn: ShopFn, key: GiveKey | ShopAmount): string => `$sh_fn_${fn}_${key}`;
-/** 그 기능에 없는 칸 (「–」): 1:1 상담은 맥락(신분·상태창·괴이·챗로그)을 요청문에 넣는 자리가 없다 */
-export const shopFnNone = (fn: ShopFn, key: GiveKey): boolean => fn === 'desk' && key === 'ctx';
 /** 기능 표 한 칸이 켜져 있나 */
 export function shopFnOn(vars: Vars, fn: ShopFn, key: GiveKey): boolean {
-  if (shopFnNone(fn, key)) return false;
   const v = vars?.[shopFnVar(fn, key)];
   return v === '1' || v === '0' ? v === '1' : key === 'ctx' ? true : FN_DEF[key];
 }

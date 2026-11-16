@@ -151,6 +151,11 @@ export interface DeskSource {
   /** 손님 사내 계정 이름 */
   nick: string;
   language: string | null;
+  /** 본편 맥락 (상점 문의와 같은 네 가지). 「맥락 반영」이 꺼져 있으면 빈 글 */
+  identity: string;
+  status: string;
+  situation: string;
+  story: string;
 }
 
 const G = () => guideSections('BmDesk');
@@ -161,6 +166,10 @@ const material = (src: DeskSource) => [
   src.refs ? `${guideTxt('BmDesk', 'HEAD_REFS')}\n${src.refs}` : '',
   guideTxt('BmDesk', 'SHELF', { shelf: src.shelf || guideTxt('BmDesk', 'NONE') }),
   guideTxt('BmDesk', 'CUSTOMER', { nick: src.nick || '-', points: Math.trunc(src.points).toLocaleString('en-US') }),
+  src.identity ? `${guideTxt('BmDesk', 'HEAD_PROTAGONIST')}\n${src.identity}` : '',
+  src.status ? `${guideTxt('BmDesk', 'HEAD_STATUS')}\n${src.status}` : '',
+  src.situation ? `${guideTxt('BmDesk', 'HEAD_SITUATION')}\n${src.situation}` : '',
+  src.story ? `${guideTxt('BmDesk', 'HEAD_STORY')}\n${src.story}` : '',
 ].filter(Boolean).join('\n\n');
 
 /** 상담사 만들기 + 첫 인사 */

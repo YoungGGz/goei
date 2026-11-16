@@ -12,7 +12,7 @@ import { HS_MAIN_SET, hsMainSettings, type HsLogKind } from '../core/hslog';
 import { SHOP_MAIN_ALL, SHOP_MAIN_KINDS, SHOP_MAIN_LABEL, SHOP_MAIN_LINES, SHOP_PLACES, shopMain, shopMainLines, type ShopPlace } from '../core/shopctx';
 import { advChipsCtl, advCtl } from './advanced';
 import { advValue } from '../core/advanced';
-import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopAmountNone, shopFnNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
+import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopAmountNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
 import { siteLogo } from './browser';
 import { ICONS } from './icons';
 import { ckWide, helpBox, mxGrid, numCtl, numSet, setGroup, setRow, setSeg, stepSize, type CkBand } from './setrow';
@@ -285,8 +285,8 @@ export function shopTable(vars: State, busy = false): string {
   /* ── 2. 기능마다 따로 정하는 값: 줄 = 진열·문의·1:1 상담·채팅 반응(망상홈쇼핑). 가게들이 한 값을 같이 쓴다 ($sh_fn_*) ── */
   const FL = SHOP_FNS.map((f) => nm('', f.label));
   const giveFn: CkBand = { title: '넘길 내용', groups: [{ name: '', opts: GIVE_OPTS, kind: 'check' }],
-    marks: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => (shopFnNone(f.key, k) ? null : shopFnOn(v, f.key, k)))),
-    acts: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => (shopFnNone(f.key, k) ? null : `s:shop:fn_${f.key}_${k}=${shopFnOn(v, f.key, k) ? '0' : '1'}`))),
+    marks: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => shopFnOn(v, f.key, k))),
+    acts: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => `s:shop:fn_${f.key}_${k}=${shopFnOn(v, f.key, k) ? '0' : '1'}`)),
     foot: helpBox('가게 표와 기능 표에서 모두 켠 것만 넘겨요. 「–」는 그곳에 없는 값이에요.') };
   const AMT = ['turns', 'refs', 'talk'] as const;
   const amountFn: CkBand = { title: '넘길 양', groups: AMT.map((k) => ({ name: SHOP_AMOUNTS[k].label, opts: [SHOP_AMOUNTS[k].unit], kind: 'num' as const })),

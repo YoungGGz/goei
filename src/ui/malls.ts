@@ -623,13 +623,13 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
 
 // ── 포인트몰 1:1 상담 (2026-11-09 사용자: 기능 없이 상담사와 대화하는 재미, 상담마다 다른 백일몽 직원) ──
 
-/** 상담사 모델에 넘길 자료: 백일몽 로어북·위키(넘길 내용·수는 설정 → 상점의 가게 표·기능 표·양 표 「1:1 상담」 줄), 지금 진열, 남은 포인트, 사내 계정 */
+/** 상담사 모델에 넘길 자료: 백일몽 로어북·위키(넘길 내용·수는 설정 → 상점의 가게 표·기능 표·양 표 「1:1 상담」 줄), 지금 진열, 남은 포인트, 사내 계정, 본편 맥락(「맥락 반영」이 켜져 있을 때. 상점 문의와 같은 네 가지) */
 export function deskSource(ctx: ChatContext): DeskSource {
   const vars = ctx.chat.scriptstate;
   const s = mallSettings(vars, 'bm');
   const st = readMall(vars, 'bm', aliveAnchors(ctx.chat));
   const src = shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: mallVars(vars, 'bm') as typeof ctx.chat.scriptstate } }, { ...st, shop: guideTxt('BmDesk', 'SHOP_NAME'), owner: '' }, s, shopGive(vars, 'bm', 'desk'));
-  return { refs: src.refs, shelf: onShelf(st).map((x) => guideTxt('BmDesk', 'SHELF_LINE', { name: x.name, price: x.price, desc: x.desc })).join('\n'), points: balanceOf(ctx, 'bm'), nick: loggedNick(ctx), language: src.language };
+  return { refs: src.refs, shelf: onShelf(st).map((x) => guideTxt('BmDesk', 'SHELF_LINE', { name: x.name, price: x.price, desc: x.desc })).join('\n'), points: balanceOf(ctx, 'bm'), nick: loggedNick(ctx), language: src.language, identity: src.identity, status: src.status, situation: src.situation, story: src.story };
 }
 
 async function saveDesk(ctx: ChatContext, st: DeskState) {
