@@ -59,6 +59,8 @@ const ANSWERED = [
   ["The \"owner\" is the 운영자. Buying is a bank transfer", "The \"owner\" is the 운영자. The material about the protagonist (identity, recent story) is for you as the writer: the 운영자 has not read it and knows the customer only by what they type and buy on this page. Buying is a bank transfer"],
   // 11-16 사용자: 포인트몰 1:1 상담도 본편 맥락을 받는다. 상담사는 그걸 읽은 사람이 아니다
   ["sees the counselor only as the code name on [손님에게 보이는 호칭]. Text chat only. Write in Korean.", "sees the counselor only as the code name on [손님에게 보이는 호칭]. Text chat only. The material about the customer under [주인공 신분], [상태창 — 지금 시각·장소], [진행 중 괴이·사건] and [최근 본문] is for you as the writer: the counselor has not read it and knows the customer only as the account under [손님] and by what they type in this chat. Write in Korean."],
+  // 11-16 사용자: 포인트몰 공지도 주인공 자료를 아는 것처럼 쓰지 않는다
+  ["There is no shopkeeper or chat; the \"owner\" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty.", "There is no shopkeeper or chat; the \"owner\" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty. The material about the protagonist (identity, recent story) is for you as the writer: the mall page does not know it, and the notice never refers to the customer or to what they are going through."],
   // 11-15 사용자: 같은 말 되풀이 줄이기. 상태창 이어 쓰기 안내는 직전 상태 블록에서 한 번만 (다시 물을 때의 분석 지시는 11-16 사용자 결정으로 원문 그대로)
   [' block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.', ' block just before the latest user input; follow the note in that block.'],
 ];
