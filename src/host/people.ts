@@ -648,7 +648,7 @@ async function hypaMemory(chat: Chat, char: { chaId?: string } | undefined, quer
 
 // ── 모델 Router (본편 앞, 설정 router=model) ──
 
-let routerCache: { key: string; selected: string[] } | null = null;
+let routerCache: { key: string; selected: string[]; hints: RouterHint[] } | null = null;
 let routerHints: RouterHint[] = [];
 // 2026-11-07: 시간 초과 누적으로 세션 끝까지 끄던 routerSlowStreak 는 뺌 (원본은 그 턴만 생략). 전수검사 2 의 A
 /** 마지막 Router 가 본 미등록 이름 (갱신기 힌트) */
@@ -656,12 +656,17 @@ export const routerHintsNow = (): RouterHint[] => routerHints;
 
 /** 모델이 고른 장면 인물. 실패·지연·빈 결과면 null (코드 Router 로). 입력·최근 글·명단이 같으면 재사용 */
 export async function routerPeople(chat: Chat, store: PeopleStore, input: string, settings: PeopleSettings, exclude: string[] = [], identityOf?: (name: string) => string | null | undefined, roster: RosterRow[] = []): Promise<string[] | null> {
+  // 힌트는 이번 턴의 Router 가 본 것만 간다: 부르지 않거나 실패한 턴에 지난 턴 힌트가 갱신기로 가지 않게 먼저 비운다 (같은 입력의 재사용은 그때 힌트를 다시 쓴다)
+  routerHints = [];
   if (settings.router !== 'model' || !Object.keys(store.people).length) return null;
   // 항상 포함·글에 나온 사람·동행·장면 유지만으로 장면 인물 자리가 찼으면 모델이 고른 인물은 들어갈 자리가 없다: 부르지 않는다
   if (sceneFullByCode(chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) return null;
   const names = allNames(roster);
   const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf });
-  if (routerCache?.key === built.key) return routerCache.selected;
+  if (routerCache?.key === built.key) {
+    routerHints = routerCache.hints;
+    return routerCache.selected;
+  }
   const t0 = Date.now();
   const diag: DiagRun = { at: new Date().toISOString(), chat: '', reason: 'router', model: settings.stageModel.router, people: [], indexes: [], sizes: { system: built.system.length, data: JSON.stringify(built.data).length, span: 0 }, outChars: 0, ms: 0, ok: false };
   try {
@@ -674,7 +679,7 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
     const r = parseRouter(raw, store, names, built.max);
     diag.people = r.selected;
     diag.ok = true;
-    routerCache = { key: built.key, selected: r.selected };
+    routerCache = { key: built.key, selected: r.selected, hints: r.newCharacters };
     routerHints = r.newCharacters;
     return r.selected.length ? r.selected : null;
   } catch (error) {

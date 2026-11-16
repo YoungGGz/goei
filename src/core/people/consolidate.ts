@@ -116,7 +116,7 @@ export function applyConsolidate(store: PeopleStore, who: string, input: Consoli
  *  - 줄일 수 있음 = 항목이 둘 이상인 칸이 있다 (결과는 입력보다 항목 수가 적어야 반영되므로 한 항목짜리 칸은 줄지 않는다)
  *  - 충분히 = 「저장 상한 − 정리 목표」(상한의 20%) 글자. 정리가 된 인물이 다시 상한을 넘기까지 늘어나는 분량과 같다.
  *    불러도 상한 아래로 못 내려간 인물(고정 항목·정리에서 빠지는 칸이 크거나 결과가 버려짐)을 새 항목 하나마다 다시 부르지 않는다.
- *    처음 부를 때도 같다: 정리 자료가 이 분량에 못 미치면 다 합쳐도 목표에 닿지 않는다.
+ *    처음 부를 때는 이 문턱을 보지 않는다: 일부만 합쳐도 상한 아래로 내려갈 수 있다 (상한을 넘기면 한 번은 부른다).
  *  tried = 인물 이름 → 마지막으로 불렀을 때의 정리 자료 글자 수 (부르는 쪽이 채팅마다 기억한다). 상한 아래로 내려간 인물은 지우고, 자료가 줄어든 인물은 그 크기로 다시 맞춘다 */
 export function tidyDue(store: PeopleStore, chat: Parameters<typeof liveness>[0], settings: PeopleSettings, tried: Map<string, number>): { name: string; chars: number }[] {
   const live = liveness(chat);
@@ -131,8 +131,9 @@ export function tidyDue(store: PeopleStore, chat: Parameters<typeof liveness>[0]
     const lists = input ? Object.values(input.data.slots) : [];
     if (!lists.some((l) => l.length > 1)) continue;
     const chars = lists.reduce((n, l) => n + l.reduce((m, e) => m + e.text.length, 0), 0);
-    const last = tried.get(name) ?? 0;
-    if (chars < last) tried.set(name, chars);
+    const last = tried.get(name);
+    if (last === undefined) out.push({ name, chars });
+    else if (chars < last) tried.set(name, chars);
     else if (chars - last >= step) out.push({ name, chars });
   }
   return out;

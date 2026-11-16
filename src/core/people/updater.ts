@@ -120,9 +120,11 @@ export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSett
     const named = !!d.key && texts.some((t) => t.includes(d.key));
     return liveEntries(d.entries, live).map((e) => ({ near: named || (e.who ?? []).some((n) => scene.includes(n)), pos: live.at.get(e.anchor) ?? -1, seq: e.seq, item: { type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) } }));
   });
-  if (settings.docsCap <= 0 || rows.length <= settings.docsCap) return rows.map((r) => r.item);
-  const keep = new Set([...rows].sort((a, b) => Number(b.near) - Number(a.near) || b.pos - a.pos || b.seq - a.seq).slice(0, settings.docsCap));
-  return rows.filter((r) => keep.has(r)).map((r) => r.item);
+  // 상한은 사건·장소·세력·물건 문서만 센다 (설정 도움말대로). 서사 리듬 기록은 세지 않고 늘 보낸다
+  const capped = rows.filter((r) => r.item.type !== 'rhythm');
+  if (settings.docsCap <= 0 || capped.length <= settings.docsCap) return rows.map((r) => r.item);
+  const keep = new Set([...capped].sort((a, b) => Number(b.near) - Number(a.near) || b.pos - a.pos || b.seq - a.seq).slice(0, settings.docsCap));
+  return rows.filter((r) => r.item.type === 'rhythm' || keep.has(r)).map((r) => r.item);
 }
 
 /** 인물 기록을 자료용으로 (칸별 id·본문, 상한을 넘으면 오래된 history·scene 부터 뺀다) */

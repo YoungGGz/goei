@@ -458,10 +458,12 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
       received += commitInvitations(cur, result.invitations, time);
       const b = readBulletins(chat);
       const notices = commitAnnouncements(b, cur, result.announcements, plan.announce, time);
+      // 쉬는 턴도 시각과 같이 요청한 턴부터 센다: 늦게 저장돼 그사이 턴이 넘어갔어도 한 턴 더 쉬지 않게
+      const asked = (chat.message?.length ?? 0) === startLength ? chat : ctx.chat;
       const marks = {
-        ...(unsolicitedGot ? cooldownMark(chat, 'incoming') : {}),
-        ...(result.invitations.length ? cooldownMark(chat, 'invitation') : {}),
-        ...(notices ? cooldownMark(chat, 'announcement') : {}),
+        ...(unsolicitedGot ? cooldownMark(asked, 'incoming') : {}),
+        ...(result.invitations.length ? cooldownMark(asked, 'invitation') : {}),
+        ...(notices ? cooldownMark(asked, 'announcement') : {}),
       };
       note = received || result.invitations.length || notices
         ? `메시지 ${received}개 · 단톡 초대 ${result.invitations.length}개 · 공지 ${notices}개를 받았어요.`

@@ -151,8 +151,10 @@ test('별도 정리: 고정 항목이 상한을 넘긴 인물에게 매 턴 새 
     }
   }
   // 30턴 동안 정리 자료는 약 1,200자: 400자 늘 때마다 1회
-  assert.ok(calls.length >= 1 && calls.length <= 3, `호출 ${calls.length}회 (${calls.join(',')})`);
-  assert.ok(calls[0] > 5, '정리 자료가 400자에 못 미치는 첫 몇 턴은 부르지 않는다');
+  // 처음 한 번은 문턱 없이 부른다 (일부만 합쳐도 상한 아래로 갈 수 있다). 그 뒤로는 400자 늘 때마다
+  assert.ok(calls.length >= 1 && calls.length <= 4, `호출 ${calls.length}회 (${calls.join(',')})`);
+  assert.equal(calls[0], 2, '줄일 수 있는 칸이 생긴 턴에 처음 한 번');
+  assert.ok(calls.length < 2 || calls[1] - calls[0] > 5, '그 뒤로는 새 항목 하나마다 부르지 않는다');
   // 항목이 하나뿐인 칸만 있으면 줄일 수 없으므로 자료가 커도 부르지 않는다
   const one = T.emptyStore();
   one.people.도윤 = person('도윤');
