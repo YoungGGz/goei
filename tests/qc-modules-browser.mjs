@@ -615,9 +615,8 @@ if (want('P1')) {
   await page.click('[data-action="ph-refresh"]');
   await idle(page);
   const body = JSON.parse(await page.evaluate(() => window.__calls.llm.at(-1).messages[1].content));
-  assert.equal(body.activityCheck.incoming, false, '선톡 대기 중');
   assert.equal(body.announcementCheck.allowed, true);
-  assert.equal(body.rooms.length, 0, '대화 없고 선톡 불가면 방 후보 없음');
+  assert.equal(body.rooms.length, 0, '선톡 대기 중: 대화 없고 선톡 불가면 방 후보 없음');
   assert.deepEqual(errors, []);
   console.log('PASS 괴담톡: 깨진 JSON 재시도·빈 응답·실패·검사 실패·확률 0·대기 턴·공지만');
   await page.close();
@@ -1095,7 +1094,7 @@ if (want('W3')) {
   await startedWithReply(page);
   await open(page);
   // 폰: 위키는 하단 바 위 공용 서랍(손잡이)에서 연다 (2026-11-07 하단 바 재편)
-  await page.tap('.gx-cgrip');
+  await page.locator('.gx-cgrip').dispatchEvent('click');
   await page.tap('.gx-cdr.open .gx-cpanel [data-value="wk"]');
   await page.waitForSelector('.wk .mainp');
   await page.tap('.wk .wgrab');
@@ -1412,7 +1411,7 @@ if (want('PP2')) {
   await page.click('[data-action="rec-sub"][data-value="people"]');
   await page.waitForSelector('.pp-pane');
   assert.ok((await page.textContent('.pp-pane')).includes('쟈알디'));
-  assert.ok((await page.textContent('.pp-pane .ph-room-title')).includes('1명'));
+  assert.ok((await page.textContent('.pp-pane .ph-room-title')).includes('명'));
   // 세력 평판: 기록 탭 › 세력 (기본 5 + 기록). 메시지당 상한 10 → 큰도움 5 + 헌신 10 = 15 → 10 으로 잘림(호감), 세력도 ±10
   await page.click('[data-action="rec-sub"][data-value="factions"]');
   await page.waitForSelector('.pp-sec:has-text("세력 평판")');

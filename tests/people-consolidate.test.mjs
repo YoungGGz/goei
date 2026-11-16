@@ -89,3 +89,105 @@ test('정리: 수치 모드 의심 칸은 정리 자료에 넣지 않고, 모델
   delete store.people.쟈알디.slots.state;
   assert.equal(C.buildConsolidate(store, chat, '쟈알디', settings), null);
 });
+
+// 토큰 점검 (11-15): 정리 지침의 칸 설명은 자료에 실린 칸만, 별도 정리 호출은 같은 항목들로 다시 부르지 않는다
+test('정리 지침: 자료에 없는 칸(빈 칸·첫인상·수치 의심)의 설명은 싣지 않는다', () => {
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  store.people.쟈알디.slots.state = [e('s1', '본부에 있음'), e('s2', '왼팔 부상')];
+  store.people.쟈알디.slots['affinity.appraisal'] = [e('a1', '첫인상', { target: '@user' })];
+  store.people.쟈알디.slots.suspicion = [e('u1', '[+1] 단서', { target: '@user', kind: '거짓말' })];
+  const settings = St.peopleSettings({ $pp_num_suspicion: '1' });
+  const input = C.buildConsolidate(store, chat, '쟈알디', settings);
+  assert.deepEqual(Object.keys(input.data.slots), ['state']);
+  assert.equal(input.system, C.CONSOLIDATE_PROMPT(settings.lang, ['state']));
+  assert.ok(input.system.includes('state = '));
+  for (const s of ['history = ', 'affinity.appraisal = ', 'suspicion = ', 'knowledge = ']) assert.ok(!input.system.includes(s), s);
+  assert.ok(C.CONSOLIDATE_PROMPT(settings.lang, T.slotsFor(settings.features, settings.qualitative)).includes('history = '), '전에는 켜진 칸 전부의 설명이 실렸다');
+});
+
+test('별도 정리: 상한을 넘긴 인물만, 부른 뒤에는 정리 자료가 「상한 − 목표」만큼 늘어야 다시 부른다', () => {
+  const store = T.emptyStore();
+  const long = (id) => e(id, `${id} ` + '가'.repeat(280));
+  store.people.쟈알디 = person('쟈알디');
+  store.people.쟈알디.slots.history = Array.from({ length: 10 }, (_, i) => long(`h${i}`));
+  store.people.나루 = person('나루');
+  store.people.나루.slots.history = [long('n1')];
+  // 정리할 수 없는 항목(고정)만으로 상한을 넘긴 인물: 정리 자료가 없어 부르지 않는다
+  store.people.도윤 = person('도윤');
+  store.people.도윤.slots.history = Array.from({ length: 10 }, (_, i) => ({ ...long(`p${i}`), pin: true }));
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
+  const tried = new Map();
+  const due = C.tidyDue(store, chat, settings, tried);
+  assert.deepEqual(due.map((d) => d.name), ['쟈알디']);
+  // 불렀는데 결과가 줄지 않아 그대로인 경우: 다음 턴에는 부르지 않는다
+  tried.set(due[0].name, due[0].chars);
+  assert.deepEqual(C.tidyDue(store, chat, settings, tried), []);
+  // 새 항목 하나(상한의 20% = 400자에 못 미침)로는 다시 부르지 않고, 그만큼 늘면 다시 부른다
+  store.people.쟈알디.slots.history.push(long('h10'));
+  assert.deepEqual(C.tidyDue(store, chat, settings, tried), []);
+  store.people.쟈알디.slots.history.push(long('h11'));
+  assert.deepEqual(C.tidyDue(store, chat, settings, tried).map((d) => d.name), ['쟈알디']);
+  // 정리가 반영되면(항목이 합쳐지면) 상한 아래로 내려가 대상에서 빠지고, 기억도 지워져 다음에 넘길 때 처음처럼 판정한다
+  const input = C.buildConsolidate(store, chat, '쟈알디', settings);
+  C.applyConsolidate(store, '쟈알디', input, { slots: { history: [{ text: '합친 기록', from: [...input.ids.keys()] }] } }, S.liveness(chat), settings);
+  assert.deepEqual(C.tidyDue(store, chat, settings, tried), []);
+  assert.equal(tried.has('쟈알디'), false);
+});
+
+test('별도 정리: 고정 항목이 상한을 넘긴 인물에게 매 턴 새 항목이 하나씩 생겨도 턴마다 부르지 않는다', () => {
+  const store = T.emptyStore();
+  store.people.도윤 = person('도윤');
+  store.people.도윤.slots.history = Array.from({ length: 10 }, (_, i) => ({ ...e(`p${i}`, `p${i} ` + '가'.repeat(280)), pin: true }));
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
+  const tried = new Map();
+  const calls = [];
+  // 턴마다 40자쯤의 상태 항목 하나. 모델 결과는 줄지 않아 버려진다고 본다 (기록은 그대로)
+  for (let turn = 1; turn <= 30; turn++) {
+    (store.people.도윤.slots.state ??= []).push(e(`s${turn}`, `${turn}번째 상태 ` + '나'.repeat(32)));
+    for (const d of C.tidyDue(store, chat, settings, tried)) {
+      tried.set(d.name, d.chars);
+      calls.push(turn);
+    }
+  }
+  // 30턴 동안 정리 자료는 약 1,200자: 400자 늘 때마다 1회
+  // 처음 한 번은 문턱 없이 부른다 (일부만 합쳐도 상한 아래로 갈 수 있다). 그 뒤로는 400자 늘 때마다
+  assert.ok(calls.length >= 1 && calls.length <= 4, `호출 ${calls.length}회 (${calls.join(',')})`);
+  assert.equal(calls[0], 2, '줄일 수 있는 칸이 생긴 턴에 처음 한 번');
+  assert.ok(calls.length < 2 || calls[1] - calls[0] > 5, '그 뒤로는 새 항목 하나마다 부르지 않는다');
+  // 항목이 하나뿐인 칸만 있으면 줄일 수 없으므로 자료가 커도 부르지 않는다
+  const one = T.emptyStore();
+  one.people.도윤 = person('도윤');
+  one.people.도윤.slots.history = Array.from({ length: 10 }, (_, i) => ({ ...e(`p${i}`, `p${i} ` + '가'.repeat(280)), pin: true }));
+  one.people.도윤.slots.state = [e('s1', '다'.repeat(290))];
+  one.people.도윤.slots.scene = [e('c1x', '라'.repeat(290))];
+  assert.deepEqual(C.tidyDue(one, chat, settings, new Map()), []);
+  // 정리가 일부만 반영돼 자료가 줄었지만 아직 상한 위: 줄어든 크기로 다시 맞추고, 거기서 400자 늘어야 다시 부른다
+  const part = T.emptyStore();
+  part.people.쟈알디 = person('쟈알디');
+  part.people.쟈알디.slots.history = Array.from({ length: 9 }, (_, i) => e(`h${i}`, `h${i} ` + '가'.repeat(280)));
+  const t2 = new Map([['쟈알디', 5000]]);
+  assert.deepEqual(C.tidyDue(part, chat, settings, t2), []);
+  assert.ok(t2.get('쟈알디') < 5000);
+  part.people.쟈알디.slots.history.push(e('h9', '마'.repeat(290)), e('h10', '바'.repeat(290)));
+  assert.deepEqual(C.tidyDue(part, chat, settings, t2).map((d) => d.name), ['쟈알디']);
+});
+
+test('별도 정리(runTidy): 호출이 실패한 인물은 다음 턴에 다시 부르고, 답을 받았는데 줄지 않은 인물은 부르지 않는다', async () => {
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  store.people.쟈알디.slots.history = Array.from({ length: 10 }, (_, i) => e(`h${i}`, `h${i} ` + '가'.repeat(280)));
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
+  const tried = new Map();
+  const calls = [];
+  const fail = async (n) => (calls.push(n), { ok: false, message: '모델 요청에 실패' });
+  const thrown = async (n) => { calls.push(n); throw new Error('시간 초과'); };
+  const same = async (n) => (calls.push(n), { ok: true, message: '바뀐 칸이 없어요' });
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, fail), [{ name: '쟈알디', message: '모델 요청에 실패' }]);
+  assert.equal(tried.has('쟈알디'), false, '실패하면 기억을 남기지 않는다');
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, thrown), [{ name: '쟈알디', message: 'Error: 시간 초과' }]);
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, same), []);
+  assert.deepEqual(calls, ['쟈알디', '쟈알디', '쟈알디'], '항목이 그대로여도 실패 뒤에는 다음 턴에 다시 부른다');
+  assert.deepEqual(await C.runTidy(store, chat, settings, tried, same), []);
+  assert.equal(calls.length, 3, '답을 받았는데 줄지 않았으면 다음 턴에는 부르지 않는다');
+});

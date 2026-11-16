@@ -2,8 +2,8 @@
 // 절 단위 혼합(split)이면 요원 자리에 들어간 그 인물의 시트 원문을 요청에서 빼고 기록 블록으로 대신한다.
 import { sexualTexts } from './sexual';
 import type { Chat } from '../types';
-import { peopleBlock, personBlock, rhythmBlock, unknownTo, TRIM_ORDER } from './inject';
-import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
+import { blockEntries, peopleBlock, personBlock, rhythmBlock, unknownTo, TRIM_ORDER } from './inject';
+import { nameMatcher, scenePeople, carriedScene, entriesOf } from './select';
 import { liveChanges, liveEntries, liveness, type Liveness } from './store';
 import { latestNote } from './updater';
 import { rhythmClock, rhythmClockLines } from './rhythm';
@@ -11,7 +11,8 @@ import { factionNow, factionsBlock, sceneFactionCodes, userFactionOf } from './f
 import { messageText } from '../refs';
 import { fixedSections } from './seed';
 import type { PeopleSettings } from './settings';
-import type { PeopleStore, Temper } from './types';
+import { docFeature, type PeopleStore, type Temper } from './types';
+import { guideTxt } from '../guides';
 
 export interface PromptMessage {
   role?: string;
@@ -34,21 +35,63 @@ export interface RequestOpts {
   people?: string[];
 }
 
+/** 코드가 고르는 장면 인물: 항상 포함(always) + 글에 이름이 나온 사람·동행·장면 유지(byCode). 자리 수는 6명(항상 포함이 더 많으면 그 수) */
+function codePeople(chat: Chat, o: RequestOpts): { always: string[]; byCode: string[]; max: number } {
+  const match = nameMatcher(entriesOf(o.store, o.extraNames ?? {}));
+  const always = o.settings.always.filter((n) => o.store.people[n]);
+  const byCode = scenePeople(chat, o.store, match, { input: o.input, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
+  return { always, byCode, max: Math.max(6, always.length) };
+}
+
+/** 코드가 고른 인물만으로 장면 인물 자리가 찼나. 차 있으면 모델 Router 가 고른 인물은 전부 잘리므로 그 호출을 건너뛴다 */
+export function sceneFullByCode(chat: Chat, o: RequestOpts): boolean {
+  if (!o.settings.on) return false;
+  const c = codePeople(chat, o);
+  return c.always.length + c.byCode.length >= c.max;
+}
+
+/** 기록 문서 블록 (설정 「기록 문서 포함」): 사건·장소·세력·물건 문서 가운데 장면과 관련된 것(문서 이름이 입력·최근 글에 나왔거나 장면 인물이 얽힌 항목)을
+ *  최근 것부터 maxChars 안에서 고르고, 일어난 차례로 적는다. 관련 문서가 없으면 빈 문자열 */
+export function docsBlockFor(chat: Chat, o: RequestOpts, people: string[], live: Liveness, maxChars: number): string {
+  const list = Array.isArray(chat.message) ? chat.message : [];
+  const texts = [...(o.input ? [o.input] : []), ...list.slice(-2).map((m) => messageText(String(m.data ?? '')))];
+  const rows: { pos: number; seq: number; line: string }[] = [];
+  for (const d of Object.values(o.store.docs)) {
+    if (d.type === 'rhythm' || !(o.settings.features as Set<string>).has(docFeature(d.type))) continue;
+    const named = !!d.key && texts.some((t) => t.includes(d.key));
+    for (const e of liveEntries(d.entries, live)) {
+      if (!named && !(e.who ?? []).some((n) => people.includes(n))) continue;
+      rows.push({ pos: live.at.get(e.anchor) ?? -1, seq: e.seq, line: guideTxt('Main', 'DOCS.ITEM', { type: d.type, key: d.key, text: e.text }) });
+    }
+  }
+  if (!rows.length) return '';
+  rows.sort((a, b) => a.pos - b.pos || a.seq - b.seq);
+  const head = guideTxt('Main', 'DOCS.HEAD');
+  const kept: string[] = [];
+  let size = head.length;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    size += rows[i].line.length + 1;
+    if (size > maxChars) break;
+    kept.unshift(rows[i].line);
+  }
+  return kept.length ? [head, ...kept].join('\n') : '';
+}
+
 /** 장면 인물의 기록 블록 (본편용). 대상이 없으면 빈 문자열 */
 export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; people: string[]; sheets: string[] } {
   if (!o.settings.on) return { text: '', people: [], sheets: [] };
-  const names: NameEntry[] = entriesOf(o.store, o.extraNames ?? {});
-  const match = nameMatcher(names);
   // 코드 Router(이름이 직접 나온 인물·동행)는 늘 들어가고, 모델 Router 가 더 고른 인물(이름 없이 가리킨 제3자 등)을 뒤에 합친다.
   // 2026-11-07 전수검사 2 의 B: 모델 결과가 코드 결과를 대체하면 모델이 빠뜨린 인물이 그 턴 기록에서 사라졌다 (원본 includeMentionedCharacters 와 같게)
   // 항상 포함할 인물(설정 always, 원본 tracked)은 맨 앞에: 글에 안 나와도 그 턴 기록·Director 자료에 든다
-  const always = o.settings.always.filter((n) => o.store.people[n]);
   // 장면에 남아 있는 인물(설정 「장면 인물 유지」)은 글에 나온 사람·동행 칸 뒤, 모델 Router 가 고른 사람 앞
-  const byCode = scenePeople(chat, o.store, match, { input: o.input, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
+  const { always, byCode, max } = codePeople(chat, o);
   const byModel = (o.people ?? []).filter((n) => o.store.people[n] && !always.includes(n) && !byCode.includes(n));
-  const people = [...always, ...byCode, ...byModel].slice(0, Math.max(6, always.length));
+  const people = [...always, ...byCode, ...byModel].slice(0, max);
   if (!people.length) return { text: '', people: [], sheets: [] };
   const live: Liveness = liveness(chat);
+  // 기록 문서 (설정 「기록 문서 포함」, 기본 끔): 컨텍스트 글자 상한을 「장면 인물 수 + 1」로 나눈 한 몫까지 쓰고, 쓴 만큼 인물 기록의 상한에서 뺀다
+  const docsText = o.settings.docsInject ? docsBlockFor(chat, o, people, live, Math.floor(o.settings.blockCap / (people.length + 1))) : '';
+  const blockCap = o.settings.blockCap - docsText.length;
   const changes = liveChanges(o.store, live);
   /** 인물마다: 시트 원문(요청에서 뺄 것)과 상한 밖 길이(시트 고정 절) */
   const own: { sheet: string | null; exempt: number }[] = [];
@@ -57,7 +100,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
   /** 인물마다 블록을 만드는 함수 (글자 몫만 바꿔 다시 만들 수 있게) */
   const make: ((maxChars: number) => string)[] = [];
   // 본편 전체 예산을 장면 인물 수로 나눈다 (고정 절 원문은 예산 밖)
-  const share = Math.max(1, Math.floor(o.settings.blockCap / people.length));
+  const share = Math.max(1, Math.floor(blockCap / people.length));
   for (const n of people) {
     const p = o.store.people[n];
     const sheet = o.sheetOf(n);
@@ -82,6 +125,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
         taste: o.settings.features.has('taste'),
         openness: o.settings.features.has('openness'),
         axes: o.settings.features.has('axes'),
+        axesObserved: o.settings.axesObsInject,
         features: o.settings.features,
         qual: o.settings.qualitative,
         sexual: sx,
@@ -99,11 +143,10 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
   // 넘친 만큼을 지금 가장 긴 인물부터 「항목 단위」로 줄인다. 몫을 글자 수로만 깎으면 넘친 글자가 항목 하나(150~200자)보다 작을 때
   // 블록이 그대로라 뒤 인물이 통째로 빠졌다 (11-14 재검토 ①-1 검증). 줄일 항목이 남아 있는 한 아무도 통째로 빼지 않는다.
   /** 인물마다: 칸 글자 합(personBlock 과 같은 셈)과 줄일 수 있는 항목 길이(빼는 순서대로) */
-  const trim = people.map((n) => {
-    const slots = o.store.people[n].slots;
-    const sz = (l: unknown) => liveEntries((l as never) ?? [], live).reduce((m, e) => m + e.text.length + 3, 0);
-    const counted = Object.values(slots).reduce((s, l) => s + sz(l), 0);
-    const items = TRIM_ORDER.flatMap((k) => liveEntries(slots[k] ?? [], live).map((e) => e.text.length + 3));
+  const trim = people.map((n, i) => {
+    const kept = blockEntries(o.store.people[n], live, { sheet: own[i].sheet, mode: o.settings.inject });
+    const counted = Object.values(kept).reduce((s, l) => s + (l ?? []).reduce((m, e) => m + e.text.length + 3, 0), 0);
+    const items = TRIM_ORDER.flatMap((k) => (kept[k] ?? []).map((e) => e.text.length + 3));
     // 처음 블록(몫 = share)에서 이미 빠진 항목 수
     let left = counted;
     let drop = 0;
@@ -111,7 +154,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
     return { items, left, drop };
   });
   for (;;) {
-    const over = sizeOf(blocks.length) - o.settings.blockCap;
+    const over = sizeOf(blocks.length) - blockCap;
     if (over <= 0) break;
     const can = trim.map((t, i) => i).filter((i) => trim[i].drop < trim[i].items.length);
     if (!can.length) break;
@@ -128,7 +171,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
   // 그래도 넘치면 글 중간에서 자르지 않고 뒤 인물부터 통째로 뺀다 (모델이 고른 인물 → 글에 나온 인물, 항상 포함은 끝까지).
   // 뺀 인물의 원래 시트는 요청에 남긴다 (전수검사 11-13: 4명부터 뒤 인물이 블록에서도 시트에서도 사라졌다)
   let keep = blocks.length;
-  while (keep > 1 && sizeOf(keep) > o.settings.blockCap) keep--;
+  while (keep > 1 && sizeOf(keep) > blockCap) keep--;
   blocks.length = keep;
   const sheets = own.slice(0, keep).map((x) => x.sheet).filter((x): x is string => !!x);
   // 서사 리듬 (선택): 장면 전체 기록과 메모를 맨 앞에
@@ -138,6 +181,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
     const rb = rhythmBlock(docs, note, rhythmClockLines(rhythmClock(o.store, chat, live)));
     if (rb) blocks.unshift(rb);
   }
+  if (docsText) blocks.push(docsText);
   // 세력 평판 (기본 켬): 장면 세력(인물 소속 ∪ 최근 글에 나온 세력) 가운데 중립이 아닌 것만 한 줄씩, 맨 뒤에
   if (o.settings.features.has('faction_rep')) {
     const list = Array.isArray(chat.message) ? chat.message : [];

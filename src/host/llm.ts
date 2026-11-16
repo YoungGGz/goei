@@ -3,7 +3,7 @@ import { prepareAttachments } from '../core/attach';
 import { clip, requestText, traceCall } from './trace';
 import { tokens } from '../core/gnet';
 import { photoData } from './photo';
-import { applyAdvanced } from '../core/advanced';
+import { advNum, applyAdvanced } from '../core/advanced';
 import { retryAnalyze } from '../core/craft';
 import { guideTxt } from '../core/guides';
 import { imageMissingLine } from '../core/attach';
@@ -121,12 +121,33 @@ export async function runModel(messages: LlmMessage[], model: ModelChoice, stati
   }
 }
 
+// 메인 모델로 보내는 보조 호출의 표시. Risu 가 이 요청도 본편 조립기(beforeRequest, body.ts)에 넘기면
+// 본편용 로어·참고 기록·소지품이 붙지 않게, 보내는 동안 첫 글과 마지막 글을 적어 두고 조립기가 알아본다.
+const ownMain = new Map<string, number>();
+const callPrint = (ms: readonly unknown[]): string => {
+  const text = (m: unknown) => { const c = (m as { content?: unknown } | null)?.content; return typeof c === 'string' ? c : ''; };
+  return `${text(ms[0])}\n\u0000\n${text(ms[ms.length - 1])}`;
+};
+/** 지금 플러그인이 메인 모델로 보내고 있는 요청인가 */
+export const isOwnMainCall = (messages: readonly unknown[]): boolean => ownMain.size > 0 && Array.isArray(messages) && messages.length > 0 && ownMain.has(callPrint(messages));
+
 async function runModelRaw(messages: LlmMessage[], model: ModelChoice, staticModel?: string, onChunk?: (chars: number) => void): Promise<string> {
   let res: unknown;
   try {
     // allowPlugins: 사용자가 플러그인이 제공하는 모델(pluginmodel:::)을 메인·보조로 쓰면 이게 없을 때 Risu가 막는다.
     // 이 플러그인은 모델 제공 플러그인이 아니라서 서로 부르는 고리가 생기지 않는다.
-    res = await risuai.runLLMModel({ messages: await withPhotos(prepareAttachments(messages)), mode: model === 'aux' ? 'submodel' : 'model', allowPlugins: true, ...(staticModel ? { staticModel } : {}) });
+    const sent = await withPhotos(prepareAttachments(messages));
+    const print = model === 'aux' ? '' : callPrint(sent);
+    if (print) ownMain.set(print, (ownMain.get(print) ?? 0) + 1);
+    try {
+      res = await risuai.runLLMModel({ messages: sent, mode: model === 'aux' ? 'submodel' : 'model', allowPlugins: true, ...(staticModel ? { staticModel } : {}) });
+    } finally {
+      if (print) {
+        const n = (ownMain.get(print) ?? 1) - 1;
+        if (n > 0) ownMain.set(print, n);
+        else ownMain.delete(print);
+      }
+    }
   } catch (error) {
     throw new LlmError(`모델 요청에 실패했어요: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -165,6 +186,8 @@ export interface RetryOptions {
   staticModel?: string;
   /** 호출 흐름 기록에 적을 이름 (host/trace.ts) */
   label?: string;
+  /** 모델 쪽 일시 오류에 같은 요청을 다시 보내는 횟수 (설정 「모델 오류 재시도」). 없으면 state 의 설정, 그것도 없으면 2 */
+  transientRetries?: number;
 }
 
 // ── 동시 요청 수 (라이트보드 「동시요청수」, 2026-11-06). 괴담넷·괴담톡·위키 요청만 센다. 인물 기록은 세지 않는다 (리수폿 스레드 요청) ──
@@ -218,7 +241,8 @@ export async function generate<T>(messages: LlmMessage[], model: ModelChoice, pa
   let ask = messages;
   let use = model;
   let earlier: unknown = null;
-  let transientLeft = TRANSIENT_RETRIES;
+  const transientMax = o.transientRetries ?? (o.state ? advNum(o.state, 'gen', 'transient') : TRANSIENT_RETRIES);
+  let transientLeft = transientMax;
   for (let attempt = 0; ; attempt++) {
     let raw = '';
     try {
@@ -226,10 +250,10 @@ export async function generate<T>(messages: LlmMessage[], model: ModelChoice, pa
         // 통합 요청(first = Joint.ask)은 동시 요청 칸 밖에서: 칸이 1이면 한쪽이 칸을 잡고 다른 쪽을 기다려 둘 다 멈췄다 (11-09 점검)
         raw = attempt === 0 && o.first ? await o.first(ask) : await limited(o.concurrent, () => runModel(ask, use, o.staticModel, attempt ? `${o.label ?? '기타'} 다시 묻기 ${attempt}` : o.label));
       } catch (error) {
-        // 모델 쪽 일시 오류면 형식 재시도 횟수와 무관하게 같은 요청을 다시 (최대 2회)
+        // 모델 쪽 일시 오류면 형식 재시도 횟수와 무관하게 같은 요청을 다시 (설정 「모델 오류 재시도」, 기본 2회)
         if (!transient(error) || transientLeft <= 0) throw error;
         transientLeft--;
-        console.log(`[goei] 모델 일시 오류, 다시 보냄 (${TRANSIENT_RETRIES - transientLeft}/${TRANSIENT_RETRIES}): ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`);
+        console.log(`[goei] 모델 일시 오류, 다시 보냄 (${transientMax - transientLeft}/${transientMax}): ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`);
         await new Promise((r) => setTimeout(r, 1200));
         attempt--;
         continue;

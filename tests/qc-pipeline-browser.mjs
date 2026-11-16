@@ -97,7 +97,9 @@ const unresolved = (t) => [...new Set((t.match(/\{\{[^}]*\}\}/g) ?? []))].filter
     let out = await request(page, msgs);
     let blk = out.find((m) => m.content.startsWith('[Previous status]')).content;
     assert.ok(blk.includes('[▣|2025.01.01|02:47 AM|4°C|관리국 본부 사무실|없음|쟈알디|없음|관리국/신입]'), `날씨·잔고 칸 빠짐(hide 는 남음): ${blk}`);
-    assert.ok(blk.includes('Fields: 날짜 | 시각 | 기온 | 위치 | 목표 | 동행 | 투입 | 신분'));
+    // 칸 이름은 같은 요청의 상태창 지침(칸 순서 규칙)에 한 번만. 블록에 또 적지 않는다
+    assert.equal(out.filter((m) => m.content.includes('Fields in order: 날짜 | 시각 | 기온 | 위치 | 목표 | 동행 | 투입 | 신분.')).length, 1);
+    assert.ok(!blk.includes('Fields:'), blk);
     // 잔고 칸 켜고 장부에 거래가 있으면 그 값. 거래는 기준 메시지가 살아 있을 때만
     await setVars(page, { $st_col_weather: 'on', $st_col_temp: 'on', $st_col_wallet: 'on', $st_wallet: JSON.stringify({ start: 100000, log: [{ id: 'a', anchor: 'u1', amount: -30000, memo: '택시', src: 'story', at: '' }, { id: 'b', anchor: 'gone', amount: 99999, memo: '없는 메시지', src: 'story', at: '' }, { id: 'c', anchor: '', amount: 5000, memo: '수동', src: 'manual', at: '' }] }) });
     out = await request(page, msgs);

@@ -375,6 +375,19 @@ export function pruneScene(store: PeopleStore, chat: Chat): void {
   if (!Object.keys(store.scene).length) delete store.scene;
 }
 
+/** 장면 인물 목록을 남겨 두는 응답 수. 쓰는 것은 요청 바로 앞 응답의 목록 하나다 (select.ts carriedScene) —
+ *  마지막 응답들을 지우거나 다시 굴려도 그 앞 응답의 목록이 있도록 채팅 뒤쪽 몇 개만 둔다 */
+export const SCENE_KEEP = 20;
+/** 장면 인물 목록을 채팅 뒤쪽 SCENE_KEEP 개 응답 것만 남긴다. keep = 방금 적은 응답 (지난 응답을 뒤늦게 읽은 것이면 다음 묶음이 쓰도록 남긴다) */
+export function capScene(store: PeopleStore, chat: Chat, keep?: string): void {
+  if (!store.scene) return;
+  const keys = Object.keys(store.scene);
+  if (keys.length <= SCENE_KEEP) return;
+  const at = new Map(msgs(chat).map((m, i) => [messageKey(m, i), i]));
+  const recent = new Set(keys.filter((k) => at.has(k)).sort((a, b) => at.get(b)! - at.get(a)!).slice(0, SCENE_KEEP));
+  for (const k of keys) if (!recent.has(k) && k !== keep) delete store.scene[k];
+}
+
 export function putChange(store: PeopleStore, c: Change): boolean {
   if (store.log.some((x) => x.id === c.id)) return false;
   store.log.push({ ...c, reason: plain(c.reason, 80), ...(c.quote ? { quote: plain(c.quote, 60) } : {}) });
@@ -412,13 +425,16 @@ export function unreadIndexes(chat: Chat, store: PeopleStore): number[] {
   return out;
 }
 
-/** 안 읽은 응답을 「지금 갱신」이 읽을 새 것(마지막으로 읽은 응답 뒤, 읽은 적이 없으면 마지막 하나)과 「지난 응답 읽기」 몫(그 앞)으로 나눈다 */
+/** 안 읽은 응답을 「지금 갱신」이 읽을 새 것(마지막으로 읽은 응답 뒤, 읽은 적이 없으면 마지막 하나)과 「지난 응답 읽기」 몫(그 앞)으로 나눈다.
+ *  남은 지난 응답이 첫 장면(채팅 맨 앞의 봇 메시지) 하나뿐이면 새 것과 같이 읽는다: 첫 응답만 읽으면 첫 장면이 「지난 응답 1개 안 읽음」으로 끝까지 남았다 (11-15 사용자) */
 export function splitUnread(chat: Chat, store: PeopleStore): { newer: number[]; older: number[] } {
   const all = unreadIndexes(chat, store);
   const list = msgs(chat);
   const lastRead = Math.max(-1, ...list.map((m, i) => (store.read[messageKey(m, i)] !== undefined ? i : -1)));
   const newer = lastRead < 0 ? all.slice(-1) : all.filter((i) => i > lastRead);
-  return { newer, older: all.filter((i) => !newer.includes(i)) };
+  const older = all.filter((i) => !newer.includes(i));
+  if (newer.length && older.length === 1 && older[0] === 0) return { newer: [0, ...newer], older: [] };
+  return { newer, older };
 }
 
 export function markRead(store: PeopleStore, chat: Chat, indexes: number[]): void {

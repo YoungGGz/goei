@@ -1,9 +1,11 @@
 import { stripVirtual, withWorldLore } from '../core/world/virtual';
+import { makeAssetCopy, splitAssetCopy } from '../core/world/assetcopy';
 import { setStatusColumns } from '../core/world/statuscols';
 import { setIconAliases, setIconPool } from '../core/iconmatch';
 import { ITEM_ICON_ALIAS_VAR, itemIconPoolOn, setItemRules } from '../core/items';
 import type { Chat, LoreEntry } from '../core/types';
 import { applyAdvanced } from '../core/advanced';
+import { auxLoreRisu } from '../core/auxlore';
 
 export interface CharacterSnapshot {
   name?: string;
@@ -11,6 +13,10 @@ export interface CharacterSnapshot {
   chaId?: string;
   alternateGreetings?: string[];
   globalLore?: LoreEntry[];
+  /** 켜진 모듈의 로어북 (「보조 호출 로어북 = 로어북 포함」일 때만 채운다. core/auxlore.ts) */
+  moduleLore?: LoreEntry[];
+  /** 카드에 든 에셋용 사본 (폴더 + 요원 항목). globalLore 에는 없다 (core/world/assetcopy.ts) */
+  assetCopy?: LoreEntry[];
   [key: string]: unknown;
 }
 
@@ -21,6 +27,30 @@ export interface ChatContext {
   chat: Chat;
 }
 
+/** 켜진 모듈의 로어북. Risu 가 주는 「지금 봇 + 이 채팅 + 켜진 모듈」 목록에서 봇·채팅 것을 뺀 나머지.
+ *  그 기능이 없는 Risu 면 전역으로 켠 모듈의 로어북을 읽는다. 못 읽으면 빈 목록 (참고 자료가 줄 뿐 요청은 그대로 간다) */
+async function moduleLore(char: CharacterSnapshot, chat: Chat): Promise<LoreEntry[]> {
+  const isEntry = (e: unknown): e is LoreEntry => !!e && typeof e === 'object';
+  const print = (e: LoreEntry) => `${String(e.key ?? '')}\u0000${String(e.comment ?? '')}\u0000${String(e.content ?? '')}`;
+  try {
+    if (typeof risuai.getCurrentLorebookEntries === 'function') {
+      const all = ((await risuai.getCurrentLorebookEntries()) ?? []).filter(isEntry);
+      const mine = new Map<string, number>();
+      for (const e of [...(char.globalLore ?? []), ...(Array.isArray(chat.localLore) ? (chat.localLore as LoreEntry[]) : [])]) mine.set(print(e), (mine.get(print(e)) ?? 0) + 1);
+      return all.filter((e) => {
+        const n = mine.get(print(e)) ?? 0;
+        if (n > 0) mine.set(print(e), n - 1);
+        return n <= 0;
+      });
+    }
+    const db = await risuai.getDatabase(['modules', 'enabledModules']);
+    const on = new Set(db?.enabledModules ?? []);
+    return (db?.modules ?? []).filter((m) => on.has(m.id)).flatMap((m) => (Array.isArray(m.lorebook) ? m.lorebook.filter(isEntry) : []));
+  } catch {
+    return [];
+  }
+}
+
 export async function loadContext(): Promise<ChatContext | null> {
   const charIndex = await risuai.getCurrentCharacterIndex();
   const chatIndex = await risuai.getCurrentChatIndex();
@@ -28,7 +58,9 @@ export async function loadContext(): Promise<ChatContext | null> {
   const char = (await risuai.getCharacterFromIndex(charIndex)) as CharacterSnapshot | null;
   const chat = (await risuai.getChatFromIndex(charIndex, chatIndex)) as Chat | null;
   if (!char || !chat) return null;
+  if (auxLoreRisu(chat.scriptstate)) char.moduleLore = await moduleLore(char, chat);
   // 세계 데이터(기본 + 카드 덧쓰기)를 가상 로어북으로 붙인다. 저장할 때는 updateCharacterLore 가 뺀다
+  char.assetCopy = splitAssetCopy(char.globalLore).copy;
   char.globalLore = withWorldLore(char.globalLore);
   chat.message ??= [];
   // 상태창 파서에 이 채팅의 칸 구성을 알린다 (core/world/statuscols.ts)
@@ -82,11 +114,23 @@ export function notifyLoreSaved(charIndex: number): void {
 export async function updateCharacterLore(charIndex: number, mutate: (lore: LoreEntry[]) => LoreEntry[] | null): Promise<boolean> {
   const latest = (await risuai.getCharacterFromIndex(charIndex)) as CharacterSnapshot | null;
   if (!latest) throw new Error('캐릭터를 찾을 수 없어요.');
-  const next = mutate(stripVirtual(latest.globalLore ?? []));
+  // 에셋용 사본은 고치는 쪽에 보이지 않게 떼어 두었다가 그대로 다시 붙인다
+  const { rest, copy } = splitAssetCopy(stripVirtual(latest.globalLore ?? []));
+  const next = mutate(rest);
   if (!next) return false;
-  await risuai.setCharacterToIndex(charIndex, { ...latest, globalLore: stripVirtual(next) });
+  await risuai.setCharacterToIndex(charIndex, { ...latest, globalLore: [...splitAssetCopy(stripVirtual(next)).rest, ...copy] });
   notifyLoreSaved(charIndex);
   return true;
+}
+
+/** 에셋용 사본을 넣거나(지금 플러그인 자료로 새로 만든다) 뺀다. 다른 로어북은 건드리지 않는다. 카드에 남은 사본을 돌려준다 */
+export async function setAssetCopy(charIndex: number, put: boolean): Promise<LoreEntry[]> {
+  const latest = (await risuai.getCharacterFromIndex(charIndex)) as CharacterSnapshot | null;
+  if (!latest) throw new Error('캐릭터를 찾을 수 없어요.');
+  const { rest } = splitAssetCopy(stripVirtual(latest.globalLore ?? []));
+  const copy = put ? makeAssetCopy(withWorldLore(rest)) : [];
+  await risuai.setCharacterToIndex(charIndex, { ...latest, globalLore: [...rest, ...copy] });
+  return copy;
 }
 
 /** 캐릭터 읽기 (로어북에 세계 데이터 가상 항목을 붙여서). 읽기 전용 — 저장은 updateCharacterLore 로 */

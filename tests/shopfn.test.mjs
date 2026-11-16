@@ -93,17 +93,21 @@ test('기본값: 참조 로어북 수가 넉넉하면 진열·문의 요청문�
   assert.ok(JSON.stringify(shopReq(v, 'shelf').msgs).includes('[최근 본문]'));
 });
 
-test('기본값: 1:1 상담 자료는 예전과 같고 맥락(챗로그·상태창·괴이)은 넘어가지 않는다', () => {
+test('1:1 상담: 참고 자료는 예전과 같고, 본편 맥락은 상점 문의와 같은 네 가지를 「맥락 반영」대로 받는다', () => {
   const ctx = ctxOf({ $sh_refs: '12' });
   const d = M.deskSource(ctx);
   const s = M.mallSettings(ctx.chat.scriptstate, 'bm');
   const old = M.shopSource(mallCtx(ctx, 'bm'), { ...M.readMall(ctx.chat.scriptstate, 'bm'), shop: '백일몽', owner: '' }, s);
   assert.equal(d.refs, old.refs);
   assert.equal(d.language, old.language);
-  assert.deepEqual(Object.keys(d).sort(), ['language', 'nick', 'points', 'refs', 'shelf']);
-  assert.equal(M.shopGive(ctx.chat.scriptstate, 'bm', 'desk').context, false);
-  assert.equal(M.shopFnNone('desk', 'ctx'), true);
-  assert.equal(M.shopFnOn({ $sh_fn_desk_ctx: '1' }, 'desk', 'ctx'), false, '없는 칸은 변수가 있어도 꺼짐');
+  assert.deepEqual(Object.keys(d).sort(), ['identity', 'language', 'nick', 'points', 'refs', 'shelf', 'situation', 'status', 'story']);
+  assert.equal(M.shopGive(ctx.chat.scriptstate, 'bm', 'desk').context, true);
+  assert.equal(d.story, old.story);
+  assert.ok(d.story, '켜져 있으면 최근 본문이 간다');
+  // 기능 표의 1:1 상담 줄을 끄면 네 가지 모두 빠진다
+  const off = M.deskSource(ctxOf({ $sh_refs: '12', $sh_fn_desk_ctx: '0' }));
+  assert.deepEqual([off.identity, off.status, off.situation, off.story], ['', '', '', '']);
+  assert.equal(off.refs, d.refs);
 });
 
 test('참조 로어북: 수만큼만 넘긴다. 가게·주인 이름에 걸린 것이 먼저 남고, 그다음 챗로그 것이 원래 차례대로', () => {

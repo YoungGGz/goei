@@ -21,7 +21,7 @@ import { cleanIcon, itemsRule, itemEquip, itemState, stripGrades, itemUses, item
 import { leftWordIn, offWordIn } from '../itemrules';
 import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
 import { imgTagNames } from '../imgtag';
-import { changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
+import { capScene, changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
 import type { Feature, PeopleSettings } from './settings';
 import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
 
@@ -91,6 +91,8 @@ export interface UpdateInput {
   used: UsedNow[];
   /** 상점 판단 (설정 「상점 판단」이 갱신기일 때, core/shop.ts shopJudgeBy): 판단할 응답의 m 꼬리표. 없으면 null */
   shop: { m: string } | null;
+  /** 포인트몰 수령 확인 (2026-11-16): 받으러 간 응답의 m 꼬리표와 그때 받으러 간 물건 이름. 없으면 null */
+  pickup: { m: string; items: string[] } | null;
 }
 
 /** 소지품 절 자료: 지금 가진 것 (core/items.ts). 판정(사용·남은 횟수·장착)과 상태를 같이 준다 */
@@ -109,6 +111,20 @@ export function cleanSpan(raw: string, cap: number): string {
   const tail = t.slice(-Math.floor(cap * 0.35));
   // 접힌 자리 표시는 지침 「인물 기록 갱신기(덧붙임)」 SPAN.FOLD 절
   return `${head}\n${guideTxt('UpdaterExtra', 'SPAN.FOLD')}\n${tail}`;
+}
+
+/** 갱신기 자료의 문서 항목 (docs_now): 켜진 종류의 살아 있는 항목.
+ *  설정 「기록 문서 항목 상한」(0 = 제한 없음)을 넘으면 장면과 관련된 항목(문서 이름이 이 묶음의 글에 나왔거나 장면 인물이 얽힘)을 최근 것부터, 남는 자리는 나머지를 최근 것부터 채운다. 싣는 차례는 그대로 */
+export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[]) {
+  const rows = Object.values(store.docs).filter((d) => settings.features.has(docFeature(d.type) as Feature)).flatMap((d) => {
+    const named = !!d.key && texts.some((t) => t.includes(d.key));
+    return liveEntries(d.entries, live).map((e) => ({ near: named || (e.who ?? []).some((n) => scene.includes(n)), pos: live.at.get(e.anchor) ?? -1, seq: e.seq, item: { type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) } }));
+  });
+  // 상한은 사건·장소·세력·물건 문서만 센다 (설정 도움말대로). 서사 리듬 기록은 세지 않고 늘 보낸다
+  const capped = rows.filter((r) => r.item.type !== 'rhythm');
+  if (settings.docsCap <= 0 || capped.length <= settings.docsCap) return rows.map((r) => r.item);
+  const keep = new Set([...capped].sort((a, b) => Number(b.near) - Number(a.near) || b.pos - a.pos || b.seq - a.seq).slice(0, settings.docsCap));
+  return rows.filter((r) => r.item.type === 'rhythm' || keep.has(r)).map((r) => r.item);
 }
 
 /** 인물 기록을 자료용으로 (칸별 id·본문, 상한을 넘으면 오래된 history·scene 부터 뺀다) */
@@ -183,6 +199,8 @@ export interface BuildOpts {
   away?: { name: string; place?: string }[];
   /** 상점 판단 (갱신기가 판단할 때): 판단할 응답 위치(가장 최근 응답)와 주인공 이름들 */
   shop?: { at: number; self: string[] } | null;
+  /** 포인트몰 수령 확인: at = 받으러 간 응답 번호, items = 받으러 간 물건 이름 */
+  pickup?: { at: number; items: string[] } | null;
   /** 명부의 요원 줄 (host/people.ts rosterOf). 설정 「명부 대조」가 켜져 있으면 기록이 없는 줄을 자료 roster 로 보낸다 */
   roster?: RosterRow[];
 }
@@ -296,7 +314,10 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   // 다시 읽기(only)는 새 인물·이름 옮기기·장면 인물을 받지 않으니 그 자료도 싣지 않는다
   const fresh = !o.only?.length;
   const excluded = new Set(o.exclude ?? []);
-  const roster = fresh && o.settings.rosterHint ? (o.roster ?? []).filter((r) => r.name && !store.people[r.name] && !excluded.has(r.name)).map((r) => ({ name: r.name, names: [...new Set([r.english, ...r.aliases].filter(Boolean))], affiliation: o.factionNames?.[r.affiliation] ?? r.affiliation, rank: r.rank, department: r.department })) : [];
+  const rosterAll = fresh && o.settings.rosterHint ? (o.roster ?? []).filter((r) => r.name && !store.people[r.name] && !excluded.has(r.name)).map((r) => ({ name: r.name, names: [...new Set([r.english, ...r.aliases].filter(Boolean))], affiliation: o.factionNames?.[r.affiliation] ?? r.affiliation, rank: r.rank, department: r.department })) : [];
+  // 명부 대조 인원 상한 (설정, 0 = 제한 없음): 넘으면 이 묶음의 글에 소속·직급·부서가 나온 사람을 앞에 두고 자른다 (명부 차례는 그대로)
+  const rosterNear = (r: { affiliation: string; rank: string; department: string }) => [r.affiliation, r.rank, r.department].some((w) => !!w && texts.some((t) => t.includes(w)));
+  const roster = o.settings.rosterCap > 0 && rosterAll.length > o.settings.rosterCap ? [...rosterAll.filter(rosterNear), ...rosterAll.filter((r) => !rosterNear(r))].slice(0, o.settings.rosterCap) : rosterAll;
   // 대기 이름: 근거 응답이 채팅에 살아 있는 줄만 싣는다 (다시 굴리거나 지운 응답에서만 나온 이름은 이야기에 없던 이름이다).
   // 설정 「이름 없는 인물 기록」이 꺼져 있으면 호칭으로 올라온 줄도 뺀다 (다시 와도 받지 않는다)
   const waiting = fresh ? Object.entries(store.pending).filter(([, row]) => live.at.has(row.anchor) && (o.settings.newUnnamed || !row.provisional)) : [];
@@ -327,6 +348,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     return liveEntries(p.slots.history, live).some(after) || Object.values(store.docs).some((d) => d.type === 'event' && liveEntries(d.entries, live).some(after));
   });
   const shopM = o.shop && !o.only?.length && confirmedIdx.has(o.shop.at) ? [...tags].find(([, i]) => i === o.shop!.at)?.[0] ?? '' : '';
+  const pickM = o.pickup?.items.length && !o.only?.length && confirmedIdx.has(o.pickup.at) ? [...tags].find(([, i]) => i === o.pickup!.at)?.[0] ?? '' : '';
   const data = {
     request_ref: `pp_${Date.now().toString(36)}`,
     // 세력 평판 수치도 같은 계기 이름을 쓴다: 호감이 글로만·꺼짐이어도 세력 수치가 켜져 있으면 넣는다 (전수검사 11-13)
@@ -345,9 +367,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     ...(sceneBefore.length ? { scene_before: sceneBefore } : {}),
     ...(o.hints?.length ? { name_hints: o.hints.filter((h) => !store.people[h.name]).slice(0, 12) } : {}),
     ...(o.memory?.length ? { memory: o.memory } : {}),
-    docs_now: DOC_TYPES.some((t) => o.settings.features.has(docFeature(t) as Feature))
-      ? Object.values(store.docs).filter((d) => o.settings.features.has(docFeature(d.type) as Feature)).flatMap((d) => liveEntries(d.entries, live).map((e) => ({ type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) })))
-      : undefined,
+    docs_now: DOC_TYPES.some((t) => o.settings.features.has(docFeature(t) as Feature)) ? docsNow(store, live, o.settings, texts, chosen) : undefined,
     suspicion_now: o.settings.features.has('suspicion') && !o.settings.qualitative.has('suspicion') ? chosen.flatMap((n) => suspicionCases(store.people[n], live)) : undefined,
     npc_relations: o.settings.features.has('npc_emotion') ? true : undefined,
     ...(clock ? { rhythm_clock: rhythmClockLines(clock) } : {}),
@@ -378,9 +398,11 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     used_now: o.items && o.used?.length ? o.used.map((u) => ({ name: u.name, times: u.n, consumable: u.left !== undefined, uses_left: u.left })) : undefined,
     // 상점 판단 (11-09): 가장 최근 응답 끝에 주인공이 물건을 살 수 있는 곳이 있나. 기준 글은 지침 「상점」 SHOP_RULE (본편 표식 지침과 같은 글)
     shop_check: shopM ? { m: shopM, protagonist: o.shop!.self.filter(Boolean) } : undefined,
-    want: { shop: !!shopM || undefined, new_people: true, next_note: wantNote, address: o.settings.features.has('register'), identity: true, transactions: typeof o.wallet === 'number', point_transactions: typeof o.points === 'number' || undefined, items: !!o.items },
+    // 포인트몰 수령 확인 (2026-11-16): 주인공이 받으러 간 물건을 그 응답에서 실제로 받았나. 글은 갱신기 지침 pickup 절
+    pickup_check: pickM ? { m: pickM, items: o.pickup!.items } : undefined,
+    want: { shop: !!shopM || undefined, pickup: !!pickM || undefined, new_people: true, next_note: wantNote, address: o.settings.features.has('register'), identity: true, transactions: typeof o.wallet === 'number', point_transactions: typeof o.points === 'number' || undefined, items: !!o.items },
   };
-  return { shop: shopM ? { m: shopM } : null, system: o.system, data, indexes: batch, tags, people: chosen, confirmed: confirmedIdx, overBudget, names: o.names, tidy: o.settings.tidy === 'same' ? over : [], factions: factionCodes, factionNames: o.factionNames ?? {}, clock, review, turn, wallet: typeof o.wallet === 'number', points: typeof o.points === 'number', items: o.items ? o.items.map((e) => e.name) : null, itemsWorn: o.items ? o.items.filter((e) => e.equipped).map((e) => e.name) : [], used: o.items ? o.used ?? [] : [] };
+  return { shop: shopM ? { m: shopM } : null, pickup: pickM ? { m: pickM, items: o.pickup!.items } : null, system: o.system, data, indexes: batch, tags, people: chosen, confirmed: confirmedIdx, overBudget, names: o.names, tidy: o.settings.tidy === 'same' ? over : [], factions: factionCodes, factionNames: o.factionNames ?? {}, clock, review, turn, wallet: typeof o.wallet === 'number', points: typeof o.points === 'number', items: o.items ? o.items.map((e) => e.name) : null, itemsWorn: o.items ? o.items.filter((e) => e.equipped).map((e) => e.name) : [], used: o.items ? o.used ?? [] : [] };
 }
 
 // ── 자료에 싣는 안내 글: 지침 「인물 기록 갱신기(덧붙임)」의 절 (설정 → 지침에서 고침) ──
@@ -392,6 +414,8 @@ export const trackingRule = (): string => guideTxt('UpdaterExtra', 'TRACKING_RUL
 const resolvedPrefix = (): string => guideTxt('UpdaterExtra', 'ENTRY.RESOLVED');
 /** 고쳐 둔 갱신기 지침에 상점 절이 없을 때 덧붙이는 출력 칸 안내 (host/people.ts updaterSystem) */
 export const shopKeyLine = (): string => guideTxt('UpdaterExtra', 'SHOP_KEY');
+/** 고쳐 둔 갱신기 지침에 수령 확인 절이 없을 때 덧붙이는 출력 칸 안내 */
+export const pickupKeyLine = (): string => guideTxt('UpdaterExtra', 'PICKUP_KEY');
 
 // ── 지침 조립 ──
 
@@ -482,6 +506,8 @@ export interface UpdateResult {
   sexual_init?: { who: string; sexual_desire?: string | null; paraphilia?: string | null; m: string; quote: string }[];
   /** 상점 판단 (shop_check 가 있을 때): 지금 상점이 있으면 하나, 없으면 null */
   shop?: { name?: string; owner?: string | null; m?: string; quote?: string } | null;
+  /** 포인트몰 수령 확인 (pickup_check 가 있을 때): 그 응답에서 실제로 받은 물건 이름 */
+  pickup?: unknown;
   /** 바꾸지 않은 이유·빠진 규칙 (원본 issues[]). 빈 답인지 「확인했는데 변화 없음」인지 가른다 (2026-11-07) */
   issues?: { code?: string; who?: string | null; reason?: string }[];
 }
@@ -524,6 +550,8 @@ export interface ApplyReport {
   items: ItemChange[];
   /** 상점 판단 결과 (판단을 맡았을 때만): 있으면 가게, 없으면 null. undefined = 맡지 않음 */
   shop?: { index: number; name: string; owner: string } | null;
+  /** 포인트몰 수령 확인: 물었으면 늘 있다. names = 받았다고 한 이름 (물은 것 가운데, 답 칸이 없으면 빈 목록 = 못 받음), anchor = 판단한 응답 키 */
+  pickup?: { anchor: string; names: string[] };
 }
 export interface ItemChange {
   anchor: string;
@@ -709,7 +737,9 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     // 이름 없는 인물(호칭으로 올린 것)을 받을지는 설정이 정한다. 어떤 호칭이 기록할 만한지는 모델이 판단한다 (지침 4절).
     // 호칭으로 올라와 기다리던 이름은 다시 올 때 표시가 빠져 있어도 호칭이다 (같은 글자의 같은 인물이다)
     const pend = store.pending[name];
-    const provisional = n.provisional === true || pend?.provisional === true;
+    // 이름 표의 인물(표의 이름·별명으로 온 것)은 호칭으로 올라와도 이름 있는 인물이다: 표시를 남기면 메인 요청에 「이름이 아님」이 붙고 이름 옮기기의 대상이 된다
+    const inTable = input.names.some((e) => norm(e.name) === norm(name));
+    const provisional = !inTable && (n.provisional === true || pend?.provisional === true);
     if (provisional && !ctx.settings.newUnnamed) {
       drop('new_people', n, '이름 없는 인물 기록 꺼짐', name);
       continue;
@@ -1449,6 +1479,24 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     if (t && !name) drop('shop', t, '가게 이름 없음');
   }
 
+  // 6c-1b. 포인트몰 수령 확인 (2026-11-16 사용자): 받으러 간 물건(pickup_check.items) 가운데 그 응답에서 실제로 받았다고 한 이름만.
+  // 장면 전체로 보는 판단이라 인용은 받지 않는다 (상점 판단과 같다). 물은 이름이 아니면 버린다. 답 칸이 없으면 하나도 못 받은 것
+  if (input.pickup && !ctx.only?.length) {
+    const ev = evidenceLoose(input.pickup.m);
+    if (typeof ev !== 'string') {
+      const raw = Array.isArray(r.pickup) ? r.pickup : [];
+      const names: string[] = [];
+      const pool = [...input.pickup.items]; // 같은 이름을 둘 샀으면 답한 수만큼만
+      for (const t of raw.slice(0, 40)) {
+        const n = plain(typeof t === 'string' ? t : (t as { name?: unknown } | null)?.name, 60);
+        const at = pool.findIndex((x) => sameItemName(x, n));
+        if (at >= 0) names.push(...pool.splice(at, 1));
+        else drop('pickup', t, '받으러 간 물건이 아님');
+      }
+      report.pickup = { anchor: ev.anchor, names };
+    }
+  }
+
   // 6c-2. 소지품 (2026-11-07, core/items.ts): 본문에 분명히 적힌 변화만, 인용 필수. update·gone 은 목록에 있는 이름만, 같은 이름은 한 번. 다시 읽기(only)에서는 받지 않는다
   if (ctx.items && input.items && !ctx.only?.length) {
     report.applied.items = 0;
@@ -1575,7 +1623,10 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       if (who && !ctx.exclude?.includes(who) && !present.includes(who)) present.push(who);
     }
     const last = Math.max(...input.indexes);
-    if (list[last]) (store.scene ??= {})[messageKey(list[last], last)] = present;
+    if (list[last]) {
+      (store.scene ??= {})[messageKey(list[last], last)] = present;
+      capScene(store, chat, messageKey(list[last], last));
+    }
   }
 
   if (!ctx.keepRead) markRead(store, chat, input.indexes);

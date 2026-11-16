@@ -3,7 +3,7 @@
 // 값의 우선순위: 명부 > 옛 World catalog / Agent roster 줄 > 로어북 키에서 추정.
 // 세력 호칭·괴담톡 탭·첫 턴 로어북도 명부에 두고, 옛 카드는 Faction display·Phone tabs·Start trigger에서 읽는다.
 // 폴더가 없는 카드는 옛 목록 그대로 쓴다.
-import { BUILTIN, extraFactions, extraNames, extraTabId, extraTabs, type FactionSpec, pickSpec } from '../factions';
+import { BUILTIN, OPEN_TO, extraFactions, extraNames, extraTabId, extraTabs, type FactionSpec, pickSpec } from '../factions';
 import { DIRECTORY_COMMENT, directoryEntries, isDirectory, LEGACY_DATA, parseSeedManifest } from '../lorebooks';
 import { agentShared, orgShared } from '../sharedpics';
 import { pickScenes, type ScenesData } from '../scenes';
@@ -324,7 +324,7 @@ export const DEFAULT_PHONE_TABS = {
     { id: 'T01', name: '관리', visible_for: ['A00'], name_by_faction: { B00: '가짜' } },
     { id: 'T02', name: '가짜', visible_for: ['B00'], name_by_faction: { B00: '관리' } },
     { id: 'T03', name: '백일', visible_for: ['C00'] },
-    { id: 'T04', name: '중립', visible_for: ['A00', 'B00', 'C00', 'D00', 'E00'] },
+    { id: 'T04', name: '중립', visible_for: ['A00', 'B00', 'C00', 'E00'] },
     { id: 'T05', name: '기타', visible_for: ['A00', 'B00', 'C00', 'D00', 'E00'] },
     { id: 'X01', name: '괴이', visible_for: ['A00', 'B00', 'C00', 'D00', 'E00'] },
   ],
@@ -559,10 +559,10 @@ export interface TabInfo {
 
 export function phoneTabs(lore: LoreEntry[]): TabInfo[] {
   const out = phoneTabsSection(lore).tabs.map((t) => ({ id: t.id, name: t.name, visibleFor: [...t.visible_for] }));
-  // 새 세력: 기본 다섯 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다 (phone.ts tabCatalog와 같음)
+  // 새 세력: 민간인을 뺀 기본 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다 (phone.ts tabCatalog와 같음)
   const extra = extraFactions(lore).map((f) => f.code);
   if (!extra.length) return out;
-  for (const t of out) if (BUILTIN.every((f) => t.visibleFor.includes(f))) t.visibleFor.push(...extra.filter((f) => !t.visibleFor.includes(f)));
+  for (const t of out) if (OPEN_TO.every((f) => t.visibleFor.includes(f))) t.visibleFor.push(...extra.filter((f) => !t.visibleFor.includes(f)));
   for (const t of extraTabs(lore)) if (!out.some((x) => x.id === t.id)) out.push(t);
   return out;
 }
@@ -635,7 +635,7 @@ function orgDefaults(code: string, tabs: TabInfo[]): { rosterFor: string[]; phon
     const own = tabs.find((t) => t.id.startsWith('T') && t.visibleFor.length === 1 && t.visibleFor[0] === code);
     return { rosterFor: code === 'D00' || code === 'E00' ? [] : [code], phoneTabs: own ? [own.id] : [] };
   }
-  const open = tabs.find((t) => t.id.startsWith('T') && FACTIONS.every((f) => t.visibleFor.includes(f)));
+  const open = tabs.find((t) => t.id.startsWith('T') && OPEN_TO.every((f) => t.visibleFor.includes(f)));
   return { rosterFor: [], phoneTabs: open ? [open.id] : [] };
 }
 

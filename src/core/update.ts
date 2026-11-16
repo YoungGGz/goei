@@ -6,6 +6,7 @@ import { dropOldOutsidePlaces, migrateLore, readDirectoryData, withDirectory } f
 import { dropDefaultAliases } from './world/registry';
 import { fillDirectory, findFolder } from './install';
 import type { LoreEntry } from './types';
+import { splitAssetCopy } from './world/assetcopy';
 
 export const UPDATE_SCHEMA = 1;
 
@@ -266,6 +267,15 @@ function ownBotManifest(lore: LoreEntry[] | undefined): LoreEntry | undefined {
 
 /** 지금 캐릭터에 업데이트를 합친 결과 (저장은 하지 않음) */
 export function planUpdate(char: Record<string, unknown>, payload: CardPayload): UpdatePlan {
+  // 에셋용 사본은 업데이트가 보지 않게 떼어 두었다가 그대로 다시 붙인다 (core/world/assetcopy.ts)
+  const { rest, copy } = splitAssetCopy(char.globalLore as LoreEntry[] | undefined);
+  if (!copy.length) return planUpdateLore(char, payload);
+  const plan = planUpdateLore({ ...char, globalLore: rest }, payload);
+  plan.next.globalLore = [...((plan.next.globalLore as LoreEntry[]) ?? []), ...copy];
+  return plan;
+}
+
+function planUpdateLore(char: Record<string, unknown>, payload: CardPayload): UpdatePlan {
   const incoming = alignFolder((char.globalLore as LoreEntry[]) ?? [], payload.data.globalLore);
   const current = renamed((char.globalLore as LoreEntry[]) ?? [], incoming);
   const lore = mergeByName(current, incoming, loreName, (e) => PROTECTED_LORE.includes(e.comment ?? ''));

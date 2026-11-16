@@ -318,9 +318,9 @@ for (const vp of vps) {
       await tap('s:bm:ctx');
       assert.equal((await ss()).$bm_sh_ctx, '0');
       assert.deepEqual([await pressed('s:bm:ctx'), await pressed('s:cos:ctx'), await pressed('s:shop:ctx')], ['false', 'true', 'true']);
-      // 기능 표: 세 가게가 같이 쓰는 한 값. 1:1 상담의 맥락 반영은 없는 칸(「–」)
+      // 기능 표: 세 가게가 같이 쓰는 한 값. 1:1 상담도 맥락 반영 칸이 있다 (2026-11-16 사용자)
       assert.deepEqual(await Promise.all(['shelf', 'talk', 'desk', 'say'].map((f) => pressed(`s:shop:fn_${f}_persona`))), ['true', 'true', 'true', 'true']);
-      assert.equal(!!(await page.$(cell('s:shop:fn_desk_ctx'))), false, '1:1 상담 · 맥락 반영 칸은 조작이 없다');
+      assert.equal(await pressed('s:shop:fn_desk_ctx'), 'true', '1:1 상담 · 맥락 반영 칸도 켜져 있다');
       await tap('s:shop:fn_talk_persona');
       assert.equal((await ss()).$sh_fn_talk_persona, '0');
       assert.deepEqual(await Promise.all(['shelf', 'talk', 'desk'].map((f) => pressed(`s:shop:fn_${f}_persona`))), ['true', 'false', 'true'], '그 기능의 줄만 꺼진다');

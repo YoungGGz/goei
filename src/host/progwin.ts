@@ -1,7 +1,7 @@
 // 호출 진행 창 (11-09 사용자 설계): Risu 채팅 화면 오른쪽 위에, 한 턴의 라우터→디렉터→본편→갱신기→인터넷이 어디까지 돌았는지.
 // 상태는 core/progress.ts 가 들고(호출 시작·진행·끝은 host/llm.ts, 턴은 host/trace.ts·body.ts), 여기서는 그리기만 한다.
 // PC: 턴이 시작되면 카드(300px)가 저절로 펼쳐지고 끝나면 5초(실패 10초) 뒤 48px 단추(유령 단추와 같은 규격)로 접힌다. 머리글을 끌어 옮기고, 누르면 접고, 단추를 누르면 지난 턴을 다시 본다.
-// 폰: 새 단추 없이 오른쪽 가장자리의 점 다섯 개짜리 막대(길이 고정) — 턴 중에 점이 켜지고, 누르면 PC 와 같은 카드. 본문은 가리지 않는다.
+// 폰: 새 단추 없이 오른쪽 가장자리의 점 다섯 개짜리 막대(길이 고정) — 턴 중에 점이 켜지고, 누르면 PC 와 같은 카드. 본문은 가리지 않는다. 위아래로 끌어 옮기고, 상황판이 열려 있으면 숨는다.
 // 본 화면 DOM 은 SafeElement 로만 다룬다 (host/overlay.ts 와 같은 방식: 리스너는 좌표로 어느 것을 눌렀는지 판단).
 import { body as rootBody, themeVars } from './overlay';
 import { inside, type Rect } from '../core/fab';
@@ -90,13 +90,14 @@ ${themeVars('[x-goei-prog]')}
 [x-goei-prog] [data-dot] [data-p="bad"] { display: none; position: absolute; top: -3px; right: -3px; width: 10px; height: 10px; border-radius: 50%; background: var(--p-danger); border: 2px solid var(--g-panel); }
 [x-goei-prog][x-goei-fail="true"] [data-dot] [data-p="bad"] { display: block; }
 [x-goei-prog] [data-dot] [data-p="dots"] { display: none; }
-/* 폰: 상단 바 아래 오른쪽 가장자리에 붙은 막대 (점 다섯 개, 길이 고정). 카드는 눌렀을 때만 */
-[x-goei-prog][x-goei-phone="true"] { right: 0; top: 64px; }
-/* 폰에서 상황판이 열려 있으면 주소줄·즐겨찾기 줄 아래로 (주소줄의 탭 수 단추를 가렸다, 전수검사 11-13 사용자 승인) */
-[x-goei-prog][x-goei-phone="true"][x-goei-panel="true"] { top: 160px; }
+/* 폰: 오른쪽 가장자리에 붙은 막대 (점 다섯 개, 길이 고정). 위아래 자리는 끌어서 정하고 상황판을 열어도 그대로다 (11-15 사용자). 카드는 눌렀을 때만 */
+[x-goei-prog][x-goei-phone="true"] { right: 0; }
+/* 폰에서 상황판이 열려 있으면 숨긴다 (11-15 사용자) */
+[x-goei-prog][x-goei-phone="true"][x-goei-panel="true"] { display: none; }
 [x-goei-prog][x-goei-phone="true"] [data-dot] {
   width: 28px; height: auto; padding: 8px 0 9px; border-right: 0; border-radius: 10px 0 0 10px;
   display: flex; flex-direction: column; align-items: center; gap: 7px; box-shadow: 0 8px 18px -10px rgba(0,0,0,.6);
+  touch-action: none; /* 끌 때 화면이 같이 밀리지 않게 */
 }
 [x-goei-prog][x-goei-phone="true"] [data-dot] svg { width: 14px; height: 14px; margin-bottom: 1px; color: var(--g-sub); }
 [x-goei-prog][x-goei-phone="true"][x-goei-run="true"] [data-dot] svg { color: var(--g-signal); }
@@ -107,6 +108,8 @@ ${themeVars('[x-goei-prog]')}
 [x-goei-prog] [data-p="d"][data-s="skip"] { background: transparent; border: 1.5px solid var(--g-line); width: 6px; height: 6px; }
 [x-goei-prog] [data-p="d"][data-s="fail"] { background: var(--p-danger); }
 [x-goei-prog][x-goei-phone="true"] [data-card] { right: 10px; top: 0; width: min(${CARD_W + 30}px, calc(100vw - 20px)); }
+/* 막대가 화면 아래쪽에 있으면 카드는 위로 자란다 (아래로 넘치지 않게) */
+[x-goei-prog][x-goei-phone="true"][x-goei-low="true"] [data-card] { top: auto; transform-origin: bottom right; }
 [x-goei-prog][x-goei-phone="true"] [data-grip] { cursor: pointer; }
 @keyframes goei-prog-spin { to { transform: rotate(360deg); } }
 @keyframes goei-prog-flow { to { stroke-dashoffset: -20; } }
@@ -213,7 +216,7 @@ export function dotHtml(t: Turn | null): string {
 
 export interface ProgWin {
   setVisible(visible: boolean): Promise<void>;
-  /** 상황판이 떠 있나 (body.ts 가 매 초 appShown() 으로). PC 는 저절로 펴지 않고, 폰은 막대를 주소줄 아래로 */
+  /** 상황판이 떠 있나 (body.ts 가 매 초 appShown() 으로). 떠 있으면 PC 는 저절로 펴지 않고, 폰은 숨긴다 */
   setPanel(open: boolean): Promise<void>;
   setTheme(theme: ThemeName): Promise<void>;
   remove(): Promise<void>;
@@ -225,6 +228,9 @@ interface Pos {
 }
 // 상황판 닫기 X (오른쪽 위 구석) 를 덮지 않게 한 칸 아래 (11-11). 옮긴 자리는 기억한다
 const DEFAULT_POS: Pos = { right: 12, top: 76 };
+/** 폰 막대의 위아래 자리 (오른쪽에는 늘 붙는다). 기본은 상단 바와 상황판 주소줄·즐겨찾기 줄 아래 */
+const PHONE_TOP_KEY = 'goei-plugin:prog-phone-top';
+const DEFAULT_PHONE_TOP = 160;
 
 export async function createProgWin(): Promise<ProgWin> {
   const root = await rootBody();
@@ -267,18 +273,32 @@ export async function createProgWin(): Promise<ProgWin> {
   } catch {
     /* 기본 자리 */
   }
+  let phoneTop = DEFAULT_PHONE_TOP;
+  try {
+    const n = Number(await risuai.safeLocalStorage.getItem(PHONE_TOP_KEY));
+    if (Number.isFinite(n) && n > 0) phoneTop = n;
+  } catch {
+    /* 기본 자리 */
+  }
 
+  const rectOf = async (el: SafeEl | null) => (el ? ((await el.getBoundingClientRect()) as Rect) : null);
   const viewport = async () => {
     const r = (await root.body.getBoundingClientRect()) as Rect;
     return { vw: r.width, vh: r.height };
   };
   const applyPos = async () => {
+    const { vw, vh } = await viewport();
     if (phone) {
+      const h = (await rectOf(dot))?.height ?? 0;
+      phoneTop = Math.min(Math.max(8, phoneTop), Math.max(8, vh - h - 8));
+      const low = phoneTop > vh / 2;
       await host.setStyle('right', '');
-      await host.setStyle('top', '');
+      await host.setStyle('top', `${phoneTop}px`);
+      await host.setAttribute('x-goei-low', low ? 'true' : 'false');
+      await card.setStyle('bottom', low ? `${-h}px` : '');
       return;
     }
-    const { vw, vh } = await viewport();
+    await card.setStyle('bottom', '');
     const w = open ? CARD_W : BTN;
     pos = { right: Math.min(Math.max(0, pos.right), Math.max(0, vw - w)), top: Math.min(Math.max(0, pos.top), Math.max(0, vh - 40)) };
     await host.setStyle('right', `${pos.right}px`);
@@ -357,8 +377,7 @@ export async function createProgWin(): Promise<ProgWin> {
   const offProgress = onProgress(onChange);
 
   // ── 누르기·끌기 (좌표로 판단, host/overlay.ts 와 같은 까닭) ──
-  const rectOf = async (el: SafeEl | null) => (el ? ((await el.getBoundingClientRect()) as Rect) : null);
-  let drag: { x: number; y: number; start: Pos; hit: Promise<boolean> } | null = null;
+  let drag: { x: number; y: number; start: Pos; startTop: number; hit: Promise<boolean> } | null = null;
   let moved = false;
   let pending: { x: number; y: number } | null = null;
   let loop: Promise<void> | null = null;
@@ -375,12 +394,13 @@ export async function createProgWin(): Promise<ProgWin> {
         if (drag !== d) continue;
         const dx = p.x - d.x;
         const dy = p.y - d.y;
-        if (!moved && Math.hypot(dx, dy) < 6) continue;
+        if (!moved && (phone ? Math.abs(dy) : Math.hypot(dx, dy)) < 6) continue;
         if (!moved) {
           moved = true;
           await host.setAttribute('x-goei-drag', 'true');
         }
-        pos = { right: d.start.right - dx, top: d.start.top + dy };
+        if (phone) phoneTop = d.startTop + dy;
+        else pos = { right: d.start.right - dx, top: d.start.top + dy };
         await applyPos();
       }
     } catch {
@@ -393,13 +413,14 @@ export async function createProgWin(): Promise<ProgWin> {
     drag = null;
     pending = null;
     moved = false;
-    if (!visible || phone || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return;
+    // 폰은 접힌 막대만 위아래로 끈다 (펼친 카드는 머리줄을 누르면 접힌다)
+    if (!visible || (phone && (open || panelOpen)) || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return;
     if ((ev.buttons ?? 1) !== 1 && (ev.button ?? 0) !== 0) return;
     const x = ev.clientX;
     const y = ev.clientY;
     // 펼친 창은 머리줄을, 접힌 단추는 단추를 잡고 끈다 (11-11 사용자: 단추가 옮겨지지 않았다). 끌고 놓으면 뒤따르는 클릭은 무시된다 (moved)
     const grab = open;
-    drag = { x, y, start: { ...pos }, hit: (async () => inside(await rectOf(grab ? await card.querySelector('[data-grip]') : dot), x, y))().catch(() => false) };
+    drag = { x, y, start: { ...pos }, startTop: phoneTop, hit: (async () => inside(await rectOf(grab ? await card.querySelector('[data-grip]') : dot), x, y))().catch(() => false) };
   };
   const onMove = (ev: PointerEv) => {
     if (!drag || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return;
@@ -417,7 +438,8 @@ export async function createProgWin(): Promise<ProgWin> {
       if (moved) {
         await host.setAttribute('x-goei-drag', 'false');
         try {
-          await risuai.safeLocalStorage.setItem(POS_KEY, JSON.stringify(pos));
+          if (phone) await risuai.safeLocalStorage.setItem(PHONE_TOP_KEY, String(Math.round(phoneTop)));
+          else await risuai.safeLocalStorage.setItem(POS_KEY, JSON.stringify(pos));
         } catch {
           /* 자리 저장 실패는 무시 */
         }
@@ -425,7 +447,7 @@ export async function createProgWin(): Promise<ProgWin> {
     });
   };
   const onClick = async (ev: PointerEv) => {
-    if (!visible) return;
+    if (!visible || (phone && panelOpen)) return;
     await loop;
     if (moved) return; // 끌고 놓은 뒤 따라오는 클릭
     if (!open) {
@@ -441,9 +463,9 @@ export async function createProgWin(): Promise<ProgWin> {
       return;
     }
     if (inside(await rectOf(card), ev.clientX, ev.clientY)) return;
-    // 창 밖: 도는 중이 아닐 때만 접는다 (팝업창 규격과 같게, 11-09 사용자)
+    // 창 밖: 폰은 언제든 접는다 (11-15 사용자). PC 는 저절로 펴지는 창이라 도는 중이 아닐 때만 (팝업창 규격과 같게, 11-09 사용자)
     const t = progressTurn();
-    if (!t || t.endAt || Date.now() - t.at >= WATCHDOG) {
+    if (phone || !t || t.endAt || Date.now() - t.at >= WATCHDOG) {
       clearHide();
       await setOpen(false);
     }
@@ -498,6 +520,7 @@ export async function createProgWin(): Promise<ProgWin> {
       if (next === panelOpen) return;
       panelOpen = next;
       await host.setAttribute('x-goei-panel', next ? 'true' : 'false');
+      if (next && phone) await setOpen(false);
     },
     async setTheme(theme) {
       await host.setAttribute('x-goei-theme', theme);

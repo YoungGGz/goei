@@ -208,6 +208,56 @@ test('갱신기 자료: 명부 대조(roster)·호칭 기록(handles)·대기 �
   assert.equal(only.held_names, undefined);
 });
 
+// 토큰 점검 (11-15): 명부 대조 인원 상한 (기본 0 = 제한 없음)
+test('명부 대조 인원 상한: 기본은 전원, 상한을 두면 글에 소속·직급·부서가 나온 사람부터 그 수만큼', () => {
+  const store = T.emptyStore();
+  const all = (s) => U.buildUpdate(chat(['user', '안녕', 'u1'], ['char', '복도에 누군가 서 있었다.', 'c1']), store, [1], { settings: s, system: '', values: {}, names: Sel.namesWith(store, B.allNames(ROSTER)), roster: ROSTER }).data.roster;
+  assert.equal(St.PP_DEFAULTS.roster_cap, '0');
+  assert.equal(all(settings()).length, ROSTER.length, '기본: 전원');
+  const cap = Math.min(5, ROSTER.length - 1);
+  const cut = all(settings({ $pp_roster_cap: String(cap) }));
+  assert.deepEqual(cut.map((r) => r.name), ROSTER.slice(0, cap).map((r) => r.name), '글에 단서가 없으면 명부 차례대로');
+  // 글에 직급이나 부서가 나온 사람이 앞에 온다
+  const target = ROSTER.slice(cap).find((r) => (r.department || r.rank) && !ROSTER.slice(0, cap).some((x) => [x.affiliation, x.rank, x.department].includes(r.department || r.rank)));
+  assert.ok(target, '자료: 상한 뒤쪽에 부서·직급이 다른 사람이 있다');
+  const word = target.department || target.rank;
+  const near = U.buildUpdate(chat(['user', '안녕', 'u1'], ['char', `${word} 사람이 서류를 들고 왔다.`, 'c1']), store, [1], { settings: settings({ $pp_roster_cap: String(cap) }), system: '', values: {}, names: Sel.namesWith(store, B.allNames(ROSTER)), roster: ROSTER }).data.roster;
+  assert.equal(near.length, cap);
+  assert.ok(near.some((r) => r.name === target.name), `${target.name}(${word})이 들어감`);
+  const row = Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === 'roster_cap');
+  assert.ok(row && row.help && row.ctl.opts[0][0] === '0', '정의표: 첫 선택지가 제한 없음');
+  for (const k of ['docs_inject', 'axes_obs_inject']) {
+    assert.equal(St.PP_DEFAULTS[k], '0', `${k} 기본 끔`);
+    assert.deepEqual(Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === k)?.ctl, { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] });
+  }
+});
+
+// 토큰 점검 (11-15): 갱신기 자료의 문서 항목 상한 (기본 0 = 제한 없음)
+test('기록 문서 항목 상한: 기본은 전부, 상한을 두면 장면과 관련된 항목과 최근 항목부터 그 수만큼 (차례는 그대로)', () => {
+  const store = T.emptyStore();
+  store.people.나루 = npc('나루');
+  const c = chat(['user', '안녕', 'u1'], ['char', '옛일.', 'c1'], ['user', '다음', 'u2'], ['char', '나루가 창고 열쇠를 꺼냈다.', 'c2']);
+  const doc = (type, key, id, anchor, extra = {}) => ((store.docs[`${type}:${key}`] ??= { type, key, entries: [] }).entries.push({ id, text: `${key} 기록 ${id}`, src: 'story', anchor, seq: 1, ...extra }));
+  doc('event', '정전 사고', 'd1', 'c1');
+  doc('event', '회의', 'd2', 'c1', { who: ['나루'] });
+  doc('location', '옥상', 'd3', 'c1');
+  doc('item', '창고 열쇠', 'd4', 'c1');
+  doc('faction', '상인회', 'd5', 'c2');
+  doc('event', '지워진 일', 'd6', 'gone');
+  const now = (s) => U.buildUpdate(c, store, [3], { settings: s, system: '', values: {}, names: Sel.namesWith(store, []) }).data.docs_now.map((d) => d.id);
+  assert.equal(St.PP_DEFAULTS.docs_cap, '0');
+  assert.deepEqual(now(settings()), ['d1', 'd2', 'd3', 'd4', 'd5'], '기본: 살아 있는 항목 전부');
+  assert.deepEqual(now(settings({ $pp_docs_cap: '20' })), ['d1', 'd2', 'd3', 'd4', 'd5'], '상한 안이면 그대로');
+  // 2개: 장면 인물(나루)이 얽힌 d2, 이름이 글에 나온 d4
+  assert.deepEqual(now(settings({ $pp_docs_cap: '2' })), ['d2', 'd4']);
+  // 3개: 남는 자리는 최근 항목(d5)
+  assert.deepEqual(now(settings({ $pp_docs_cap: '3' })), ['d2', 'd4', 'd5']);
+  // 꺼진 종류는 상한과 무관하게 빠진다
+  assert.deepEqual(now(settings({ $pp_docs_cap: '3', $pp_docs_item: '0' })), ['d1', 'd2', 'd5']);
+  const row = Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === 'docs_cap');
+  assert.ok(row && row.help && row.ctl.opts[0][0] === '0', '정의표: 첫 선택지가 제한 없음');
+});
+
 test('새 인물: 역할·묘사로 된 이름을 코드가 걸러내지 않는다. 호칭(provisional)은 설정이 켜져 있을 때만 받는다', () => {
   const c = chat(['user', '택시를 탔다', 'u1'], ['char', '택시 기사가 백미러로 이쪽을 봤다. 붉은 코트의 여자가 옆자리에 앉았다.', 'c1']);
   const mk = () => {
@@ -844,4 +894,22 @@ test('메인 요청·Router: 호칭 기록은 이름이 아니라는 표시가 �
   assert.equal(rows['붉은 코트의 여자'].provisional, true);
   assert.ok(!('provisional' in rows.김철수));
   assert.match(router.system, /`provisional`/);
+});
+
+test('첫 장면은 첫 응답과 같이 읽는다: 「지난 응답 1개 안 읽음」으로 남지 않는다', () => {
+  const m = (role, data, chatId) => ({ role, data, chatId });
+  const fresh = { message: [m('char', '첫 장면', 'o'), m('user', '가자', 'u1'), m('char', '첫 응답', 'c1')] };
+  const st = T.emptyStore();
+  assert.deepEqual(S.splitUnread(fresh, st), { newer: [0, 2], older: [] });
+  // 이미 첫 응답만 읽고 첫 장면이 남은 채팅: 다음 새 응답과 같이 읽는다
+  S.markRead(st, fresh, [2]);
+  assert.deepEqual(S.splitUnread(fresh, st), { newer: [], older: [0] }, '새 응답이 없으면 그대로');
+  const next = { message: [...fresh.message, m('user', '다음', 'u2'), m('char', '둘째 응답', 'c2')] };
+  assert.deepEqual(S.splitUnread(next, st), { newer: [0, 4], older: [] });
+  // 기능을 중간에 켠 긴 채팅: 지난 응답은 사용자가 고르는 몫으로 남는다
+  const long = { message: [m('char', '첫 장면', 'o'), m('user', '1', 'u1'), m('char', 'a', 'c1'), m('user', '2', 'u2'), m('char', 'b', 'c2')] };
+  assert.deepEqual(S.splitUnread(long, T.emptyStore()), { newer: [4], older: [0, 2] });
+  // 맨 앞이 사용자 글이면(첫 장면 없음) 해당 없음
+  const noScene = { message: [m('user', '1', 'u1'), m('char', 'a', 'c1'), m('user', '2', 'u2'), m('char', 'b', 'c2')] };
+  assert.deepEqual(S.splitUnread(noScene, T.emptyStore()), { newer: [3], older: [1] });
 });

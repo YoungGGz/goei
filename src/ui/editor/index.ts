@@ -14,8 +14,9 @@ import { bindCropDrag, cropValue, directoryDraft, directoryExtList, directoryInp
 import { handleImgPrompt, imgInput, imgPromptPane } from '../imgprompt';
 import { GHOST_ICON, ICONS } from '../icons';
 import { labelSwitches } from '../controls';
-import { bindDrawer, drawerHtml } from '../drawer';
 import { bindMbar } from '../mbar';
+import { bindSwipeBack } from '../swipeback';
+import { NavHistory } from '../../core/navhist';
 import { booksInput, defaultsState } from '../advanced';
 import { rememberPanel } from '../panels';
 import editorCss from './style.css';
@@ -115,8 +116,21 @@ export function setOverrides(next: WorldOverrides): void {
   edUi.over = next;
 }
 
+/** 설정 창 안 앞뒤 이동 기록 (본 설정 페이지 순서). 폰 쓸기가 상황판과 같은 뜻으로 쓴다: 오른쪽 = 뒤로, 왼쪽 = 앞으로 (11-15 사용자) */
+const edHist = new NavHistory<string>();
+/** 쓸기가 할 일. 뒤로: 열린 목록 닫기 → 앞서 본 페이지 → 더 없으면 설정 닫기. 앞으로: 뒤로 갔던 페이지 */
+function edStep(dir: -1 | 1): (() => void) | null {
+  if (!edUi.open || edUi.confirm) return null;
+  if (consultUi.open) return dir < 0 ? () => void run('ai-close') : null;
+  if (edUi.drawer) return dir < 0 ? () => void run('ed-drawer') : null;
+  if (edHist.can(dir)) return () => { const n = edHist.go(dir); if (n) void run('ed-node', n); };
+  return dir < 0 ? () => void run('ed-close') : null;
+}
+
 export function openEditor(h: EditorHost, node?: EditorNode): void {
   host = h;
+  if (!edUi.open) edHist.clear();
+  edCdr = false;
   edUi.open = true;
   if (node) edUi.node = legacyNode(node);
   edUi.notice = '';
@@ -166,6 +180,9 @@ function ensureRoot(): HTMLElement {
     const t = ev.target as HTMLElement;
     // 폰: AI 상담 판 바깥(어두운 곳)을 누르면 판만 닫는다
     if (t === root) return void run(consultUi.open && isPhone() ? 'ai-close' : 'ed-close');
+    // 왼쪽 목록이 떠 있을 때 그 바깥(설정 본문)을 누르면 목록만 닫는다. 눌린 자리의 단추는 누른 것으로 치지 않는다 (11-15 사용자).
+    // 머리줄(목록 단추·닫기)과 아래 갈래 줄·하단 바는 평소대로 눌린다
+    if (edUi.drawer && t.closest('.gw-body, .gw-totop') && getComputedStyle(root!.querySelector('.gw-menu') ?? root!).display !== 'none') return void run('ed-drawer');
     // 거점: 지역 지도를 누른 자리가 거점 위치 (%) — 패널(app.ts)과 같은 처리
     const pickMap = t.closest<HTMLElement>('[data-base-pick]');
     if (pickMap) {
@@ -781,6 +798,8 @@ export function render(): void {
   const ctx = host.ctx();
   if (ctx) overridesOf(ctx); // 저장·새로 읽기 뒤 덧쓰기 초안을 카드 값으로 맞춘다 (지침 화면처럼 초안을 안 쓰는 화면에서도)
   root.hidden = false;
+  edHist.record(edUi.node);
+  bindSwipeBack(root, edStep, '.gw-body');
   root.dataset.theme = host.theme();
   root.toggleAttribute('data-dirty', anyDirty());
   const width = getPrefs().editorWidth ?? 90;
@@ -824,7 +843,9 @@ export function render(): void {
       <div class="gw-top-right">${right}</div>
     </header>`;
   const tabTools = TABS.map(([id, label, icon]) => `<button class="ph-tool" data-action="ed-tab" data-value="${id}" aria-pressed="${tab === id}" aria-label="${label}" title="${label}">${icon}<span class="ph-tool-l">${label}</span></button>`).join('');
-  const foot = phone ? `${drawerHtml(tabTools, '', 'gw-tabdrawer')}${host.mobileNav?.() ?? ''}` : '';
+  // 폰: 갈래 넷과 닫기는 설정 창 전용 서랍에 (늘 떠 있지 않는다). 상황판 서랍과 같은 틀(.gx-cdr)·같은 손짓: 하단 바를 위로 쓸면 올라오고 아래로 쓸면 내려간다 (11-15 사용자)
+  const cdr = `<div class="gx-cdr gw-cdr${edCdr ? ' open' : ''}"><div class="gx-cslide"><span class="gx-cgrip" aria-hidden="true"><i></i></span><div class="gx-cpanel ph-tools">${tabTools}<button class="ph-tool" data-action="ed-close" aria-label="설정 닫기" title="설정 닫기">${ICONS.close}<span class="ph-tool-l">닫기</span></button></div></div></div>`;
+  const foot = phone ? (host.mobileNav?.() ?? '').replace(/^(\s*<nav\b[^>]*>)/, `$1${cdr}`) : '';
   const html = `<div class="gw-win${edUi.drawer ? ' drawer' : ''}${phone ? ' phone' : ''}">
     ${top}
     <nav class="gw-tree"><div class="gw-tabs" role="tablist">${tabs}</div>${tree(ctx)}</nav>
@@ -840,10 +861,22 @@ export function render(): void {
   consultAfterRender(root, ctx);
   if (phone) {
     // 바뀐 곳만 그리면 서랍·하단 바 요소가 그대로 남으니 한 번만 묶는다
-    const box = root.querySelector<HTMLElement>('.ph-drawer');
+    const panel = root.querySelector<HTMLElement>('.gw-cdr .gx-cpanel');
     const bar = root.querySelector<HTMLElement>('.gx-mbar');
-    if (box && !boundOnce.has(box)) { boundOnce.add(box); bindDrawer(root); }
-    if (bar && !boundOnce.has(bar)) { boundOnce.add(bar); bindMbar(root, () => void run('ed-close')); }
+    if (bar && !boundOnce.has(bar)) { boundOnce.add(bar); bindMbar(root, () => void run('ed-close'), setCdr); }
+    // 펼친 서랍 줄을 아래로 쓸어도 닫힌다
+    if (panel && !boundOnce.has(panel)) {
+      boundOnce.add(panel);
+      let y0: number | null = null;
+      panel.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+      panel.addEventListener('pointermove', (e) => {
+        if (y0 === null || e.clientY - y0 < 18) return;
+        y0 = null;
+        setCdr(false);
+      });
+      panel.addEventListener('pointerup', () => { y0 = null; });
+      panel.addEventListener('pointercancel', () => { y0 = null; });
+    }
   }
   KEEP.forEach((q, i) => { const el = root!.querySelector<HTMLElement>(q); if (el && keep[i]) el.scrollTop = keep[i]; });
   syncTop();
@@ -863,6 +896,15 @@ function syncTop(): void {
 }
 
 const boundOnce = new WeakSet<HTMLElement>();
+/** 폰 설정 창 서랍(갈래 넷 + 닫기) 펼침. 요소를 갈지 않고 class 만 바꿔서 미끄러진다 */
+let edCdr = false;
+function setCdr(open: boolean): void {
+  edCdr = open;
+  const el = root?.querySelector<HTMLElement>('.gw-cdr');
+  if (!el) return;
+  void el.offsetHeight;
+  el.classList.toggle('open', open);
+}
 
 const env = { render: () => render(), refresh: async () => { await host?.refresh(); render(); } };
 
@@ -1006,6 +1048,13 @@ export async function handle(action: string, value?: string): Promise<void> {
       return render();
     case 'ed-tab': {
       const t = (value ?? 'set') as Tab;
+      // 폰: 갈래를 누르면 왼쪽 목록이 그 갈래가 눌린 채로 열린다 (아래 줄에서든 목록 안에서든). 페이지는 목록에서 고른다 (11-15 사용자)
+      if (isPhone()) {
+        setCdr(false);
+        if (tabOf(edUi.node) !== t) await handle('ed-node', edUi.last[t] ?? firstOf(t));
+        edUi.drawer = true;
+        return render();
+      }
       return handle('ed-node', edUi.last[t] ?? firstOf(t));
     }
     case 'ed-goto': {

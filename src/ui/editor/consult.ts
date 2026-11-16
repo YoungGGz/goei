@@ -122,10 +122,28 @@ export async function consultLast(): Promise<string> {
   ].join('\n');
 }
 
-/** [메뉴]: 메뉴마다 소개와 줄 이름. 끝에 설정 메뉴가 아닌 항목 이름 (안내만) */
-export function consultMenus(menus: CatMenu[]): string {
-  const names = (m: CatMenu) => [...new Set(m.rows.flatMap((r) => r.keys))].join(', ');
-  return [...menus.map((m) => C('MENUS.LINE', { menu: m.menu, intro: m.intro ? C('MENUS.INTRO', { intro: m.intro }) : '', names: names(m) })), C('MENUS.OTHERS_HEAD'), catalogOthers()].join('\n');
+/** [메뉴] 한 줄: 메뉴 소개와 줄 이름. short 면 줄 이름 목록을 뺀다 (메뉴 이름·소개만: 모델은 그 이름으로 <open> 할 수 있다) */
+const menuLine = (m: CatMenu, short: boolean): string => {
+  const intro = m.intro ? C('MENUS.INTRO', { intro: m.intro }) : '';
+  return short ? C('MENUS.LINE_SHORT', { menu: m.menu, intro }) : C('MENUS.LINE', { menu: m.menu, intro, names: [...new Set(m.rows.flatMap((r) => r.keys))].join(', ') });
+};
+/** [메뉴]: 메뉴마다 소개와 줄 이름. 끝에 설정 메뉴가 아닌 항목 이름 (안내만). short = 줄 이름 목록을 뺄 메뉴(page) */
+export function consultMenus(menus: CatMenu[], short?: Set<string>): string {
+  return [...menus.map((m) => menuLine(m, !!short?.has(m.page))), C('MENUS.OTHERS_HEAD'), catalogOthers()].join('\n');
+}
+/** 「요청 토큰 상한」을 넘는 만큼([메뉴] 목록만으로 over 토큰 초과) 줄 이름 목록을 뺄 메뉴를 고른다: 펼칠 메뉴(keep)는 두고 목록의 뒤쪽 메뉴부터. 넘지 않으면 빈 집합 */
+export function shortMenus(menus: CatMenu[], keep: string[], over: number): Set<string> {
+  const out = new Set<string>();
+  let left = over;
+  for (let i = menus.length - 1; i >= 0 && left > 0; i--) {
+    const m = menus[i];
+    if (keep.includes(m.page)) continue;
+    const saved = tokens(menuLine(m, false)) - tokens(menuLine(m, true));
+    if (saved <= 0) continue;
+    out.add(m.page);
+    left -= saved;
+  }
+  return out;
 }
 
 /** 사용자 글에 이름이 나온 메뉴: 메뉴 이름, 또는 한두 메뉴에만 있는 묶음·줄 이름 (여러 메뉴에 다 있는 이름으로는 메뉴를 못 고른다) */
@@ -272,12 +290,24 @@ async function ask(d: ConsultDeps, ctx: ChatContext): Promise<void> {
     // 펼칠 메뉴: 지금 보는 메뉴 → 바꾸자고 한 줄·마지막 판의 메뉴 → 사용자 글에 이름이 나온 메뉴 → (다시 물을 때) 모델이 달라고 한 메뉴
     const cur = catalogCurrent();
     const want = [cur, ...pending.map((p) => pageOf(p.id)), ...(lastCard?.who === 'card' ? lastCard.rows.map((r) => r.page) : []), ...menusInText(menus, said && said.who === 'me' ? said.text : '')].filter(Boolean);
-    const src = (opened: CatMenu[]): ConsultSource => ({ state: consultState(ctx, started), last, menus: consultMenus(menus), opened: opened.map((m) => ({ menu: m.menu, items: m.rows })), all, pending, talk });
+    // 「요청 토큰 상한」은 [메뉴] 목록에도 건다: 지금 메뉴 하나를 펼친 요청이 상한을 넘으면 펼치지 않는 메뉴의 줄 이름 목록부터 뺀다 (상한이 없으면 전부 넣는다)
+    let short = new Set<string>();
+    const src = (opened: CatMenu[]): ConsultSource => ({ state: consultState(ctx, started), last, menus: consultMenus(menus, short), opened: opened.map((m) => ({ menu: m.menu, items: m.rows })), all, pending, talk });
     const last = await consultLast();
     const size = (m: { content: string }[]) => m.reduce((n, x) => n + tokens(x.content), 0);
-    const base = budget > 0 ? size(consultPrompt(src([]))) : 0;
-    const call = async (wantNow: string[]): Promise<ConsultReply> =>
-      (await generate(consultPrompt(src(openMenus(menus, wantNow, base, budget))), modelOf(), parseConsult, { retries: gen.retries, retryModel: gen.retryModel, label: 'AI 상담' })).value;
+    let base = 0;
+    /** 상한이 있으면 이 요청에서 펼치려는 메뉴를 기준으로 [메뉴] 목록을 줄이고, 펼친 메뉴가 없는 요청의 크기를 다시 잰다 */
+    const fit = (wantNow: string[]): void => {
+      short = new Set();
+      if (!(budget > 0)) return;
+      const first = openMenus(menus, wantNow, 0, 0).slice(0, 1);
+      short = shortMenus(menus, wantNow, size(consultPrompt(src(first))) - budget);
+      base = size(consultPrompt(src([])));
+    };
+    const call = async (wantNow: string[]): Promise<ConsultReply> => {
+      fit(wantNow);
+      return (await generate(consultPrompt(src(openMenus(menus, wantNow, base, budget))), modelOf(), parseConsult, { retries: gen.retries, retryModel: gen.retryModel, transientRetries: gen.transientRetries, label: 'AI 상담' })).value;
+    };
     let value = await call(want);
     // <open>: 모델이 메뉴를 더 달라고 하면 그 메뉴를 더해 한 번만 다시 묻는다 (그 답은 화면에 내지 않는다). 없는 메뉴 이름은 버린다
     const more = value.open.map((n) => menus.find((m) => flat(m.menu) === flat(n))?.page ?? '').filter((p) => p && !want.includes(p));

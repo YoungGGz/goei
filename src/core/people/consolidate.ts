@@ -39,7 +39,8 @@ export function buildConsolidate(store: PeopleStore, chat: Parameters<typeof liv
     for (const e of sorted) ids.set(e.id, { slot, entry: e });
   }
   if (!ids.size) return null;
-  return { system: CONSOLIDATE_PROMPT(settings.lang, enabled), data: { name: who, chars: recordChars(p, live), target: Math.round(settings.personCap * 0.8), slots }, ids };
+  // 칸 설명은 자료에 실린 칸만 (빈 칸·정리에서 빠지는 칸의 설명은 싣지 않는다)
+  return { system: CONSOLIDATE_PROMPT(settings.lang, enabled.filter((s) => slots[s])), data: { name: who, chars: recordChars(p, live), target: Math.round(settings.personCap * 0.8), slots }, ids };
 }
 
 export interface ConsolidateResult { slots?: Record<string, { text?: unknown; target?: unknown; from?: unknown }[]> }
@@ -109,4 +110,45 @@ export function applyConsolidate(store: PeopleStore, who: string, input: Consoli
     report.after += next.length;
   }
   return report;
+}
+
+/** 별도 정리 호출을 할 인물: 저장 상한을 넘겼고, 정리로 줄일 수 있고, 마지막으로 부른 뒤 정리 자료가 충분히 늘어난 사람.
+ *  - 줄일 수 있음 = 항목이 둘 이상인 칸이 있다 (결과는 입력보다 항목 수가 적어야 반영되므로 한 항목짜리 칸은 줄지 않는다)
+ *  - 충분히 = 「저장 상한 − 정리 목표」(상한의 20%) 글자. 정리가 된 인물이 다시 상한을 넘기까지 늘어나는 분량과 같다.
+ *    불러도 상한 아래로 못 내려간 인물(고정 항목·정리에서 빠지는 칸이 크거나 결과가 버려짐)을 새 항목 하나마다 다시 부르지 않는다.
+ *    처음 부를 때는 이 문턱을 보지 않는다: 일부만 합쳐도 상한 아래로 내려갈 수 있다 (상한을 넘기면 한 번은 부른다).
+ *  tried = 인물 이름 → 마지막으로 불렀을 때의 정리 자료 글자 수 (부르는 쪽이 채팅마다 기억한다). 상한 아래로 내려간 인물은 지우고, 자료가 줄어든 인물은 그 크기로 다시 맞춘다 */
+export function tidyDue(store: PeopleStore, chat: Parameters<typeof liveness>[0], settings: PeopleSettings, tried: Map<string, number>): { name: string; chars: number }[] {
+  const live = liveness(chat);
+  const step = settings.personCap - Math.round(settings.personCap * 0.8);
+  const out: { name: string; chars: number }[] = [];
+  for (const name of Object.keys(store.people)) {
+    if (recordChars(store.people[name], live) <= settings.personCap) {
+      tried.delete(name);
+      continue;
+    }
+    const input = buildConsolidate(store, chat, name, settings);
+    const lists = input ? Object.values(input.data.slots) : [];
+    if (!lists.some((l) => l.length > 1)) continue;
+    const chars = lists.reduce((n, l) => n + l.reduce((m, e) => m + e.text.length, 0), 0);
+    const last = tried.get(name);
+    if (last === undefined) out.push({ name, chars });
+    else if (chars < last) tried.set(name, chars);
+    else if (chars - last >= step) out.push({ name, chars });
+  }
+  return out;
+}
+
+/** 별도 정리 한 번: tidyDue 가 고른 인물마다 call 을 부른다. 호출이 실패하면(모델 오류·시간 초과·저장 실패) 그 인물의 기억을 지워 다음 턴에 다시 판정한다.
+ *  돌려주는 것은 실패한 인물과 그 안내 */
+export async function runTidy(store: PeopleStore, chat: Parameters<typeof liveness>[0], settings: PeopleSettings, tried: Map<string, number>, call: (name: string) => Promise<{ ok: boolean; message: string }>): Promise<{ name: string; message: string }[]> {
+  const failed: { name: string; message: string }[] = [];
+  for (const { name, chars } of tidyDue(store, chat, settings, tried)) {
+    tried.set(name, chars);
+    const r = await call(name).catch((error) => ({ ok: false, message: String(error) }));
+    if (r.ok) continue;
+    tried.delete(name);
+    failed.push({ name, message: r.message });
+  }
+  return failed;
 }

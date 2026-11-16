@@ -56,8 +56,8 @@ Inspect Paragraph blocks before finishing. If fewer than two distinct unregister
 @@SECTION NW.FORMAT
 OUTPUT CONTRACT
 Return one complete <lightboard-namuwiki> block without a code fence or commentary. All labels and prose are Korean; structural keys remain exactly as below.
-Opening tag: <lightboard-namuwiki doc_title="requested title" doc_type="other" main_color="#27685b" asset_src="" related1="optional subtopic" recent1="optional related subject">
-Use doc_type="person" for an individual and "other" for other topics. Omit unused optional attributes. Keep asset_src="". Do not output image tags, URLs, raw macros or additional image fields; portraits are attached locally.
+Opening tag: <lightboard-namuwiki doc_title="requested title" doc_type="other" main_color="#27685b" related1="optional subtopic" recent1="optional related subject">
+Use doc_type="person" for an individual and "other" for other topics. Omit unused optional attributes. Do not output image tags, URLs, raw macros or additional image fields; portraits are attached locally.
 
 BLOCKS (each begins on a new line)
 [Infobox]Title:문서 제목|항목:값|항목:값

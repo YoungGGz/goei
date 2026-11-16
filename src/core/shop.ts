@@ -73,9 +73,25 @@ export function ownShops(vars: Vars): OwnShop[] {
   }
 }
 const ownNames = (o: OwnShop) => [o.name, ...o.alias.split(/[,，、]/)].map((x) => x.trim()).filter(Boolean);
-/** 표식의 가게 이름에 맞는 켜진 고유 상점 */
+/** 표식의 가게 이름에 맞는 켜진 고유 상점. 이름·별칭이 똑같은 줄이 먼저, 없으면 표식 이름 안에 이름·별칭이 들어 있는 줄 (11-16 사용자: 모델이 「임직원 복지몰」처럼
+ *  다르게 적어도 플러그인이 알아본다). 여러 줄이 걸리면 가장 긴 이름이 맞은 줄. 두 글자 미만인 이름은 들어 있나로 보지 않는다 */
 export function ownShopOf(vars: Vars, shop: string): OwnShop | null {
-  return ownShops(vars).find((o) => o.on && o.name && ownNames(o).some((n) => sameShopName(n, shop))) ?? null;
+  const list = ownShops(vars).filter((o) => o.on && o.name);
+  const exact = list.find((o) => ownNames(o).some((n) => sameShopName(n, shop)));
+  if (exact) return exact;
+  const want = normName(shop);
+  let best: OwnShop | null = null;
+  let len = 1;
+  for (const o of list) {
+    for (const n of ownNames(o)) {
+      const k = normName(n);
+      if (k.length > len && want.includes(k)) {
+        best = o;
+        len = k.length;
+      }
+    }
+  }
+  return best;
 }
 /** 화면 카드용: 정리된 표식의 주인 칸이 `@web:사이트` 이면 그 사이트 id */
 export const webSiteOfOwner = (owner: string): string => (/^@web:([a-z0-9_-]{1,12})$/i.exec(owner.trim())?.[1] ?? '');
@@ -95,7 +111,9 @@ export const SHOP_MAX_VAR = '$sh_max';
 /** 희귀·특가 구획 켜기 (기본 켬) */
 export const SHOP_FEATURE_VAR = '$sh_feature';
 /** 상점 넷(기본 상점·우주 쇼핑몰·포인트몰·망상홈쇼핑)이 값 하나를 같이 쓰는 설정: 기본 상점 자리($sh_*)의 값을 넷이 같이 읽는다 (2026-11-11 사용자: 설정 → 상점) */
-export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR];
+/** 문의로 물건 바꾸기 (기본 켬): 끄면 문의 요청에 진열 규칙을 넣지 않고, 주인·운영자가 말로 물건을 더하거나 진열을 새로 짜지 않는다 (값 흥정·빼기는 그대로) */
+export const SHOP_TALK_STOCK_VAR = '$sh_talk_stock';
+export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR, SHOP_TALK_STOCK_VAR];
 export const SHOP_SIZE_LO = 1;
 export const SHOP_SIZE_HI = 16;
 
@@ -125,6 +143,8 @@ export interface ShopSettings {
   turns: number;
   /** 넘길 참고 로어북 수 (0~12) */
   refs: number;
+  /** 문의로 물건을 더하거나 진열을 새로 짤 수 있음 (끄면 문의 요청에서 진열 규칙이 빠진다) */
+  talkStock: boolean;
 }
 
 type Vars = Record<string, unknown> | undefined;
@@ -156,6 +176,7 @@ export function shopSettings(vars: Vars): ShopSettings {
     judge: vars?.[SHOP_JUDGE_VAR] === 'main' ? 'main' : vars?.[SHOP_JUDGE_VAR] === 'updater' ? 'updater' : 'auto',
     turns: numIn(vars?.[SHOP_TURNS_VAR], SHOP_TURNS_DEFAULT, 1, 8),
     refs: numIn(vars?.[SHOP_REFS_VAR], SHOP_REFS_DEFAULT, 0, 12),
+    talkStock: vars?.[SHOP_TALK_STOCK_VAR] !== '0',
   };
 }
 function sizeOf(vars: Vars, legacy: ShopCount): [number, number] {
@@ -352,7 +373,7 @@ function readOffer(v: unknown): ShopOffer | null {
     desc: clean(o.desc, 120),
     effect: clean(o.effect, 60),
     ...traitsOf(o),
-    ...(typeof o.truth === 'string' && o.truth ? { truth: clean(o.truth, 60) } : {}),
+    ...(typeof o.truth === 'string' && o.truth ? { truth: clean(o.truth, 200) } : {}),
     ...(Number.isSafeInteger(o.paid) ? { paid: o.paid as number } : {}),
     ...(o.price === null ? { price: null } : Number.isSafeInteger(o.price) ? { price: o.price as number } : {}),
     ...(Number.isSafeInteger(o.first) ? { first: o.first as number } : {}),
@@ -412,6 +433,14 @@ export function turnKeyAt(chat: Chat, index: number): string {
   const list = chat.message ?? [];
   return index > 0 && list[index - 1] ? `t:${messageKey(list[index - 1], index - 1)}` : `t:first:${Math.max(0, index)}`;
 }
+/** 어느 응답에 맞춰 만든 결과인지: 그 응답의 자리·글·턴 열쇠 */
+export interface TurnMark { index: number; data: string; turn: string }
+/** 응답에 맞춰 만든 결과를 아직 써도 되는가: 그 응답이 같은 자리에 같은 글로 있고 턴 열쇠가 같으면 된다.
+ *  뒤에 메시지가 더 붙은 것(채팅이 이어짐)은 괜찮고, 그 응답을 지웠거나 다시 굴렸거나 앞 메시지가 바뀌었으면 안 된다 */
+export function turnResultValid(chat: Chat, made: TurnMark): boolean {
+  const m = chat.message?.[made.index];
+  return !!m && String(m.data ?? '') === made.data && turnKeyAt(chat, made.index) === made.turn;
+}
 export function turnKey(chat: Chat): string {
   const last = lastBot(chat);
   return last ? turnKeyAt(chat, last.index) : '';
@@ -443,11 +472,12 @@ export function settleShop(chat: Chat, responseIndex: number, self: string[] = [
   const norm = (s: string) => s.replace(/\s+/g, '').toLowerCase();
   const me = new Set(self.map(norm).filter(Boolean));
   const found = on ? findShopTag(text) : null;
-  // 고유 상점 (11-09): 인터넷 접속(@web)이면 그 몰 사이트를 여는 표식으로 바꾸고 상점 방문은 열지 않는다. 직접 간 곳은 「직접 가면 쓸 창」이 없으면 열지 않는다
+  // 고유 상점 (11-09): 인터넷 접속(@web)이면 그 몰 사이트를 여는 표식으로 바꾸고 상점 방문은 열지 않는다.
+  // 인터넷 전용 가게(사이트는 있고 「직접 가면 쓸 창」이 없는 줄)는 주인 칸이 무엇이든 접속 표식으로 바로잡는다 (11-16 사용자: 모델이 표식을 어떻게 내든 인터넷 창을 띄운다)
   const own = found ? ownShopOf(chat.scriptstate, found.shop) : null;
   const webAsk = !!found && found.owner.trim().toLowerCase().startsWith(WEB_OWNER);
-  const site = webAsk && own?.web ? own.web : '';
-  const mine = !!found && (webAsk ? !site : (!!found.owner && me.has(norm(found.owner))) || (!!own && !own.visit));
+  const site = own?.web && (webAsk || !own.visit) ? own.web : '';
+  const mine = !!found && !site && (webAsk || (!!found.owner && me.has(norm(found.owner))) || (!!own && !own.visit));
   const web = !mine && !!site;
   const tag = mine || web ? null : found;
   const webRaw = web ? `[shop: ${own!.name}|${WEB_OWNER}:${site}]` : '';
@@ -566,13 +596,13 @@ export function parseOrderLine(line: string): Omit<ShopQuote, 'id'> | null {
 }
 
 /** 물건 줄 → 칸. 글머리표·번호(「1. 」「2) 」)·마크다운 표 앞뒤 「|」를 뗀다 (전수검사 11-13) */
-function lineCells(line: string): string[] {
+export function lineCells(line: string): string[] {
   let t = line.trim().replace(/^[-*•+]\s*/, '').replace(/^\d{1,3}[.)]\s+/, '');
   if (t.startsWith('|')) t = t.slice(1).replace(/\|\s*$/, '');
   return t.split('|').map((c) => c.trim());
 }
 
-function parseLine(line: string): Omit<ShopItem, 'id'> | null {
+export function parseLine(line: string): Omit<ShopItem, 'id'> | null {
   const cells = lineCells(line);
   if (cells.length < 2) return null;
   // 따라 쓴 칸 이름 줄·표 구분선은 물건이 아니다 (전수검사 11-13)
@@ -758,7 +788,9 @@ export function dropItemsNamed(st: ShopState, names: string[]): ShopState {
 }
 
 /** 주인에게 말한 결과를 상태에 (내 말은 부르는 쪽이 먼저 적는다) */
-export function applyTalk(st: ShopState, r0: TalkReply, kick = true): ShopState {
+/** stock: 설정 「문의로 물건 바꾸기」. 꺼져 있으면 응답의 물건 더하기·전체 다시 짜기는 받지 않는다 (값 바꾸기·빼기는 받는다) */
+export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = true): ShopState {
+  const r0: TalkReply = stock ? r1 : { ...r1, all: [], add: [], mode: r1.mode === 'all' ? 'none' : r1.mode };
   // 포인트 상점: 「900p」로 적은 값도 포인트 값으로
   const r = st.identity.points ? { ...r0, all: r0.all.map(pointPrice), add: r0.add.map(pointPrice), reprice: r0.reprice.map(pointPrice) } : r0;
   let items = st.items.slice();
@@ -830,7 +862,7 @@ export function buyNote(st: ShopState, id: string, key = ''): ShopState | null {
 
 /** 팔기 시작: 소지품 한 줄을 들고 주인에게 보인다 (값은 아직 없음). 내 말은 부르는 쪽이 sayToOwner 로 적는다 */
 export function startSell(st: ShopState, it: Omit<ShopOffer, 'price' | 'first'>): ShopState {
-  return { ...st, sell: { itemId: it.itemId, name: clean(it.name, 30), desc: clean(it.desc, 120), effect: clean(it.effect, 60), ...traitsOf(it), ...(it.truth ? { truth: clean(it.truth, 60) } : {}), ...(Number.isSafeInteger(it.paid) ? { paid: it.paid } : {}) } };
+  return { ...st, sell: { itemId: it.itemId, name: clean(it.name, 30), desc: clean(it.desc, 120), effect: clean(it.effect, 60), ...traitsOf(it), ...(it.truth ? { truth: clean(it.truth, 200) } : {}), ...(Number.isSafeInteger(it.paid) ? { paid: it.paid } : {}) } };
 }
 
 /** 기본 상점: 말·판 것에 그때의 기준 응답 키를 적는다 (쇼핑몰은 key 가 비어 stampLastLine 이 적는다) (전수검사 11-13) */
@@ -880,6 +912,19 @@ export function reviveShop(st: ShopState, alive: Set<string>): ShopState {
 export const shelfItems = (st: ShopState): ShopItem[] => st.items.filter((x) => !x.sold);
 export const soldItems = (st: ShopState): ShopItem[] => st.items.filter((x) => x.sold);
 
+/** 메인 요청에 붙이는 진열대 글 (설정 「진열」): 안 팔린 물건마다 이름·값·설명·보이는 효과. 숨긴 진짜 효과는 넣지 않는다. 글은 지침 「메인 요청에 붙는 글」의 INVENTORY.SHOP.SHELF_* 절 */
+export function shelfMainText(st: ShopState): string {
+  return shelfItems(st).map((x) => {
+    const money = guideTxt('Main', st.identity.points ? 'INVENTORY.SHOP.SHELF_PRICE_POINTS' : 'INVENTORY.SHOP.SHELF_PRICE_WON', { price: x.price.toLocaleString('en-US') });
+    return guideTxt('Main', 'INVENTORY.SHOP.SHELF_ITEM', {
+      name: x.name,
+      price: x.pay ? (x.price ? `${x.pay} + ${money}` : x.pay) : money,
+      desc: x.desc ? guideTxt('Main', 'INVENTORY.SHOP.SHELF_DESC', { desc: x.desc }) : '',
+      effect: x.effect ? guideTxt('Main', 'INVENTORY.SHOP.SHELF_EFFECT', { effect: x.effect }) : '',
+    });
+  }).join('; ');
+}
+
 /** 다음 턴 본편에 넘길 이번 방문 사건 (core/items.ts itemsBlock 의 This turn). 마지막 응답의 상점일 때만 */
 export function shopEvents(chat: Chat): string[] {
   const live = currentShop(chat);
@@ -897,6 +942,12 @@ export function shopEvents(chat: Chat): string[] {
   const main = shopMain(chat.scriptstate, 'shop');
   // 글은 지침 「메인 요청에 붙는 글」의 INVENTORY.SHOP.* 절
   if (main.has('sell') && sales.length) out.push(guideTxt('Main', 'INVENTORY.SHOP.SOLD', { items: sales.map((x) => guideTxt('Main', st.identity.points ? 'INVENTORY.SHOP.SOLD_ITEM_POINTS' : 'INVENTORY.SHOP.SOLD_ITEM_WON', { name: x.name, price: x.price.toLocaleString('en-US') })).join(', '), shop: st.shop }));
+  // 「진열」(기본 끔): 사지 않은 물건까지 지금 진열대 전체. 진열과 함께 받은 주인 대사는 내가 말을 걸지 않은 턴에만 여기서 넘긴다 (말을 걸었으면 「문의」가 대화째 넘긴다)
+  if (main.has('shelf') && live && live.loaded && !st.closed) {
+    const shelf = shelfMainText(st);
+    if (shelf) out.push(guideTxt('Main', 'INVENTORY.SHOP.SHELF', { shop: st.shop, items: shelf }));
+    if (!spoke && lastOwner) out.push(guideTxt('Main', 'INVENTORY.SHOP.OWNER_SAID', { shop: st.shop, line: lastOwner.text }));
+  }
   if (!main.has('ask')) return out;
   if (st.closed && lastOwner) out.push(guideTxt('Main', 'INVENTORY.SHOP.REFUSED', { shop: st.shop, line: lastOwner.text.slice(0, 80) }));
   else if (!st.closed && spoke && lastOwner) {
@@ -930,6 +981,8 @@ export interface ShopSource {
   truthMode?: TruthMode;
   /** 우주몰: 진행 중 맞춤 주문 (core/orders.ts ordersText) */
   orders?: string;
+  /** 요청에 같이 넘길 지난 문의 대화의 줄 수 (최근 줄부터). 없으면 전부 */
+  talkMax?: number;
 }
 
 // 지침 글은 플러그인 내장 지침 「Shop」(지침/상점.txt, 설정 → 지침 → 상점에서 고침). 여기는 절을 골라 자리만 채운다 (2026-11-07 사용자: 지침은 전부 지침 메뉴에서)
@@ -989,12 +1042,14 @@ export function shelfPrompt(src: ShopSource, s: ShopSettings, guide: GuideName =
     src.language ?? '',
   ].filter(Boolean).join('\n\n');
   // 새로고침: 이번 방문 대화 전부를 같이 (2026-11-07 사용자: 주인이 방금 나눈 말을 알고 새 물건·한마디를 내게)
-  const talk = !first && src.st.talk.length ? `\n\n${guideTxt(guide, 'HEAD_VISIT_TALK')}\n${talkLines(src.st, guide)}` : '';
+  const visit = first ? '' : talkLines(src.st, guide, src.talkMax);
+  const talk = visit ? `\n\n${guideTxt(guide, 'HEAD_VISIT_TALK')}\n${visit}` : '';
   return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, '', guide)}${talk}\n\n${guideTxt(guide, first ? 'TASK_FIRST' : 'TASK_RESTOCK')}` }], s, fillGuide(g.THOUGHTS_SHELF, {}));
 }
 
 /** 이번 방문 대화 줄 (지침의 TALK_LINE_ME · TALK_LINE_OWNER 절) */
-const talkLines = (st: ShopState, guide: GuideName): string => st.talk.map((l) => guideTxt(guide, l.who === 'me' ? 'TALK_LINE_ME' : 'TALK_LINE_OWNER', { text: l.text })).join('\n');
+/** max: 넘길 줄 수 (최근 줄부터). 없으면 전부 */
+const talkLines = (st: ShopState, guide: GuideName, max?: number): string => (max === undefined ? st.talk : max <= 0 ? [] : st.talk.slice(-max)).map((l) => guideTxt(guide, l.who === 'me' ? 'TALK_LINE_ME' : 'TALK_LINE_OWNER', { text: l.text })).join('\n');
 /** 주인에게 말하기 (흥정·문의·요청·잡담). 대화는 이번 방문 것 전부 */
 export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 'Shop'): CraftMessage[] {
   const st = src.st;
@@ -1012,16 +1067,19 @@ export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 
   const v = { line: lineOf(guide) };
   const system = [
     fillGuide(g.COMMON, v),
-    [fillGuide(g.TALK, v), fillGuide(s.feature ? g.TALK_FEATURE : g.TALK_PLAIN, v), fillGuide(s.kick ? g.KICK_ON : g.KICK_OFF, v)].filter(Boolean).join(' '),
+    [fillGuide(g.TALK, v), s.talkStock ? '' : guideTxt(guide, 'TALK_NO_STOCK'), fillGuide(s.feature ? g.TALK_FEATURE : g.TALK_PLAIN, v), fillGuide(s.kick ? g.KICK_ON : g.KICK_OFF, v)].filter(Boolean).join(' '),
     o ? fillGuide(g.SELL, v) : '',
     guide === 'Cos' && !o ? fillGuide(g.INFO, v) : '',
     guide === 'Cos' && !o ? fillGuide(g.ORDER, v) : '',
     st.identity.points ? fillGuide(g.POINT_SHOP, v) : '',
     [fillGuide(g.TALK_OUTPUT, v), o ? fillGuide(g.TALK_OUTPUT_OFFER, v) : '', guide === 'Cos' && !o ? fillGuide(g.TALK_OUTPUT_INFO, v) : '', guide === 'Cos' && !o ? fillGuide(g.TALK_OUTPUT_ORDER, v) : '', s.kick ? fillGuide(g.TALK_OUTPUT_END, v) : ''].filter(Boolean).join('\n'),
-    SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true),
+    // 「문의로 물건 바꾸기」를 끄면 진열 규칙을 넣지 않는다. 우주몰 문의(팔기 중이 아닐 때)는 맞춤 주문 견적 줄에 쓰는 칸 설명만 짧게 넣는다 (지침 ORDER_COLUMNS 절).
+    // 견적의 진실 칸도 설정 「진실 미리 정하기」를 따른다 (진열과 같은 TRUTH_* 절)
+    s.talkStock ? SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true) : guide === 'Cos' && !o ? `${guideTxt(guide, 'ORDER_COLUMNS')} ${guideTxt(guide, `TRUTH_${(src.truthMode ?? 'mix').toUpperCase()}`)}` : '',
     src.language ?? '',
   ].filter(Boolean).join('\n\n');
-  const talk = talkLines(st, guide);
+  // 내가 방금 한 말(마지막 줄)은 늘 넘긴다
+  const talk = talkLines(st, guide, src.talkMax === undefined ? undefined : Math.max(1, src.talkMax));
   const sales = st.sales.map((x) => `${x.name} (${x.price})`).join(', ');
   const notes = (st.notes ?? []).map((n) => guideTxt(guide, n.bought ? 'NOTE_ITEM_BOUGHT' : 'NOTE_ITEM_OPEN', { title: n.title, price: n.price })).join(', ');
   const quotes = (st.quotes ?? []).map((q) => guideTxt(guide, q.accepted ? 'QUOTE_ITEM_PAID' : 'QUOTE_ITEM_OPEN', { name: q.item.name, price: q.price, hours: q.hours })).join(', ');
@@ -1073,8 +1131,16 @@ export const genLanguage = (vars: Vars): string | null => genSettings(vars).lang
 export function programPrompt(src: ShopSource, s: ShopSettings, fill: Record<string, string>): CraftMessage[] {
   const g = G('Hs');
   const v = { ...fill, line: lineOf('Hs') };
-  const system = [fillGuide(g.COMMON, v), SHELF_RULES(g, s, src.st, 'Hs'), fillGuide(g.BROADCAST, v), fillGuide(g.HOST ?? '', v), fillGuide(g.VIEWERS ?? '', v), src.language ?? ''].filter(Boolean).join('\n\n');
+  // KNOWS: 누가 무엇을 아는지 (편성·채팅 반응·상담원이 같이 읽는다, 11-15 사용자)
+  const system = [fillGuide(g.COMMON, v), fillGuide(g.KNOWS ?? '', v), SHELF_RULES(g, s, src.st, 'Hs'), fillGuide(g.BROADCAST ?? '', v), fillGuide(g.HOST ?? '', v), fillGuide(g.VIEWERS ?? '', v), src.language ?? ''].filter(Boolean).join('\n\n');
   return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${guideTxt('Hs', 'TASK_PROGRAM')}` }], s, fillGuide(g.THOUGHTS_PROGRAM ?? '', v));
+}
+/** 망상홈쇼핑 전화 주문 상담원 (물건 맞교환 감정·흥정, 11-15 사용자: 상담원은 사람이 아니고 채널 몫부터 챙겨 후려친다).
+ *  system: 누가 무엇을 아는지(KNOWS) + 상담원 + 맞교환/흥정 + 출력 꼴. user: 참고 자료·맥락(편성과 같은 길) + 지금 상품 + 내민 물건 + 지금 조건 + 통화 */
+export function operatorPrompt(src: ShopSource, s: ShopSettings, mode: 'barter' | 'talk', body: string, noMoney: boolean): CraftMessage[] {
+  const g = G('Hs');
+  const system = [fillGuide(g.KNOWS ?? '', {}), [fillGuide(g.OPERATOR ?? '', {}), fillGuide(mode === 'barter' ? g.OPERATOR_BARTER ?? '' : g.OPERATOR_TALK ?? '', {}), noMoney ? fillGuide(g.OPERATOR_NO_MONEY ?? '', {}) : ''].filter(Boolean).join(' '), fillGuide(g.OPERATOR_OUTPUT ?? '', {}), src.language ?? ''].filter(Boolean).join('\n\n');
+  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${body}\n\n${guideTxt('Hs', 'TASK_OPERATOR')}` }], s, fillGuide(g.THOUGHTS_OPERATOR ?? '', {}));
 }
 /** 망상홈쇼핑 머리 (지침 「망상홈쇼핑」의 HEAD_CHANNEL · HEAD_CHANNEL_HOST 절) */
 const channelHead = (st: ShopState): string => (st.owner ? guideTxt('Hs', 'HEAD_CHANNEL_HOST', { shop: st.shop, owner: st.owner }) : guideTxt('Hs', 'HEAD_CHANNEL', { shop: st.shop }));

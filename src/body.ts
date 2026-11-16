@@ -5,7 +5,7 @@ import { hasStatusTag } from './core/world';
 import { isSceneMessage, isUnsent, renderStartCards, renderUnsentMark, SCENE_MARK, START_MARK, stripSceneMark, stripStartCard, stripUnsentMark, UNSENT_MARK } from './core/dispatch';
 import { readPersona, readUser, USER_MARK } from './host/user';
 import { hasSceneCard, renderSceneCards } from './core/dispatch';
-import { CONTEXT as GN_CONTEXT, GN_RAW, gnetSettings, mainContext, readGnet, userNick } from './core/gnet';
+import { CONTEXT as GN_CONTEXT, GN_RAW, gnetSettings, mainContext, readGnet, shareContextRules, userNick } from './core/gnet';
 import { BOARD_SITES, boardView } from './core/boards';
 import { mainContextRules } from './core/gnetPrompt';
 import { ALWAYS_BOOKS, isVirtual, stripVirtual, withWorldLore } from './core/world/virtual';
@@ -14,8 +14,8 @@ import { evaluate } from './core/cbs';
 import { shouldKeepSeed } from './core/request';
 import { messageText } from './core/refs';
 import { insertedSystemTexts, processRequest, unwrapCalls, unwrapScenes, type PromptMessage } from './core/request';
-import { HISTORY as PH_HISTORY, hasCall, mainContext as phoneMainContext, phoneSettings, PH_STATE, PH_BULLETINS, readBulletins, readPhone, renderCalls } from './core/phone';
-import { viewSettings } from './core/phoneView';
+import { HISTORY as PH_HISTORY, hasCall, mainContext as phoneMainContext, phoneSettings, PH_STATE, PH_BULLETINS, readBulletins, readHabits, readPhone, renderCalls } from './core/phone';
+import { PH_VIEWS, readViews, viewSettings } from './core/phoneView';
 import { mainContextRules as phoneRules } from './core/phonePrompt';
 import { advNum, applyAdvanced, genSettings } from './core/advanced';
 import { fitTotal, type ContextPart } from './core/budget';
@@ -46,7 +46,7 @@ import { createFab, type Fab } from './host/overlay';
 import { createProgWin, progressOn, type ProgWin } from './host/progwin';
 import { BRAND } from './ui/brand';
 import { cardPalette as themedCardPalette, currentTheme, onThemeChange, repaintTheme, setCurrentTheme, themeName } from './ui/theme';
-import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
+import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, keepImgTagsInRequest, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
 import { loadModuleAssets, modulePicker } from './host/assets';
 import { getPrefs } from './core/settings';
 import { appShown, openApp, openInstall, openRecords, openShop, openWiki } from './ui/app';
@@ -60,10 +60,11 @@ import { landingHtml as renderLanding } from './ui/landing';
 import { loadPrefs } from './host/prefs';
 import { isWaiting, setWaiting } from './host/waiting';
 import { syncDecorators, computeLore, hasUnlockTag, loreOptions, patchSlots, readUnlocked, sameVars, stripDecorators, stripUnlockTags, trimRoster, unlockedValue, unlockTags, UNLOCK_VAR, type LoreMode, hasSlots, insertLoreBlock, joinLoreBlock, LORE_KINDS, slotParts, slotTexts, slotVar, type LoreBlockPart, type LoreKind } from './core/lore';
-import { advValue } from './core/advanced';
+import { advValue, alwaysBookOn, loreLimits } from './core/advanced';
+import { isOwnMainCall } from './host/llm';
 import { userInfo } from './host/user';
 import { applyPlayer, hidePlayerTag, playerAgent, playerBlock } from './core/player';
-import { buildImgPrompt, imgCharacters, imgPromptConfig, stripImgLore } from './core/imgprompt';
+import { buildImgPrompt, imgCharacters, imgPromptConfig, imgSceneNames, stripImgLore } from './core/imgprompt';
 import { withStatusBlock, type StatusShape } from './core/statusctx';
 import { settleItemUse, withInventory } from './core/items';
 import { withHomeshop } from './core/homeshop';
@@ -88,6 +89,7 @@ import { progressAbort, progressEnd, progressPlan, progressTurn, progressWatch }
 import { turnPlan } from './core/progplan';
 import { bookText } from './core/refs';
 import { stripMarkers } from './core/sanitize';
+import { contextTag, tagStep } from './core/stagetags';
 
 const PLUGIN_ID = 'goei-plugin';
 const WATCH_MS = 1000;
@@ -161,6 +163,8 @@ function addedTexts(before: PromptMessage[], after: PromptMessage[]): string[] {
 
 async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: string): Promise<M[]> {
   if (type !== 'model' || !Array.isArray(messages)) return messages;
+  // 플러그인이 메인 모델로 보낸 보조 호출(괴담넷·위키 등)이 여기로 들어오면 본편용 로어·기록을 붙이지 않고 그대로 보낸다 (host/llm.ts)
+  if (isOwnMainCall(messages)) return messages;
   if (faultOn('beforeRequest')) throw new Error('시험용 예외 주입(beforeRequest)');
   // 자동 재시도: 이미 조립한 요청이 다시 들어왔다. 참고 기록·인물 기록이 두 번 끼고 호출 기록 턴이 새로 열리지 않게 그대로 보낸다 (전수검사 11-13)
   if (lastAdded.size && sysTexts(messages).some((t) => lastAdded.has(t))) {
@@ -169,6 +173,17 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   }
   const input0 = messages;
   const failed: string[] = [];
+  /** 줄마다 어느 조립 단계가 넣거나 고쳤는지 (호출 기록 › 메인 요청 조립의 이름표, core/stagetags.ts). Risu 가 보낸 그대로인 줄은 빈 글 */
+  let tags: string[] = messages.map(() => '');
+  /** 단계 하나가 배열을 바꿨다: prev 는 단계 전 배열. 이름표를 못 붙여도 요청은 그대로 */
+  const mark = <T extends PromptMessage[]>(name: string | ((m: PromptMessage) => string), prev: T, next: T): T => {
+    try {
+      tags = tagStep(prev, tags, next, name);
+    } catch {
+      /* 이름표만 빠진다 */
+    }
+    return next;
+  };
   /** 플러그인이 끼운 글 (호출 기록의 「이 중 플러그인이 넣은 것」, 전수검사 11-13) */
   let added: string[] | undefined;
   /** 한 단계: 던지면 이름·까닭을 모으고 fallback(= 그 단계 이전 모양) */
@@ -221,48 +236,49 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
       const all = chat0?.message ?? [];
       for (let k = all.length - 1; k >= 0 && all[k]?.role === 'user' && !cardFresh; k--) cardFresh = typeof all[k].data === 'string' && hasSceneCard(all[k].data);
       const o = chat0 ? { cardIsLast: hasSceneCard(lastData), cardFresh, callIsLast: hasCall(lastData) } : {};
-      messages = step('지시문·전화 풀기', () => unwrapCalls(unwrapScenes(messages, o).messages, o).messages, messages);
+      messages = mark('지시문·전화 풀기', messages, step('지시문·전화 풀기', () => unwrapCalls(unwrapScenes(messages, o).messages, o).messages, messages));
     }
     const marked = (t: unknown) => typeof t === 'string' && (t.includes(UNSENT_MARK) || t.includes(START_MARK) || t.includes(SCENE_MARK));
     if (messages.some((m) => marked(m?.content))) {
-      messages = step('시작 카드 표식', () => messages.map((m) => (marked(m?.content) ? { ...m, content: stripSceneMark(stripStartCard(stripUnsentMark(m.content))) } : m)), messages);
+      messages = mark('시작 카드 표식', messages, step('시작 카드 표식', () => messages.map((m) => (marked(m?.content) ? { ...m, content: stripSceneMark(stripStartCard(stripUnsentMark(m.content))) } : m)), messages));
     }
     // 오래된 메시지의 이미지 태그는 요청에서 뺀다 (원본 「🖼️에셋리퀘제거」)
     if (liteNow || messages.some((m) => typeof m?.content === 'string' && imgTagsKnown(m.content, modulePicker()))) {
       // 이 채팅의 에셋 출력이 꺼져 있으면 최근 것까지 전부 뺀다. 남기면 모델이 따라 써 태그가 끝없이 이어졌다 (전수검사 11-13)
-      const assetOff = step('에셋 출력 읽기', () => (ctx ? !basicSettings(ctx.char.globalLore, ctx.chat.scriptstate).assetOn : imgHidden()), false);
-      messages = step('옛 이미지 태그', () => (assetOff ? stripAllImgTags(messages) : stripOldImgTags(messages, getPrefs().imgSend ?? IMG_RECENT.def)), messages);
+      // 보조 모델이 태그를 붙이는 방식도 같다: 메인 요청에 이미지 지침이 없으니 태그를 남길 까닭이 없다
+      const assetOff = step('에셋 출력 읽기', () => { if (!ctx) return imgHidden(); const b = basicSettings(ctx.char.globalLore, ctx.chat.scriptstate); return !keepImgTagsInRequest(b.assetOn, b.assetModel); }, false);
+      messages = mark('옛 이미지 태그', messages, step('옛 이미지 태그', () => (assetOff ? stripAllImgTags(messages) : stripOldImgTags(messages, getPrefs().imgSend ?? IMG_RECENT.def)), messages));
     }
     if (liteNow) {
       // 유저 이름(상태창 지침·명부의 {{user}})은 채팅에 그려진 숨은 칸에서 읽는다. 새로고침 뒤 창을 열지 않고 보내면 비어 있다
       await stepAsync('유저 이름', () => readUser(), undefined);
-      messages = step('기록 태그 정리', () => stripHistoryTags(messages), messages);
+      messages = mark('기록 태그 정리', messages, step('기록 태그 정리', () => stripHistoryTags(messages), messages));
       if (ctx) {
         const c = ctx;
         const pre = messages;
-        messages = step('로어', () => fixLore(messages, c), messages);
-        messages = await stepAsync('주인공', () => withPlayer(messages, c), messages);
-        messages = step('명부 다듬기', () => trimRoster(messages), messages);
+        messages = mark('로어', messages, step('로어', () => fixLore(messages, c), messages));
+        messages = mark('주인공', messages, await stepAsync('주인공', () => withPlayer(messages, c), messages));
+        messages = mark('명부 다듬기', messages, step('명부 다듬기', () => trimRoster(messages), messages));
         const mctx = step('참고 기록', () => moduleContext(sceneText(messages), c), [] as string[]);
         if (mctx.length) {
           // 마지막 사용자 메시지 바로 앞에 (원본은 맨 끝). 모델이 이번 행동보다 참고 기록을 「지금 할 일」로 읽지 않게
           const at = messages.map((m) => m?.role).lastIndexOf('user');
           const add = mctx.map((t) => ({ role: 'system', content: t }) as M);
-          messages = at < 0 ? [...messages, ...add] : [...messages.slice(0, at), ...add, ...messages.slice(at)];
+          messages = mark((m) => contextTag(String(m?.content ?? '')), messages, at < 0 ? [...messages, ...add] : [...messages.slice(0, at), ...add, ...messages.slice(at)]);
         }
         // 지난 응답의 상태창 줄은 지우고 마지막 한 줄만 직전 상태 블록으로 (core/statusctx.ts). 신분 칸이 빠졌으면 아는 값을 채운다
         // 칸 구성(설정)대로 다시 만들고 잔고 칸은 장부 값으로 (core/world/statuscols.ts · core/wallet.ts)
-        messages = step('상태창', () => withStatusBlock(messages, step('신분', () => knownIdentity(c), ''), step('상태창 모양', () => statusShape(c), undefined)), messages);
+        messages = mark('상태창', messages, step('상태창', () => withStatusBlock(messages, step('신분', () => knownIdentity(c), ''), step('상태창 모양', () => statusShape(c), undefined)), messages));
         // 소지품 [Inventory]: 지금 가진 것·한계·이번 턴 사건(사용·새로 산 것·넘침)을 마지막 유저 메시지 앞에 (core/items.ts, 설정 「소지품 → 본편에 넘기기」)
-        messages = step('소지품', () => withInventory(messages, c.chat), messages);
+        messages = mark('소지품', messages, step('소지품', () => withInventory(messages, c.chat), messages));
         // 「다음 메시지에 사용」 칩: 요청에 실려 나갔으니 바로 숨긴다 (host/usebox.ts markUseSent, 2026-11-12 사용자: 보냈는데 안 없어짐)
         await stepAsync('사용 상자', () => markUseSent(c.charIndex, c.chatIndex, c.chat), undefined);
         // 망상홈쇼핑: 할부 호출 턴·방청 신청 턴에만 한 번 (core/homeshop.ts, 평소엔 아무것도 안 넣는다)
-        messages = step('망상홈쇼핑', () => withHomeshop(messages, c.chat), messages);
+        messages = mark('망상홈쇼핑', messages, step('망상홈쇼핑', () => withHomeshop(messages, c.chat), messages));
         // 장면 인물의 살아 있는 기록 (core/people). 절 단위 혼합이면 그 인물의 시트 원문은 빼고 기록으로 대신한다
-        messages = await stepAsync('인물 기록', () => withPeople(messages, c), messages);
+        messages = mark('인물 기록', messages, await stepAsync('인물 기록', () => withPeople(messages, c), messages));
         // 이미지 태그 지침 (core/imgprompt): 카드 로어북 「Asset」 대신 설정으로 조립. 옛 카드의 로어북 본문이 남아 있으면 지운다
-        messages = step('이미지 지침', () => withImgPrompt(messages, c), messages);
+        messages = mark('이미지 지침', messages, step('이미지 지침', () => withImgPrompt(messages, c), messages));
         added = step('더한 글', () => addedTexts(pre, messages), undefined);
       }
     }
@@ -271,7 +287,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
       // 요청 도중에는 채팅을 저장하지 않는다. 응답이 붙기 전에 채팅 객체를 바꾸면 응답이 사라질 수 있다.
       // 남은 seed_lore 변수는 여기서 걸러지므로 두 번째 전송부터는 모델에 가지 않는다.
       const chat = ctx?.chat ?? (await stepAsync('시드 채팅 읽기', async () => (await risuai.getChatFromIndex(await risuai.getCurrentCharacterIndex(), await risuai.getCurrentChatIndex())) as Chat | null, null));
-      if (chat) messages = step('시드', () => processRequest(messages, chat).messages, messages);
+      if (chat) messages = mark('시드', messages, step('시드', () => processRequest(messages, chat).messages, messages));
     }
   } catch (error) {
     // 단계 밖(끼우기·판정)에서 던진 것. 마지막으로 성공한 모양을 그대로 쓴다
@@ -280,7 +296,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   if (failed.length) console.log(`[goei] 요청 조립 실패: 단계 ${failed.join(' · ')} — 그 단계는 건너뛰고 표식만 지워 보냅니다`);
   // 마지막 정리: 어느 단계가 실패했어도 플러그인 표식은 모델에 가지 않게 (정상이면 이미 지워져 있어 바뀌는 것이 없다)
   const out = sanitize(messages);
-  if (liteNow) step('호출 기록', () => traceMain(out, failed, added), undefined);
+  if (liteNow) step('호출 기록', () => traceMain(out, failed, added, tags.length === out.length ? tags : undefined), undefined);
   // 새로 끼운 글만 기억한다. 원래 있던 system 글을 고친 결과(자리 로어북 보정 등)는 다음 새 요청에도 똑같이 들어올 수 있어 뺀다 (11-14 재검토 ①-2)
   lastAdded = new Set(insertedSystemTexts(input0, out));
   return out;
@@ -314,7 +330,7 @@ function loreFor(char: LoreChar, chat0: Chat, input?: string) {
   const chat = chat0.message?.some((m) => isSceneMessage(m.data)) ? { ...chat0, message: chat0.message.filter((m) => !isSceneMessage(m.data)) } : chat0;
   const mode = advValue(chat.scriptstate, 'gen', 'lore_mode') as LoreMode;
   const player = playerAgent(char.globalLore, chat.scriptstate);
-  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, userOrTag()), input, ...(player ? { exclude: [player.lore] } : {}) });
+  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, userOrTag(), loreLimits(chat.scriptstate)), input, ...(player ? { exclude: [player.lore] } : {}) });
 }
 
 /** 고른 로어북을 자리 항목이 읽는 채팅 변수에 적는다 (요청 전이라 Risu가 세고 넘치면 오래된 채팅을 지운다).
@@ -382,6 +398,8 @@ function fixLore<M extends PromptMessage>(messages: M[], { char, chat }: ChatCon
   // 🏷️Tag 의 상태창 절은 이 채팅의 칸 구성에서 만든다 (`{status_section}` 자리)
   const cols = usedCols(colConfig(chat.scriptstate));
   for (const b of ALWAYS_BOOKS) {
+    // 설정 「세력 요약 보내기」·「요원 명단 보내기」를 끈 채팅은 그 지침을 넣지 않는다
+    if (!alwaysBookOn(chat.scriptstate, b.kind)) continue;
     const e = (char.globalLore ?? []).find((x) => isVirtual(x) && x.comment === b.name);
     if (e && typeof e.content === 'string') parts.push({ order: b.order, text: evaluate(b.kind === 'tag' ? fillStatusSection(e.content, cols) : e.content, env) });
   }
@@ -483,6 +501,9 @@ function appendImgPrompt<M extends PromptMessage>(messages: M[], text: string): 
   return end === messages.length || end === 0 ? [...messages, add] : [...messages.slice(0, end), add, ...messages.slice(end)];
 }
 
+/** 요청의 마지막 대화 글 몇 개 (시스템 글 빼고). 이미지 지침의 「장면 인물만」이 이름을 찾는 범위 */
+const recentTexts = (messages: PromptMessage[], n = 4): string[] => messages.filter((m) => m?.role !== 'system' && typeof m?.content === 'string').slice(-n).map((m) => m.content as string);
+
 /** 이미지 태그 지침: 에셋 출력 켬 + 메인 모델일 때 요청 맨 끝에, 끝이 assistant 프리필이면 그 앞에 (로어북 Asset 의 @@depth 0 과 같은 자리). 보조 모델이면 지침 없이 옛 블록만 지운다 */
 function withImgPrompt<M extends PromptMessage>(messages: M[], { char, chat }: ChatContext): M[] {
   const s = basicSettings(char.globalLore, chat.scriptstate);
@@ -490,7 +511,9 @@ function withImgPrompt<M extends PromptMessage>(messages: M[], { char, chat }: C
   if (!s.assetOn || s.assetModel !== 'main') return out;
   const cfg = imgPromptConfig(getPrefs());
   const me = playerAgent(char.globalLore, chat.scriptstate);
-  const names = imgCharacters(char.globalLore, cfg, { assetPlayer: s.assetPlayer, playerEnglish: me?.english || undefined, userName: userInfo().name });
+  const all = imgCharacters(char.globalLore, cfg, { assetPlayer: s.assetPlayer, playerEnglish: me?.english || undefined, userName: userInfo().name });
+  // 설정 「장면 인물만」(기본 끔): 최근 대화에 이름이 나온 캐릭터만 지침에 넣는다. 주인공은 늘 남긴다
+  const names = getPrefs().imgNamesScene ? imgSceneNames(char.globalLore, all, recentTexts(out), [s.assetPlayer ? me?.english || userInfo().name : '']) : all;
   if (!names.length) return out;
   // 지침 속 {{user}}는 Risu 가 다시 풀지 않으니 여기서 푼다 (전수검사 11-13)
   return appendImgPrompt(out, evaluate(buildImgPrompt(cfg, names, s.assetPlayer), { vars: chat.scriptstate ?? {}, char: char.name, user: me?.name || userOrTag() }));
@@ -503,7 +526,7 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
   // 게시판 사이트마다 따로 (괴담넷·괴담갤·세정게·연어 마켓, 2026-11-08)
   const boardsOn = BOARD_SITES.map((site) => ({ site, view: boardView(chat, site) })).filter(({ view }) => !!view.scriptstate?.[GN_RAW] && gnetSettings(view.scriptstate).context);
   const wantGnet = boardsOn.length > 0;
-  const wantPhone = (!!ss?.[PH_STATE] || !!ss?.[PH_BULLETINS]) && phoneSettings(ss).context;
+  const wantPhone = (!!ss?.[PH_STATE] || !!ss?.[PH_BULLETINS] || !!ss?.[PH_VIEWS]) && phoneSettings(ss).context;
   const wantWiki = wikiContextOn(ss);
   // 망상홈쇼핑 시청 기록 (core/hslog.ts): 방송에서 실제로 본 것·친 채팅·주문. 기록이 있고 「본편에 넘기기」($hs_main)가 켜져 있을 때
   const wantHs = hsMainOn(ss);
@@ -514,24 +537,33 @@ function moduleContext(scene: string, { char, chat }: ChatContext): string[] {
   const focus = makeFocus(scene, buildRegistry(char.globalLore));
   // 기능마다 반영 상한 안에서 고르고, 합이 「본편 반영 총 상한」을 넘으면 상한을 나눠 다시 고른다 (core/budget.ts fitTotal)
   const parts: ContextPart[] = [];
+  // 게시판 덩어리의 안내문 (parts 앞쪽과 같은 차례). 앞 게시판과 글자까지 같은 안내문은 빈 글로 만들어 상한에서 세지 않는다 (shareContextRules)
+  const boardRules: string[] = [];
   for (const { site, view } of boardsOn) {
     const rule = mainContextRules({ char: src.char, chat: view });
     const st = readGnet(view);
     // 어느 게시판 글인지 이름을 붙인다 (전수검사 11-13: 네 게시판이 모두 feature:'gnet' 으로만 갔다)
-    if (rule && (st.posts.length || st.dms.length)) parts.push({ cap: GN_CONTEXT.tokens, build: (cap) => withCap(GN_CONTEXT, 'tokens', cap, () => mainContext(st, userNick(ss), rule, focus, BOARD_NAME[site])) });
+    if (rule && (st.posts.length || st.dms.length)) {
+      const own = !boardRules.includes(rule) ? rule : '';
+      parts.push({ cap: GN_CONTEXT.tokens, build: (cap) => withCap(GN_CONTEXT, 'tokens', cap, () => mainContext(st, userNick(ss), own, focus, BOARD_NAME[site])) });
+      boardRules.push(rule);
+    }
   }
   if (wantPhone && rules.phone) {
     try {
       const st = readPhone(chat);
       const notices = readBulletins(chat);
-      parts.push({ cap: PH_HISTORY.contextTokens, build: (cap) => withCap(PH_HISTORY, 'contextTokens', cap, () => phoneMainContext(st, notices, phoneSettings(ss), rules.phone!, focus)) });
+      parts.push({ cap: PH_HISTORY.contextTokens, build: (cap) => withCap(PH_HISTORY, 'contextTokens', cap, () => phoneMainContext(st, notices, phoneSettings(ss), rules.phone!, focus, { views: readViews(ss), habits: readHabits(ss) })) });
     } catch (error) {
       console.log(`[goei] 괴담톡 기록을 읽지 못했어요: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   if (wantWiki && rules.wiki) parts.push({ cap: advNum(ss, 'nw', 'ctx_tokens'), build: (cap) => wikiMainContext(chat, rules.wiki!, focus, cap) });
   if (wantHs) parts.push({ cap: hsMainSettings(ss).tokens, build: (cap) => hsMainContext(chat, hsMainRules(), focus, cap) });
-  return fitTotal(parts, advNum(ss, 'gen', 'ctx_total')).filter(Boolean);
+  const texts = fitTotal(parts, advNum(ss, 'gen', 'ctx_total'));
+  // 게시판 여럿의 안내문이 글자까지 같으면 처음 붙는 덩어리에만 둔다 (앞 덩어리가 비었으면 다음 덩어리로 옮긴다)
+  const n = boardRules.length;
+  return [...shareContextRules(texts.slice(0, n), boardRules), ...texts.slice(n)].filter(Boolean);
 }
 
 /** 공용 상한 상수를 잠깐 바꿔 고르고 되돌린다 */
@@ -646,8 +678,9 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 상점 표식 `[shop: 가게|주인]`: 이 응답 기준으로 상점 상태를 맞추고 지난 응답의 표식은 지운다 (core/shop.ts settleShop). 설정이 꺼져 있어도 남은 표식은 정리
     // 주인공 자기 가게는 상점이 아니다 (11-09 사용자: 마덕희로 플레이 → 헐값매입 상점이 뜸): 캐릭터 플레이 요원 이름·페르소나 이름
     const selfNames = hasShopTag(raw) ? [playerAgent((await getChar<LoreChar>(arg.characterIndex).catch(() => null))?.globalLore, (latest ?? chat).scriptstate)?.name ?? '', userInfo().name] : [];
+    // 이 응답에 표식이 없고 방문 중인 상점이 없어도 돌린다: 접속 표식(`@web:사이트`)은 방문 상태를 남기지 않아, 건너뛰면 지난 응답의 접속 카드가 남았다 (11-16). 바뀔 것이 없으면 settleShop 이 null
     // 갱신기가 상점을 판단하면(설정 「상점 판단」, 11-09) 여기서는 건드리지 않는다: 갱신기가 표식을 붙이고 같은 정리를 돌린다 (host/people.ts). 그래야 같은 가게에 머무는 동안 방문 기록이 지워지지 않는다
-    if ((shopJudgeBy((latest ?? chat).scriptstate).by === 'main' || !shopOn((latest ?? chat).scriptstate)) && (hasShopTag(raw) || (latest ?? chat).scriptstate?.['$st_shop']) && settleShop(latest ?? chat, arg.messageIndex, selfNames)) {
+    if ((shopJudgeBy((latest ?? chat).scriptstate).by === 'main' || !shopOn((latest ?? chat).scriptstate)) && settleShop(latest ?? chat, arg.messageIndex, selfNames)) {
       latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
         const r = settleShop(cur, arg.messageIndex, selfNames);
         return r ? { ...cur, ...(r.message ? { message: r.message } : {}), scriptstate: { ...(cur.scriptstate ?? {}), ...r.vars } } : null;
@@ -988,14 +1021,14 @@ function startWatcher(fab: Fab | null): () => void {
       // 접속 효과는 버튼 자리에서 버튼이 나타나며 (v0.16.22)
       if (next.changed) await fab?.setVisible(next.fabVisible, next.intro);
       // 호출 진행 창 (11-09): 유령 단추와 같은 화면에서만, 설정 「화면 → 호출 진행 창」이 켜져 있을 때
-      // 상황판이 떠 있어도 그 위에 보인다 (11-11 사용자: 보조 기능은 대부분 상황판을 연 채로 쓰니 숨기면 의미가 없다). 닫기 X 를 덮지 않게 기본 자리를 내렸고 단추를 끌어 옮길 수 있다 (host/progwin.ts)
+      // PC 는 상황판이 떠 있어도 그 위에 보인다 (11-11 사용자: 보조 기능은 대부분 상황판을 연 채로 쓰니 숨기면 의미가 없다). 닫기 X 를 덮지 않게 기본 자리를 내렸고 단추를 끌어 옮길 수 있다 (host/progwin.ts)
       // 상황판이 떠 있는 동안에는 유령 단추 판정(fabVisible)이 꺼져 있어도 보이게 한다
       const pShow = (next.fabVisible || appShown()) && progressOn();
       const pKey = `${pShow}`;
       if (prog && pKey !== progKey) { progKey = pKey; await prog.setVisible(pShow).catch(() => {}); }
       // 떠 있으면 매 초 폭(폰·PC 모양)·자리를 다시 맞춘다 (릴리스 점검 11-09: 창 크기를 바꿔도 그대로였다)
       else if (prog && pShow) await prog.setVisible(true).catch(() => {});
-      // 상황판이 떠 있으면 PC 카드를 저절로 펴지 않고, 폰 막대는 주소줄 아래로 (닫기 X·탭 수 단추를 가리지 않게, 전수검사 11-13)
+      // 상황판이 떠 있으면 PC 카드를 저절로 펴지 않고(닫기 X 를 가리지 않게, 전수검사 11-13), 폰 막대는 숨긴다 (11-15 사용자)
       if (prog) await prog.setPanel(appShown()).catch(() => {});
       // 턴에 채팅을 붙이고, 채팅을 옮겼으면 앞 채팅의 턴을 치우고, 본편을 너무 오래 기다리면 실패로 닫는다
       progressWatch(`${snap.charIndex}:${snap.chatIndex}`);

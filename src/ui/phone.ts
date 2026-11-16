@@ -10,12 +10,12 @@ import { setSitePicSource, attachAction, attachBody, attachEditor, attachInput, 
 import {
   applyEvents, bulletinUnread, callRecord, commitAnnouncements, commitInvitations, contactDetails, cooldownMark, directory, LIMITS, listedRooms,
   membership, parseRefresh, parseReply, personOf, phoneSettings, phoneTime, phoneValue, PH, PH_AUTO_LAST, PH_CONTACTS, PhoneError, push, readBulletins,
-  readCustom, readPhone, readRoom, refreshAllowed, roomLabel, unreadCount, unsolicited, keepValid, lastReply, validCallTarget, writeBulletins, writePhone,
+  readCustom, readPhone, readRoom, refreshAllowed, roomLabel, unreadCount, unsolicited, keepValid, lastReply, chatPrefixKept, validCallTarget, writeBulletins, writePhone,
   chancePassed, parseReactions, mergeHabits, parseHabits, type Contact, type Directory, type PRoom, type PState, contactId, splitRecords, noticeSettings, phoneStorage, STORAGE_MAX, hiddenPause, noticeLabel,
   BANTER_ROWS,
 } from '../core/phone';
 import { refreshPrompt, refreshRetry, replyPrompt, viewPrompt } from '../core/phonePrompt';
-import { parseView, PH_VIEW_LAST, readViews, VIEW_HISTORY, VIEW_PRESETS, viewSettings, viewUnread, writeViews, type ViewRoom } from '../core/phoneView';
+import { matchView, parseView, PH_VIEW_LAST, readViews, VIEW_HISTORY, VIEW_PRESETS, viewSettings, viewUnread, writeViews, type ViewRoom } from '../core/phoneView';
 import { agentFace, imageUrl, stChip } from './images';
 import { readWorld, worldOn } from '../core/world/output';
 import { ICONS } from './icons';
@@ -39,6 +39,7 @@ import { personaText } from '../host/user';
 import { playerSource } from '../core/player';
 import { updateChat, type ChatContext } from '../host/risu';
 import { isPhone } from './media';
+import { isWaiting, onWaiting } from '../host/waiting';
 
 type Sub = 'contacts' | 'chats' | 'notices';
 
@@ -46,7 +47,9 @@ interface PhoneUi {
   sub: Sub;
   tab: string;
   query: string;
-  view: 'list' | 'room' | 'group' | 'call' | 'add' | 'settings' | 'notice' | 'view';
+  view: 'list' | 'room' | 'group' | 'settings' | 'notice' | 'view';
+  /** 떠 있는 작은 창: 전화 걸기·연락처 추가 (보던 화면 위에 뜬다, 11-15 사용자) */
+  pop: '' | 'call' | 'add';
   /** 열어 둔 보기 전용 방 */
   viewId: string | null;
   /** 작성칸 + 버튼으로 연 첨부 메뉴 */
@@ -81,14 +84,14 @@ interface PhoneUi {
 export const phone: PhoneUi = {
   sub: 'contacts', tab: '', query: '', view: 'list', room: null, invite: null, picked: [], topic: '', gname: '', draft: '', page: 1, call: '', callText: '',
   addName: '', addNote: '', openNotice: null, noticePage: 1, attach: [], confirm: null, notice: '', failure: null, attachMenu: false, pickQuery: '',
-  chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', viewId: null,
+  chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', viewId: null, pop: '',
 };
 
 export function resetPhone() {
   Object.assign(phone, {
     sub: 'contacts', tab: '', query: '', view: 'list', room: null, invite: null, picked: [], topic: '', gname: '', draft: '', page: 1, call: '', callText: '',
     addName: '', addNote: '', openNotice: null, noticePage: 1, attach: [], confirm: null, notice: '', failure: null, attachMenu: false, pickQuery: '',
-    chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '',
+    chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', pop: '',
   });
 }
 
@@ -114,10 +117,25 @@ function envForAuto(ctx: { charIndex: number; chatIndex: number }): PhoneEnv {
   return showing === undefined || (showing && chatKey(showing) === chatKey(ctx)) ? env : quietEnv;
 }
 
+/** 본편 응답 대기가 풀릴 때까지 (host/people.ts waitNotBusy 와 같은 방식). 요청 도중에 채팅을 저장하면 응답과 겹쳐 덮을 수 있다 */
+function whenIdle(): Promise<void> {
+  if (!isWaiting()) return Promise.resolve();
+  return new Promise((resolve) => {
+    const off = onWaiting((w) => {
+      if (w) return;
+      off();
+      resolve();
+    });
+  });
+}
+
 const PAGE = 40;
 const jobs = new Map<string, string>();
 const chatKey = (ctx: { charIndex: number; chatIndex: number }) => `${ctx.charIndex}:${ctx.chatIndex}`;
 export const phoneBusy = (ctx: { charIndex: number; chatIndex: number }) => jobs.has(chatKey(ctx));
+/** 응답은 받았고 본편 응답이 끝나기를 기다리는 자동 작업 (저장만 남음). 손 조작은 막지 않고, 다음 자동 작업만 미룬다 */
+const parked = new Set<string>();
+const autoBusy = (ctx: { charIndex: number; chatIndex: number }) => phoneBusy(ctx) || parked.has(chatKey(ctx));
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -138,7 +156,7 @@ function dir(ctx: ChatContext, chat = ctx.chat): Directory {
 
 const token = () => `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 
-async function run(ctx: ChatContext, env: PhoneEnv, label: string, work: () => Promise<string>): Promise<boolean> {
+async function run(ctx: ChatContext, env: PhoneEnv, label: string, work: (park: () => Promise<void>) => Promise<string>): Promise<boolean> {
   const key = chatKey(ctx);
   if (jobs.has(key)) {
     phone.notice = `${jobs.get(key)} 끝난 뒤 다시 눌러 주세요.`;
@@ -149,15 +167,28 @@ async function run(ctx: ChatContext, env: PhoneEnv, label: string, work: () => P
   phone.notice = '';
   phone.failure = null;
   env.render();
+  let held = true;
+  // 저장 전 대기: 작업 잠금을 먼저 풀어, 본편 응답을 기다리는 동안 손 조작이 막히지 않게 한다
+  const park = async () => {
+    if (!isWaiting()) return;
+    held = false;
+    jobs.delete(key);
+    parked.add(key);
+    env.render();
+    await whenIdle();
+  };
   try {
-    phone.notice = await work();
+    const note = await work(park);
+    if (held || !jobs.has(key)) phone.notice = note;
   } catch (error) {
+    if (!held && jobs.has(key)) return true;
     const msg = error instanceof Error ? error.message : String(error);
     phone.notice = msg;
     const raw = (error as { raw?: string }).raw;
     if (raw) phone.failure = { label, reason: msg, raw };
   } finally {
-    jobs.delete(key);
+    if (held) jobs.delete(key);
+    else parked.delete(key);
     await env.refresh();
   }
   return true;
@@ -372,7 +403,7 @@ async function createGroup(ctx: ChatContext, env: PhoneEnv) {
 /** 전체 새 메시지 확인 (원본 refreshInbox). automatic: 채팅 응답 뒤 자동 확인 */
 export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false, joint?: Joint) {
   const e = env ?? (automatic ? envForAuto(ctx) : envOr(env));
-  return run(ctx, e, automatic ? '새 메시지를 자동으로 확인하는 중이에요.' : '새 메시지를 확인하는 중이에요.', async () => {
+  return run(ctx, e, automatic ? '새 메시지를 자동으로 확인하는 중이에요.' : '새 메시지를 확인하는 중이에요.', async (park) => {
     const startLength = ctx.chat.message?.length ?? 0;
     const st = readPhone(ctx.chat);
     // 요청 때 있던 방: 확인 중에 지워졌으면 옛 사본으로 되살리지 않는다 (전수검사 11-13)
@@ -400,14 +431,18 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
       first: joint && ((m) => joint.ask('phone', m)),
     });
     let note = '';
+    // 자동 확인은 사용자가 다음 말을 보낸 뒤에 끝날 수 있다: 본편 응답을 기다리는 동안에는 저장하지 않고, 대기가 풀린 뒤 앞 메시지가 그대로인지 확인하고 저장한다
+    if (automatic) await park();
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-      if (automatic && (chat.message?.length ?? 0) !== startLength) {
-        note = '채팅이 이어져서 이번 자동 확인 결과는 저장하지 않았어요.';
+      // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
+      if (automatic && !chatPrefixKept(ctx.chat, chat)) {
+        note = '채팅이 바뀌어서 이번 자동 확인 결과는 저장하지 않았어요.';
         return null;
       }
       const cur = readPhone(chat);
       const set = phoneSettings(chat.scriptstate);
-      const time = phoneTime(chat);
+      // 시각은 요청한 턴의 것 (채팅이 이어졌으면 지금 시각은 다음 턴의 것이다)
+      const time = phoneTime((chat.message?.length ?? 0) === startLength ? chat : ctx.chat);
       let received = 0;
       let unsolicitedGot = false;
       for (const u of result.updates) {
@@ -439,10 +474,12 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
       received += commitInvitations(cur, result.invitations, time);
       const b = readBulletins(chat);
       const notices = commitAnnouncements(b, cur, result.announcements, plan.announce, time);
+      // 쉬는 턴도 시각과 같이 요청한 턴부터 센다: 늦게 저장돼 그사이 턴이 넘어갔어도 한 턴 더 쉬지 않게
+      const asked = (chat.message?.length ?? 0) === startLength ? chat : ctx.chat;
       const marks = {
-        ...(unsolicitedGot ? cooldownMark(chat, 'incoming') : {}),
-        ...(result.invitations.length ? cooldownMark(chat, 'invitation') : {}),
-        ...(notices ? cooldownMark(chat, 'announcement') : {}),
+        ...(unsolicitedGot ? cooldownMark(asked, 'incoming') : {}),
+        ...(result.invitations.length ? cooldownMark(asked, 'invitation') : {}),
+        ...(notices ? cooldownMark(asked, 'announcement') : {}),
       };
       note = received || result.invitations.length || notices
         ? `메시지 ${received}개 · 단톡 초대 ${result.invitations.length}개 · 공지 ${notices}개를 받았어요.`
@@ -456,7 +493,7 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
 /** 채팅 응답이 끝난 뒤 (main.ts onOutput), 또는 「창을 열 때」면 괴담톡 탭을 열 때 (openCheck). 같은 응답에는 한 번만 */
 export async function autoRefresh(ctx: ChatContext, messageIndex: number, env?: PhoneEnv, joint?: Joint): Promise<void> {
   const set = phoneSettings(ctx.chat.scriptstate);
-  if (!(env ? set.autoOpen : set.auto) || phoneBusy(ctx)) return;
+  if (!(env ? set.autoOpen : set.auto) || autoBusy(ctx)) return;
   const data = String(ctx.chat.message?.[messageIndex]?.data ?? '');
   if (!data.trim()) return;
   // 턴 열쇠: 같은 턴의 응답을 다시 굴려도 다시 부르지 않는다 (core/shop.ts turnKeyAt)
@@ -478,7 +515,7 @@ export async function autoRefresh(ctx: ChatContext, messageIndex: number, env?: 
 /** 보기 전용 방 자동 만들기 (「매 턴」은 채팅 응답 뒤, 「창을 열 때」는 탭을 열 때). 같은 응답에는 한 번 */
 export async function autoView(ctx: ChatContext, messageIndex: number, env?: PhoneEnv): Promise<void> {
   const set = viewSettings(ctx.chat.scriptstate);
-  if (!(env ? set.auto === 'open' : set.auto === 'turn') || phoneBusy(ctx)) return;
+  if (!(env ? set.auto === 'open' : set.auto === 'turn') || autoBusy(ctx)) return;
   const data = String(ctx.chat.message?.[messageIndex]?.data ?? '');
   if (!data.trim()) return;
   const stamp = turnKeyAt(ctx.chat, messageIndex);
@@ -613,7 +650,7 @@ async function placeCall(ctx: ChatContext, env: PhoneEnv, target: string, purpos
     else message.push(newMessage(record));
     return { ...chat, message };
   });
-  Object.assign(phone, { view: 'list', call: '', callText: '', notice: '' });
+  Object.assign(phone, { pop: '', call: '', callText: '', notice: '' });
   await env.close();
 }
 
@@ -801,7 +838,7 @@ function viewPane(ctx: ChatContext, d: Directory, busy: boolean): string {
 /** 보기 전용 방 하나 만들기 */
 function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
   const set = viewSettings(ctx.chat.scriptstate);
-  return run(ctx, env, `${VIEW_PRESETS[set.preset]}을 만드는 중이에요.`, async () => {
+  return run(ctx, env, `${VIEW_PRESETS[set.preset]}을 만드는 중이에요.`, async (park) => {
     const startLength = ctx.chat.message?.length ?? 0;
     const prompt = fitPrompt(fnBudget(ctx.chat.scriptstate, 'ph', 'view'), () => viewPrompt(source(ctx), names(ctx), readViews(ctx.chat.scriptstate)));
     const { value } = await askModel(prompt.messages, phoneSettings(ctx.chat.scriptstate).model, (raw) => parseView(raw, set.preset), {
@@ -809,19 +846,24 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
     });
     let note = '';
     let id = '';
+    let roomName = value.name;
+    // 본편 응답을 기다리는 동안에는 저장하지 않는다 (refreshInbox 와 같음)
+    if (automatic) await park();
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-      if (automatic && (chat.message?.length ?? 0) !== startLength) {
-        note = '채팅이 이어져서 이번 보기 전용 방은 저장하지 않았어요.';
+      // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
+      if (automatic && !chatPrefixKept(ctx.chat, chat)) {
+        note = '채팅이 바뀌어서 이번 보기 전용 방은 저장하지 않았어요.';
         return null;
       }
       const list = readViews(chat.scriptstate);
-      // 11-07 사용자: 매 턴 새 방을 파지 않는다 — 같은 종류는 한 방에 이어 쓴다
-      const cur = [...list].reverse().find((x) => x.preset === set.preset);
-      const time = phoneTime(chat);
+      // 같은 인물들의 방이 있으면 거기에 이어 쓰고, 인물이 다르면 새 방 (11-07·11-15 사용자, core/phoneView.ts matchView)
+      const cur = matchView(list, value);
+      const time = phoneTime((chat.message?.length ?? 0) === startLength ? chat : ctx.chat);
       // 창이 닫혀 있으면 마지막 화면이 목록이어도 안 본 것 (전수검사 11-13)
       const seen = !automatic || (env.visible() && phone.sub === 'chats' && (phone.view === 'list' || (phone.view === 'view' && phone.viewId === cur?.id)));
       if (cur) {
         id = cur.id;
+        roomName = cur.name;
         // 모델은 매번 p1, p2…를 새로 매긴다: 사람은 이름으로 맞추고, 번호가 겹치는 새 인물은 새 번호로 (전수검사 11-13)
         const remap = new Map<string, string>();
         const used = new Set([...cur.people, ...value.people].map((x) => x.id));
@@ -844,6 +886,9 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
         cur.unread = !seen;
         cur.messages.push({ sender: '-', type: 'time', text: time }, ...value.messages);
         if (cur.messages.length > VIEW_HISTORY) cur.messages.splice(0, cur.messages.length - VIEW_HISTORY);
+        // 방금 이어 쓴 방이 목록 맨 위로 (목록은 뒤에서부터 보인다)
+        list.splice(list.indexOf(cur), 1);
+        list.push(cur);
       } else {
         id = `v_${Date.now().toString(36)}`;
         list.push({ ...value, id, time, unread: !seen });
@@ -851,7 +896,7 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
       return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...writeViews(list) } };
     });
     if (id && !automatic) Object.assign(phone, { sub: 'chats', view: 'view', viewId: id });
-    else if (id) note = `「${value.name}」 방에 새 글이 왔어요.`;
+    else if (id) note = `「${roomName}」 방에 새 글이 왔어요.`;
     return note;
   });
 }
@@ -1081,22 +1126,41 @@ function searchView(ctx: ChatContext, st: PState, d: Directory): string {
   return sec('연락처', people.length, contactList(ctx, people, st)) + sec('대화', rooms.length, chatList(ctx, rooms, d)) + sec('공지', notes.length, noticeList(notes, noticeFactionLabel(names(ctx))));
 }
 
-function callView(): string {
-  return `<div class="ph-form">${paneHead('전화 걸기', '기록을 남기고 창을 닫아요. 채팅에서 전송을 누르면 통화 장면이 이어져요.')}
-    <div class="ph-form-body">
-      <label class="ph-label">상대</label><input class="gx-search" data-input="ph-call-to" value="${esc(phone.call)}" placeholder="상대 이름" maxlength="60">
-      <label class="ph-label">할 말·용건 (선택)<small>채팅 입력창에 덧붙여 보내도 돼요</small></label><textarea class="gx-search" data-input="ph-call-text" rows="3" placeholder="예: 방금 본 걸 보고하려고">${esc(phone.callText)}</textarea>
-    </div>
-    <div class="ph-form-foot"><button class="gx-start" data-action="ph-call-place">${ICONS.call} 전화 걸기</button></div></div>`;
+/** 전화 걸기·연락처 추가 창: 보던 화면 위에 뜨고, 창 밖을 누르거나 ✕·Esc 로 닫는다 */
+function popWin(title: string, sub: string, body: string): string {
+  return `<div class="gx-agpop ph-pop" data-action="ph-pop-close"><div class="ph-popcard ph-form" role="dialog" aria-label="${title}" data-action="ph-pop-stay">
+    <header class="ph-pop-head"><div class="ph-room-title"><b>${title}</b><small>${sub}</small></div><button class="gx-x" data-action="ph-pop-close" aria-label="닫기">${ICONS.close}</button></header>
+    ${body}</div></div>`;
 }
 
-function addView(): string {
-  return `<div class="ph-form">${paneHead('연락처 추가', '「기타」 탭에 들어가요. 명부에 있는 이름이면 그 인물로 추가돼요.')}
+/** 명부에서 고르기: 고르면 이름 칸에 들어간다. 명부에 없는 사람은 이름 칸에 직접 적는다 */
+function rosterPick(ctx: ChatContext, cur: string, keep: (c: Contact) => boolean): string {
+  const people = [...new Set(dir(ctx).map.values())].filter(keep);
+  if (!people.length) return '';
+  const groups = new Map<string, Contact[]>();
+  for (const c of people) groups.set(c.group ?? '', [...(groups.get(c.group ?? '') ?? []), c]);
+  const opt = (c: Contact) => `<option value="${esc(c.name)}" ${c.name === cur.trim() ? 'selected' : ''}>${esc(c.name)}${c.rank ? ` · ${esc(c.rank)}` : ''}</option>`;
+  const fnames = names(ctx);
+  const body = [...groups].map(([g, list]) => (g ? `<optgroup label="${esc(fnames[g] ?? g)}">${list.map(opt).join('')}</optgroup>` : list.map(opt).join(''))).join('');
+  return `<select class="gx-select ph-pick-sel" data-change="ph-pop-pick" aria-label="명부에서 고르기"><option value="">명부에서 고르기</option>${body}</select>`;
+}
+
+function callView(ctx: ChatContext): string {
+  return popWin('전화 걸기', '기록을 남기고 창을 닫아요. 채팅에서 전송을 누르면 통화 장면이 이어져요.', `
     <div class="ph-form-body">
-      <label class="ph-label">이름</label><input class="gx-search" data-input="ph-add-name" value="${esc(phone.addName)}" maxlength="60" placeholder="이름">
+      <label class="ph-label">상대<small>명부에 없는 사람은 이름을 직접 적어요</small></label>${rosterPick(ctx, phone.call, () => true)}<input class="gx-search" data-input="ph-call-to" value="${esc(phone.call)}" placeholder="상대 이름" maxlength="60">
+      <label class="ph-label">할 말·용건 (선택)<small>채팅 입력창에 덧붙여 보내도 돼요</small></label><textarea class="gx-search" data-input="ph-call-text" rows="3" placeholder="예: 방금 본 걸 보고하려고">${esc(phone.callText)}</textarea>
+    </div>
+    <div class="ph-form-foot"><button class="gx-start" data-action="ph-call-place">${ICONS.call} 전화 걸기</button></div>`);
+}
+
+function addView(ctx: ChatContext): string {
+  return popWin('연락처 추가', '「기타」 탭에 들어가요.', `
+    <div class="ph-form-body">
+      <label class="ph-label">이름<small>명부에 없는 사람은 이름을 직접 적어요</small></label>${rosterPick(ctx, phone.addName, (c) => !c.visible)}<input class="gx-search" data-input="ph-add-name" value="${esc(phone.addName)}" maxlength="60" placeholder="이름">
       <label class="ph-label">인물 메모 (선택)<small>어떤 사람인지, 어떻게 아는 사이인지</small></label><textarea class="gx-search" data-input="ph-add-note" rows="3">${esc(phone.addNote)}</textarea>
     </div>
-    <div class="ph-form-foot"><button class="gx-start" data-action="ph-add-save">추가</button></div></div>`;
+    <div class="ph-form-foot"><button class="gx-start" data-action="ph-add-save">추가</button></div>`);
 }
 
 function settingsView(ctx: ChatContext): string {
@@ -1142,8 +1206,6 @@ function listHtml(ctx: ChatContext, st: PState, d: Directory): string {
 function paneHtml(ctx: ChatContext, st: PState, d: Directory, busy: boolean): string {
   if (phone.view === 'room') return roomView(ctx, st, d, busy);
   if (phone.view === 'group') return groupView(ctx, st, d);
-  if (phone.view === 'call') return callView();
-  if (phone.view === 'add') return addView();
   if (phone.view === 'settings') return settingsView(ctx);
   if (phone.view === 'notice') return noticeDetail(ctx);
   if (phone.view === 'view') return viewPane(ctx, d, busy);
@@ -1190,6 +1252,8 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
     if (phone.notice === t) phone.notice = '';
   });
   const detail = phone.view !== 'list';
+  // 전화·연락처 추가 창이 떠 있으면 안내는 그 창 바탕 안에 띄운다 (창 바탕이 화면을 덮어 밖의 안내가 가려진다)
+  const pop = phone.pop === 'call' ? callView(ctx) : phone.pop === 'add' ? addView(ctx) : '';
   const tools = [
     tool('ph-refresh', ICONS.refresh, '새 메시지 확인', busy ? 'disabled' : '', '새로고침'),
     tool('ph-group', ICONS.group, '단톡 만들기', busy ? 'disabled' : '', '단톡'),
@@ -1209,13 +1273,14 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
       ${drawerHtml(tools, '', '', 'phone')}
     </section>
     <section class="ph-pane">${detail ? status : ''}${paneHtml(ctx, st, d, busy)}</section>
-    ${note}
+    ${pop ? pop.replace(/<\/div>$/, `${note}</div>`) : note}
   </main>`;
 }
 
 /** 괴담톡 탭 버튼. 처리했으면 true */
 export async function handlePhone(action: string, value: string | undefined, ctx: ChatContext, env: PhoneEnv): Promise<boolean> {
   if (!action.startsWith('ph-')) return false;
+  if (action === 'ph-pop-stay') return true; // 작은 창 안의 빈 곳: 아무 일도 없다 (창 밖 누름과 가르려는 표시)
   liveEnv = env;
   const v = value ?? '';
   // 두 번 눌러 지우는 단추는 여기 다 적어야 한다 — 빠지면 두 번째 「정말 삭제」가 확인을 먼저 지워 버려 먹통이 된다 (11-09 사용자: 사이드스토리 방 삭제 안 됨)
@@ -1270,7 +1335,18 @@ export async function handlePhone(action: string, value: string | undefined, ctx
       if (phone.view === 'room' && phone.room === v && !isPhone()) return handlePhone('ph-back', undefined, ctx, env);
       await openRoom(ctx, env, v);
       return true;
+    case 'ph-pop-pick':
+      if (phone.pop === 'call') phone.call = v;
+      else if (phone.pop === 'add') phone.addName = v;
+      break;
+    case 'ph-pop-close':
+      phone.pop = '';
+      break;
     case 'ph-back':
+      if (phone.pop) {
+        phone.pop = '';
+        break;
+      }
       if (phone.view === 'group' && phone.invite) {
         Object.assign(phone, { view: 'room', room: phone.invite, invite: null, picked: [] });
         break;
@@ -1430,13 +1506,13 @@ export async function handlePhone(action: string, value: string | undefined, ctx
       return true;
     }
     case 'ph-call':
-      Object.assign(phone, { view: 'call', call: v, callText: '' });
+      Object.assign(phone, { pop: 'call', call: v, callText: '' });
       break;
     case 'ph-call-place':
       await placeCall(ctx, env, phone.call, phone.callText);
       return true;
     case 'ph-add':
-      Object.assign(phone, { view: 'add', addName: '', addNote: '' });
+      Object.assign(phone, { pop: 'add', addName: '', addNote: '' });
       break;
     case 'ph-add-save':
       await addContact(ctx, env);
@@ -1505,7 +1581,7 @@ async function addContact(ctx: ChatContext, env: PhoneEnv) {
   }
   const match = found[0];
   if (match?.visible) {
-    Object.assign(phone, { view: 'list', sub: 'contacts', tab: match.tabs[0] ?? '', query: '', notice: '이미 등록된 연락처예요.' });
+    Object.assign(phone, { pop: '', sub: 'contacts', tab: match.tabs[0] ?? '', query: '', notice: '이미 등록된 연락처예요.' });
     return env.render();
   }
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
@@ -1517,7 +1593,7 @@ async function addContact(ctx: ChatContext, env: PhoneEnv) {
     }
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [PH_CONTACTS]: JSON.stringify(data) } };
   });
-  Object.assign(phone, { view: 'list', sub: 'contacts', tab: 'T05', query: '', notice: '연락처를 기타에 추가했어요.' });
+  Object.assign(phone, { pop: '', sub: 'contacts', tab: 'T05', query: '', notice: '연락처를 기타에 추가했어요.' });
   await env.refresh();
 }
 

@@ -5,7 +5,7 @@
 // 종류 14개는 없앴다 (2026-11-07 밤 사용자). 물건마다 판정: 사용 가능 · 소모성(남은 횟수 숫자 하나, 사용마다 1 빼고 0이면 없어짐) · 장착(손·장비, 사용자 2026-11-14 무기 → 손).
 // 비소모 물건은 숫자 없이 상태만 설명 글로. 상태 4단계(멀쩡·손상·고장·파괴)는 보조 모델만 본문을 보고 바꾼다 (memory goei-equip-design).
 import type { Chat } from './types';
-import { guideTxt } from './guides';
+import { guideTxt, type GuideName } from './guides';
 import { aliveAnchors } from './wallet';
 import { messageKey } from './people/store';
 import type { PromptMessage } from './request';
@@ -13,7 +13,10 @@ import type { ItemChange, ItemNow } from './people/updater';
 import { currentShop, shopEvents, shopOn, shopGuide } from './shop';
 import { mallEvents, soldPasses } from './malls';
 import { boughtPasses } from './shopctx';
+import { bmGoing, bmWaiting, type BmOrder } from './orders';
+import { peopleSettings } from './people/settings';
 import { hsBuyPasses } from './hslog';
+import { boxLanded } from './homeshop';
 import { EQUIP_LABEL, EQUIP_SLOTS, STATE_LABEL, cleanIcon, itemEquip, itemState, itemUses, itemWeight, type ItemEquip, type ItemState } from './itemtraits';
 export * from './itemtraits';
 import type { StartItem } from './startitems';
@@ -373,14 +376,16 @@ export function addItem(it: Items, alive: Set<string>, e: ItemInput): Items {
   if (!name) return it;
   const desc = clean(e.desc, 80);
   const effect = clean(e.effect, 60);
-  const truth = e.truth ? clean(e.truth, 60) : '';
+  // 숨긴 진짜 효과: 모델이 지은 것은 지침대로 짧지만, 우주몰 고정 상품처럼 사용자가 적은 것(200자까지)은 자르지 않는다. 화면에는 안 보이고 메인 모델만 본다
+  const truth = e.truth ? clean(e.truth, 200) : '';
   const text = e.text ? clean(e.text, 400) : '';
   const quote = e.quote ? clean(e.quote, 120) : undefined;
   // 갈래는 종류 + 판정 표로 코드가 정한다 (모델이 적은 사용·장착 깃발은 표에 줄이 없을 때만). 손으로 넣은 것·시작 소지품(manual)은 적힌 대로
   const kind = kindOfIcon(e.icon);
   const ruled = e.from === 'manual' ? undefined : traitsFor(kind, e.icon, name, { use: e.use, uses: e.uses, equip: e.equip });
   if (ruled) e = { ...e, use: ruled.use, uses: ruled.uses ?? (itemUses(e.uses) ? e.uses : undefined), equip: ruled.equip ?? '' };
-  const found = liveItems(it, alive).find((x) => sameItemName(x.name, name));
+  // 본문에서 주운 것은 숨긴 진짜 효과가 있는 산 물건 줄에 합치지 않는다: 이름만 같은 평범한 물건이 그 진실을 같이 쓰게 된다 (11-15)
+  const found = liveItems(it, alive).find((x) => sameItemName(x.name, name) && !(e.from === 'story' && x.truth));
   // 상점·쇼핑몰에서 산 것(store)은 같은 이름이 있어도 늘 새 줄로: 「방금 샀다」·다시 굴리기 되돌림이 맞게. 합치기는 사용자가 「합치기」로 (전수검사 11-13)
   if (found && e.from !== 'store') {
     if (ruled) e = { ...e, equip: ruled.equip ?? found.equip ?? '' };
@@ -552,6 +557,8 @@ export function sellItem(it: Items, id: string, anchor: string, note?: string): 
 /** 합칠 수 있나 (2026-11-08 사용자): 둘 다 소모성이고 이름에 같은 낱말이 있을 때만 — 같은 소모품이 두 칸으로 갈라진 것을 한 묶음으로 */
 export function canMerge(a: Item, b: Item): boolean {
   if (a.id === b.id || a.uses === undefined || b.uses === undefined) return false;
+  // 숨긴 진짜 효과가 다르면(한쪽만 있어도) 합치지 않는다: 남는 줄 것만 남아 다른 쪽 진실이 사라지거나 옮겨 간다 (11-15)
+  if ((a.truth ?? '') !== (b.truth ?? '')) return false;
   const words = (n: string) => clean(n, 30).toLowerCase().split(/[\s·.,'"「」()\-_/]+/).filter((w) => w.length >= 1);
   const wa = new Set(words(a.name));
   return words(b.name).some((w) => wa.has(w));
@@ -807,14 +814,48 @@ export function itemLine(e: Item, left: number | undefined, equipped: boolean, d
 }
 
 export interface BlockUse {
+  /** 쓰는 물건 줄 (있으면 숨긴 진짜 효과를 이 줄 것만 붙인다. 이름이 같은 다른 물건 것까지 가지 않게, 11-15) */
+  id?: string;
   name: string;
   n: number;
   /** 소모성이면 이번에 쓰고 난 뒤 남는 횟수 */
   after?: number;
 }
 
+/** 면대면이 아닌 곳(망상홈쇼핑·우주 쇼핑몰·포인트몰)에서 산 물건이 어떻게 손에 들어왔는지: 산 턴에 한 번, 곳마다 한 줄 (11-15 사용자: 상자가 소지품에 갑자기 생겨 본편이 씹는다).
+ *  글은 그 몰 지침의 ARRIVE 절(본편에 보내는 받는 법, 11-15 사용자: 소지품 지침에 넣지 말고 몰마다 자기 지침에). 절이 비었거나 몰이 아닌 곳(면대면 상점)은 아무것도 안 붙인다.
+ *  우주몰 맞춤 주문 수령은 제 절(ARRIVE_ORDER): 값은 주문할 때 이미 냈으니 「송금이 들어가는 순간」이 아니다 (2026-11-16) */
+const ARRIVE_GUIDE: Record<string, [GuideName, string]> = { hs: ['Hs', 'ARRIVE'], cos: ['Cos', 'ARRIVE'], 'cos-order': ['Cos', 'ARRIVE_ORDER'] };
+/** hsBox: 망상홈쇼핑은 주문해 「상자가 들어온 턴」에만 붙인다 (core/homeshop.ts boxLanded). 산 물건 줄로는 가리지 않는다 — 상자를 연 턴의 속 물건도 store=hs 라 도착 글이 다시 갔다 */
+export function arrivals(bought: Item[], hsBox = false): string[] {
+  const stores = [...new Set(bought.map((e) => e.store ?? '').filter((st) => st !== 'hs' && ARRIVE_GUIDE[st]))];
+  if (hsBox) stores.unshift('hs');
+  return stores.map((st) => guideTxt(...ARRIVE_GUIDE[st]).trim()).filter(Boolean);
+}
+
+/** 포인트몰에서 산 것을 이번 턴에 받았으면 한 줄 (2026-11-16 사용자: 받는 것은 회사에서 — 「주문 조회」의 받기). 산 것은 전의 일이라 「방금 삼」에는 올리지 않고, 받는 법(그 몰 지침 ARRIVE 절)에 이름을 넣어 넘긴다 */
+export function bmPicked(bought: Item[]): string[] {
+  const names = bought.filter((e) => e.store === 'bm').map((e) => e.name);
+  const text = names.length ? guideTxt('Bm', 'ARRIVE', { items: names.join(', ') }).trim() : '';
+  return text ? [text] : [];
+}
+
+/** 포인트몰 「받기」를 본편이 확인하게 할 수 있나 (2026-11-16 사용자: 갈 수 없는 상황인데 받아 버리면 뜬금없다).
+ *  본편에 「받으러 간다」를 알릴 길(소지품 넘기기 + 설정 「메인 요청에 붙이는 것」 포인트몰 「구매」)과, 그 응답을 읽고 판단할 갱신기(인물 기록 켜짐 + 매 턴)가 다 있을 때만.
+ *  하나라도 없으면 판단할 곳이 없으니 누르면 바로 들어온다 */
+export const bmPickupConfirm = (vars: Record<string, unknown> | undefined): boolean => {
+  if (!itemPushOn(vars) || !boughtPasses(vars, 'bm')) return false;
+  const p = peopleSettings(vars);
+  return p.on && p.when === 'turn';
+};
+/** 받으러 가는 턴에 본편에 한 줄 (그 몰 지침 PICKUP_TRY 절): 갈 수 있으면 받고 못 가면 못 받는다. 받았는지는 그 응답을 갱신기가 읽고 정한다 */
+export function bmTrying(going: BmOrder[]): string[] {
+  const text = going.length ? guideTxt('Bm', 'PICKUP_TRY', { items: going.map((o) => o.item.name).join(', ') }).trim() : '';
+  return text ? [text] : [];
+}
+
 /** 본편에 넘기는 글. 비면 빈 문자열 (붙이지 않는다). 전부 넘김 — 자르지 않는다. 칸 수는 소지품 격자만 센다 (장착 칸에 놓인 건 빼고) */
-export function itemsBlock(list: Item[], opts: { slots: number; limit: string; carry?: number; left?: (e: Item) => number | undefined; use?: BlockUse[]; bought?: string[]; events?: string[]; always?: boolean; detail?: ItemDetail; recent?: string[] }): string {
+export function itemsBlock(list: Item[], opts: { slots: number; limit: string; carry?: number; left?: (e: Item) => number | undefined; use?: BlockUse[]; bought?: string[]; events?: string[]; always?: boolean; detail?: ItemDetail; recent?: string[]; waiting?: string }): string {
   const lines = list.map((e) => itemLine(e, opts.left?.(e), isEquipped(e, list), opts.detail));
   const use = (opts.use ?? []).filter((u) => u.name);
   const bought = (opts.bought ?? []).filter(Boolean);
@@ -832,6 +873,8 @@ export function itemsBlock(list: Item[], opts: { slots: number; limit: string; c
   out.push(g('INVENTORY.CARRY_LIMIT', { limit: opts.limit }));
   const recent = (opts.recent ?? []).filter(Boolean);
   if (recent.length) out.push(g('INVENTORY.RECENT', { list: recent.join('; ') }));
+  // 산 뒤 아직 안 받은 것 (포인트몰 수령 대기): 가진 것이 아니라는 것만 알린다. 글은 그 몰 지침의 절
+  if (opts.waiting) out.push(opts.waiting);
   const events: string[] = [];
   if (use.length) events.push(g('INVENTORY.EVENT.USES', { list: use.map((u) => `${u.name}${u.n > 1 ? ` ×${u.n}` : ''}${u.after === 0 ? ` ${g('INVENTORY.USE.USED_UP')}` : u.after !== undefined ? ` ${g('INVENTORY.USE.LEFT', { n: u.after })}` : ''}`).join(', ') }));
   if (bought.length) events.push(g('INVENTORY.EVENT.BOUGHT', { list: bought.join(', ') }));
@@ -839,7 +882,7 @@ export function itemsBlock(list: Item[], opts: { slots: number; limit: string; c
   if (carried > opts.slots) events.push(g('INVENTORY.EVENT.OVER_LIMIT'));
   if (events.length) out.push(g('INVENTORY.THIS_TURN', { events: events.join('; ') }));
   // 숨긴 진짜 효과: 이번 턴에 쓰는 물건, 몸에 걸친 장비만 (11-09 사용자: 평소엔 광고 문구만 가고, 쓰는 순간에 「이번에 일어나는 일」로 받는다)
-  const reveal = list.filter((e) => e.truth && (use.some((u) => u.name === e.name) || isEquipped(e, list)));
+  const reveal = list.filter((e) => e.truth && (use.some((u) => (u.id ? u.id === e.id : u.name === e.name)) || isEquipped(e, list)));
   if (reveal.length) {
     // 글은 지침 「메인 요청에 붙는 글」 INVENTORY.REALLY · INVENTORY.REALLY_UNKNOWN(_LABEL) · INVENTORY.REALLY_LINE(_LABEL) 절
     out.push(g('INVENTORY.REALLY'));
@@ -888,15 +931,23 @@ export function recentItemLog(chat: Chat, it: Items, n: number, vars?: Record<st
   const list = chat.message ?? [];
   const keys = new Set<string>();
   for (let i = list.length - 1; i >= 0 && keys.size < n; i--) if (list[i].role === 'char') keys.add(messageKey(list[i], i));
+  // 망상홈쇼핑 전화 주문·맞교환: 이 턴의 것은 같은 글의 「새로 산 것」(택배 상자)과 「This turn」(맞교환으로 낸 물건) 줄이 이미 넘기므로 여기서 되풀이하지 않는다
+  const nowKey = lastBotKey(chat);
+  const hsBarter = guideTxt('Hs', 'ORDER_BARTER_NOTE');
+  // 「새로 산 것」에 실제로 오르는 것(inventoryText 와 같은 newlyBought(liveItems)): 같은 턴에 열어 숨은 택배 상자는 거기 없으니 여기 남긴다
+  let boughtIds: Set<string> | null = null;
+  const inBought = (id: string) => (boughtIds ??= new Set(newlyBought(liveItems(it, aliveAnchors(chat)), nowKey).map((x) => x.id))).has(id);
   return it.log.filter((l) => {
     if (!l.anchor || !keys.has(l.anchor)) return false;
     // 상점 「메인 요청에 붙이는 것」을 끈 판 것·산 것은 뺀다 (soldNow·newlyBought 와 같게, 전수검사 11-13)
     if (l.what === 'sell') {
       const note = String(l.note ?? '');
+      if (l.anchor === nowKey && note === hsBarter) return false;
       return soldPasses(vars, note.replace(/에 팖$/, '').trim(), /에 팖$/.test(note));
     }
     if (l.what === 'get' && l.by === 'store') {
       const e = it.list.find((x) => x.id === l.item);
+      if (e && e.store === 'hs' && l.anchor === nowKey && inBought(e.id)) return false;
       return !e || (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store));
     }
     return true;
@@ -1020,18 +1071,26 @@ export function inventoryText(chat: Chat): string {
   const left = (e: Item) => itemLeft(it, e, alive);
   // 상점(core/shop.ts): 켜져 있으면 물건이 없어도 블록을 보내 표식 지침을 넘기고, 이번 방문의 사건(주인과 나눈 말·쫓겨남)을 This turn 에 더한다
   const shop = shopOn(vars);
-  const use = usesToSend(chat, it, alive).map(({ id: _id, ...u }): BlockUse => u);
+  const use: BlockUse[] = usesToSend(chat, it, alive);
   const resumed = invJustResumed(chat);
   const soldOff = [...soldNow(it, lastBotKey(chat), currentShop(chat)?.shop, (place, plain) => soldPasses(vars, place, plain)), ...mallEvents(chat)];
+  const boughtNow = newlyBought(live, lastBotKey(chat)).filter((e) => (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store)));
+  // 포인트몰에서 사고 아직 안 받은 것 (2026-11-16 사용자: 받는 것은 회사에서): 기다리는 동안 한 줄. 설정 「메인 요청에 붙이는 것」 포인트몰 「구매」를 따른다
+  // 「받기」를 눌러 이번 턴에 받으러 가는 것은 따로 한 줄(PICKUP_TRY)로 가고, 기다리는 줄에서는 뺀다
+  const bmOpen = boughtPasses(vars, 'bm') ? bmWaiting(vars, alive) : [];
+  const bmGo = bmPickupConfirm(vars) ? bmOpen.filter((o) => bmGoing(o, lastBotKey(chat))) : [];
+  const bmWait = bmOpen.filter((o) => !bmGo.includes(o)).map((o) => o.item.name);
+  const waiting = bmWait.length ? guideTxt('Bm', 'PICKUP_WAIT', { items: bmWait.join(', ') }).trim() : '';
   const text = itemsBlock(live, {
     slots: itemSlots(vars),
     limit: itemLimit(vars),
     carry: itemCarry(vars),
     left,
     use,
-    bought: newlyBought(live, lastBotKey(chat)).filter((e) => (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store))).map(boughtLine),
-    events: [...(resumed ? [resumedEvent()] : []), ...mergedNow(it, lastBotKey(chat)), ...movedNow(it, lastBotKey(chat)), ...droppedNow(it, lastBotKey(chat), keysAfterLastBot(chat)), ...soldOff, ...(shop ? shopEvents(chat) : [])],
-    always: shop || resumed || soldOff.length > 0,
+    bought: boughtNow.filter((e) => e.store !== 'bm').map(boughtLine),
+    events: [...arrivals(boughtNow, hsBuyPasses(vars) && boxLanded(vars, lastBotKey(chat), alive)), ...bmPicked(boughtNow), ...bmTrying(bmGo), ...(resumed ? [resumedEvent()] : []), ...mergedNow(it, lastBotKey(chat)), ...movedNow(it, lastBotKey(chat)), ...droppedNow(it, lastBotKey(chat), keysAfterLastBot(chat)), ...soldOff, ...(shop ? shopEvents(chat) : [])],
+    always: shop || resumed || soldOff.length > 0 || !!waiting || bmGo.length > 0,
+    waiting,
     detail: itemDetail(vars),
     recent: recentItemLog(chat, it, itemLogTurns(vars), vars),
   });
@@ -1245,6 +1304,51 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
   }
   return it;
 }
+/**
+ * 포인트몰 수령 대기를 본문이 먼저 받아 버렸을 때 (2026-11-16 사용자: 받는 것은 회사에서): 갱신기가 수령 대기 중인 물건과 같은 이름을 「얻음」(new)으로 올리면
+ * 새 물건을 만들지 않고 그 대기 줄을 「받음」으로 바꿔 살 때의 물건(숨긴 진실 포함)을 넣는다 — 물건이 둘이 되지 않게. 이미 지닌 같은 이름이 있으면 건드리지 않는다.
+ * 본문이 받는 장면을 이미 썼으니 from 은 story (다음 턴에 받는 법 글을 다시 넘기지 않는다). 돌려주는 changes 는 처리한 줄을 뺀 나머지
+ */
+export function settleBmPickups(it0: Items, orders: BmOrder[], alive: Set<string>, changes: ItemChange[]): { it: Items; orders: BmOrder[]; changes: ItemChange[]; settled: number } {
+  let it = it0;
+  let list = orders;
+  const rest: ItemChange[] = [];
+  let settled = 0;
+  for (const c of changes) {
+    const o = c.action === 'new' ? list.find((x) => !x.taken && sameItemName(x.item.name, c.name)) : undefined;
+    if (!o || liveItems(it, alive).some((e) => sameItemName(e.name, c.name))) {
+      rest.push(c);
+      continue;
+    }
+    const g = o.item;
+    it = addItem(it, alive, { name: g.name, desc: g.desc, effect: g.effect, truth: g.truth, use: g.use, uses: g.uses, equip: g.equip, icon: g.icon, weight: g.weight, from: 'story', store: 'bm', anchor: c.anchor, quote: c.quote, ...(o.walletId ? { walletId: o.walletId } : {}), ...(o.paidWith ? { paidWith: o.paidWith } : {}) });
+    list = list.map((x) => (x.id === o.id ? { ...x, taken: true, takenKey: c.anchor } : x));
+    settled++;
+  }
+  return { it, orders: list, changes: rest, settled };
+}
+
+/**
+ * 포인트몰 「받기」 확인 (2026-11-16 사용자): 받으러 간 물건(asked) 가운데 갱신기가 「그 응답에서 실제로 받았다」고 한 이름(names)만 「받음」으로 바꾸고
+ * 살 때의 물건(숨긴 진실 포함)을 넣는다. 본편이 받는 장면을 이미 썼으니 from 은 story (다음 턴에 받는 법 글이 다시 가지 않는다).
+ * 갱신기가 같은 물건을 「얻음」(new)으로도 올렸으면 그 줄은 뺀다 — 둘이 되지 않게 (settleBmPickups 와 겹치지 않는다: 여기서 받은 줄은 이미 taken)
+ */
+export function confirmBmPickups(it0: Items, orders: BmOrder[], asked: BmOrder[], names: string[], alive: Set<string>, anchor: string, changes: ItemChange[]): { it: Items; orders: BmOrder[]; changes: ItemChange[]; got: BmOrder[] } {
+  let it = it0;
+  const left = [...names];
+  const got: BmOrder[] = [];
+  for (const o of asked) {
+    const i = left.findIndex((n) => sameItemName(n, o.item.name));
+    if (i < 0) continue;
+    left.splice(i, 1);
+    const g = o.item;
+    it = addItem(it, alive, { name: g.name, desc: g.desc, effect: g.effect, truth: g.truth, use: g.use, uses: g.uses, equip: g.equip, icon: g.icon, weight: g.weight, from: 'story', store: 'bm', anchor, ...(o.walletId ? { walletId: o.walletId } : {}), ...(o.paidWith ? { paidWith: o.paidWith } : {}) });
+    got.push(o);
+  }
+  const ids = new Set(got.map((o) => o.id));
+  return { it, orders: orders.map((x) => (ids.has(x.id) ? { ...x, taken: true, takenKey: anchor } : x)), changes: changes.filter((c) => !(c.action === 'new' && got.some((o) => sameItemName(o.item.name, c.name)))), got };
+}
+
 /** 본문에서 장착을 풂: 칸만 비우고(갈래는 그대로 — 다시 장착할 수 있다) 기록 한 줄 */
 function offItem(it: Items, cur: Item, c: ItemChange): Items {
   // 손 칸에 있던 것이면 hand 를 적는다 (풀고 나면 held 가 지워져 나중에는 알 수 없다)

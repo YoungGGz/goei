@@ -141,7 +141,7 @@ const STATUS_CSS = `
 .gst-cash small{margin-left:7px;font-size:12px;font-weight:700}.gst-cash>span+.gst-pt{margin-left:14px}.gst-up{color:var(--gs-blue)}.gst-down{color:var(--gs-red)}
 .gst-link{cursor:pointer;text-decoration:underline dotted;text-decoration-color:color-mix(in srgb,currentColor 50%,transparent);text-underline-offset:3px}
 [data-gst-tip]{cursor:pointer}
-.gst-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:5;padding:6px 10px;border-radius:9px;border:1px solid var(--gs-line);background:var(--gs-panel);color:var(--gs-text);box-shadow:0 6px 18px -8px var(--gs-shadow);font-size:12px;font-weight:600;line-height:1.4;letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s}
+.gst-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);z-index:5;padding:6px 10px;border-radius:9px;border:1px solid var(--gs-line);background:var(--gs-panel);color:var(--gs-text);font-size:12px;font-weight:600;line-height:1.4;letter-spacing:0;white-space:nowrap;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .12s}
 .gst-tip::before{content:'';position:absolute;left:50%;top:100%;margin-left:-5px;width:8px;height:8px;margin-top:-4px;box-sizing:border-box;background:var(--gs-panel);border:solid var(--gs-line);border-width:0 1px 1px 0;transform:rotate(45deg)}
 .gst-clock .gst-tip{left:0;transform:none}.gst-clock .gst-tip::before{left:20px}
 .gst-kv{display:grid;grid-template-columns:auto auto;gap:2px 10px;align-items:baseline;text-align:left}

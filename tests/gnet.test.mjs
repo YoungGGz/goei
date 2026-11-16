@@ -146,7 +146,9 @@ test('user records, threads and the main-request context block', () => {
   assert.ok(text.endsWith('[MODULE_CONTEXT_END]'));
   const records = JSON.parse(text.split('\n')[2]).records;
   assert.equal(records.filter((r) => r.kind === 'private_message').length, 2);
-  assert.equal(records.find((r) => r.kind === 'private_message' && r.sender === 'x').access, 'sender and recipient only');
+  // access 글은 기록마다가 아니라 덩어리에 종류별로 한 번만
+  assert.ok(records.every((r) => r.access === undefined));
+  assert.deepEqual(JSON.parse(text.split('\n')[2]).access, { public_post: 'publicly accessible; reading by each character is not established', private_message: 'sender and recipient only' });
   const chat = writeGnet({ message: [], scriptstate: {} }, st);
   assert.equal(chat.scriptstate.$st_unread_gnet, '1');
   assert.equal(readGnet(chat).posts[0].title, '제목');

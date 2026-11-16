@@ -29,13 +29,15 @@ export const PHONE_SET: SetPage = {
       title: '참조',
       rows: [
         { key: 'status', label: '요원 상태 참조', ctl: onOff('0'), help: '켜면 상황판의 요원 상태(출동 중·부상 등)를 답장 요청에 넣어요. 출동 중인 요원은 그에 맞게 답해요' },
+        { key: 'adv_board_posts', label: '괴담넷 글 참조', ctl: { t: 'adv', item: 'board_posts' } },
+        { key: 'adv_cross_history', label: '다른 방 말풍선 참조', ctl: { t: 'adv', item: 'cross_history' } },
       ],
     },
     {
       title: '컨텍스트 포함',
       rows: [
         { key: 'context', label: '사용', common: 'ctx', ctl: onOff('0'), help: '지금 장면과 관련된 괴담톡 대화가 메인 요청에 붙어요' },
-        { key: 'adv_ctx', label: '붙일 것', ctl: { t: 'advchips', items: ['ctx_focus', 'ctx_messages', 'ctx_notices_on'] } },
+        { key: 'adv_ctx', label: '붙일 것', ctl: { t: 'advchips', items: ['ctx_focus', 'ctx_messages', 'ctx_notices_on', 'ctx_views', 'ctx_reactions', 'ctx_habits'] } },
         { key: 'adv_ctx_history', label: '넣을 말풍선', ctl: { t: 'adv', item: 'ctx_history' } },
         { key: 'adv_ctx_notices', label: '넣을 공지', ctl: { t: 'adv', item: 'ctx_notices' } },
         { key: 'adv_ctx_tokens', label: '컨텍스트 토큰 상한', ctl: { t: 'adv', item: 'ctx_tokens' } },
@@ -55,6 +57,7 @@ export const PHONE_SET: SetPage = {
         { key: 'adv_cd_incoming', label: '선톡 받은 뒤 쉬는 턴', ctl: { t: 'adv', item: 'cd_incoming' } },
         { key: 'group_invites', label: '단톡방 초대 받기', ctl: onOff('0'), inline: pct('group_invite_chance') },
         { key: 'adv_cd_invite', label: '초대 받은 뒤 쉬는 턴', ctl: { t: 'adv', item: 'cd_invite' } },
+        { key: 'adv_check_contacts', label: '선톡·초대 후보', ctl: { t: 'adv', item: 'check_contacts' } },
         { key: 'banter', label: '단톡 수다', ctl: onOff('0'), inline: pct('banter_chance'), help: '새 메시지를 확인할 때 이 확률로 내 단톡방 하나에서 사람들끼리 대화가 오가요. 응답이 길어져요' },
         { key: 'banter', label: '단톡 수다 줄 수', ctl: { t: 'minmax', lo: BANTER_ROWS[0], hi: BANTER_ROWS[1], unit: '줄', act: 'num' }, help: `수다 한 번에 오가는 말 수예요(${BANTER_ROWS[0]}~${BANTER_ROWS[1]}). 그 안에서 모델이 정해요` },
       ],

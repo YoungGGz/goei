@@ -10,8 +10,9 @@ const out = await build({
       export { HS_PAIRS } from './src/core/setdef/homeshop';
       export { shopGiveOn } from './src/core/shopfn';
       export { dropDoubleSync, syncPointsToStatus, readPoints } from './src/core/points';
-      export { mergeLate, lateNow } from './src/ui/malls';
-      export { mallVarsOf, readMall } from './src/core/malls';
+      export { mergeLate, lateNow, sendsOrders } from './src/ui/malls';
+      export { guideSections } from './src/core/guides';
+      export { mallVarsOf, readMall, mallAtKey, mallSeenKey, mallUnseen } from './src/core/malls';
       export { aliveAnchors } from './src/core/wallet';
       export { markSold } from './src/core/shop';
     `,
@@ -117,4 +118,28 @@ test('settings#6: 최소가 최대를 넘으면 짝도 같이 맞춘다', () => 
   // 짝 없는 칸
   assert.deepEqual(M.hsNumVars({}, 'speed', 12, pair('speed')), { [K('speed')]: '12' });
   assert.deepEqual(M.hsNumVars({}, 'nope', 1), {});
+});
+
+test('우주 쇼핑몰: 「진행 중 맞춤 주문」 목록은 문의 요청에만 넣는다 (진열 요청에는 쓰는 곳이 없다)', () => {
+  assert.equal(M.sendsOrders('cos', 'talk'), true);
+  assert.equal(M.sendsOrders('cos', 'shelf'), false);
+  assert.equal(M.sendsOrders('bm', 'talk'), false);
+  assert.equal(M.sendsOrders('bm', 'shelf'), false);
+});
+
+test('망상홈쇼핑 지침: 스티커 밑 글·맞교환 말을 편성에서 따로 청하지 않는다 (스티커는 진실 칸에서 몇 글자, 맞교환은 상담원 요청이 판단)', () => {
+  const g = M.guideSections('Hs');
+  assert.equal(g.BROADCAST_PEEK, undefined);
+  assert.equal(g.BROADCAST_BARTER, undefined);
+  assert.doesNotMatch(g.BROADCAST, /\{peek_|\{barter_/);
+  assert.match(g.OPERATOR, /not a human/);
+});
+
+test('쇼핑몰 「매 턴」: 받아 둔 진열을 아직 안 열어 봤으면 새로 받지 않는다', () => {
+  const at = M.mallAtKey('cos'), seen = M.mallSeenKey('cos');
+  assert.equal(M.mallUnseen({ [at]: 't:a' }, 'cos', true), true, '받기만 하고 안 열어 봄');
+  assert.equal(M.mallUnseen({ [at]: 't:a', [seen]: 't:a' }, 'cos', true), false, '열어 봄');
+  assert.equal(M.mallUnseen({ [at]: 't:b', [seen]: 't:a' }, 'cos', true), true, '본 뒤 새로 받은 진열은 아직 안 봄');
+  assert.equal(M.mallUnseen({}, 'cos', false), false, '진열이 없으면 받는다');
+  assert.equal(M.mallUnseen({ [at]: 't:a' }, 'bm', true), false, '몰마다 따로');
 });

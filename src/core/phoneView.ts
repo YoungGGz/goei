@@ -3,6 +3,7 @@
 // - 혼잣말: 시점 인물 한 명의 속마음을 메시지처럼
 // - 다중인격 혼잣말: 시점 인물의 마음속 여러 갈래(1~9)가 단톡처럼 주고받는다
 // 내가 끼지 않는 방이라 괴담톡 대화 기록(PState)과 따로 둔다. 선톡·새로고침·채팅 반영에는 섞이지 않는다.
+// 방은 참여 인물마다 하나: 같은 인물들이면 그 방에 이어 쓰고, 인물이 다르면 새 방 (matchView).
 import { decodeJson, parseReactions, PH, phoneValue, PhoneError } from './phone';
 import { guideTxt } from './guides';
 
@@ -13,7 +14,7 @@ export const VIEW_PRESETS: Record<ViewPreset, string> = { get side() { return vi
 export const PH_VIEWS = PH('views');
 export const PH_VIEW_LAST = PH('view_last');
 export const VIEW_KEEP = 30;
-/** 한 방에 쌓아 두는 말풍선 수 (같은 종류는 한 방에 이어 쓰므로)*/
+/** 한 방에 쌓아 두는 말풍선 수 (같은 인물들의 방에 이어 쓰므로)*/
 export const VIEW_HISTORY = 300;
 export const VIEW_LIMITS = { messages: 30, text: 600, name: 60, people: 10 };
 
@@ -73,15 +74,28 @@ export function readViews(state: Record<string, unknown> | undefined): ViewRoom[
 export const writeViews = (list: ViewRoom[]): Record<string, string> => ({ [PH_VIEWS]: JSON.stringify(list.slice(-VIEW_KEEP)) });
 export const viewUnread = (list: ViewRoom[]) => list.filter((r) => r.unread).length;
 
-/** 이어 쓸 때 참고할 같은 종류의 마지막 방 (모델에 보낼 모양) */
-/** limit = 넘길 말풍선 수 (양 표 「보기 전용 방」 줄의 지난 기록) */
-export function previousView(list: ViewRoom[], preset: ViewPreset, limit = VIEW_LIMITS.messages): unknown {
-  const r = [...list].reverse().find((x) => x.preset === preset);
-  if (!r) return undefined;
-  return {
+// ── 방은 참여 인물로 가른다 (11-15 사용자: 「같은 인물들이 매번 새 방을 파니까」 이어 쓰라고 한 것 — 인물이 다르면 다른 방) ──
+// 사이드스토리: 참여 인물 이름이 모두 같으면 같은 방. 혼잣말·다중인격 혼잣말: 시점 인물이 같으면 같은 방 (갈래 이름은 그때그때 달라도 한 사람의 마음속).
+const nameKey = (s: string) => s.replace(/\s+/g, ' ').trim();
+const povName = (r: Pick<ViewRoom, 'pov' | 'people'>) => nameKey(r.people.find((p) => p.id === r.pov)?.name ?? '');
+const roomKey = (r: Pick<ViewRoom, 'preset' | 'pov' | 'people'>) =>
+  r.preset === 'side' ? [...new Set(r.people.map((p) => nameKey(p.name)))].sort().join('\n') : povName(r);
+
+/** 새로 만든 방(value)을 이어 붙일 기존 방. 없으면 undefined (새 방). 같은 것이 여럿이면 가장 최근 방 */
+export function matchView(list: ViewRoom[], value: Pick<ViewRoom, 'preset' | 'pov' | 'people'>): ViewRoom | undefined {
+  const key = roomKey(value);
+  return key ? [...list].reverse().find((x) => x.preset === value.preset && roomKey(x) === key) : undefined;
+}
+
+/** 같은 종류의 기존 방들 (모델에 보낼 모양, 최근 방부터). 모델이 인물 이름을 그대로 다시 쓰고 앞 내용을 되풀이하지 않게.
+ *  limit = 방마다 넘길 말풍선 수 (양 표 「보기 전용 방」 줄의 지난 기록) */
+export function viewRooms(list: ViewRoom[], preset: ViewPreset, limit = VIEW_LIMITS.messages): unknown[] {
+  const rooms = list.filter((x) => x.preset === preset).reverse();
+  const each = Math.max(1, limit);
+  return rooms.map((r) => ({
     name: r.name, pov: r.pov, participants: r.people,
-    messages: r.messages.filter((m) => m.type !== 'time').slice(-limit).map((m) => ({ sender: m.type === 'text' ? m.sender : '-', type: m.type, content: m.type === 'text' ? m.text : m.type === 'pause' ? m.text : '-' })),
-  };
+    messages: r.messages.filter((m) => m.type !== 'time').slice(-each).map((m) => ({ sender: m.type === 'text' ? m.sender : '-', type: m.type, content: m.type === 'text' ? m.text : m.type === 'pause' ? m.text : '-' })),
+  }));
 }
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');

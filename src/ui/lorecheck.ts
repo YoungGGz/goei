@@ -1,5 +1,5 @@
 // 설정 → 「로어북 확인」: 다음 요청에 넣을 세력·특수·괴이·요원 로어북과 켠 까닭, Risu 방식이었다면 달랐을 것 (core/lore.ts)
-import { advValue } from '../core/advanced';
+import { advValue, loreLimits } from '../core/advanced';
 import { tokens } from '../core/gnet';
 import { computeLore, loreOptions, SLOTS, type LoreMode, type LorePick, type LoreReason } from '../core/lore';
 import type { ChatContext } from '../host/risu';
@@ -21,7 +21,7 @@ function item(p: LorePick, risu = false): string {
 /** plain: 접는 칸 없이 바로 펼쳐 보이기 (기능 → 로어북 호출 페이지) */
 export function loreCheckBox(ctx: ChatContext, plain = false): string {
   const mode = advValue(ctx.chat.scriptstate, 'gen', 'lore_mode') as LoreMode;
-  const opts = (m: LoreMode) => loreOptions(ctx.char as never, ctx.chat, m);
+  const opts = (m: LoreMode) => loreOptions(ctx.char as never, ctx.chat, m, '', loreLimits(ctx.chat.scriptstate));
   const now = computeLore(ctx.char.globalLore, ctx.chat, opts(mode));
   if (!now) return '';
   const other = computeLore(ctx.char.globalLore, ctx.chat, opts(mode === 'risu' ? 'plugin' : 'risu'))!;

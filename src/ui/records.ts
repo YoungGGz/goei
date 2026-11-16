@@ -223,7 +223,7 @@ function journalPane(ctx: ChatContext): string {
   const durs = todayRows.map((r) => (r.at !== null && r.since !== null ? Math.max(0, r.at - r.since) : null)).filter((d): d is number => d !== null);
   const avg = durs.length ? Math.round(durs.reduce((a, b) => a + b, 0) / durs.length) : null;
   const clockText = now === null ? '' : journalClock(now).replace(/^(\d\d)\.(\d\d)/, `${new Date(now * 60000).getUTCFullYear()}.$1.$2`);
-  // 2026-11-05 사용자: 「BUREAU LOG · 관리국 일지」 같은 머리글·영한 겹침 라벨은 빼고 한글만. 「이번 달」 대신 전체 건수 (지난달이 안 보인다는 지적)
+  // 2026-11-05 사용자: 「BUREAU LOG · 관리국 일지」 같은 머리글·영한 겹침 라벨은 빼고 한글만. 「이번 달」 대신 전체 건수 (지난달도 보이게)
   const mon = monitor('일지', '', clockText, [
     { label: '종료 전체', value: String(rows.length), sub: kinds(rows) || '아직 없음', tone: 'mint' },
     { label: '내 사건', value: String(mineN), sub: `보고서 ${reports.filter((r) => r.mine).length}건`, tone: 'amb' },

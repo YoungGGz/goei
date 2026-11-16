@@ -324,6 +324,10 @@ The program keeps the user's character's inventory (`items_now` = what they carr
 <<SHOP_JUDGE>>
 Return `shop` as one object when there is one (`name` = 가게 이름, `owner` = 주인 이름 or empty, `m` = `shop_check.m`), otherwise `null`.
 <<END:shop>>
+<<SECTION:pickup>>
+## 15f. Welfare mall pickup
+`pickup_check.items` = goods the user's character bought earlier at 백일몽 포인트몰 and set out to collect in person at the headquarters rental storage in response `pickup_check.m`. Return `pickup` = the names (copied exactly) of those the user's character actually receives in that response; `[]` when none. Never report these goods in `items`.
+<<END:pickup>>
 <<SECTION:tidy>>
 ## 11. Tidying an oversized record
 `tidy` lists persons over the storage budget (`name`, `chars`, `target`). For each, besides this turn's changes, add `merge` items: `{"who","slot","op":"merge","from":[ids…],"text":"≤300 chars","m":"<confirmed m>","quote":null}`. A merge joins 2+ live entries of one slot into one denser statement keeping every still-true fact; merge only what overlaps, repeats or is superseded; never pinned entries. Prefer `history` (adjacent events), `state`/`scene` (only what is still true), then `knowledge`, `behavior`, `threads`; `relationship`/`speech` and per-target feature slots keep one per target; `affinity.appraisal` is never merged. Stop near `target`. ≤24 items per tidied person; no `merge` for persons not listed.
@@ -431,6 +435,9 @@ Every key below is present.
 <<SECTION:shop>>
  "shop":{"name":"<Korean ≤30 chars>","owner":"<name or empty>","m":"m2"},
 <<END:shop>>
+<<SECTION:pickup>>
+ "pickup":["<name from pickup_check.items>"],
+<<END:pickup>>
 <<SECTION:next_note>>
  "next_note":[{"who":"<name>","now":"<English ≤120 chars>","must_not_reveal":["<≤80 chars>"]}],
 <<END:next_note>>

@@ -388,11 +388,15 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('always', '', { ctl: `<input class="gx-search pp-always" data-change="pp-always" name="pp-always" value="${esc(v('always'))}" placeholder="예: 쟈알디, 스팡달" maxlength="400" aria-label="항상 포함할 인물">` }),
     ppRow('scene_carry', v('scene_carry') === '1' ? '1' : '0'),
     ppRow('block_cap', String(s.blockCap)),
+    // 이 두 줄은 딸린 기능(문서 기록·성격)이 꺼져 있어도 보인다: 기능 줄이 이 칸보다 아래에 있어, 숨기면 한 번에 바꾼 값을 되돌릴 때 이 줄을 찾지 못한다
+    ppRow('docs_inject', s.docsInject ? '1' : '0'),
+    ppRow('axes_obs_inject', s.axesObsInject ? '1' : '0'),
   ].join('');
   const refRows = [
     ppRow('recent_msgs', String(s.recentMsgs)),
     ppRow('prev_pairs', String(s.prevPairs)),
     ppRow('span_cap', String(s.spanCap)),
+    ppRow('docs_cap', String(s.docsCap)),
     ppRow('hypa', v('hypa') === '1' ? '1' : '0'),
     s.hypa ? ppRow('hypa_items', String(s.hypaItems)) : '',
     s.hypa ? ppRow('hypa_cap', String(s.hypaCap)) : '',
@@ -425,6 +429,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('newpeople', s.newPeople),
     ppRow('twoturn', v('twoturn') === '1' ? '1' : '0'),
     ppRow('roster_hint', v('roster_hint') === '1' ? '1' : '0'),
+    s.rosterHint ? ppRow('roster_cap', String(s.rosterCap)) : '',
     ppRow('new_unnamed', v('new_unnamed') === '1' ? '1' : '0'),
   ].join('');
   const update = [
@@ -584,7 +589,7 @@ export function peopleListView(ctx: ChatContext): string {
   const docsN = Object.values(store.docs).reduce((a, d) => a + liveEntries(d.entries, live).length, 0);
   const empty = !Object.keys(store.people).length && !pending.length ? '<div class="ph-blank"><p>아직 기록된 인물이 없어요.<br>메인 응답에서 요원·인물이 등장하면 기록이 생겨요.</p></div>' : '';
   const undoN = store.lastRun ? store.lastRun.entries.length + store.lastRun.docs.length + store.lastRun.changes.length + store.lastRun.observations.length + store.lastRun.newPeople.length : 0;
-  const undoBtn = undoN ? `<button class="ph-tool" data-action="pp-undo-run" title="마지막 갱신이 만든 ${undoN}개(항목·계기·문서·관찰·새 인물)를 취소해요. 취소한 항목·계기는 인물 상세에서, 문서는 기록 문서에서 다시 살릴 수 있어요. 관찰은 되살릴 수 없고 새 인물은 지워져요" aria-label="마지막 갱신 되돌리기" ${peopleUi.busy ? 'disabled' : ''}>↶</button>` : '';
+  const undoBtn = undoN ? `<button class="ph-tool" data-action="pp-undo-run" title="마지막 갱신이 만든 ${undoN}개(항목·계기·문서·관찰·새 인물)를 취소해요. 취소한 항목·계기는 인물 상세에서, 문서는 기록 문서에서 다시 살릴 수 있어요. 관찰은 되살릴 수 없고 새 인물은 지워져요" aria-label="마지막 갱신 되돌리기" ${peopleUi.busy ? 'disabled' : ''}>${ICONS.undo}</button>` : '';
   const newN = store.lastRun?.newPeople.length ?? 0;
   const undoAsk = undoN && peopleUi.undoAsk && peopleUi.undoAsk === undoKey(ctx, store)
     ? `<div class="gx-hint">마지막 갱신 ${undoN}개를 취소할까요?${newN ? ` 새 인물 ${newN}명은 지워져요.` : ''} <button class="gx-mini danger" data-action="pp-undo-run-yes" ${peopleUi.busy ? 'disabled' : ''}>취소하기</button><button class="gx-mini" data-action="pp-undo-run-no">그만</button></div>`

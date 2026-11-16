@@ -27,14 +27,12 @@ export interface WikiSettings {
   images: 'off' | 'infobox' | 'body';
   /** 자동 작성: 끔 / 창을 열 때 / 매 턴 (라이트보드 나무위키, 2026-11-06) */
   auto: '0' | 'open' | 'turn';
-  autoTitle: 'model' | 'input';
-  autoQuery: string;
 }
 
 /** 원본 Settings 로어북 기본값 */
 export const WIKI_DEFAULTS: WikiSettings = {
   mode: 'expand', model: 'main', length: 'detailed', refreshPrevious: true, chatTurns: 8, referenceCount: 20,
-  footnotes: 'pop', images: 'infobox', auto: '0', autoTitle: 'model', autoQuery: '',
+  footnotes: 'pop', images: 'infobox', auto: '0',
 };
 
 export function wikiSettings(state: Record<string, unknown> | undefined): WikiSettings {
@@ -51,8 +49,6 @@ export function wikiSettings(state: Record<string, unknown> | undefined): WikiSe
     footnotes: pick('$nw_footnotes', ['pop', 'inline'] as const, WIKI_DEFAULTS.footnotes),
     images: pick('$nw_images', ['off', 'infobox', 'body'] as const, WIKI_DEFAULTS.images),
     auto: pick('$nw_auto', ['0', 'open', 'turn'] as const, WIKI_DEFAULTS.auto),
-    autoTitle: pick('$nw_auto_title', ['model', 'input'] as const, WIKI_DEFAULTS.autoTitle),
-    autoQuery: String(s['$nw_auto_query'] ?? '').trim().slice(0, 80),
   };
 }
 

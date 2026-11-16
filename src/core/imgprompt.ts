@@ -69,6 +69,19 @@ export function imgCharacters(lore: LoreEntry[] | undefined, cfg: ImgPromptConfi
   return names;
 }
 
+/** 장면에 나온 이름만 고른다 (설정 「장면 인물만」): 명부의 한글 이름·영문 표기·별칭 가운데 하나가 texts 에 나온 요원과, 이름이 그대로 나온 임의 추가 이름.
+ *  keep 의 이름(주인공)은 글에 없어도 남긴다. 차례는 names 그대로 */
+export function imgSceneNames(lore: LoreEntry[] | undefined, names: string[], texts: string[], keep: string[] = []): string[] {
+  const hay = texts.join('\n').toLowerCase();
+  const kept = new Set(keep.map((n) => cleanName(n).toLowerCase()).filter(Boolean));
+  const terms = new Map<string, string[]>();
+  for (const a of readDirectory(lore).agents) if (a.english) terms.set(cleanName(a.english).toLowerCase(), [a.name, a.english, ...(a.legacyEnglish ?? []), ...(a.aliases ?? [])]);
+  return names.filter((n) => {
+    const key = n.toLowerCase();
+    return kept.has(key) || [n, ...(terms.get(key) ?? [])].some((t) => !!t && hay.includes(String(t).toLowerCase()));
+  });
+}
+
 /** 지침 조립. userName을 주면 {{user}}를 그 이름으로 푼다 (플러그인이 붙이는 글은 Risu가 CBS를 풀지 않음. 전수검사 11-13) */
 export function buildImgPrompt(cfg: ImgPromptConfig, characters: string[], assetPlayer: boolean, userName?: string): string {
   // 주인공 금지 문장은 지침 「Asset」 절 MAIN_USER_SKIP · MAIN_USER_RULE (전수검사 11-13)

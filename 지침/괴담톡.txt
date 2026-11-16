@@ -98,6 +98,9 @@ send: reply to the owner's exact text, already stored as the latest message.
 
 @@SECTION ACTION_INVITE_INITIAL
 invite_initial: the group and invitations already exist. React or open conversation according to actual relationships and privateDirection, without inventing an owner announcement.
+@@END
+
+@@SECTION ACTION_INVITE_NAME
 This action alone also permits {"op":"replace","path":"/name","value":"practical room name"}: recognizable to the owner, at most __LIMIT_room_name__ characters, without secret disclosures.
 @@END
 
@@ -163,7 +166,7 @@ After the output contract block, and only there, you may append one <ph-habits>J
 VIEW-ONLY ROOM
 Generate one view-only room for the phone owner to read. The owner does not take part unless the owner is the viewpoint character; nobody in it can see the owner reading.
 Use viewpoint.name as the viewpoint character. Include that character in participants and set pov to that participant's ID. Give each participant a short stable ID such as p1, p2.
-Keep all content within the narrative's current endpoint (narratorOnly.recentStory and currentSceneTime). Leave pending choices, actions and outcomes unresolved. Limit each participant to what that participant could have witnessed, learned or received. Do not repeat earlier output; when previousRoom is given, continue from it and reuse its identities and names where they still fit.
+Keep all content within the narrative's current endpoint (narratorOnly.recentStory and currentSceneTime). Leave pending choices, actions and outcomes unresolved. Limit each participant to what that participant could have witnessed, learned or received. Do not repeat earlier output. rooms, when given, lists the existing view-only rooms of this kind with their recent messages. A room belongs to its participants: output with the same participants as a listed room is appended to that room, so continue from where that room stopped and keep its participant names exactly as listed. Output with different participants becomes a separate new room.
 Write each bubble as one immediate beat. Use as many messages as the moment warrants; six to twelve text rows is a typical range, not a target.
 @@END
 
@@ -232,10 +235,15 @@ Allow the viewpoint character to speak as themself alongside the facets, using t
 Keep the participant identified by pov silent. Generate the facets' contributions without inventing statements by the viewpoint participant or implying those statements through replies.
 @@END
 
+@@SECTION VIEW.REACTIONS
+EMOJI REACTIONS
+A text message in the output may also carry "reactions": space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants. Omit it when there are none.
+@@END
+
 @@SECTION VIEW.OUTPUT
 OUTPUT CONTRACT
-Return exactly {"name":"room name","pov":"participant ID","participants":[{"id":"p1","name":"..."}],"messages":[{"sender":"participant ID","type":"text","content":"...","reactions":"-"}]}.
-type is text, pause or skip. A pause uses sender "-" and a short elapsed-time marker in Korean as content (at most 12 characters). A skip uses "-" for sender and content, only when an unknown stretch is omitted. reactions is "-" or space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants.
+Return exactly {"name":"room name","pov":"participant ID","participants":[{"id":"p1","name":"..."}],"messages":[{"sender":"participant ID","type":"text","content":"..."}]}.
+type is text, pause or skip. A pause uses sender "-" and a short elapsed-time marker in Korean as content (at most 12 characters). A skip uses "-" for sender and content, only when an unknown stretch is omitted. At most __VIEW_LIMIT_messages__ messages; each text content at most __VIEW_LIMIT_text__ characters.
 Use strict JSON with native objects/arrays. Escape line breaks as \n. No commentary, Markdown fences or trailing text.
 @@END
 
@@ -374,6 +382,14 @@ current affiliation internal notices
 
 @@SECTION MAIN_CONTEXT.NOTICE_ACCESS
 received by owner; audience bounded by channel
+@@END
+
+@@SECTION MAIN_CONTEXT.VIEWS
+viewOnlyRooms are not messenger traffic and were sent to nobody. kind side: a minor spoken exchange that took place off-page among the listed speakers; only those speakers know it. kind mono or multi: the viewpoint character's unspoken inner thoughts (multi: voices inside that one mind); nobody else knows them. Treat them as background consistent with the story, never as events to retell or as knowledge other characters hold.
+@@END
+
+@@SECTION MAIN_CONTEXT.HABITS
+textingHabits are preserved notes on how each contact writes messages. Use them only when that contact texts in the story; they are not facts the contact would announce.
 @@END
 
 @@SECTION FIRST_CONTACT

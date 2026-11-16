@@ -1,14 +1,17 @@
 // 괴담톡: 저장 형식(원본 ph_state·ph_contacts·ph_bulletins와 같음), 연락처·탭, 대화 규칙, 모델 응답 검사와 반영.
 // 원칙(원본과 같음): 이미 저장된 말풍선은 모델이 고치거나 지우지 못한다. 모델은 새 말풍선·대기·퇴장(단톡)만 덧붙이고,
 // 초대·방 만들기·공지 채널·시각·기록 번호는 앱이 정한다.
-import type { Chat, LoreEntry } from './types';
+import type { Chat, ChatMessage, LoreEntry } from './types';
 import { readWorld } from './world/output';
 import { phoneTabsSection, readDirectory, rosterOf } from './world/directory';
-import { BUILTIN, extraFactions, extraTabs, factionType, isFactionCode } from './factions';
+import { OPEN_TO, extraFactions, extraTabs, factionType, isFactionCode } from './factions';
 import { dateNow, storyTurns, tokens, cut } from './gnet';
 import { attachmentRecords, describe, sitePicAsPhoto, stripForged } from './attach';
 import { pickRecords, related, type Focus, type Pick } from './focus';
 import { guideTxt } from './guides';
+import type { ViewRoom } from './phoneView';
+import { messageHash, messageKey } from './people/store';
+import { stripReadyTags } from './orders';
 export { hasAttachment } from './attach';
 
 export class PhoneError extends Error {
@@ -47,7 +50,7 @@ export const LIMITS = {
   events: 12, reply_tokens: 1500, input_tokens: 4000, pause_tokens: 200, topic_tokens: 2000, memo_tokens: 2000, notices: 1, invitations: 1,
   members: 9, room_name: 60, notice_title: 80, notice_issuer: 60, notice_tokens: 1200,
 };
-export const HISTORY = { room: 100, announcement: 10, context: 200, contextNotices: 1, contextTokens: 4000, turns: 8, focus: true, contextRecent: 8 };
+export const HISTORY = { room: 100, announcement: 10, context: 200, contextNotices: 1, contextTokens: 4000, turns: 8, focus: true, contextRecent: 8, contextViews: false, contextReactions: false, contextHabits: false };
 export const STORAGE = { dm: 40, group: 100, notice: 20 };
 export const STORAGE_MAX = 20000;
 export const COOLDOWN = { incoming: 1, invitation: 3, announcement: 3 };
@@ -205,10 +208,10 @@ function tabCatalog(lore: LoreEntry[]): { entries: TabDef[]; orders: Record<stri
     if (entries.some((e) => e.id === row.id)) continue;
     entries.push({ id: row.id, name: row.name || row.id, names: { ...row.name_by_faction }, visibleFor: new Set(row.visible_for) });
   }
-  // 새 세력: 기본 다섯 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다
+  // 새 세력: 민간인을 뺀 기본 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다
   const extra = extraFactions(lore).map((f) => f.code);
   if (extra.length) {
-    for (const e of entries) if (BUILTIN.every((f) => e.visibleFor.has(f))) for (const f of extra) e.visibleFor.add(f);
+    for (const e of entries) if (OPEN_TO.every((f) => e.visibleFor.has(f))) for (const f of extra) e.visibleFor.add(f);
     for (const t of extraTabs(lore)) if (!entries.some((e) => e.id === t.id)) entries.push({ id: t.id, name: t.name, names: {}, visibleFor: new Set(t.visibleFor) });
   }
   const orders: Record<string, string[]> = {};
@@ -1097,25 +1100,62 @@ export function lastReply(chat: Chat): number {
   return -1;
 }
 
+/** 자동 호출을 보낼 때의 채팅(before)에 있던 메시지가 지금 채팅(now)에 그대로 남아 있나.
+ *  뒤에 새 메시지가 붙기만 했으면 받은 결과는 그 턴의 것이라 그대로 쓴다. 앞 메시지가 지워지거나 바뀌었으면(다시 굴림·수정) 쓰지 않는다 */
+export function chatPrefixKept(before: Chat, now: Chat): boolean {
+  const a = before.message ?? [];
+  const b = now.message ?? [];
+  if (b.length < a.length) return false;
+  // 메시지 정체(chatId)와 읽음 판정용 내용 해시로 견준다. 플러그인이 응답 본문에 붙였다 떼는 것(상점 표식·주문 완성 표식·이미지 태그·끝 줄바꿈)은 바뀐 것으로 보지 않는다
+  const body = (m: ChatMessage) => (typeof m?.data === 'string' ? { ...m, data: stripReadyTags(m.data) } : m);
+  for (let i = a.length - 1; i >= 0; i--) {
+    if (a[i]?.role !== b[i]?.role || messageKey(a[i], i) !== messageKey(b[i], i)) return false;
+    if (a[i]?.data !== b[i]?.data && messageHash(body(a[i])) !== messageHash(body(b[i]))) return false;
+  }
+  return true;
+}
+
 // ── 채팅 요청에 넣는 기록 (원본 mainContext + RC.contextPack, 장면 관련 기록 먼저는 core/focus.ts) ──
 
-export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules: string, focus?: Focus | null): string {
+/** 메인 요청에 같이 붙일 수 있는 것 (「붙일 것」 칩이 켜져 있을 때만 쓴다) */
+export interface MainExtra {
+  /** 보기 전용 방 (core/phoneView.ts readViews) */
+  views?: ViewRoom[];
+  /** 말버릇 기록 (readHabits) */
+  habits?: Habit[];
+}
+
+export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules: string, focus?: Focus | null, extra: MainExtra = {}): string {
   if (!set.context) return '';
-  const items: Pick<Record<string, unknown>>[] = [];
+  type Rec = Record<string, unknown>;
+  const items: Pick<Rec>[] = [];
+  // 방 이름·받는 사람은 방마다 한 번만 싣는다 (rooms). 기록에는 방 ID 와, 받는 사람이 방의 것과 다를 때만 recipients 를 둔다.
+  // 기록은 시간 순 배열이라 순번은 싣지 않고, 종류는 보통 말풍선(message)이 아닐 때만 싣는다
+  const roomInfo: Record<string, { title: string; recipients: string[] }> = {};
+  const senderId = new Map<Rec, string>();
   if (set.contextMessages) {
+    const reactions = HISTORY.contextReactions && set.reactions;
     for (const r of Object.values(st.rooms)) {
       // 방에 있는 사람 이름이 장면에 나오면 그 방 기록 전체가 관련
       const names = [roomLabel(r), ...Object.values(r.people).flatMap((p) => [p.name, p.english ?? ''])];
       const roomHit = related(focus, names);
+      const recipients = (m: PMsg) => JSON.stringify(m.audience.map((c) => r.people[c]?.name ?? c));
+      // 방의 받는 사람 = 그 방 기록에서 가장 흔한 목록
+      const count = new Map<string, number>();
+      for (const m of r.messages) count.set(recipients(m), (count.get(recipients(m)) ?? 0) + 1);
+      const usual = [...count.entries()].sort((x, y) => y[1] - x[1])[0]?.[0] ?? '[]';
+      roomInfo[r.id] = { title: roomLabel(r), recipients: JSON.parse(usual) as string[] };
       for (const m of r.messages) {
         if ((m.kind === 'pause' && hiddenPause(m.text)) || m.kind === 'skip') continue;
-        items.push({
-          order: m.id, related: roomHit || related(focus, [], m.text),
-          data: {
-            room: r.id, title: roomLabel(r), recipients: m.audience.map((c) => r.people[c]?.name ?? c), kind: m.kind,
-            sender: m.sender === 'me' ? guideTxt('Common', 'REFS.USER_NAME') : m.sender === 'system' ? 'system' : r.people[m.sender]?.name ?? m.sender, text: describe(sitePicAsPhoto(m.text)), time: m.time, order: m.id,
-          },
-        });
+        const own = recipients(m);
+        const data: Rec = {
+          room: r.id, ...(m.kind === 'message' ? {} : { kind: m.kind }),
+          sender: m.sender === 'me' ? guideTxt('Common', 'REFS.USER_NAME') : m.sender === 'system' ? 'system' : r.people[m.sender]?.name ?? m.sender, text: describe(sitePicAsPhoto(m.text)), time: m.time,
+          ...(own === usual ? {} : { recipients: JSON.parse(own) as string[] }),
+          ...(reactions && m.kind === 'message' && m.reactions ? { reactions: m.reactions } : {}),
+        };
+        senderId.set(data, m.sender);
+        items.push({ order: m.id, related: roomHit || related(focus, [], m.text), data });
       }
     }
   }
@@ -1125,18 +1165,72 @@ export function mainContext(st: PState, b: Bulletins, set: PhoneSettings, rules:
     for (const a of (HISTORY.contextNotices > 0 ? b.items.slice(-HISTORY.contextNotices) : [])) {
       items.push({
         order: a.order, related: true, free: true,
-        data: { kind: 'announcement', channel: a.channel, title: a.title, sender: a.issuer, text: a.text, time: a.time, order: a.order, recipients: [guideTxt('Common', 'REFS.USER_NAME')], access },
+        data: { kind: 'announcement', channel: a.channel, title: a.title, sender: a.issuer, text: a.text, time: a.time, recipients: [guideTxt('Common', 'REFS.USER_NAME')], access },
       });
     }
   }
-  const payload = (records: unknown[]) => `[MODULE_CONTEXT_BEGIN]\n${rules}\n${JSON.stringify({ feature: 'phone', records })}\n[MODULE_CONTEXT_END]`;
+  const habitRows = HISTORY.contextHabits && set.habits ? extra.habits ?? [] : [];
+  const payload = (records: Rec[], views: unknown[] = []) => {
+    const used = new Set(records.map((x) => x.room).filter((x): x is string => typeof x === 'string'));
+    const rooms = Object.fromEntries(Object.entries(roomInfo).filter(([id]) => used.has(id)));
+    // 말버릇은 실린 기록에 말한 사람이 나온 연락처 것만
+    const speakers = new Set(records.map((x) => senderId.get(x)).filter(Boolean));
+    const habits = habitRows.filter((h) => speakers.has(h.id)).map((h) => ({ sender: h.name, note: h.note }));
+    const more = [views.length ? guideTxt('Phone', 'MAIN_CONTEXT.VIEWS') : '', habits.length ? guideTxt('Phone', 'MAIN_CONTEXT.HABITS') : ''].filter(Boolean).map((t) => `\n${t}`).join('');
+    const body = { feature: 'phone', ...(used.size ? { rooms } : {}), records, ...(views.length ? { viewOnlyRooms: views } : {}), ...(habits.length ? { textingHabits: habits } : {}) };
+    return `[MODULE_CONTEXT_BEGIN]\n${rules}${more}\n${JSON.stringify(body)}\n[MODULE_CONTEXT_END]`;
+  };
+  const over = (text: string) => HISTORY.contextTokens > 0 && tokens(text) > HISTORY.contextTokens;
+  // 보기 전용 방 몫을 먼저 떼어 둔다: 톡 기록이 상한을 다 채워도 가장 최근 방의 최근 말(톡 기록의 「아주 최근」과 같은 수, 상한의 절반까지)은 들어간다
+  const viewList = HISTORY.contextViews ? extra.views ?? [] : [];
+  const base = HISTORY.contextTokens > 0 ? HISTORY.contextTokens - tokens(payload([])) : Infinity;
+  const held = viewList.length && HISTORY.contextTokens > 0 ? mainViews(viewList, focus, base / 2, HISTORY.contextRecent) : [];
   const kept = pickRecords(items, {
     focus: HISTORY.focus, recent: HISTORY.contextRecent, max: HISTORY.context,
-    fits: (k) => !(HISTORY.contextTokens > 0 && tokens(payload(k)) > HISTORY.contextTokens),
+    fits: (k) => !over(payload(k, held)),
     // 기록마다 한 번만 센다 (전수검사 11-13: 후보마다 묶음 전체를 다시 세서 기록이 많으면 몇 초씩 늦었다)
-    cost: (d) => tokens(JSON.stringify(d)) + 1, room: HISTORY.contextTokens > 0 ? HISTORY.contextTokens - tokens(payload([])) : Infinity,
+    cost: (d) => tokens(JSON.stringify(d)) + 1, room: held.length ? HISTORY.contextTokens - tokens(payload([], held)) : base,
   });
-  return kept.length ? payload(kept) : '';
+  // 톡 기록을 고르고 남은 토큰은 관전에 더 준다
+  const views = viewList.length ? mainViews(viewList, focus, HISTORY.contextTokens > 0 ? HISTORY.contextTokens - tokens(payload(kept)) : Infinity) : [];
+  // 건별 합은 어림이라 실제 상한은 여기서 지킨다: 오래된 방의 오래된 말부터 뺀다
+  while (views.length && over(payload(kept, views))) {
+    const last = views[views.length - 1];
+    last.messages.shift();
+    if (!last.messages.length) views.pop();
+  }
+  return kept.length || views.length ? payload(kept, views) : '';
+}
+
+interface MainView { kind: string; name: string; viewpoint: string; time: string; messages: { sender: string; text: string }[] }
+/** 메인 요청에 붙일 보기 전용 방: 최근 방부터, 방마다 최근 말부터 room(토큰) 안에서 고른다. 말풍선 수는 「넣을 말풍선」까지.
+ *  「장면에 나온 것만」이면 가장 최근 방과, 참여 인물 이름이 장면에 나온 방만. only 를 주면 가장 최근 방의 최근 말 only 개까지만 */
+function mainViews(list: ViewRoom[], focus: Focus | null | undefined, room: number, only?: number): MainView[] {
+  const out: MainView[] = [];
+  let used = 0;
+  let count = 0;
+  const rooms = list.slice().reverse().filter((r, i) => (only === undefined ? !HISTORY.focus || i === 0 || related(focus, r.people.map((p) => p.name)) : i === 0));
+  for (const r of rooms) {
+    const name = (id: string) => r.people.find((p) => p.id === id)?.name ?? id;
+    const v: MainView = { kind: r.preset, name: r.name, viewpoint: name(r.pov), time: r.time, messages: [] };
+    const head = tokens(JSON.stringify(v)) + 2;
+    if (used + head > room) break;
+    let sum = head;
+    for (let i = r.messages.length - 1; i >= 0 && count < Math.min(HISTORY.context, only ?? Infinity); i--) {
+      const m = r.messages[i];
+      if (m.type !== 'text') continue;
+      const row = { sender: name(m.sender), text: m.text };
+      const c = tokens(JSON.stringify(row)) + 1;
+      if (used + sum + c > room) break;
+      sum += c;
+      count++;
+      v.messages.unshift(row);
+    }
+    if (!v.messages.length) break;
+    used += sum;
+    out.push(v);
+  }
+  return out;
 }
 
 // ── 전화 (원본 PHONE_CALL) ──

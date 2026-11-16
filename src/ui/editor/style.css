@@ -372,7 +372,7 @@
   .gw .gw-top .ps-defaults .st-act span { display: none; }
   .gw .gw-top .ps-defaults .st-act svg { width: 16px; height: 16px; }
   .gw { padding: 0; }
-  .gw-win { width: 100%; height: 100%; border-radius: 0; border: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: 'top' 'body' 'drawer' 'nav'; }
+  .gw-win { width: 100%; height: 100%; border-radius: 0; border: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: 'top' 'body' 'nav'; }
   /* 폰: 설정은 본 창의 한 화면처럼 (2026-10-29 사용자) — 머리는 본 창 모양, 아래 숨은 서랍(기능·세계·지침·점검) + 본 창 하단 바 */
   .gw-win > .gw-phead { grid-area: top; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
   .gw-win > .gw-phead .gx-tabhead { flex: 1; min-width: 0; }
@@ -380,17 +380,19 @@
   .gw-win > .gw-phead .gw-menu { display: grid; width: 36px; height: 36px; }
   .gw-win > .gw-phead .gx-head-act { gap: 4px; margin-left: auto; }
   .gw-win > .gw-phead .gx-head-act > .gx-x { width: 36px; height: 36px; }
-  .gw-win > .ph-drawer { grid-area: drawer; margin: 0; }
-  .gw-win > .ph-drawer .ph-tools { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  /* 서랍 단추는 본 창 서랍(.ph-drawer .ph-tools .ph-tool)과 같은 규칙을 그대로 (입력칸 규칙에서 뺐다) */
-  .gw-win > .ph-drawer .ph-tool[aria-pressed="true"] { background: var(--accent-bg); color: var(--signal); }
-  .gw-win > .gw-nav { grid-area: nav; position: static; border: 0; border-top: 1px solid var(--panel2); background: var(--void); }
+  /* 설정 창 전용 서랍(갈래 넷 + 닫기): 상황판 서랍(.gx-cdr, ui/style.css)과 같은 틀. 하단 바 뒤에서 올라온다 */
+  .gw .gw-cdr .ph-tool { width: auto; display: flex; background: none; }
+  .gw .gw-cdr .ph-tool svg { width: 20px; height: 20px; }
+  .gw .gw-cdr .ph-tool[aria-pressed="true"] { background: none; color: var(--signal); }
+  .gw-win > .gw-nav { grid-area: nav; position: relative; border: 0; border-top: 1px solid var(--panel2); background: var(--void); }
   .gw-win.phone .gw-tree { top: var(--gw-top-h, 60px); }
 
   .gw-menu { display: inline-flex; }
   .gw-tree { position: absolute; top: 52px; left: 0; bottom: 0; width: 260px; transform: translateX(-100%); visibility: hidden; transition: transform .18s, visibility .18s; z-index: 3; box-shadow: var(--shadow); }
   /* 닫힌 서랍은 화면 밖에 있어도 Tab·읽어 주기에 걸렸다 → visibility 로 숨김 (2026-10-28 QC) */
   .gw-win.drawer .gw-tree { transform: none; visibility: visible; }
+  /* 목록이 떠 있는 동안 본문 안의 조작은 눌리지 않는다: 누르면 본문 칸이 받아 목록만 닫는다 (index.ts 클릭 처리) */
+  .gw-win.drawer .gw-body > * { pointer-events: none; }
   .gw-page.split { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; height: auto; }
   /* 폰: 목록 대신 드롭다운 한 줄 (목록·검색·제목은 숨김) */
   .gw-list-pane { border-right: 0; border-bottom: 1px solid var(--line); max-height: none; }

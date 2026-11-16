@@ -25,7 +25,7 @@ const ctxOf = (i) => ({ charIndex: 0, chatIndex: i, char: { chaId: 'c', globalLo
 const env = { render() {}, refresh: async () => {} };
 const asking = (ctx) => peopleListView(ctx).includes('data-action="pp-undo-run-yes"');
 
-test('↶ 를 누르면 그 채팅에서 확인 줄이 뜬다', async () => {
+test('되돌리기 단추를 누르면 그 채팅에서 확인 줄이 뜬다', async () => {
   resetPeopleUi();
   const ctx = ctxOf(0);
   assert.equal(asking(ctx), false);

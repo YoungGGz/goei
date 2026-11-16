@@ -70,6 +70,8 @@ export const PP_DEFAULTS: Record<string, string> = {
   twoturn: '0',
   /** 명부 대조: 기록이 없는 명부 인물의 이름·별칭·소속·직급을 갱신기 자료(roster)로 보낸다 */
   roster_hint: '1',
+  /** 명부 대조에 보내는 명부 인원 상한. 0 = 제한 없음 */
+  roster_cap: '0',
   /** 이름 없는 인물 기록: 이름이 밝혀지지 않은 인물을 글에 쓰인 호칭으로 등록하고, 이름이 밝혀지면 기록을 옮긴다 */
   new_unnamed: '1',
   /** 장면 인물 유지: 갱신기가 장면에 남아 있다고 본 인물을 다음 메인 요청·다음 갱신에 넣는다 */
@@ -82,6 +84,12 @@ export const PP_DEFAULTS: Record<string, string> = {
   person_cap: '10000',
   /** 본편 요청에 넣는 기록 블록 전체 상한 (글자). 리수폿 Director 참고 상한과 같은 16,000 */
   block_cap: '16000',
+  /** 사건·장소·세력·물건 문서 가운데 장면과 관련된 것을 메인 요청에 넣는다 (컨텍스트 글자 상한 안에서). 기본 끔 */
+  docs_inject: '0',
+  /** 갱신기 자료(docs_now)에 싣는 사건·장소·세력·물건 문서 항목 수 상한. 0 = 제한 없음 */
+  docs_cap: '0',
+  /** 승인 전 성격 관찰(후보)도 메인 요청의 인물 기록에 넣는다. 기본 끔 */
+  axes_obs_inject: '0',
   /** 저장 상한을 넘긴 인물 정리: same = 같은 갱신 호출에 얹음(기본), separate = 별도 호출 */
   tidy: 'same',
   span_cap: '20000',
@@ -142,12 +150,18 @@ export interface PeopleSettings {
   newPeople: 'auto' | 'confirm';
   twoTurn: boolean;
   rosterHint: boolean;
+  /** 명부 대조 인원 상한 (0 = 제한 없음) */
+  rosterCap: number;
   newUnnamed: boolean;
   sceneCarry: boolean;
   prevPairs: number;
   lang: 'ko' | 'en';
   personCap: number;
   blockCap: number;
+  docsInject: boolean;
+  /** 갱신기 자료의 문서 항목 수 상한 (0 = 제한 없음) */
+  docsCap: number;
+  axesObsInject: boolean;
   tidy: 'same' | 'separate';
   /** 세력 평판 정성 모드 (num_faction_rep = 0) */
   factionQual: boolean;
@@ -219,12 +233,16 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     newPeople: v('newpeople') === 'confirm' ? 'confirm' : 'auto',
     twoTurn: v('twoturn') !== '0',
     rosterHint: v('roster_hint') !== '0',
+    rosterCap: num('roster_cap', 0, 1000),
     newUnnamed: v('new_unnamed') !== '0',
     sceneCarry: v('scene_carry') !== '0',
     prevPairs: num('prev_pairs', 0, 3),
     lang: v('lang') === 'en' ? 'en' : 'ko',
     personCap: num('person_cap', 2000, 40000),
     blockCap: num('block_cap', 4000, 64000),
+    docsInject: v('docs_inject') === '1',
+    docsCap: num('docs_cap', 0, 1000),
+    axesObsInject: v('axes_obs_inject') === '1',
     tidy: v('tidy') === 'separate' ? 'separate' : 'same',
     factionQual: v('faction_rep') === '1' && v('num_faction_rep') === '0',
     factionBounds: parseBounds(v('faction_bounds')),

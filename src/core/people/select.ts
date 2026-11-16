@@ -2,7 +2,7 @@
 // 이름 찾기는 로어북 고르기와 같은 한국어 경계 규칙(core/lore.ts keyRegex). 겹치는 호칭(「부장」)은 후보가 하나일 때만.
 import type { Chat } from '../types';
 import { messageText } from '../refs';
-import { keyRegex } from '../lore';
+import { keyRegex, nameEndsAt } from '../lore';
 import { findStatusTags } from '../world/status';
 import { messageHash, messageKey } from './store';
 import type { PeopleStore } from './types';
@@ -18,21 +18,28 @@ const isEnglish = (s: string) => /^[A-Za-z][A-Za-z0-9 .'-]*$/.test(s);
 
 /** 글에서 이름을 찾는 함수. titles 는 그 호칭을 가진 사람이 하나뿐일 때만 그 사람으로 본다 */
 export function nameMatcher(entries: NameEntry[]): (text: string) => string[] {
-  const pats: { name: string; re: RegExp }[] = [];
+  const pats: { name: string; re: RegExp; en: boolean }[] = [];
   const titleOwners = new Map<string, Set<string>>();
   for (const e of entries) for (const t of e.titles) (titleOwners.get(t) ?? titleOwners.set(t, new Set()).get(t)!).add(e.name);
   for (const e of entries) {
     const keys = [e.name, ...e.aliases, ...e.titles.filter((t) => titleOwners.get(t)?.size === 1)];
     for (const k of keys) {
-      const re = keyRegex(k, isEnglish(k), true);
-      if (re) pats.push({ name: e.name, re });
+      const en = isEnglish(k);
+      const re = keyRegex(k, en, true);
+      if (re) pats.push({ name: e.name, re, en });
     }
   }
   return (text: string) => {
     const found = new Set<string>();
     for (const p of pats) {
-      p.re.lastIndex = 0;
-      if (p.re.test(text)) found.add(p.name);
+      if (found.has(p.name)) continue;
+      // 한국어 열쇠는 뒤 경계도 본다 (keyRegex 는 앞만 본다): 「탐미주의적」「여자친구」는 그 사람이 아니다. 영어 열쇠는 식이 앞뒤를 다 본다
+      for (const m of text.matchAll(p.re)) {
+        if (p.en || nameEndsAt(text, (m.index ?? 0) + m[0].length)) {
+          found.add(p.name);
+          break;
+        }
+      }
     }
     return [...found];
   };

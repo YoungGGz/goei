@@ -56,6 +56,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       items: [
         { key: 'lang', label: '생성 언어', type: 'pick', def: 'auto', opts: [['auto', '대화 언어'], ['ko', '한국어'], ['en', '영어'], ['ja', '일본어']], hint: '괴담넷·괴담톡·위키·상점·쇼핑몰·망상홈쇼핑이 쓸 언어' },
         num('retries', '형식 오류 재시도', 1, 0, 3, '회'),
+        // 모델 쪽 일시 오류(빈 응답·시간 초과·과부하)에 같은 요청을 다시 보내는 횟수. 기본 2 = 전에 코드에 고정돼 있던 값
+        num('transient', '모델 오류 재시도', 2, 0, 5, '회', { zero: '안 함', hint: '빈 응답·시간 초과·과부하처럼 모델 쪽 일시 오류일 때 같은 요청을 그대로 다시 보내는 횟수예요. 형식 오류 재시도와 따로 세요' }),
         { key: 'retry_model', label: '재시도 모델', type: 'pick', def: 'same', opts: [['same', '같은 모델'], ['main', '메인 모델'], ['aux', '보조 모델']] },
         num('budget', '요청 토큰 상한', 0, 0, 200000, TOK, { zero: '제한 없음', hint: '괴담넷·괴담톡·위키 요청 하나의 상한. 기능마다 따로 정할 수도 있어요' }),
         num('ctx_total', '컨텍스트 총 상한', 0, 0, 200000, TOK, { zero: '제한 없음', hint: '게시판(괴담넷 등)·괴담톡·위키 기록과 망상홈쇼핑 시청 기록이 메인 요청에 붙는 양의 합. 넘치면 기능별 컨텍스트 토큰 상한 비율로 나눠요' }),
@@ -69,6 +71,13 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       title: '로어북 호출',
       items: [
         { key: 'lore_mode', label: '로어북 보내기', type: 'pick', def: 'plugin', opts: [['plugin', '플러그인이 고름'], ['risu', 'Risu가 직접']], hint: '세력·특수·괴이·요원 로어북을 요청에 넣을지 누가 정할지예요. 「플러그인이 고름」은 최근 대화에 호출 단어가 나온 것·상태창 목표·부록 조건으로 플러그인이 고르고, 「Risu가 직접」은 Risu 로어북 기능이 고르는데 낱말 속 글자에도 걸려요' },
+        { key: 'aux_lore', label: '보조 호출 로어북', type: 'pick', def: 'plugin', opts: [['plugin', '플러그인 기준'], ['risu', '로어북 포함']], hint: '괴담넷·괴담톡·위키·상점 요청에 참고로 넣을 로어북을 고르는 기준이에요. 「플러그인 기준」은 명부에 있는 이름이 글에 나온 것과 「상시 로어북」만 넣어요. 「로어북 포함」은 거기에 더해 카드에 직접 넣은 로어북·채팅 로어북·켜진 모듈의 로어북도 본편처럼 넣어요(항상 활성화는 늘, 그 밖에는 활성화 키가 글에 나올 때)' },
+        // 플러그인이 고를 때의 검색 깊이·토큰 예산. 0 = 카드의 Risu 로어북 설정(없으면 10 · 99999)
+        num('lore_depth', '검색 깊이', 0, 0, 100, '메시지', { zero: '카드 설정 따름', hint: '「플러그인이 고름」일 때 호출 단어를 찾을 최근 메시지 수예요. 줄이면 이름이 나온 뒤 로어북이 요청에 남는 턴이 줄어요' }),
+        num('lore_budget', '로어북 토큰 예산', 0, 0, 200000, TOK, { zero: '카드 설정 따름', hint: '「플러그인이 고름」일 때 고른 로어북 전체의 상한이에요. 넘으면 점수가 낮은 것부터 빼요' }),
+        // 본편 요청에 늘 붙는 세력 요약(📜Faction)·요원 명단(🙂Roster). 기본 켬
+        { key: 'lore_faction', label: '세력 요약 보내기', type: 'pick', def: '1', opts: [['1', '켬'], ['0', '끔']], hint: '모든 세력의 소개·관계표·공통 규칙을 본편 요청마다 넣어요. 끄면 호출된 세력 로어북만 가요' },
+        { key: 'lore_roster', label: '요원 명단 보내기', type: 'pick', def: '1', opts: [['1', '켬'], ['0', '끔']], hint: '모든 요원의 한 줄 소개를 본편 요청마다 넣어요. 끄면 호출된 요원 로어북만 가요' },
       ],
     },
   ],
@@ -82,6 +91,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('refresh_posts', '새로고침에 참조할 글', 10, 1, 200, '개'),
         num('comments', '답글에 참조할 댓글', 30, 1, 1000, '개'),
         num('dm_history', '답장에 참조할 쪽지', 50, 1, 1000, '통'),
+        num('dm_public', '답장에 참조할 공개 글', 8, 0, 50, '개', { zero: '안 넣음' }),
+        { key: 'activity', label: '지난 글 활동', type: 'pick', def: '1', opts: [['0', '끔'], ['1', '켬']], hint: '켜면 글 쓰기·댓글·글 하나 새로고침 요청에 게시판의 지난 글을 같이 넘겨 새 댓글과 조회·추천을 받아요. 끄면 넘기지 않아 토큰을 덜 써요.' },
         budget,
       ],
     },
@@ -92,6 +103,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('ctx_post_count', '넣을 게시글', 5, 1, 200, '개'),
         num('ctx_comment_count', '글당 댓글', 10, 0, 1000, '개'),
         num('ctx_dm_count', '넣을 쪽지', 30, 1, 200, '통'),
+        num('ctx_recent_posts', '늘 넣을 최근 글', 1, 0, 50, '개', { zero: '없음' }),
+        num('ctx_recent_dms', '늘 넣을 최근 쪽지', 5, 0, 200, '통', { zero: '없음' }),
         num('ctx_tokens', '컨텍스트 토큰 상한', 3000, 0, 200000, TOK, { zero: '제한 없음' }),
       ],
     },
@@ -100,6 +113,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       items: [
         num('incoming_chance', '선쪽지 확률', 100, 0, 100, '%', { v: '$lb_cfg_lb-gn.incoming_chance' }),
         num('cooldown', '받은 뒤 쉬는 턴', 2, 0, 100, '턴', { zero: '안 쉼' }),
+        num('incoming_prev', '선쪽지에 참조할 받은 쪽지', 0, 0, 1000, '통', { zero: '전부' }),
       ],
     },
     {
@@ -123,11 +137,21 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
     {
       title: '참조',
       chips: [chip('desc', '봇 설명', 1), chip('authors', '작가 노트', 1), chip('persona', '페르소나', 1), chip('active', '상시 로어북', 1), chip('related', '인물 로어북', 1, '$ph_related'), chip('secondary', '2차 참조', 0)],
-      items: [turns(8), num('room_history', '방마다 참조할 말풍선', 100, 10, 1000, '개'), budget],
+      items: [
+        turns(8), num('room_history', '방마다 참조할 말풍선', 100, 10, 1000, '개'), budget,
+        // 답장·새 메시지 확인에 붙는 자료의 양 (기본값 = 전과 같은 동작)
+        num('board_posts', '괴담넷 글 참조', 8, 0, 8, '개', { zero: '안 넣음', hint: '답장·새 메시지 확인 요청에 참고로 넣는 괴담넷 글 수예요.' }),
+        num('cross_history', '다른 방 말풍선 참조', 1000, 0, 1000, '개', { zero: '안 넣음', hint: '참여자가 다른 방에서 주고받은 말을 한 사람당 몇 개까지 넣을지예요. 「지난 기록」 수를 넘지 않아요.' }),
+        num('check_contacts', '선톡·초대 후보', 0, 0, 500, '명', { zero: '제한 없음', hint: '새 메시지를 확인할 때 아직 대화한 적 없는 연락처를 몇 명까지 후보로 넣을지예요. 최근 챗로그에 이름이 나온 사람을 먼저 넣어요.' }),
+      ],
     },
     {
       title: '컨텍스트 포함',
-      chips: [chip('ctx_focus', '장면에 나온 것만', 1), chip('ctx_messages', '메시지', 1, '$ph_context_messages'), chip('ctx_notices_on', '공지', 1, '$ph_context_announcements')],
+      chips: [
+        chip('ctx_focus', '장면에 나온 것만', 1), chip('ctx_messages', '메시지', 1, '$ph_context_messages'), chip('ctx_notices_on', '공지', 1, '$ph_context_announcements'),
+        // 기본 끔: 켜면 메인 요청에 같이 붙는다 (컨텍스트 토큰 상한 안에서)
+        chip('ctx_views', '보기 전용 방', 0), chip('ctx_reactions', '이모지 반응', 0), chip('ctx_habits', '말버릇', 0),
+      ],
       items: [
         num('ctx_history', '넣을 말풍선', 200, 1, 1000, '개'),
         num('ctx_notices', '넣을 공지', 1, 0, 50, '개'),
@@ -239,6 +263,8 @@ export interface GenSettings {
   userMessages: boolean;
   /** 동시 요청 수 (0 = 제한 없음) */
   concurrent: number;
+  /** 모델 쪽 일시 오류에 같은 요청을 다시 보내는 횟수 */
+  transientRetries: number;
 }
 
 /** 언어를 정해 주는 값 (auto 는 기능의 원래 문장) */
@@ -251,8 +277,15 @@ export function genSettings(state: State): GenSettings {
   return {
     language: langLine(advValue(state, 'gen', 'lang')), retries: advNum(state, 'gen', 'retries'), retryModel: m === 'main' || m === 'aux' ? m : 'same',
     userMessages: advValue(state, 'gen', 'user_msgs') !== '0', concurrent: advNum(state, 'gen', 'concurrent'),
+    transientRetries: advNum(state, 'gen', 'transient'),
   };
 }
+
+/** 플러그인이 로어북을 고를 때의 검색 깊이·토큰 예산 (0 = 카드 설정). core/lore.ts loreOptions 에 넘긴다 */
+export const loreLimits = (state: State): { depth: number; budget: number } => ({ depth: advNum(state, 'gen', 'lore_depth'), budget: advNum(state, 'gen', 'lore_budget') });
+
+/** 본편 요청에 늘 붙는 지침 가운데 세력 요약·요원 명단을 넣을지 (🏷️Tag 는 늘 넣는다) */
+export const alwaysBookOn = (state: State, kind: 'tag' | 'faction' | 'roster'): boolean => kind === 'tag' || advValue(state, 'gen', kind === 'faction' ? 'lore_faction' : 'lore_roster') !== '0';
 
 // 깊은 곳(응답 검사, 저장 정리)에서 쓰는 상수 묶음은 지금 채팅 값으로 맞춰 둔다.
 // 창을 열거나 고칠 때, 채팅 요청 전, 자동 새로고침 전에 부른다 (모두 한 번에 한 채팅만 다룬다).
@@ -268,6 +301,9 @@ export function applyAdvanced(state: State): void {
   GN_HISTORY.dmHistory = g('dm_history');
   GN_HISTORY.turns = g('turns');
   GN_HISTORY.cooldown = g('cooldown');
+  GN_HISTORY.dmPublic = g('dm_public');
+  GN_HISTORY.incomingPrev = g('incoming_prev');
+  GN_HISTORY.activity = advOn(state, 'gn', 'activity');
   GN_CONTEXT.posts = g('ctx_post_count');
   GN_CONTEXT.comments = g('ctx_comment_count');
   GN_CONTEXT.dms = g('ctx_dm_count');
@@ -276,6 +312,8 @@ export function applyAdvanced(state: State): void {
   GN_CONTEXT.includeDms = advOn(state, 'gn', 'ctx_dms');
   GN_CONTEXT.ownOnly = advOn(state, 'gn', 'ctx_own');
   GN_CONTEXT.focus = advOn(state, 'gn', 'ctx_focus');
+  GN_CONTEXT.recentPosts = g('ctx_recent_posts');
+  GN_CONTEXT.recentDms = g('ctx_recent_dms');
   for (const k of PH_LIMIT_KEYS) PH_LIMITS[k] = p(k);
   PH_HISTORY.room = p('room_history');
   PH_HISTORY.turns = p('turns');
@@ -283,6 +321,9 @@ export function applyAdvanced(state: State): void {
   PH_HISTORY.contextNotices = p('ctx_notices');
   PH_HISTORY.contextTokens = p('ctx_tokens');
   PH_HISTORY.focus = advOn(state, 'ph', 'ctx_focus');
+  PH_HISTORY.contextViews = advOn(state, 'ph', 'ctx_views');
+  PH_HISTORY.contextReactions = advOn(state, 'ph', 'ctx_reactions');
+  PH_HISTORY.contextHabits = advOn(state, 'ph', 'ctx_habits');
   PH_COOLDOWN.incoming = p('cd_incoming');
   PH_COOLDOWN.invitation = p('cd_invite');
 }

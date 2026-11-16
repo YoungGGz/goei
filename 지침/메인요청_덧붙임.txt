@@ -50,7 +50,7 @@ Balance = {{user}}'s current cash in won, digits only (e.g. `1230000`, no symbol
 @@END
 
 @@SECTION STATUS.RULE.PREVIOUS
-- The status line of the previous scene is provided in a `[Previous status]` block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.
+- The status line of the previous scene is provided in a `[Previous status]` block just before the latest user input; follow the note in that block.
 @@END
 
 @@SECTION INVENTORY.NOTE
@@ -62,7 +62,7 @@ item tracking was switched off for a while and just came back on — this list m
 @@END
 
 @@SECTION INVENTORY.REALLY
-Really (what these actually do — decided by no one in advance, known to no one in the story; let it happen and show only what is experienced):
+Really (what these actually do beneath what the label claims; no one in the story knows it unless they have learned it. Where a line says what sets it off, it happens only then; otherwise let it happen now. Show only what is experienced):
 @@END
 
 @@SECTION INVENTORY.REALLY_UNKNOWN
@@ -431,6 +431,14 @@ new plant allowed ({tiers})
 [People records]
 @@END
 
+@@SECTION DOCS.HEAD
+## Scene-related records (events, places, organizations and items; kept by the system from this chat; background facts, not content to narrate again)
+@@END
+
+@@SECTION DOCS.ITEM
+- {type} · {key}: {text}
+@@END
+
 @@SECTION PEOPLE.BLOCK.HEAD
 ## {name} (living record · updated in this chat)
 @@END
@@ -453,6 +461,14 @@ Personality axes (baseline traits, not current feeling):
 
 @@SECTION PEOPLE.BLOCK.PATTERNS
 Long-term changes:
+@@END
+
+@@SECTION PEOPLE.BLOCK.AXES_OBSERVED
+Seen in recent scenes (not yet a confirmed change; a tendency only):
+@@END
+
+@@SECTION PEOPLE.BLOCK.AXES_OBSERVED_ITEM
+- {axis} ({direction}): {pattern}
 @@END
 
 @@SECTION PEOPLE.BLOCK.SEXUAL
@@ -795,6 +811,34 @@ protagonist: "{text}"
 owner: "{text}"
 @@END
 
+@@SECTION INVENTORY.SHOP.SHELF
+the shelf of {shop} now offers these, not bought — {items}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_ITEM
+{name} ({price}){desc}{effect}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_DESC
+: {desc}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_EFFECT
+, effect: {effect}
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_PRICE_WON
+{price} won
+@@END
+
+@@SECTION INVENTORY.SHOP.SHELF_PRICE_POINTS
+{price} Baekilmong points
+@@END
+
+@@SECTION INVENTORY.SHOP.OWNER_SAID
+the owner of {shop} said on showing the shelf: "{line}"
+@@END
+
 @@SECTION STATUS.RECENT_CASH_LINE
 {amount} won {memo}
 @@END
@@ -813,6 +857,14 @@ the custom order 「{item}」 from {mall} is now finished and waiting; the prota
 
 @@SECTION MALL.DESK
 chatted by text with a counselor on the {mall} 1:1 상담 — {lines}
+@@END
+
+@@SECTION MALL.SHELF
+the {mall} website now lists these, not bought — {items}
+@@END
+
+@@SECTION MALL.NOTICE
+the front page of the {mall} website reads: "{text}"
 @@END
 
 @@SECTION MALL.LINE

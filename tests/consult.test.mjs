@@ -137,3 +137,35 @@ test('증상 지식 글(KNOWLEDGE): 1,500자 이하, 한국어는 화면 낱말�
   assert.ok(k.length > 200 && k.length <= 1500, `KNOWLEDGE ${k.length}자`);
   assert.ok(consultPrompt({ state: '', last: '', menus: '', opened: [], all: [], pending: [], talk: [] })[0].content.includes(k.split('\n')[0]), '요청의 지침에 들어간다');
 });
+
+// ── [메뉴] 목록에도 「요청 토큰 상한」 (src/ui/editor/consult.ts) ──
+await build({ stdin: { contents: "export { consultMenus, shortMenus } from './src/ui/editor/consult'; export { tokens } from './src/core/gnet';", resolveDir: process.cwd(), loader: 'ts' }, outfile: join(dir, 'consult-ui.mjs'), bundle: true, platform: 'browser', target: 'es2022', format: 'esm', loader: { '.txt': 'text' }, logLevel: 'silent' });
+const U = await import(pathToFileURL(join(dir, 'consult-ui.mjs')));
+
+test('[메뉴] 목록: 상한을 넘지 않으면 전부 넣고, 넘는 만큼만 펼치지 않는 메뉴의 줄 이름 목록을 뒤에서부터 뺀다', () => {
+  const row = (k) => ({ keys: [k], group: '' });
+  const menus = ['인물', '인터넷', '괴담톡', '상점'].map((menu, i) => ({ page: `p${i}`, menu, intro: `${menu} 소개`, rows: Array.from({ length: 12 }, (_, j) => row(`${menu} 설정 줄 ${j + 1}`)) }));
+  const full = U.consultMenus(menus);
+  assert.equal(U.consultMenus(menus, new Set()), full);
+  for (const m of menus) assert.match(full, new RegExp(`- ${m.menu}: ${m.menu} 소개 \\| 줄: ${m.menu} 설정 줄 1, `));
+  // 넘지 않으면 아무것도 빼지 않는다 (상한이 없을 때와 같다)
+  assert.equal(U.shortMenus(menus, ['p0'], 0).size, 0);
+  assert.equal(U.shortMenus(menus, ['p0'], -50).size, 0);
+  // 조금 넘으면 맨 뒤 메뉴 하나만
+  assert.deepEqual([...U.shortMenus(menus, ['p0'], 1)], ['p3']);
+  // 많이 넘으면 뒤에서부터 차례로, 펼칠 메뉴(지금 메뉴·달라고 한 메뉴)는 끝까지 둔다
+  assert.deepEqual([...U.shortMenus(menus, ['p0', 'p3'], 1)], ['p2']);
+  const most = U.shortMenus(menus, ['p0'], 1e9);
+  assert.deepEqual([...most].sort(), ['p1', 'p2', 'p3']);
+  const cut = U.consultMenus(menus, most);
+  assert.ok(U.tokens(cut) < U.tokens(full));
+  assert.match(cut, /- 인물: 인물 소개 \| 줄: 인물 설정 줄 1, /, '펼칠 메뉴는 줄 이름이 남는다');
+  for (const m of menus.slice(1)) {
+    assert.match(cut, new RegExp(`^- ${m.menu}: ${m.menu} 소개$`, 'm'), '메뉴 이름과 소개는 남아 <open> 으로 달라고 할 수 있다');
+    assert.ok(!cut.includes(`${m.menu} 설정 줄 1`));
+  }
+  // 뺀 만큼이 넘은 양을 채우면 멈춘다
+  const one = U.tokens(U.consultMenus(menus)) - U.tokens(U.consultMenus(menus, new Set(['p3'])));
+  assert.deepEqual([...U.shortMenus(menus, ['p0'], one)], ['p3']);
+  assert.deepEqual([...U.shortMenus(menus, ['p0'], one + 1)], ['p3', 'p2']);
+});

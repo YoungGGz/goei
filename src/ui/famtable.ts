@@ -12,7 +12,7 @@ import { HS_MAIN_SET, hsMainSettings, type HsLogKind } from '../core/hslog';
 import { SHOP_MAIN_ALL, SHOP_MAIN_KINDS, SHOP_MAIN_LABEL, SHOP_MAIN_LINES, SHOP_PLACES, shopMain, shopMainLines, type ShopPlace } from '../core/shopctx';
 import { advChipsCtl, advCtl } from './advanced';
 import { advValue } from '../core/advanced';
-import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopFnNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
+import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopAmountNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
 import { siteLogo } from './browser';
 import { ICONS } from './icons';
 import { ckWide, helpBox, mxGrid, numCtl, numSet, setGroup, setRow, setSeg, stepSize, type CkBand } from './setrow';
@@ -128,14 +128,16 @@ export function boardTable(state: State, busy = false): string {
       ['속으로만', '정리하되 적지 않게 해요.'],
       ['적고 지움', '짧게 적게 한 뒤 플러그인이 지워요. 응답이 느려져요.'],
     ]),
-    R('다양성 강화', C('sampling', s0.sampling), '켜면 모델이 게시판 두 벌을 쓰고 플러그인이 두 번째 벌을 써요. 토큰을 더 써요.'),
+    R('다양성 강화', C('sampling', s0.sampling), '켜면 모델이 게시판 두 벌을 쓰고 플러그인이 덜 흔한 벌을 써요. 토큰을 더 써요.'),
     R('비망록', SW('memo'), '켜면 모델 거부를 줄이는 긴 앞글을 요청마다 붙여요. 토큰을 더 써요.'),
     R('다시 보기', N('reiterate'), '첫 응답 뒤 모델에게 지침과 형식을 지켰는지 다시 보게 하는 횟수예요. 1회마다 호출이 1회 늘어요.'),
     R('한 번에 받을 답글', set([['최소', N('replies_min')], ['최대', N('replies')]]), '내 글이나 댓글에 한 번에 달리는 답글의 수예요.'),
+    R('지난 글 활동', SW('activity'), '켜면 글 쓰기·댓글·글 하나 새로고침 요청에 게시판의 지난 글을 같이 넘겨 새 댓글과 조회·추천을 받아요. 끄면 넘기지 않아 토큰을 덜 써요.'),
   ].join(''));
   const limit = setGroup('길이 상한', [
     R('모델이 쓰는 글', set([['글 본문', N('post_tokens')], ['글 제목', N('title_tokens')], ['댓글', N('comment_tokens')], ['쪽지', N('dm_tokens')]])),
     R('쪽지에 같이 넘기는 글', set([['붙는 글', N('origin_tokens')], ['붙는 댓글', N('quote_tokens')], ['이전 쪽지 한 통', N('history_tokens')]]), '글이나 댓글을 보고 쪽지를 보낼 때 같이 넘기는 글 하나의 길이 상한이에요.'),
+    R('답장에 참조할 공개 글', N('dm_public'), '쪽지 답장 요청에 참고로 같이 넘기는 게시판 글의 수예요. 0이면 넘기지 않아요.'),
   ].join(''));
   const keep = setGroup('게시판에 남기는 것', [
     R('주요 인물 닉네임 보존', C('keyfigures', s0.keyFigures), '켜면 주요 인물이 쓰던 닉네임을 다음 새로고침에도 그대로 써요.'),
@@ -143,10 +145,12 @@ export function boardTable(state: State, busy = false): string {
     R('내 댓글 있는 글 유지', C('keepreplied', s0.keepReplied), '켜면 내가 댓글을 단 남의 글도 남겨요.'),
     R('쪽지 자동 정리', `${setSeg('fam-set', 'b:gn:storage', ret.auto ? '1' : '0', ONOFF, busy)}${ret.auto ? numCtl('b:gn:dmkeep', { n: ret.limit, lo: 1, hi: STORAGE_MAX, step: 5 }, '남길 쪽지', '통', busy) : ''}`, '켜면 상대마다 최근 쪽지를 이 수만큼만 남기고 오래된 것은 지워요.'),
     R('선쪽지 뒤 쉬는 턴', N('cooldown'), '선쪽지를 받은 뒤 새 선쪽지가 오지 않는 턴의 수예요.'),
+    R('선쪽지에 참조할 받은 쪽지', N('incoming_prev'), '같은 쪽지가 또 오지 않게 선쪽지 요청에 같이 넘기는 받은 쪽지의 수예요. 0이면 전부 넘겨요.'),
   ].join(''));
   const attach = setGroup('메인 요청에 붙이는 것', [
     R('붙일 것', advChipsCtl('gn', ['ctx_posts', 'ctx_dms', 'ctx_own'], st0 as never), '「내가 쓴 것만」을 켜면 내가 쓴 글과 내가 댓글을 단 글만 붙여요. 위 격자에서 「컨텍스트 포함」을 켠 게시판에만 붙어요.'),
-    R('장면에 나온 것만 고르기', SW('ctx_focus'), '켜면 최근 글 1개와 쪽지 5통은 늘 붙이고, 나머지는 지금 장면에 이름이 나온 것만 붙여요.'),
+    R('장면에 나온 것만 고르기', SW('ctx_focus'), '켜면 아래 「늘 붙일 최근 것」은 늘 붙이고, 나머지는 지금 장면에 이름이 나온 것만 붙여요.'),
+    R('늘 붙일 최근 것', set([['게시글', N('ctx_recent_posts')], ['쪽지', N('ctx_recent_dms')]]), '「장면에 나온 것만 고르기」를 켰을 때 장면과 상관없이 붙이는 가장 새 글과 쪽지의 수예요.'),
     R('최대 양', set([['게시글', N('ctx_post_count')], ['글마다 댓글', N('ctx_comment_count')], ['쪽지', N('ctx_dm_count')], ['토큰 상한', N('ctx_tokens')]]), '토큰 상한을 넘는 것은 빼요.'),
   ].join(''));
 
@@ -236,7 +240,7 @@ export function shopTable(vars: State, busy = false): string {
   // 망상홈쇼핑 줄 (2026-11-13): 방송에서 생기는 것은 다른 가게와 달라 칸 셋(방송 내용·시청자 채팅·내 채팅)을 더한다. 주문은 「구매」 칸. 값은 core/hslog.ts ($hs_main·$hs_main_kinds·$hs_main_tokens)
   const hsRow = rows.find((r) => r.id === 'hs')!;
   const hm = hsMainSettings(v);
-  const HS_EXTRA: [HsLogKind, string][] = [['show', '방송 내용'], ['chat', '시청자 채팅'], ['say', '내 채팅']];
+  const HS_EXTRA: [HsLogKind, string][] = [['show', '방송 내용'], ['chat', '시청자 채팅'], ['say', '내 채팅'], ['aside', '스티커·상담원']];
   const hsCell = (k: HsLogKind) => hm.kinds.includes(k);
   const hsAct = (k: HsLogKind) => (hm.on ? `s:hs:main_hs_${k}=${hsCell(k) ? '0' : '1'}` : null);
   const attach: CkBand = { title: '메인 요청에 붙이는 것', groups: [
@@ -255,12 +259,16 @@ export function shopTable(vars: State, busy = false): string {
       ['맞춤 주문', '주문한 일, 완성된 일, 받은 물건이에요. 완성된 일은 우주 쇼핑몰 설정의 「완성 알림」이 「카드 + 메인 요청」일 때만 붙어요.'],
       ['방송 내용', '망상홈쇼핑에서 본 편성 제목, 상품, 진행자 대사예요.'],
       ['내 채팅', '방송 채팅에 내가 친 말과 거기에 돌아온 반응이에요.'],
+      ['스티커·상담원', '망상홈쇼핑에서 들춰 본 스티커 밑 글과 전화 주문 상담원의 말이에요.'],
+      ['진열', '사지 않은 물건까지 진열대 전체와, 진열과 함께 온 주인의 말이나 쇼핑몰 공지예요. 쇼핑몰은 진열을 받은 턴에만 붙어요.'],
     ]) };
   const numBox = (key: string, n: number, lo: number, hi: number, unit: string, label: string) => `<div class="st-step adv-step${stepSize(hi, unit, '제한 없음')}"><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.max(lo, n - 1)}" ${n <= lo || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 줄이기">−</button><input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" data-change="fam-num" data-key="${key}" value="${n === 0 ? '' : n}" placeholder="제한 없음" aria-label="최대 양 ${label}"${busy ? ' disabled' : ''}><span>${unit}</span><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.min(hi, n + 1)}" ${n >= hi || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 늘리기">+</button></div>`;
   const HT = HS_MAIN_SET.tokens;
-  const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [hsN, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, hsN)]]), helpBox('', [
+  const HU = HS_MAIN_SET.turns;
+  const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [hsN, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, hsN)], ['시청 기록', numBox('s:hs:main_turns', hm.turns, HU.lo, HU.hi, HU.unit, '시청 기록')]]), helpBox('', [
     ['대화', '「문의」와 「1:1 상담」으로 붙이는 대화의 줄 수예요. 넘으면 최근 줄만 붙여요.'],
     [hsN, '망상홈쇼핑에서 붙이는 것의 토큰 상한이에요. 넘으면 오래된 시청자 채팅부터 빼요.'],
+    ['시청 기록', '망상홈쇼핑 방송을 마지막으로 본 턴부터 몇 턴 동안 붙일지예요. 비우면 다음 편성을 받을 때까지 붙여요.'],
   ])));
   /* ── 1-2. 가게 표: 줄 = 가게 넷, 칸 = 넘길 내용 여섯 + 맥락 반영 (core/shopfn.ts) ── */
   const GIVE_OPTS = ['봇 설명', '작가 노트', '페르소나', '상시 로어북', '관련 로어북', '2차 참조', '맥락 반영'];
@@ -277,16 +285,17 @@ export function shopTable(vars: State, busy = false): string {
   /* ── 2. 기능마다 따로 정하는 값: 줄 = 진열·문의·1:1 상담·채팅 반응(망상홈쇼핑). 가게들이 한 값을 같이 쓴다 ($sh_fn_*) ── */
   const FL = SHOP_FNS.map((f) => nm('', f.label));
   const giveFn: CkBand = { title: '넘길 내용', groups: [{ name: '', opts: GIVE_OPTS, kind: 'check' }],
-    marks: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => (shopFnNone(f.key, k) ? null : shopFnOn(v, f.key, k)))),
-    acts: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => (shopFnNone(f.key, k) ? null : `s:shop:fn_${f.key}_${k}=${shopFnOn(v, f.key, k) ? '0' : '1'}`))),
-    foot: helpBox('가게 표와 기능 표에서 모두 켠 것만 넘겨요. 「–」는 그곳에 없는 값이에요.') };
-  const AMT = ['turns', 'refs'] as const;
+    marks: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => shopFnOn(v, f.key, k))),
+    acts: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => `s:shop:fn_${f.key}_${k}=${shopFnOn(v, f.key, k) ? '0' : '1'}`)),
+    foot: helpBox('가게 표와 기능 표에서 모두 켠 것만 넘겨요.') };
+  const AMT = ['turns', 'refs', 'talk'] as const;
   const amountFn: CkBand = { title: '넘길 양', groups: AMT.map((k) => ({ name: SHOP_AMOUNTS[k].label, opts: [SHOP_AMOUNTS[k].unit], kind: 'num' as const })),
-    marks: SHOP_FNS.map((f) => AMT.map((k) => ({ n: shopFnNum(v, f.key, k), lo: SHOP_AMOUNTS[k].min, hi: SHOP_AMOUNTS[k].max }))),
-    acts: SHOP_FNS.map((f) => AMT.map((k) => `s:shop:fn_${f.key}_${k}`)),
+    marks: SHOP_FNS.map((f) => AMT.map((k) => (shopAmountNone(f.key, k) ? null : { n: shopFnNum(v, f.key, k), lo: SHOP_AMOUNTS[k].min, hi: SHOP_AMOUNTS[k].max }))),
+    acts: SHOP_FNS.map((f) => AMT.map((k) => (shopAmountNone(f.key, k) ? null : `s:shop:fn_${f.key}_${k}`))),
     foot: helpBox('', [
       ['챗로그', '맥락 반영이 켜져 있을 때 넘기는 최근 턴의 수예요. 꺼져 있어도 관련 로어북을 고를 때는 이만큼 읽어요.'],
       ['참조 로어북', '관련 로어북과 2차 참조 가운데 넘기는 수예요.'],
+      ['지난 대화', '진열을 새로 받거나 문의할 때 같이 넘기는 지난 문의 대화의 줄 수예요. 넘으면 최근 줄만 넘겨요.'],
     ]) };
   const fnPart = `<h2 class="fam-h">기능마다 따로 정하는 값</h2><div class="fam-wide">${ckWide([giveFn], FL, busy)}${ckWide([amountFn], FL, busy)}</div>`;
 
@@ -301,6 +310,7 @@ export function shopTable(vars: State, busy = false): string {
     ]),
     R('다양성 강화', sw('diverse', s0.diverse), '켜면 싼 것, 비싼 것, 흔한 것, 특이한 것을 섞어 받아요.'),
     R('지난 목록 피하기', sw('prev', s0.avoidPrev), '켜면 지난번에 나온 물건을 다시 내지 않게 해요.'),
+    R('문의로 물건 바꾸기', sw('talkstock', s0.talkStock), '끄면 주인이나 운영자가 말로 물건을 더하거나 진열을 새로 짜지 않아요. 문의 요청에서 진열 규칙이 빠져 요청이 짧아져요. 값 흥정은 그대로 돼요.'),
   ].join(''));
   const note = blocked ? `<p class="gx-hint">${blocked === 'both' ? '소지품과 가계부가' : blocked === 'items' ? '소지품이' : '가계부가'} 꺼져 있어 기본 상점과 쇼핑몰 둘을 쓸 수 없어요. 산 물건은 소지품에, 돈은 가계부로 오가서 둘 다 켜져 있어야 해요.</p>` : '';
   /* ── 3. 기본 상점에만 있는 값: 거래 끊음 + (ui/settings.ts 가 잇는) 열리는 조건 ── */

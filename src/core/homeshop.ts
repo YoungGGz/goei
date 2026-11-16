@@ -3,7 +3,7 @@
 // 상품 줄·요청문·참고 자료는 상점(core/shop.ts)을 그대로 쓰고, 설정 값만 사이트 것($hs_sh_*, 우주몰·포인트몰과 같은 방식).
 // 여기는 순수 계산: 설정·저장 모양·응답 해석·동작 고르기. 화면은 ui/homeshop.ts, 그림은 host/homeshop.ts.
 import { expectOf, type PackSpec } from './datapack';
-import { lastBot, parseShelf, shopSettings, ShopError, SHOP_CTX_VAR, SHOP_SHARED_VARS, type ShopIdentity, type ShopItem, type ShopSettings } from './shop';
+import { costOf, findShopTag, lastBot, lineCells, parseLine, shopSettings, webSiteOfOwner, ShopError, SHOP_CTX_VAR, SHOP_SHARED_VARS, type ShopItem, type ShopSettings } from './shop';
 import type { Chat } from './types';
 import { userTurns, type PromptMessage } from './request';
 import { aliveAnchors } from './wallet';
@@ -17,6 +17,16 @@ export const HS_SITE = 'hs';
 /** 방송 이름·진행자 이름 (지침 「망상홈쇼핑」의 CHANNEL_NAME · HOST_NAME 절). 화면과 요청이 같은 절을 부를 때 읽는다 (2026-11-15 사용자) */
 export const hsName = (): string => guideTxt('Hs', 'CHANNEL_NAME');
 export const hsHost = (): string => guideTxt('Hs', 'HOST_NAME');
+/** 지금 방송에 닿을 수 있나 (2026-11-16 사용자: 접속 카드로만, 늘 열림은 설정).
+ *  설정 「인터넷에 상시 노출」이 켜져 있으면 늘. 꺼져 있으면(기본) 마지막 응답에 이 사이트의 접속 표식(`[shop: …|@web:hs]`)이 붙어 있을 때만 —
+ *  표식은 「상점 판단」이 응답마다 정하고 지난 응답 것은 지워지므로(core/shop.ts settleShop) 따로 기억하는 것이 없다 */
+export function hsReach(chat: Chat): boolean {
+  const s = hsSettings(chat.scriptstate);
+  if (!s.on) return false;
+  if (s.net) return true;
+  const tag = findShopTag(lastBot(chat)?.text ?? '');
+  return !!tag && webSiteOfOwner(tag.owner) === HS_SITE;
+}
 /** 편성 상태 (상품·큐시트·채팅·지금 부) */
 export const HS_VAR = '$hs_show';
 /** 「창을 열 때」 자동 호출: 마지막으로 편성을 받은 응답 */
@@ -121,7 +131,7 @@ export const HS_KEY = {
   clips: '$hs_clips', read: '$hs_read', scalePc: '$hs_scale_pc', scalePhone: '$hs_scale_ph',
   next: '$hs_next', turn: '$hs_turn', lock: '$hs_lock', left: '$hs_left',
   drop: '$hs_drop', dropRate: '$hs_drop_rate', dropFast: '$hs_drop_fast', dropStep: '$hs_drop_step', soonAt: '$hs_soon_at', endLo: '$hs_end_lo', endHi: '$hs_end_hi',
-  callLo: '$hs_call_lo', callHi: '$hs_call_hi', forms: '$hs_forms', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter',
+  callLo: '$hs_call_lo', callHi: '$hs_call_hi', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk',
 } as const;
 /** 숫자 칸 범위·기본값 (설정 화면과 읽기가 같이 쓴다) */
 export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: number; unit: string }> = {
@@ -154,13 +164,10 @@ export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: 
   callLo: { key: HS_KEY.callLo, lo: 1, hi: 60, def: 6, unit: '턴' },
   callHi: { key: HS_KEY.callHi, lo: 1, hi: 60, def: 12, unit: '턴' },
 };
-/** 출연 형태 기본 목록 (설정에서 고친다, 쉼표·줄바꿈으로 나눔) */
 /** 주문 전화번호 기본값 */
 export const HS_TEL_DEFAULT = '080-404-0000';
 /** 내 채팅을 읽는 동안 진행자 컷에서 대기와 번갈아 트는 동작 (이름은 영문·우리말 어느 쪽이든) */
 export const HS_READ_DEFAULT = '고개 꺾기, 굳은 응시';
-/** 출연 형태 기본값 (지침 「망상홈쇼핑」의 FORMS_DEFAULT 절, 호출 CALL 절의 {form} 으로 간다) */
-export const hsFormsDefault = (): string => guideTxt('Hs', 'FORMS_DEFAULT');
 export type HsAuto = 'manual' | 'open';
 export type HsScale = 'auto' | 'fit' | '0.5' | '1' | '2';
 export interface HsRules {
@@ -216,14 +223,14 @@ export interface HsSettings {
   /** 남은 수량 시작 값 */
   left: number;
   drop: HsDrop;
-  /** 할부 호출: 다음 호출까지 턴 [최소, 최대] · 출연 형태 목록 */
+  /** 시연 호출: 상자를 연 뒤 불려 가기까지 턴 [최소, 최대] */
   call: [number, number];
-  forms: string[];
-  /** 방청 신청 · 스티커 들추기 · 채팅 보내기 · 물건 맞교환 */
+  /** 방청 신청 · 스티커 들추기 · 채팅 보내기 · 물건 맞교환 · 상담원과 흥정 */
   aud: boolean;
   peek: boolean;
   say: boolean;
   barter: boolean;
+  talk: boolean;
 }
 /** 수 칸 하나를 적을 값. 최소·최대 줄(pair)이면 최소가 최대를 넘을 때 짝도 같이 맞춘다 (가게 표·게시판 표와 같은 방식, 전수검사 11-13) */
 export function hsNumVars(vars: Vars, k: string, raw: number, pair?: readonly [string, string]): Record<string, string> {
@@ -248,7 +255,7 @@ export function hsSettings(vars: Vars): HsSettings {
   const size: [number, number] = vars?.[hsKey('$sh_min')] === undefined && vars?.[hsKey('$sh_max')] === undefined ? [3, 5] : shop.size;
   return {
     on: vars?.[HS_KEY.on] !== '0',
-    net: vars?.[HS_KEY.net] !== '0',
+    net: vars?.[HS_KEY.net] === '1',
     auto: vars?.[HS_KEY.auto] === 'manual' ? 'manual' : 'open',
     shop: { ...shop, on: true, size, feature: false, kick: false },
     chat: pair(n(vars, 'chatMin'), n(vars, 'chatMax')),
@@ -271,11 +278,11 @@ export function hsSettings(vars: Vars): HsSettings {
     left: n(vars, 'left'),
     drop: { on: vars?.[HS_KEY.drop] !== '0', rate: n(vars, 'dropRate') / 100, fast: n(vars, 'dropFast') / 10, step: n(vars, 'dropStep'), soon: n(vars, 'soonAt'), end: pair(n(vars, 'endLo'), n(vars, 'endHi')) },
     call: pair(n(vars, 'callLo'), n(vars, 'callHi')),
-    forms: (() => { const f = String(vars?.[HS_KEY.forms] ?? '').split(/[,\n]/).map((x) => x.trim().slice(0, 30)).filter(Boolean); return f.length ? f : hsFormsDefault().split(',').map((x) => x.trim()); })(),
     aud: vars?.[HS_KEY.aud] !== '0',
     peek: vars?.[HS_KEY.peek] !== '0',
     say: vars?.[HS_KEY.say] !== '0',
     barter: vars?.[HS_KEY.barter] !== '0',
+    talk: vars?.[HS_KEY.talk] !== '0',
   };
 }
 
@@ -318,13 +325,15 @@ export interface HsCue {
 export interface HsPart {
   item: ShopItem;
   cues: HsCue[];
-  /** 스티커를 들췄을 때 보이는 한 줄 (진실 보장 없음) */
-  peek?: string;
+  /** 무이자 할부: 값 대신 채널에 출연하는 횟수 (상품 줄의 출연 칸, 없으면 출연으로는 안 판다). 원 값은 item.price (0 이면 돈으로는 안 판다) */
+  inst?: number;
+  /** 방송에서 정말 매진됐다 (큐시트의 sold 줄이 나온 뒤). 다시 열어도 매진 그대로, 주문을 받지 않는다 (11-15 사용자) */
+  out?: true;
   /** 이 부가 방송되는 동안 흐르는 시청자 채팅 (11-12 사용자: 상품마다) */
   chat?: HsChatLine[];
 }
-/** 전화 주문 상담원의 말 (편성과 같이 받는다) */
-export interface HsOps { hello: string; done: string; barter: string }
+/** 전화 주문 상담원의 말 (편성과 같이 받는다): 전화를 받을 때 · 값이나 출연으로 주문이 확정될 때. 맞교환·흥정은 상담원 요청이 따로 (operatorPrompt) */
+export interface HsOps { hello: string; done: string }
 export interface HsChatLine { nick: string; text: string }
 export interface HsShow {
   loaded: boolean;
@@ -345,15 +354,23 @@ export interface HsShow {
 export const emptyShow = (): HsShow => ({ loaded: false, key: '', title: '', parts: [], chat: [], at: 0, prev: [] });
 
 const CUT_IN: [RegExp, CueCut][] = [[/^(a|와이드|wide|전체|스튜디오)/i, 'A'], [/^(b|바스트|bust|정면|진행자)/i, 'B'], [/^(c|상품|클로즈|close|product)/i, 'C'], [/^(d|전화|call|phone)/i, 'D']];
-function eventOf(cell: string): { ev: CueEvent; n?: number } {
-  const s = cell.replace(/\s+/g, '').toLowerCase();
+/** 화면 사건 칸 → 사건. 매진은 칸 전체가 매진 낱말(sold·sold out·매진·완판)과 똑같을 때만 받는다:
+ *  낱말 일부만 맞춰 「곧 매진」「매진 직전」「nearly sold out」까지 매진으로 읽던 것을 막는다 (11-15 사용자: 매진이 거의 모든 상품에 뜬다).
+ *  다른 사건은 잘못 켜져도 주문을 막지 않으므로 전처럼 낱말이 들어 있으면 받는다 */
+const EVENT_EXACT = new Map<string, Exclude<CueEvent, '' | 'left'>>(
+  (Object.keys(CUE_EVENT_WORD) as Exclude<CueEvent, ''>[]).filter((k): k is Exclude<CueEvent, '' | 'left'> => k !== 'left').flatMap((k) => [[CUE_EVENT_WORD[k], k], [CUE_EVENT_LABEL[k].replace(/\s+/g, ''), k]] as [string, Exclude<CueEvent, '' | 'left'>][]),
+);
+export function eventOf(cell: string): { ev: CueEvent; n?: number } {
+  const s = cell.replace(/[\s"'`「」『』\[\]()]+/g, '').toLowerCase();
   if (!s || s === '-') return { ev: '' };
+  const exact = EVENT_EXACT.get(s) ?? (s === 'soldout' || s === '완판' ? 'sold' : '');
+  if (exact) return { ev: exact };
+  if (/sold|매진|완판/.test(s)) return { ev: '' };
   const left = /(?:left|남은수량|수량)[-−–]?(\d+)/.exec(s);
   if (left) return { ev: 'left', n: Math.max(1, Math.min(99, Number(left[1]))) };
   if (/price|가격/.test(s)) return { ev: 'price' };
   if (/rush|폭주/.test(s)) return { ev: 'rush' };
   if (/soon|임박/.test(s)) return { ev: 'soon' };
-  if (/sold|매진|완판/.test(s)) return { ev: 'sold' };
   if (/call|phone|전화/.test(s)) return { ev: 'call' };
   if (/tear|찢김|신호|끊김/.test(s)) return { ev: 'tear' };
   if (/look|stare|응시|시선|쳐다/.test(s)) return { ev: 'look' };
@@ -362,14 +379,18 @@ function eventOf(cell: string): { ev: CueEvent; n?: number } {
 /** 큐 한 줄 「컷|표정|대사|화면 사건」. 대사가 없으면 null */
 export function parseCue(line: string, moods: Map<string, string>): HsCue | null {
   const cells = line.split('|').map((x) => x.trim());
+  // 줄 끝에 「|」를 하나 더 붙인 줄: 빈 끝 칸은 버린다 (사건 낱말이 대사로 밀리지 않게)
+  while (cells.length > 3 && !cells[cells.length - 1]) cells.pop();
   if (cells.length < 3) return null;
-  const text = clean(cells[2], 160);
+  // 대사 안에 「|」가 섞이면 칸이 밀린다: 사건은 늘 맨 끝 칸, 그 사이는 모두 대사
+  const ev = cells.length >= 4 ? cells[cells.length - 1] : '';
+  const text = clean(cells.slice(2, cells.length >= 4 ? -1 : undefined).join(' '), 160);
   if (!text) return null;
   const cut = CUT_IN.find(([re]) => re.test(cells[0]))?.[1] ?? 'B';
   // 그림 묶음이 아직 안 왔으면(표정 표가 비었으면) 낱말 그대로 두고 재생 때 찾는다 (moodName)
   const word = cells[1].replace(/\s+/g, '').toLowerCase();
   const mood = moods.get(word) ?? (moods.size ? 'talk' : word || 'talk');
-  return { cut, mood, text, ...eventOf(cells[3] ?? '') };
+  return { cut, mood, text, ...eventOf(ev) };
 }
 /** 저장된 표정(동작 이름 또는 그림이 늦어 남은 낱말) → 동작 이름 */
 export const moodName = (mood: string, moods: Map<string, string>): string => moods.get(mood.replace(/\s+/g, '').toLowerCase()) ?? (moods.size ? 'talk' : mood);
@@ -384,15 +405,36 @@ export function moodMap(pack: Pick<HsPack, 'cuts'> | null): Map<string, string> 
 }
 
 export class HsError extends ShopError {}
-const hsIdentity = (): ShopIdentity => ({ sells: hsName(), never: '', prices: '' });
 function block(raw: string, tag: string): string {
   const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}\\s*>`, 'i').exec(raw);
   return m ? m[1].trim() : '';
 }
-export interface ShowReply { title: string; items: Omit<ShopItem, 'id'>[]; cues: HsCue[][]; chat: HsChatLine[]; chats: HsChatLine[][]; peeks: string[]; ops: HsOps }
+export interface ShowReply { title: string; items: Omit<ShopItem, 'id'>[]; insts: number[]; cues: HsCue[][]; chat: HsChatLine[]; chats: HsChatLine[][]; ops: HsOps }
+/** 상품 줄 「이름|값|쓰임|그림|무게|설명|효과|출연|진실」 → 물건 + 출연 횟수. 값은 원(없으면 「-」), 출연은 정수(없으면 「-」). 둘 다 없으면 null.
+ *  값 칸에 「무이자 N회」처럼 횟수가 오면 출연으로 읽는다 (원 값 0 = 돈으로는 안 판다. 공짜가 되지 않게). 원이 아닌 대가 글은 받지 않는다 — 그런 대가는 상담원이 흥정에서 정한다 */
+export function hsLine(line: string): { item: Omit<ShopItem, 'id'>; inst: number } | null {
+  const cells = lineCells(line);
+  if (cells.length < 2) return null;
+  const inPrice = /\d+\s*회|시연/.exec(cells[1] ?? '');
+  const c7 = (cells[7] ?? '').trim();
+  const inst = inPrice || /^(o|○|yes|y)$/i.test(c7) || Number(/\d+/.exec(c7)?.[0] ?? 0) > 0 ? 1 : 0;
+  const price = inPrice ? 0 : costOf(cells[1] ?? '')?.price ?? 0;
+  const c = [...cells];
+  c[1] = String(price);
+  c[7] = '';
+  const it = parseLine(c.join('|'));
+  if (!it || (price <= 0 && inst <= 0)) return null;
+  const { pay: _p, tag: _t, was: _w, ...rest } = it;
+  // 진실 칸이 비면 「아무도 모름」(?)으로: 광고 문구가 사실처럼 남지 않게 (우주몰과 같음)
+  return { item: rest.truth ? rest : { ...rest, truth: '?' }, inst };
+}
 /** 편성 응답: <title> · <shelf>(상점 줄) · <cue>(「#n」 아래 그 상품의 큐 줄) · <chat>(「#n」 아래 그 상품 동안의 닉|말) */
 export function parseShow(raw: string, moods: Map<string, string>): ShowReply {
-  const shelf = parseShelf(raw, hsIdentity());
+  const shelfText = block(raw, 'shelf');
+  if (!shelfText) throw new HsError(guideTxt('Shop', 'ERROR_NO_SHELF'));
+  const rows = shelfText.split('\n').map(hsLine).filter((x): x is NonNullable<ReturnType<typeof hsLine>> => !!x);
+  if (!rows.length) throw new HsError(guideTxt('Shop', 'ERROR_NO_ITEMS', { line: guideTxt('Hs', 'LINE') }));
+  const shelf = { items: rows.map((r) => r.item) };
   const cueText = block(raw, 'cue');
   if (!cueText) throw new HsError(guideTxt('Hs', 'ERR_NO_CUE'));
   const cues: HsCue[][] = [];
@@ -414,11 +456,9 @@ export function parseShow(raw: string, moods: Map<string, string>): ShowReply {
   const items = shelf.items.slice(0, cues.length || shelf.items.length);
   if (items.some((_, i) => !cues[i]?.length)) throw new HsError(guideTxt('Hs', 'ERR_CUE_LINES', { n: shelf.items.length }));
   const { shared: chat, parts: chats } = parseChat(block(raw, 'chat'));
-  // 번호 머리('#3', '3.', '3)')만 뗀다. 구분 기호 없는 앞 숫자('3번 접으면')·소수('3.5배')는 글이라 둔다 (전수검사 11-13)
-  const peeks = block(raw, 'peek').split('\n').map((x) => clean(x.replace(/^\s*(?:[#＃]\s*\d+\s*[.)|:]?|\d+\s*[.)|:](?!\d))\s*/, ''), 80)).filter(Boolean);
   const opLine = (re: RegExp) => clean(block(raw, 'operator').split('\n').map((x) => re.exec(x)?.[1] ?? '').find(Boolean) ?? '', 120);
-  const ops: HsOps = { hello: opLine(/^\s*(?:인사|hello)\s*[|:]\s*(.+)$/i), done: opLine(/^\s*(?:확정|done)\s*[|:]\s*(.+)$/i), barter: opLine(/^\s*(?:맞교환|barter)\s*[|:]\s*(.+)$/i) };
-  return { title: clean(block(raw, 'title'), 40), items, cues: cues.slice(0, items.length), chat, chats: chats.slice(0, items.length), peeks, ops };
+  const ops: HsOps = { hello: opLine(/^\s*(?:인사|hello)\s*[|:]\s*(.+)$/i), done: opLine(/^\s*(?:확정|done)\s*[|:]\s*(.+)$/i) };
+  return { title: clean(block(raw, 'title'), 40), items, insts: rows.slice(0, items.length).map((r) => r.inst), cues: cues.slice(0, items.length), chat, chats: chats.slice(0, items.length), ops };
 }
 
 /** 채팅 줄 「닉|말」. 「#n」 머리 아래 줄은 그 부의 것, 머리 앞 줄은 공용.
@@ -447,7 +487,7 @@ let seq = 0;
 const itemId = (key: string, i: number) => `ms${(Date.now() % 1e9).toString(36)}${(seq++).toString(36)}_${i}_${key.slice(-4)}`;
 /** 받은 편성을 상태로 (지금 부는 처음부터) */
 export function applyShow(st: HsShow, r: ShowReply, key: string): HsShow {
-  const parts = r.items.map((it, i) => ({ item: { ...it, id: itemId(key, i) }, cues: r.cues[i], ...(r.peeks?.[i] ? { peek: r.peeks[i] } : {}), ...(r.chats?.[i]?.length ? { chat: r.chats[i] } : {}) }));
+  const parts = r.items.map((it, i) => ({ item: { ...it, id: itemId(key, i) }, cues: r.cues[i], ...(r.insts?.[i] ? { inst: r.insts[i] } : {}), ...(r.chats?.[i]?.length ? { chat: r.chats[i] } : {}) }));
   return { loaded: true, key, title: r.title, parts, chat: r.chat, at: 0, prev: [...st.prev, ...st.parts.map((p) => p.item.name)].slice(-24), ...(r.ops ? { ops: r.ops } : {}), tk: key };
 }
 
@@ -470,7 +510,7 @@ export function readShow(vars: Vars): HsShow {
       chat: lines(j.chat),
       at: Math.max(0, Math.min(parts.length, Math.floor(Number(j.at) || 0))),
       prev: Array.isArray(j.prev) ? j.prev.map(String).slice(-24) : [],
-      ...(j.ops && typeof j.ops === 'object' ? { ops: { hello: String(j.ops.hello ?? ''), done: String(j.ops.done ?? ''), barter: String(j.ops.barter ?? '') } } : {}),
+      ...(j.ops && typeof j.ops === 'object' ? { ops: { hello: String(j.ops.hello ?? ''), done: String(j.ops.done ?? '') } } : {}),
       ...(typeof j.tk === 'string' ? { tk: j.tk } : {}),
     };
   } catch {
@@ -479,8 +519,38 @@ export function readShow(vars: Vars): HsShow {
 }
 export const showVars = (st: HsShow): Record<string, string> => ({ [HS_VAR]: JSON.stringify(st) });
 
-/** 할부 회차: 값 칸의 글(「무이자 10회」)에서 숫자. 없으면 0 */
-export const installments = (it: Pick<ShopItem, 'pay'>): number => Number(/(\d+)\s*회/.exec(it.pay ?? '')?.[1] ?? 0);
+/** 상품 값 글 (방송 가격판·편성 카드·시청 기록·채팅 반응 요청이 같이 쓴다): 지침 「망상홈쇼핑」의 PAY_BOTH · PAY_WON · PAY_APPEAR 절 */
+export function hsPayText(part: Pick<HsPart, 'item' | 'inst'>): string {
+  const won = part.item.price > 0 ? part.item.price.toLocaleString('en-US') : '';
+  const n = part.inst ?? 0;
+  return won && n ? guideTxt('Hs', 'PAY_BOTH', { won }) : won ? guideTxt('Hs', 'PAY_WON', { won }) : n ? guideTxt('Hs', 'PAY_APPEAR') : '';
+}
+
+/** FNV-1a (같은 상품이면 늘 같은 조각) */
+function fnv(t: string): number {
+  let h = 2166136261;
+  for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+  return h;
+}
+/** 상품마다 다른 스티커 (11-15 사용자: 전부 같은 방향으로만 모서리가 들린다): 들리는 모서리 · 젖혀지는 정도(1 = 가장 많이) · 붙인 기울기(도). seed = 상품 id (다시 열어도 같다) */
+export type StickerCorner = 'br' | 'bl' | 'tr' | 'tl';
+export function stickerLook(id: string): { corner: StickerCorner; lim: number; tilt: number } {
+  const h = fnv(`stk:${id}`);
+  return { corner: (['br', 'bl', 'tr', 'tl'] as const)[h % 4], lim: [0.66, 0.78, 0.9, 1][(h >>> 3) % 4], tilt: (((h >>> 6) % 9) - 4) * 0.5 };
+}
+/** 스티커를 들추면 보이는 숨은 효과(진실) 몇 글자 (11-15 사용자: 원래 효과의 일부 문자만 살짝).
+ *  어절 하나에서 시작해 cap 글자 안에서 이웃 어절을 붙인다. 진실이 없거나 아무도 모르면(?) 빈 글. seed = 상품 id (다시 열어도 같은 조각) */
+export function peelFragment(truth: string | undefined, seed: string, cap: number): string {
+  const t = String(truth ?? '').replace(/\s+/g, ' ').trim();
+  if (!t || t === '?' || cap <= 0) return '';
+  const words = t.split(' ');
+  const cand = words.map((w, k) => (Array.from(w).length >= 2 ? k : -1)).filter((k) => k >= 0);
+  const pool = cand.length ? cand : words.map((_, k) => k);
+  const i = pool[fnv(seed) % pool.length];
+  let j = i + 1;
+  while (j < words.length && Array.from(words.slice(i, j + 1).join(' ')).length <= cap) j++;
+  return Array.from(words.slice(i, j).join(' ')).slice(0, cap).join('');
+}
 
 // ── 동작 고르기 (재생 규칙. 기본값은 그림/홈쇼핑/homeshop.json 과 HS_NUM, 전부 설정에서 고친다) ──
 
@@ -576,7 +646,9 @@ export function nextDrop(left: number, end: number, rest: { ms: number; planned:
 
 // ── 주문·할부 장부·택배 상자·방청 (설계 8-4 ~ 8-10) ──
 // 할부는 물건이 아니라 사람에게 붙는 장부다 (11-09 사용자: 물건에 붙이면 쓰거나 버릴 때 의무도 사라진다). 가계부는 건드리지 않는다.
-// 호출 턴은 주문 때 미리 뽑아 적는다. 「몇 회 냈나」는 저장하지 않고 지금 턴 수로 센다 — 응답을 지우거나 다시 굴리면 저절로 되돌아간다 (가계부 방식).
+// 받는 법 (2026-11-16 사용자): 주문하면 그 자리에서 미개봉 택배 상자가 소지품에 들어온다. 그 턴의 메인 요청에 받는 법(ARRIVE)을 한 번 넘긴다.
+// 계약은 상자를 열 때 맺어진다 (로어북: 여는 사람이 산 사람). 출연 호출 턴은 주문 때가 아니라 열 때 뽑아 적는다. 안 연 상자에는 출연이 걸리지 않는다.
+// 「몇 회 냈나」는 저장하지 않고 지금 턴 수로 센다 — 응답을 지우거나 다시 굴리면 저절로 되돌아간다 (가계부 방식).
 
 export const HS_ORDERS_VAR = '$hs_orders';
 export const HS_AUD_VAR = '$hs_aud';
@@ -585,15 +657,19 @@ export interface HsOrder {
   id: string;
   /** 상품 (상자를 열면 소지품에 들어갈 것) */
   item: Omit<ShopItem, 'id' | 'sold' | 'soldKey' | 'tag' | 'was' | 'orig'>;
-  /** 할부 회차 (맞교환이면 0) */
+  /** 출연 횟수 (무이자 할부. 출연이 걸리지 않은 결제면 0) */
   n: number;
-  /** 맞교환으로 낸 물건 이름 */
-  barter?: string;
+  /** 치른 것 전부 (주문 조회·본편 기록 글. 지침 ORDER_* 절로 만든다) */
+  how: string;
+  /** 결제 방법: 원 값 · 출연 · 상담원과 정한 조건(맞교환·흥정) */
+  pay: HsPay;
   /** 주문한 응답 키 (그 응답이 지워지면 주문도 없던 일) · 주문 때 턴 */
   anchor: string;
   turn: number;
-  /** 불려 가는 턴들 (n 개, 오름차순) */
+  /** 불려 가는 턴들 (n 개, 오름차순). 상자를 열 때 뽑는다 — 열기 전에는 빈 목록 */
   dues: number[];
+  /** 상담원과 맺은 조건 (상자·물건의 결제 글을 만들 때 쓴다) */
+  terms?: HsTerms;
   /** 소지품의 택배 상자 id · 연 응답 키 */
   boxId: string;
   openKey?: string;
@@ -602,7 +678,7 @@ export function readOrders(vars: Vars): HsOrder[] {
   try {
     const arr: unknown = JSON.parse(String(vars?.[HS_ORDERS_VAR] ?? '') || '[]');
     if (!Array.isArray(arr)) return [];
-    return arr.filter((o): o is HsOrder => !!o && typeof o === 'object' && typeof (o as HsOrder).id === 'string' && !!(o as HsOrder).item && typeof (o as HsOrder).item.name === 'string' && Array.isArray((o as HsOrder).dues));
+    return arr.filter((o): o is HsOrder => !!o && typeof o === 'object' && typeof (o as HsOrder).id === 'string' && !!(o as HsOrder).item && typeof (o as HsOrder).item.name === 'string' && Array.isArray((o as HsOrder).dues)).map((o) => ({ ...o, how: String(o.how ?? ''), pay: o.pay ?? 'appear' }));
   } catch {
     return [];
   }
@@ -610,6 +686,8 @@ export function readOrders(vars: Vars): HsOrder[] {
 export const ordersVars = (list: HsOrder[]): Record<string, string> => ({ [HS_ORDERS_VAR]: list.length ? JSON.stringify(list.slice(-HS_ORDERS_MAX)) : '' });
 /** 살아 있는 주문 (주문한 응답이 남아 있는 것) */
 export const liveOrders = (vars: Vars, alive: Set<string>): HsOrder[] => readOrders(vars).filter((o) => !o.anchor || alive.has(o.anchor));
+/** 이 응답 뒤에 주문해 상자가 들어온 주문이 있나 (그 턴의 메인 요청에 받는 법 ARRIVE 를 한 번 붙인다. 같은 턴에 열어 버렸어도 들어온 것은 들어온 것) */
+export const boxLanded = (vars: Vars, lastKey: string, alive: Set<string>): boolean => !!lastKey && liveOrders(vars, alive).some((o) => o.anchor === lastKey);
 /** 낸 회차: 예정 턴이 지금 턴 이하인 것 */
 export const paidOf = (o: HsOrder, turnNow: number): number => o.dues.filter((d) => d <= turnNow).length;
 /** 상자를 열었나 (연 응답이 살아 있을 때만) */
@@ -627,15 +705,61 @@ export function scheduleDues(taken: number[], turn: number, n: number, gap: [num
   }
   return out;
 }
+/** 결제 방법 (11-15 사용자: 비싼 값을 치르거나, 다른 물건으로 치르거나, 상담원과 흥정하거나, 출연으로 때우거나) */
+export type HsPay = 'won' | 'appear' | 'barter' | 'talk';
+/** 상담원이 내놓은 조건: 원 · 가져갈 내 물건(id·이름) · 출연 횟수 · 그 밖의 대가 글 */
+export interface HsTerms { money: number; items: { id: string; name: string }[]; appear: number; other: string }
+/** 조건 → 치른 것 글 (지침 ORDER_WON · ORDER_BARTER · ORDER_INSTALLMENT · ORDER_OTHER, ORDER_JOIN 으로 잇는다). money=false 면 원 몫은 뺀다 (물건에 원 값이 따로 붙을 때) */
+export function termsText(t: HsTerms, money = true): string {
+  const parts = [
+    money && t.money > 0 ? guideTxt('Hs', 'ORDER_WON', { won: t.money.toLocaleString('en-US') }) : '',
+    t.items.length ? guideTxt('Hs', 'ORDER_BARTER', { gave: t.items.map((x) => x.name).join(', ') }) : '',
+    t.appear > 0 ? guideTxt('Hs', 'ORDER_INSTALLMENT') : '',
+    t.other ? guideTxt('Hs', 'ORDER_OTHER', { other: t.other }) : '',
+  ].filter(Boolean);
+  return parts.join(` ${guideTxt('Hs', 'ORDER_JOIN').trim() || '+'} `);
+}
+/** 상담원 응답: <operator> 말 + <terms> 조건 (「none」이면 조건 없음). 물건 이름은 내민 물건 가운데서만 찾는다 (모르는 이름은 버림). 값의 크기는 거르지 않는다 — 판단은 상담원(모델) 몫 */
+export function parseOperator(raw: string, offered: { id: string; name: string }[]): { line: string; terms: HsTerms | null } {
+  const line = clean(block(raw, 'operator'), 300);
+  if (!line) throw new HsError(guideTxt('Hs', 'ERR_NO_OPERATOR'));
+  const body = block(raw, 'terms');
+  if (!body || /^\s*(none|없음|-)\s*$/i.test(body)) return { line, terms: null };
+  const t: HsTerms = { money: 0, items: [], appear: 0, other: '' };
+  const key = (n: string) => n.replace(/\s+/g, '').toLowerCase();
+  for (const l of body.split('\n')) {
+    const m = /^\s*[-*•]?\s*(money|돈|원|items?|물건|demo|시연|appear|출연|other|기타)\s*[|:：]\s*(.+)$/i.exec(l);
+    if (!m) continue;
+    const k = m[1].toLowerCase();
+    const v = m[2].trim();
+    if (/^(money|돈|원)$/.test(k)) t.money = costOf(v)?.price ?? 0;
+    else if (/^(demo|시연|appear|출연)$/.test(k)) t.appear = /^(no|none|x|0|-|없음)$/i.test(v) ? 0 : 1;
+    else if (/^(other|기타)$/.test(k)) t.other = clean(v, 60);
+    else for (const n of v.split(/[;；,、]/)) {
+      const hit = offered.find((o) => key(o.name) === key(n.replace(/[「」『』"']/g, '')));
+      if (hit && !t.items.some((x) => x.id === hit.id)) t.items.push(hit);
+    }
+  }
+  return { line, terms: t.money || t.items.length || t.appear || t.other ? t : null };
+}
 const boxName = (name: string) => guideTxt('Hs', 'BOX_NAME', { name }).slice(0, 30);
-/** 새 주문 (장부 줄 + 상자 정보). 상자 물건은 부른 쪽이 소지품에 넣고 boxId 를 채운다 */
-export function newOrder(chat: Chat, item: ShopItem, s: Pick<HsSettings, 'call'>, barter = '', rnd: () => number = Math.random): HsOrder {
-  const alive = aliveAnchors(chat);
-  const turn = userTurns(chat);
-  const n = barter ? 0 : installments(item);
-  const taken = liveOrders(chat.scriptstate, alive).flatMap((o) => o.dues);
+/** 새 주문 (장부 줄). 상자 물건은 부른 쪽이 소지품에 넣고 boxId 를 채운다. 출연 호출 턴은 상자를 열 때 뽑는다(openOrder) */
+export function newOrder(chat: Chat, item: ShopItem, pay: HsPay, terms: HsTerms): HsOrder {
   const { id: _id, sold: _s, soldKey: _k, tag: _t, was: _w, orig: _o, ...rest } = item;
-  return { id: `ho_${item.id}`, item: rest, n, ...(barter ? { barter } : {}), anchor: lastBot(chat)?.key ?? '', turn, dues: scheduleDues(taken, turn, n, s.call, rnd), boxId: '' };
+  return { id: `ho_${item.id}`, item: rest, n: terms.appear ? 1 : 0, how: termsText(terms), pay, terms, anchor: lastBot(chat)?.key ?? '', turn: userTurns(chat), dues: [], boxId: '' };
+}
+/** 상자를 연 주문: 연 응답 키를 적고, 출연이 걸렸으면 이제 호출 턴을 뽑는다 (다른 연 주문의 호출 턴과 겹치지 않게) */
+export function openOrder(chat: Chat, o: HsOrder, s: Pick<HsSettings, 'call'>, openKey: string, rnd: () => number = Math.random): HsOrder {
+  const alive = aliveAnchors(chat);
+  const taken = liveOrders(chat.scriptstate, alive).filter((x) => x.id !== o.id && orderOpened(x, alive)).flatMap((x) => x.dues);
+  return { ...o, openKey, dues: scheduleDues(taken, userTurns(chat), o.n, s.call, rnd) };
+}
+/** 상자에 적는 결제 글 (출연은 뺀다: 상자를 열기 전에는 걸리지 않는다) · 연 물건에 적는 결제 글 (전부) */
+export function orderPaid(o: HsOrder, opened: boolean): string {
+  const t = o.terms;
+  if (!t) return '';
+  const rest = termsText(opened ? t : { ...t, appear: 0 }, false);
+  return rest ? guideTxt('Hs', 'ORDER_PAID', { how: rest }) : hsName();
 }
 /** 택배 상자 물건 (이름·설명 글은 지침 「망상홈쇼핑」의 BOX_NAME·BOX_DESC 절) */
 export const HS_BOX = { name: boxName, get desc(): string { return guideTxt('Hs', 'BOX_DESC'); }, icon: 'cardboard box' };
@@ -657,10 +781,12 @@ export function readAudience(vars: Vars): HsAudience | null {
 
 /** 본편에 넘기는 글의 머리 (지침 「망상홈쇼핑」의 BLOCK_HEAD 절). 이미 넣었는지도 이 머리로 본다 */
 const blockHead = (): string => guideTxt('Hs', 'BLOCK_HEAD');
-/** 지금 턴에 불려 가는 주문 (예정 턴 = 지금 턴). 여러 건이어도 하나 */
+/** 지금 턴에 불려 가는 주문 (예정 턴 = 지금 턴). 여러 건이어도 하나. 상자를 연 주문만 (안 연 상자에는 출연이 걸리지 않는다) */
 export function callNow(chat: Chat): { order: HsOrder; nth: number } | null {
   const t = userTurns(chat);
-  for (const o of liveOrders(chat.scriptstate, aliveAnchors(chat))) {
+  const alive = aliveAnchors(chat);
+  for (const o of liveOrders(chat.scriptstate, alive)) {
+    if (!orderOpened(o, alive)) continue;
     const i = o.dues.indexOf(t);
     if (i >= 0) return { order: o, nth: i + 1 };
   }
@@ -674,9 +800,7 @@ export function homeshopBlock(chat: Chat): string {
   const lines: string[] = [];
   const call = callNow(chat);
   if (call && g.CALL) {
-    const { order: o, nth } = call;
-    const form = s.forms[(o.id.length + nth * 7 + o.turn) % s.forms.length];
-    lines.push(fillGuide(g.CALL, { item: o.item.name, nth: String(nth), total: String(o.n), left: String(o.n - nth), form }));
+    lines.push(fillGuide(g.CALL, { item: call.order.item.name }));
   }
   const aud = readAudience(chat.scriptstate);
   if (aud && s.aud && g.AUDIENCE && aud.anchor === (lastBot(chat)?.key ?? '')) lines.push(fillGuide(g.AUDIENCE, { no: aud.no, name: aud.name }));

@@ -31,6 +31,38 @@ const ANSWERED = [
   [' Empty comments is [] only for a quiet thread.', ''],
   [' do not copy identical counts or treat every topic as a silent thread.', ' do not copy identical counts.'],
   [' Zero comments is valid for an individual quiet post, not a default for every topic.', ''],
+  // 11-15 사용자: 관전 방은 참여 인물마다 하나 (같은 인물들이면 이어 쓰고, 다르면 새 방)
+  ['Do not repeat earlier output; when previousRoom is given, continue from it and reuse its identities and names where they still fit.', 'Do not repeat earlier output. rooms, when given, lists the existing view-only rooms of this kind with their recent messages. A room belongs to its participants: output with the same participants as a listed room is appended to that room, so continue from where that room stopped and keep its participant names exactly as listed. Output with different participants becomes a separate new room.'],
+  // 11-15 토큰 낭비 정리: 새로고침에서 남긴 글은 번호·조회·추천·새 댓글만 돌려받는다(나머지는 저장본을 씀), 글의 time 칸(date 와 겹침)과 위키 여는 태그의 asset_src(읽는 곳 없음)는 쓰게 하지 않는다
+  [" Protected records may exceed the maximum; preserve their IDs, authors, titles, bodies, dates, ownership and comment ancestry verbatim.", " Protected records may exceed the maximum; keep each one by returning its saved ID (the application restores its author, title, body, date, ownership and saved comments)."],
+  ["On retained posts, keep all saved comments in order and append plausible NEW NPC comments; view/vote increases follow elapsed time and readership. Never edit or delete saved text.", "On retained posts, return only plausible NEW NPC comments, never the saved ones; view/vote increases follow elapsed time and readership. Saved text cannot be edited or deleted."],
+  [" 1-based index. Every new post/comment is NPC-authored", " 1-based index. On a retained post, saved comments keep their 1-based positions from the persisted board and NEW comments are numbered after them (saved count + 1 onward): parent=0, a saved position or an earlier NEW number. Every new post/comment is NPC-authored"],
+  ["Each posts item must be a complete object, including retained posts: author, title, time, date and content are JSON strings", "Each NEW posts item must be a complete object: author, title, date and content are JSON strings"],
+  [" Copy retained fields verbatim rather than omitting them.", " A retained post is only {id, views, upvotes, comments}, where id is its saved ID and comments holds NEW comments only: do not copy its author, title, date, content, tag or saved comments."],
+  ["\"time\":\"14:27\",", ""],
+  ["\"time\":\"14:20\",", ""],
+  ["every post (new or retained) also has \"tag\"", "every NEW post also has \"tag\""],
+  [" Reuse labels already used on the board when they fit; supplied tags on retained posts are records, never change them.", " Reuse labels already used on the board when they fit. A retained post keeps its saved tag; return a tag for it only when it has none."],
+  ["Keep asset_src=\"\". ", ""],
+  [" asset_src=\"\"", ""],
+  // 11-15 사용자(토큰 낭비 점검): 관전 출력의 반응 칸은 따로 절(VIEW.REACTIONS)로 — 이모지 반응이 꺼져 있거나 혼잣말이면 요청하지 않는다. 저장 상한(말풍선 수·글자 수)을 지침에 적는다
+  [',"reactions":"-"}]}.', '}]}.'],
+  [' reactions is "-" or space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants.', ' At most 30 messages; each text content at most 600 characters.'],
+  ['OUTPUT CONTRACT\nReturn exactly {"name":"room name"', 'EMOJI REACTIONS\nA text message in the output may also carry "reactions": space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants. Omit it when there are none.\n\nOUTPUT CONTRACT\nReturn exactly {"name":"room name"'],
+  // 11-16 인수 검토: 남긴 글의 말머리 두 절이 부딪치던 것, 다양성 강화가 쓰는 벌 설명(확률 낮은 벌)
+  ["do not copy its author, title, date, content, tag or saved comments.", "do not copy its author, title, date, content, saved tag or saved comments."],
+  ["{id, views, upvotes, comments}, where id is its saved ID", "{id, views, upvotes, comments}, plus tag only where the post category rule asks for one; id is its saved ID"],
+  ["uses alternativePosts, the second candidate.", "uses the board with the lower probability."],
+  // 11-16 사용자: 상점 주인은 주인공 자료(신분·최근 본문)를 읽은 사람이 아니다
+  ["The protagonist is the player. Write everything in Korean unless told otherwise. Prices are in Korean won", "The protagonist is the player. The material about the protagonist (identity, recent story) is for you as the writer: the owner has not read it and knows only what happens in the shop, what the protagonist says or shows there, and what the story has already shown this owner to know. Write everything in Korean unless told otherwise. Prices are in Korean won"],
+  // 11-16 사용자: 우주몰 운영자도 주인공 자료를 읽은 것이 아니다
+  ["The \"owner\" is the 운영자. Buying is a bank transfer", "The \"owner\" is the 운영자. The material about the protagonist (identity, recent story) is for you as the writer: the 운영자 has not read it and knows the customer only by what they type and buy on this page. Buying is a bank transfer"],
+  // 11-16 사용자: 포인트몰 1:1 상담도 본편 맥락을 받는다. 상담사는 그걸 읽은 사람이 아니다
+  ["sees the counselor only as the code name on [손님에게 보이는 호칭]. Text chat only. Write in Korean.", "sees the counselor only as the code name on [손님에게 보이는 호칭]. Text chat only. The material about the customer under [주인공 신분], [상태창 — 지금 시각·장소], [진행 중 괴이·사건] and [최근 본문] is for you as the writer: the counselor has not read it and knows the customer only as the account under [손님] and by what they type in this chat. Write in Korean."],
+  // 11-16 사용자: 포인트몰 공지도 주인공 자료를 아는 것처럼 쓰지 않는다
+  ["There is no shopkeeper or chat; the \"owner\" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty.", "There is no shopkeeper or chat; the \"owner\" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty. The material about the protagonist (identity, recent story) is for you as the writer: the mall page does not know it, and the notice never refers to the customer or to what they are going through."],
+  // 11-15 사용자: 같은 말 되풀이 줄이기. 상태창 이어 쓰기 안내는 직전 상태 블록에서 한 번만 (다시 물을 때의 분석 지시는 11-16 사용자 결정으로 원문 그대로)
+  [' block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.', ' block just before the latest user input; follow the note in that block.'],
 ];
 const moved = Object.entries(OLD.sections).flatMap(([file, list]) => list.map(([name, body]) => ({ file, name, body })));
 
@@ -59,8 +91,15 @@ test('기본 지침으로 만든 요청문 = 옮기기 전 코드가 만들던 �
   const ABOUT = OLD.calls['gnet.refresh.gn'].match(/## About the board\\n.*?(?=\\n)/)[0];
   const TAGS = OLD.calls['shop.talk.cos.secret'].match(/\\n구분: leave empty.*?(?=\\n)/)[0];
   const SECRET = OLD.calls['shop.shelf.cos.mix'].match(/\\nFor this mall the 설명 column.*?(?=\\n)/)[0];
+  // 11-15 토큰 낭비 정리: 댓글·글 하나 새로고침의 「다른 글 활동」에서 작업 대상 글은 본문·댓글을 빼고 번호·제목·수치만 넘긴다 (작업 입력에 이미 있음)
+  const ACT_TARGET = OLD.calls['gnet.comment'].match(/\{\\"id\\":100001,[^{}]*\\"comments\\":\[\{[^{}]*\}\],\\"commentCount\\":1,\\"commentsAllowed\\":false\}/)[0];
   // 옮긴 뒤 사용자 지시로 고친 지침 문장 (2026-11-13 소모·장착 판정): 옛 요청문에 같은 고침을 입혀 견준다. 그 밖의 글자는 그대로여야 한다
   const LATER = [
+    [ACT_TARGET, '{\\"id\\":100001,\\"author\\":\\"글쓴이\\",\\"title\\":\\"복도 불빛\\",\\"date\\":\\"2025.01.01 10:00\\",\\"views\\":3,\\"upvotes\\":1,\\"commentCount\\":1,\\"commentsAllowed\\":false}'],
+    // 11-15 토큰 낭비 정리: 새로고침에 넘기는 게시판 글에서 time 칸을 뺌 (date 와 겹침)
+    ['\\"time\\":\\"10:00\\",\\"date\\"', '\\"date\\"'],
+    // 11-15 토큰 낭비 정리: 쪽지 답장의 공개 글 참고에서 원글(PUBLIC ORIGIN 에 이미 실림)은 본문을 뺌
+    ['\\"date\\":\\"2025.01.01 10:00\\",\\"content\\":\\"3층 복도 불이 깜빡인다\\",\\"comments\\":[{\\"id\\"', '\\"date\\":\\"2025.01.01 10:00\\",\\"comments\\":[{\\"id\\"'],
     ['장비 (worn or carried on the body: clothes, armor, bags, accessories)', '장비 (worn or strapped on the body: clothes, armor, bags, accessories; not something merely kept in a pocket or bag)'],
     ['소모N (used up; N is how many uses this one item holds, judged from what it is and how it is sold)', '소모N (anything spent by using it — medicine, dressings, food and drink, ammunition, tape, batteries, single-use talismans — must be 소모N; N is how many uses this one item holds, counting everything in a set or pack, judged from what it is and how it is sold)'],
     // 전수검사 11-13: 괴담넷 보호 글은 최대 개수에 안 센다(코드와 맞춤)

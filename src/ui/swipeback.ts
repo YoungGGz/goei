@@ -20,7 +20,8 @@ function inSideScroller(el: Element | null, root: HTMLElement): boolean {
   return false;
 }
 
-export function bindSwipeBack(root: HTMLElement, step: (dir: -1 | 1) => (() => void) | null): void {
+/** boxSel = 쓸 때 손가락을 따라 밀리는 칸 (상황판은 본문, 설정 창은 설정 본문) */
+export function bindSwipeBack(root: HTMLElement, step: (dir: -1 | 1) => (() => void) | null, boxSel = '.gx-content'): void {
   if (bound.has(root)) return;
   bound.add(root);
   let x0 = 0;
@@ -57,7 +58,7 @@ export function bindSwipeBack(root: HTMLElement, step: (dir: -1 | 1) => (() => v
       sign = dx > 0 ? 1 : -1;
       if (!act) return void (mode = 'off');
       mode = 'back';
-      box = root.querySelector<HTMLElement>('.gx-content');
+      box = root.querySelector<HTMLElement>(boxSel);
     }
     if (box) {
       const d = Math.max(0, Math.min(dx * sign * 0.6, 120));

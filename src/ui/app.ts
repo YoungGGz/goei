@@ -527,6 +527,7 @@ function ensureRoot(): HTMLElement {
     // 보고서 팝업은 상태(rec.view)로 떠 있으니 뒤로 처리로 닫는다
     if (document.querySelector('.gx-rptpop')) return void handle('rec-back');
     if (view.kind === 'started' && tab === 'items' && (itemsUi.open || itemsUi.mode === 'add')) return void handle('items-close');
+    if (view.kind === 'started' && tab === 'phone' && phone.pop) return void handle('ph-pop-close');
     // 우주 쇼핑몰 질문 창 (11-09 사용자: 팝업창처럼 Esc·바깥 누름으로 닫힘)
     if (view.kind === 'started' && inBrowser() && mallAskOpen(curTab().site)) return void handle('mall-ask-close');
     if (view.kind === 'started' && inBrowser() && isBoardSite(curTab().site) && gnetDmOpen()) return void handle('gn-dm-close');
@@ -615,7 +616,7 @@ function panelInput(el: HTMLInputElement): void {
   }
   if (el?.dataset?.input === 'items-q' && view.kind === 'started' && root) return itemsInput(root, view.ctx, el.value);
   if (el?.dataset?.input === 'shop-say') return shopInput(el.value);
-  if (el?.dataset?.input === 'hs-say') return void homeshopInput(el.value);
+  if (el?.dataset?.input === 'hs-say' || el?.dataset?.input === 'hs-op') return void homeshopInput(el.value, el.dataset.input);
   if (el?.dataset?.input === 'mall-say') { const ms = curTab().site; if (isMallSite(ms)) mallInput(ms, el.value); return; }
   if (el?.dataset?.input === 'rec-q' && view.kind === 'started') {
     // 기록 › 일지 찾기: 목록만 다시 그린다 (입력칸 포커스 유지)
@@ -936,7 +937,7 @@ async function handle(action: string, value?: string): Promise<void> {
     // 시작 뒤엔 이 채팅 값. 시작 전엔 기능 페이지가 열려 있지 않아도 기능 동작(pp-·ph-·wiki-·hs-·ms-)이 이 채팅에 닿게 한다
     const cut = (value ?? '').indexOf('|');
     const inner = cut > 0 ? (value ?? '').slice(0, cut) : '';
-    if (!/^(pp-set|ph-cfg|wiki-(auto|model|auto_title)|fam-set|hs-(cfg|retry)|ms-cfg|adv-set|set-(asset|asset-model|shop-on|shop-model|shop-judge|wallet-on|inv-on))$/.test(inner)) return;
+    if (!/^(pp-set|ph-cfg|wiki-(auto|model)|fam-set|hs-(cfg|retry)|ms-cfg|adv-set|set-(asset|asset-model|shop-on|shop-model|shop-judge|wallet-on|inv-on))$/.test(inner)) return;
     if (!(view.kind === 'started' || (view.kind === 'picker' && pickerPrefs))) return;
     const keep = { scope: settingsUi.scope, page: settingsUi.page };
     if (view.kind === 'started') settingsUi.scope = 'chat';
@@ -1681,7 +1682,25 @@ function render(): void {
   root.querySelectorAll<HTMLElement>('[data-sh-log]').forEach((el) => (el.scrollTop = el.scrollHeight));
   labelSwitches(root);
   bindMapZoom(root);
-  bindMbar(root, () => void run('close'));
+  const setDrawer = (open: boolean) => {
+    if (cdrOpen === open) return;
+    cdrOpen = open;
+    syncDrawer();
+  };
+  bindMbar(root, () => void run('close'), setDrawer);
+  // 펼친 서랍 줄을 아래로 쓸어도 닫힌다
+  const cpanel = root.querySelector<HTMLElement>('.gx-cpanel');
+  if (cpanel) {
+    let y0: number | null = null;
+    cpanel.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+    cpanel.addEventListener('pointermove', (e) => {
+      if (y0 === null || e.clientY - y0 < 18) return;
+      y0 = null;
+      setDrawer(false);
+    });
+    cpanel.addEventListener('pointerup', () => { y0 = null; });
+    cpanel.addEventListener('pointercancel', () => { y0 = null; });
+  }
   bindDrawer(root);
   bindWikiSide(root, (v) => void run('wiki-list', v));
   bindFootnotes(root);
@@ -1789,6 +1808,7 @@ function navStep(dir: -1 | 1): (() => void) | null {
   if (view.kind !== 'started') return null;
   if (evUi.pop && dir < 0) return () => void run('ev-pop', evUi.pop);
   if (agUi.pop && dir < 0) return () => void run('agent-info', agUi.pop);
+  if (tab === 'phone' && phone.pop && dir < 0) return go('ph-pop-close');
   if (!navHist.can(dir)) return null;
   return () => {
     const s = navHist.go(dir);
@@ -1998,7 +2018,8 @@ function mobileBar(item: NavItem, unreadPhone: boolean, ctx: ChatContext | null,
   return drawer ? commonDrawer(ctx) + bar : bar;
 }
 
-/** 폰 공용 서랍: 바 위 가운데 납작한 손잡이(48×8, 바와 같은 색). 누르면 인터넷 사이트 전부와 설정이 두 줄(4개씩)로 올라온다
+/** 폰 공용 서랍: 바 위 가운데 납작한 손잡이(48×8, 바와 같은 색)는 표시일 뿐 눌리지 않는다 (그 자리를 눌러도 뒤의 기능바가 눌린다).
+ *  하단 바를 위로 쓸면 인터넷 사이트 전부와 설정이 올라오고, 바나 서랍 줄을 아래로 쓸면 내려간다 (11-15 사용자: 손잡이가 작고 기능바와 붙어 잘못 눌렸다)
  *  (2026-11-08 사용자: 인터넷 하나를 두지 말고 하위 사이트를 다 꺼내 둔다. 누르면 그 사이트 탭으로) */
 function commonDrawer(ctx: ChatContext | null): string {
   const here = inBrowser() ? curTab().site : null;
@@ -2052,7 +2073,7 @@ function browserBody(ctx: ChatContext): string {
   const page = br.list && isPhone() ? tabListHtml(o)
     : !t.site ? homeHtml(browserSites(ctx))
     : isBoardSite(t.site) ? gnetTab(ctx, gnetEnv, t.site)
-    : isMallSite(t.site) ? mallTab(ctx, wikiEnv, t.site)
+    : isMallSite(t.site) ? mallTab(ctx, wikiEnv, t.site, shown)
     : t.site === 'hs' ? homeshopTab(ctx, wikiEnv)
     : t.site === 'wk' ? wikiTab(ctx, wikiEnv)
     : soonHtml(t.site);

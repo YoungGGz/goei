@@ -53,11 +53,33 @@ test('고유 상점 표식: 인터넷 접속이면 사이트 표식으로 바꾸
   assert.equal(readShop(web.vars)?.shop ?? '', '', '기본 상점 방문은 열지 않음');
   // 직접 간 팝업스토어 = 기본 상점창
   assert.equal(readShop(settleShop(chat('[shop: 우주 쇼핑몰|]'), 1).vars).shop, '우주 쇼핑몰');
-  // 포인트몰은 직접 가면 열지 않음, 표에 없는 사이트 접속도 지움
-  for (const t of ['[shop: 백일몽 포인트몰|]', '[shop: 아무 몰|@web]']) {
-    const r = settleShop(chat(t), 1);
-    assert.ok(!r?.message?.[1]?.data.includes('[shop:'), t);
+  // 표에 없는 사이트 접속은 지움
+  assert.ok(!settleShop(chat('[shop: 아무 몰|@web]'), 1)?.message?.[1]?.data.includes('[shop:'));
+  // 인터넷 전용 가게(사이트 있음, 직접 가면 쓸 창 없음)는 모델이 매장으로 적어도, 이름을 다르게 적어도, 주인 칸이 무엇이든 접속 표식으로 바로잡는다 (2026-11-16 사용자)
+  for (const [t, site, name] of [
+    ['[shop: 백일몽 포인트몰|]', 'bm', '백일몽 포인트몰'],
+    ['[shop: 임직원 복지몰|]', 'bm', '백일몽 포인트몰'],
+    ['[shop: 백일몽 복지몰 매장|김 대리]', 'bm', '백일몽 포인트몰'],
+    ['[shop: 망상홈쇼핑|레드 프라이데이]', 'hs', '망상홈쇼핑'],
+    ['[shop: 망상 홈쇼핑 쇼룸|]', 'hs', '망상홈쇼핑'],
+  ]) {
+    const r = settleShop(chat(t), 1, ['김 대리']);
+    const fixed = findShopTag(r.message[1].data);
+    assert.deepEqual([fixed.shop, fixed.owner], [name, `@web:${site}`], t);
+    assert.equal(readShop(r.vars)?.shop ?? '', '', `${t}: 기본 상점 방문은 열지 않음`);
   }
+  // 이름이 들어 있어도 직접 가는 창이 있는 가게(우주 쇼핑몰)는 그대로 기본 상점 창, 상관없는 가게는 고유 상점으로 보지 않음
+  assert.equal(readShop(settleShop(chat('[shop: 우주 쇼핑몰 팝업스토어|]'), 1).vars).shop, '우주 쇼핑몰 팝업스토어');
+  assert.equal(ownShopOf({}, '임직원 복지몰').id, 'bm');
+  assert.equal(ownShopOf({}, '쇼핑몰 지하상가'), null);
+  assert.equal(ownShopOf({}, '몰'), null);
+  // 한 글자 별칭은 들어 있나로 보지 않고, 여러 줄이 걸리면 가장 긴 이름이 맞은 줄
+  const table = { [SHOP_OWN_VAR]: JSON.stringify([{ id: 'a', on: true, name: '몰', alias: '', web: 'cos', visit: '' }, { id: 'b', on: true, name: '복지', alias: '', web: 'cos', visit: '' }, { id: 'c', on: true, name: '복지몰', alias: '', web: 'bm', visit: '' }]) };
+  assert.equal(ownShopOf(table, '쇼핑몰'), null);
+  assert.equal(ownShopOf(table, '임직원 복지몰').id, 'c');
+  // 사이트도 창도 없는 줄은 전처럼 열지 않음
+  const none = { [SHOP_OWN_VAR]: JSON.stringify([{ id: 'n', on: true, name: '없는 가게', alias: '', web: '', visit: '' }]) };
+  assert.ok(!settleShop(chat('[shop: 없는 가게|]', none), 1)?.message?.[1]?.data.includes('[shop:'));
   // 편의점은 표와 상관없이 그대로
   assert.equal(readShop(settleShop(chat('[shop: 편의점|]'), 1).vars).shop, '편의점');
   // 같은 표식을 다시 정리해도 바뀌지 않는다

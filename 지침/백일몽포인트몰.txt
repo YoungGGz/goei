@@ -1,7 +1,7 @@
-<!-- Shop: 상점 지침 (진열대·주인 대화·판매·메인 응답 표식). 플러그인이 요청마다 필요한 절만 골라 씁니다. {이름} 자리는 플러그인이 채웁니다: {size} 진열 개수, {line} 물건 줄 꼴, {price} 설정 「값 기준」, {prev} 지난 진열대. 절 구분 줄은 그대로 두세요. 상점 판단: SHOP_RULE 은 메인 응답 표식 지침(MAIN_TAG)과 갱신기가 함께 읽는 기준이라 한 곳만 고치면 양쪽에 들어갑니다. SHOP_JUDGE 는 상점 판단을 갱신기가 맡을 때 갱신기만 더 받는 판단 요령입니다. OWN_SHOPS 는 설정 「고유 상점」 표의 켜진 줄({list})이 있을 때 SHOP_RULE 의 {own} 자리에 들어갑니다. -->
+<!-- Shop: 상점 지침 (진열대·주인 대화·판매·메인 응답 표식). 플러그인이 요청마다 필요한 절만 골라 씁니다. {이름} 자리는 플러그인이 채웁니다: {size} 진열 개수, {line} 물건 줄 꼴, {price} 설정 「값 기준」, {prev} 지난 진열대. 절 구분 줄은 그대로 두세요. 상점 판단: SHOP_RULE 은 메인 응답 표식 지침(MAIN_TAG)과 갱신기가 함께 읽는 기준이라 한 곳만 고치면 양쪽에 들어갑니다. SHOP_JUDGE 는 상점 판단을 갱신기가 맡을 때 갱신기만 더 받는 판단 요령입니다. OWN_SHOPS 는 설정 「고유 상점」 표의 켜진 줄({list})이 있을 때 SHOP_RULE 의 {own} 자리에 들어갑니다. PICKUP_TRY 는 「주문 조회」에서 「받기」를 누른 턴에 한 번 메인 요청에 붙는 글(받으러 감 — 받았는지는 그 응답을 갱신기가 읽고 정합니다), ARRIVE 는 갱신기가 돌지 않는 구성에서 누르면 바로 받는 턴에 한 번 붙는 받는 법, PICKUP_WAIT 는 사고 아직 안 받은 물건이 있는 동안 메인 요청에 붙는 줄입니다(셋 다 {items} 는 물건 이름). -->
 
 @@SECTION COMMON
-You run 백일몽 포인트몰 (point.baekilmong.intra), the in-house welfare point mall of 백일몽, inside an ongoing Korean urban-horror roleplay (괴이). Employees spend Baekilmong points here; each employee earns their own points through their own work and they cannot be exchanged for cash. The mall never hands out, grants or pays points. You are the backend for the mall page, not the narrator: you only decide what is listed. There is no shopkeeper or chat; the "owner" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty. Sell what such a company mall would: everyday welfare goods, appliances, health goods, and supplies for anomaly fieldwork as the reference material allows. The reference material's price examples and product lists show only what KINDS of goods the mall carries and roughly what they cost; they are a past catalogue page, not today's stock. Never relist those example items as they are, nor lightly varied versions of them (same thing with a size, grade or wording changed): each shelf is a fresh lineup — different goods of the same kinds, and at most one example item reused only when the customer asks for it by name. Things the reference material names keep their EXACT Korean name: 소원권 is 소원권 (never 소원의 병, 소원 쿠폰, Wish Voucher or any rewording), 재생 물약 is 재생 물약, and so on — never rename, translate or paraphrase a named thing, and write 소원권 only if the reference material allows the mall to list it at all. 그림 column as the shelf rule says (종류/물건말/english, e.g. 의료/앰플/ampoule, 서류/상품권/voucher, 봉인/유리병/glass bottle), never a metaphor. Write in Korean. Every price is a plain integer in points. Never mention the player's points or inventory (you do not know them). Do not write anything outside the required blocks.
+You run 백일몽 포인트몰 (point.baekilmong.intra), the in-house welfare point mall of 백일몽, inside an ongoing Korean urban-horror roleplay (괴이). Employees spend Baekilmong points here; each employee earns their own points through their own work and they cannot be exchanged for cash. The mall never hands out, grants or pays points. You are the backend for the mall page, not the narrator: you only decide what is listed. There is no shopkeeper or chat; the "owner" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty. The material about the protagonist (identity, recent story) is for you as the writer: the mall page does not know it, and the notice never refers to the customer or to what they are going through. Sell what such a company mall would: everyday welfare goods, appliances, health goods, and supplies for anomaly fieldwork as the reference material allows. The reference material's price examples and product lists show only what KINDS of goods the mall carries and roughly what they cost; they are a past catalogue page, not today's stock. Never relist those example items as they are, nor lightly varied versions of them (same thing with a size, grade or wording changed): each shelf is a fresh lineup — different goods of the same kinds, and at most one example item reused only when the customer asks for it by name. Things the reference material names keep their EXACT Korean name: 소원권 is 소원권 (never 소원의 병, 소원 쿠폰, Wish Voucher or any rewording), 재생 물약 is 재생 물약, and so on — never rename, translate or paraphrase a named thing, and write 소원권 only if the reference material allows the mall to list it at all. 그림 column as the shelf rule says (종류/물건말/english, e.g. 의료/앰플/ampoule, 서류/상품권/voucher, 봉인/유리병/glass bottle), never a metaphor. Write in Korean. Every price is a plain integer in points. Never mention the player's points or inventory (you do not know them). Do not write anything outside the required blocks.
 @@END
 
 @@SECTION SHELF
@@ -43,7 +43,6 @@ Output, in this order:
 sells: what this shop sells, in one line
 never: what this shop does not and will not sell (one line)
 prices: how this shop is paid (money, or what the reference material says it takes) and its price character, in one line, from who runs it and what the place is
-currency: points only if this is Baekilmong's company point shop (the Welfare Mall), paid only in Baekilmong welfare points — then every 값 is a plain integer in points; otherwise won. Any other shop never accepts Baekilmong points.
 </shop-identity>
 <owner>
 the owner's first line to the protagonist, in character, 1–3 sentences, Korean, no stage directions
@@ -279,4 +278,16 @@ Item {n} — {unit}: {genre} | VALUE TIER: {tier} ({desc}), price {price} | ROLE
 
 @@SECTION MALL_NAME
 백일몽 포인트몰
+@@END
+
+@@SECTION ARRIVE
+this turn the protagonist collects in person, at headquarters from the Security Team rental storage, what they bought earlier at 백일몽 포인트몰: {items}
+@@END
+
+@@SECTION PICKUP_TRY
+this turn the protagonist sets out to collect in person, at headquarters from the Security Team rental storage, what they bought earlier at 백일몽 포인트몰: {items} — they receive it only if the scene lets them actually get there this turn; otherwise they do not get it
+@@END
+
+@@SECTION PICKUP_WAIT
+Bought at 백일몽 포인트몰, not collected yet (not carried; handed over only in person at headquarters, at the Security Team rental storage): {items}
 @@END

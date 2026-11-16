@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const out = await build({ stdin: { contents: `export * from './src/core/index'; export * from './src/core/malls'; export * from './src/core/shopctx'; export { emptyShop, stampLastLine } from './src/core/shop';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false, logLevel: 'silent' });
+const out = await build({ stdin: { contents: `export * from './src/core/index'; export * from './src/core/malls'; export * from './src/core/shopctx'; export { emptyShop, stampLastLine, turnKey } from './src/core/shop';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false, logLevel: 'silent' });
 const M = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 const { SHOP_PLACES, SHOP_MAIN_ALL, SHOP_MAIN_KINDS, SHOP_MAIN_LABEL, shopMainKey, shopMain, shopMainLines, capLines, boughtPasses, soldPasses, inventoryText, mallEvents, shopEvents } = M;
 
@@ -51,7 +51,8 @@ const MARK = {
   '우주 문의(판 것)': [/just sold 여분 정장 to 우주 쇼핑몰/, 'cos', 'ask'],
   '우주 맞춤 주문(선납)': [/placed a custom order with 우주 쇼핑몰 for 「가림 내의」/, 'cos', 'order'],
   '우주 맞춤 주문(받은 것)': [/just bought[^;\n]*맞춤 장갑/, 'cos', 'order'],
-  '포인트몰 구매': [/just bought[^;\n]*복지 텀블러/, 'bm', 'buy'],
+  // 포인트몰에서 산 것은 「주문 조회」에서 받은 턴에 받는 법 줄로 간다 (2026-11-16 사용자: 받는 것은 회사에서) — 「방금 삼」에는 안 오른다
+  '포인트몰 구매': [/collects in person[^;\n]*백일몽 포인트몰: [^;\n]*복지 텀블러/, 'bm', 'buy'],
   '포인트몰 1:1 상담': [/counselor on the 백일몽 포인트몰 1:1 상담/, 'bm', 'desk'],
   '포인트몰에 판 것': [/just sold 낡은 사원증 to 백일몽 포인트몰/, 'bm', null],
 };
@@ -60,8 +61,8 @@ const present = (text) => Object.fromEntries(Object.entries(MARK).map(([n, [re]]
 
 test('이름·변수: 가게마다 있는 종류, 변수 이름, 화면 이름', () => {
   assert.deepEqual(SHOP_PLACES, ['shop', 'cos', 'bm']);
-  assert.deepEqual(SHOP_MAIN_KINDS, { shop: ['buy', 'sell', 'ask'], cos: ['buy', 'ask', 'order'], bm: ['buy', 'desk'] });
-  assert.deepEqual(SHOP_MAIN_ALL.map((k) => SHOP_MAIN_LABEL[k]), ['구매', '팔기', '문의', '맞춤 주문', '1:1 상담']);
+  assert.deepEqual(SHOP_MAIN_KINDS, { shop: ['buy', 'sell', 'ask', 'shelf'], cos: ['buy', 'ask', 'order', 'shelf'], bm: ['buy', 'desk', 'shelf'] });
+  assert.deepEqual(SHOP_MAIN_ALL.map((k) => SHOP_MAIN_LABEL[k]), ['구매', '팔기', '문의', '맞춤 주문', '1:1 상담', '진열']);
   assert.equal(shopMainKey('shop'), '$sh_main');
   assert.equal(shopMainKey('shop', 'sell'), '$sh_main_sell');
   assert.equal(shopMainKey('cos'), '$cos_sh_main');
@@ -76,12 +77,13 @@ test('기본값: 전부 켬 — 전과 같이 다 붙는다', () => {
   const text = inventoryText(scene());
   for (const [n, on] of Object.entries(present(text))) assert.equal(on, true, `${n}\n${text}`);
   assert.match(text, ALWAYS);
-  for (const p of SHOP_PLACES) { const m = shopMain({}, p); assert.equal(m.on, true); for (const k of SHOP_MAIN_KINDS[p]) assert.equal(m.has(k), true); }
+  // 「진열」만 기본 끔 (전에는 메인 요청에 가지 않던 것)
+  for (const p of SHOP_PLACES) { const m = shopMain({}, p); assert.equal(m.on, true); for (const k of SHOP_MAIN_KINDS[p]) assert.equal(m.has(k), k !== 'shelf'); }
 });
 
 test('가게 × 칸 전부: 칸 하나를 끄면 그 칸이 다스리는 것만 빠지고 나머지는 그대로', () => {
   let n = 0;
-  for (const p of SHOP_PLACES) for (const k of SHOP_MAIN_KINDS[p]) {
+  for (const p of SHOP_PLACES) for (const k of SHOP_MAIN_KINDS[p].filter((x) => x !== 'shelf')) {
     const text = inventoryText(scene({ [shopMainKey(p, k)]: '0' }));
     for (const [name, [re, mp, mk]] of Object.entries(MARK)) assert.equal(re.test(text), !(mp === p && mk === k), `${p}·${k} 끔 → ${name}\n${text}`);
     assert.match(text, ALWAYS, '산 곳이 안 적힌 것은 거르지 않는다');
@@ -105,7 +107,7 @@ test('「컨텍스트 포함」을 끄면 그 가게 것이 전부 빠지고 다
     // 꺼져 있어도 종류마다 켜 둔 값은 그대로 남는다 (다시 켜면 돌아온다)
     const m = shopMain({ [shopMainKey(p)]: '0' }, p);
     assert.equal(m.on, false);
-    for (const k of SHOP_MAIN_KINDS[p]) { assert.equal(m.kinds[k], true); assert.equal(m.has(k), false); }
+    for (const k of SHOP_MAIN_KINDS[p]) { assert.equal(m.kinds[k], k !== 'shelf'); assert.equal(m.has(k), false); }
   }
 });
 
@@ -193,4 +195,84 @@ test('산 것·판 것 가르기: 산 곳이 안 적힌 것, 「…에 팖」이
   assert.equal(soldPasses({ $cos_sh_main_ask: '0' }, '우주 쇼핑몰', true), false);
   assert.equal(soldPasses({ $bm_sh_main_buy: '0', $bm_sh_main_desk: '0' }, '백일몽 포인트몰', true), true);
   assert.equal(soldPasses({ $bm_sh_main: '0' }, '백일몽 포인트몰', true), false);
+});
+
+// ── 「진열」 칸 (기본 끔): 사지 않은 물건까지 진열대 전체 · 진열과 함께 온 주인 말 · 쇼핑몰 공지 ──
+const thing = (id, name, price, more = {}) => ({ id, name, price, desc: '', effect: '', use: false, ...more });
+/** scene 에 진열대를 채운 장면: 기본 상점(물건 둘 + 팔린 것 하나), 우주 쇼핑몰·포인트몰(이 턴에 받은 진열과 공지) */
+function shelfScene(extra = {}, at = {}) {
+  const c = scene();
+  const shop = { ...M.readShop(c.scriptstate), items: [thing('s1', '손도끼', 32000, { desc: '날이 선 것', effect: '문을 부순다' }), thing('s2', '머리카락 부적', 0, { pay: '머리카락 한 줌', truth: '숨긴 진짜 효과' }), thing('s3', '이미 산 것', 1, { sold: true })] };
+  const cos = { ...M.readMall(c.scriptstate, 'cos'), items: [thing('m1', '우주 담요', 120000, { desc: '은박', effect: '체온 유지' })] };
+  const bm = { ...M.readMall(c.scriptstate, 'bm'), loaded: true, items: [thing('b1', '복지 우산', 900)] };
+  const turn = M.turnKey(c);
+  return { ...c, scriptstate: { ...c.scriptstate, ...M.shopVars(shop), ...M.mallVarsOf('cos', cos), ...M.mallVarsOf('bm', bm), $cos_shop_note: '오늘만 특가!', $bm_shop_note: '점검 안내', $cos_shop_at: turn, $bm_shop_at: turn, ...at, ...extra } };
+}
+const SHELF_MARK = {
+  shop: /the shelf of 철물점 now offers these, not bought — 손도끼 \(32,000 won\): 날이 선 것, effect: 문을 부순다; 머리카락 부적 \(머리카락 한 줌\)/,
+  cos: /the 우주 쇼핑몰 website now lists these, not bought — 우주 담요 \(120,000 won\): 은박, effect: 체온 유지/,
+  bm: /the 백일몽 포인트몰 website now lists these, not bought — 복지 우산 \(900 Baekilmong points\)/,
+};
+
+test('진열: 기본은 끔 — 진열대·공지는 메인 요청에 붙지 않는다 (전과 같다)', () => {
+  const text = inventoryText(shelfScene());
+  for (const re of Object.values(SHELF_MARK)) assert.doesNotMatch(text, re);
+  assert.doesNotMatch(text, /손도끼|우주 담요|복지 우산|오늘만 특가|점검 안내/);
+  assert.equal(text, inventoryText(scene()), '진열대가 있든 없든 글이 같다');
+});
+
+test('진열: 가게마다 켜면 그 가게의 진열대(안 팔린 것만, 숨긴 효과 없이)와 공지가 붙는다', () => {
+  for (const p of SHOP_PLACES) {
+    const text = inventoryText(shelfScene({ [shopMainKey(p, 'shelf')]: '1' }));
+    for (const [q, re] of Object.entries(SHELF_MARK)) assert.equal(re.test(text), p === q, `${p} 켬 → ${q}\n${text}`);
+    assert.doesNotMatch(text, /이미 산 것 \(|숨긴 진짜 효과/);
+    assert.equal(/front page of the 우주 쇼핑몰 website reads: "오늘만 특가!"/.test(text), p === 'cos');
+    assert.equal(/front page of the 백일몽 포인트몰 website reads: "점검 안내"/.test(text), p === 'bm');
+    // 그 가게의 「컨텍스트 포함」을 끄면 같이 빠진다
+    const off = inventoryText(shelfScene({ [shopMainKey(p, 'shelf')]: '1', [shopMainKey(p)]: '0' }));
+    assert.doesNotMatch(off, SHELF_MARK[p]);
+  }
+});
+
+test('진열: 쇼핑몰은 진열을 받은 턴에만 붙는다 (지난 턴에 받은 진열은 다시 안 붙는다)', () => {
+  const on = { $cos_sh_main_shelf: '1', $bm_sh_main_shelf: '1' };
+  const old = inventoryText(shelfScene(on, { $cos_shop_at: 't:old', $bm_shop_at: '' }));
+  assert.doesNotMatch(old, SHELF_MARK.cos);
+  assert.doesNotMatch(old, SHELF_MARK.bm);
+  assert.doesNotMatch(old, /오늘만 특가|점검 안내/);
+});
+
+test('진열: 기본 상점에서 진열과 함께 받은 주인 대사는 말을 걸지 않은 턴에도 붙는다 (켠 때만)', () => {
+  const c = shelfScene();
+  const st = { ...M.readShop(c.scriptstate), talk: [{ who: 'owner', text: '어서 오쇼, 천천히 보쇼.' }] };
+  const vars = { ...c.scriptstate, ...M.shopVars(st) };
+  const SAID = /the owner of 철물점 said on showing the shelf: "어서 오쇼, 천천히 보쇼\."/;
+  assert.doesNotMatch(shopEvents({ ...c, scriptstate: vars }).join('\n'), SAID, '기본 끔');
+  assert.match(shopEvents({ ...c, scriptstate: { ...vars, $sh_main_shelf: '1' } }).join('\n'), SAID);
+  // 말을 걸었으면 「문의」가 대화째 넘기므로 따로 붙이지 않는다
+  const spoke = shopEvents({ ...shelfScene({ $sh_main_shelf: '1' }) }).join('\n');
+  assert.doesNotMatch(spoke, /said on showing the shelf/);
+  assert.match(spoke, /talked with the owner of 철물점/);
+});
+
+test('망상홈쇼핑 전화 주문·맞교환: 그 턴에는 「새로 산 것」「This turn」 줄만 가고 최근 기록에 되풀이되지 않는다. 다음 턴부터는 최근 기록에 남는다', () => {
+  const message = [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '옛', chatId: 'c0' }, { role: 'user', data: 'b', chatId: 'u2' }, { role: 'char', data: '본문', chatId: 'c1' }];
+  const base = { message, scriptstate: {} };
+  const alive = M.aliveAnchors(base);
+  let it = { list: [], log: [] };
+  it = M.addItem(it, alive, { name: '낡은 우산', desc: '', effect: '', use: false, from: 'story', anchor: 'c0' });
+  it = M.sellItem(it, it.list.find((e) => e.name === '낡은 우산').id, 'c1', '망상홈쇼핑 맞교환');
+  it = M.addItem(it, alive, { name: '택배 상자 A', desc: '', effect: '', use: false, from: 'store', store: 'hs', anchor: 'c1' });
+  // 다른 가게에서 산 것은 건드리지 않는다
+  it = M.addItem(it, alive, { name: '철물 손전등', desc: '', effect: '', use: false, from: 'store', store: 'shop', anchor: 'c1' });
+  const vars = { ...M.itemsVars(it), $it_push: '1' };
+  const now = inventoryText({ message, scriptstate: vars });
+  assert.match(now, /just bought[^;\n]*택배 상자 A/);
+  assert.match(now, /just sold 낡은 우산/);
+  const recent = (text) => (/Recently: ([^\n]*)/.exec(text)?.[1] ?? '');
+  assert.doesNotMatch(recent(now), /got 택배 상자 A|sold 낡은 우산/, now);
+  assert.match(recent(now), /got 철물 손전등/, '다른 가게 것은 그대로');
+  const next = inventoryText({ message: [...message, { role: 'user', data: 'c', chatId: 'u3' }, { role: 'char', data: '다음', chatId: 'c2' }], scriptstate: vars });
+  assert.match(recent(next), /sold 낡은 우산/);
+  assert.match(recent(next), /got 택배 상자 A/);
 });

@@ -31,6 +31,7 @@ export const SETTINGS_SET: SetPage = {
         { key: 'img-show', label: '표시 범위', ctl: { t: 'custom' }, help: '이미지를 띄울 메시지예요. 「최근만」이면 마지막 메시지부터 정한 개수까지만 띄워요. 바꾼 값은 메시지를 다시 그릴 때 반영돼요.', scope: 'device' },
         { key: 'img-send', label: '요청 속 이미지 태그', ctl: { t: 'custom' }, help: '모델에 보내는 대화 기록에서 이미지 태그를 남길 메시지예요. 오래된 태그를 빼면 토큰이 줄어요. 최근 태그는 모델이 태그 쓰는 법을 따라 하도록 남겨요.', scope: 'device' },
         { key: 'asset-model', label: '모델', ctl: { t: 'seg', opts: [['main', '메인 모델'], ['aux', '보조 모델']] }, help: '메인 모델은 본문과 함께 적고, 보조 모델은 응답이 끝난 뒤 한 번 더 불러 태그를 보충해요.' },
+        { key: 'img-scene', label: '장면 인물만', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '켜면 이미지 지침의 캐릭터 목록에 최근 대화에 이름이 나온 캐릭터만 넣어요. 토큰이 줄지만, 처음 등장하는 캐릭터는 다음 응답부터 이미지가 붙어요.', scope: 'device' },
         { key: 'asset-player', label: '주인공 이미지', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '「캐릭터로 플레이」로 고른 요원(내가 연기하는 주인공)에게도 이미지 태그를 붙일지예요. 끄면 페르소나처럼 주인공 이미지는 띄우지 않아요.' },
         { key: 'asset-limit', label: '캐릭터당 이미지 수', ctl: { t: 'seg', opts: [['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']] }, help: '보조 모델이 한 응답에서 캐릭터 한 명에게 붙일 이미지 태그의 최대 개수' },
       ],

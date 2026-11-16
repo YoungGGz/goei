@@ -25,7 +25,7 @@ test('truth: 안 쓰는 턴엔 Really 없음, 쓰는 턴엔 Really 에 진짜, ?
   assert.ok(used.includes('Really') && used.includes('- 빛의 돌: 쥐면 주변 전등이 전부 꺼진다 (the label says 「어둠을 밝힌다」)'), used);
   assert.ok(used.includes('- 돌: not even its seller knows (the label says 「???」 and may be false) — decide what it really does now'), used);
   // Really 설명은 쓰는 턴의 Really 머리줄에만 (11-13 전수검사: INVENTORY_NOTE 에서 뺌)
-  assert.ok(used.includes('Really (what these actually do — decided by no one in advance'), used);
+  assert.ok(used.includes('Really (what these actually do beneath what the label claims'), used);
   // 안내 글은 지침 「메인 요청에 붙는 글」 INVENTORY.NOTE 절 (2026-11-14: 코드 사본 INVENTORY_NOTE 를 없앰)
   assert.ok(!I.guideTxt('Main', 'INVENTORY.NOTE').includes('Really'));
 });
@@ -34,4 +34,28 @@ test('쪽지 내용(text): 저장되고 본편 줄에 reads 로 간다', () => {
   const it = I.addItem({ list: [], log: [] }, new Set(['a1']), { name: '쪽지: 골목', text: '소리를 내지 마라', from: 'store', anchor: 'a1' });
   assert.equal(it.list[0].text, '소리를 내지 마라');
   assert.ok(I.itemLine(it.list[0], undefined, false).includes('reads: "소리를 내지 마라"'));
+});
+
+test('truth: 이름이 같은 물건이 둘이면 쓰는 그 줄의 진실만 간다 (11-15)', () => {
+  let it = I.addItem({ list: [], log: [] }, alive, { name: '붕대', effect: '상처를 감싼다', truth: '감은 자리가 다른 사람 것이 된다', use: true, from: 'store', store: 'cos', anchor: 'a1' });
+  it = I.addItem(it, alive, { name: '붕대', effect: '상처를 감싼다', use: true, from: 'store', store: 'shop', anchor: 'a1' });
+  const live = I.liveItems(it, alive);
+  const plain = live.find((e) => !e.truth);
+  assert.ok(plain && live.length === 2);
+  const block = I.itemsBlock(live, { ...base, use: [{ id: plain.id, name: '붕대', n: 1 }] });
+  assert.ok(!block.includes('Really') && !block.includes('다른 사람'), block);
+  const real = live.find((e) => e.truth);
+  assert.ok(I.itemsBlock(live, { ...base, use: [{ id: real.id, name: '붕대', n: 1 }] }).includes('다른 사람'));
+});
+
+test('truth: 진실이 다르면 합치지 않고, 본문에서 주운 같은 이름 물건은 진실 있는 산 물건 줄에 안 합친다 (11-15)', () => {
+  let it = I.addItem({ list: [], log: [] }, alive, { name: '은하 붕대', effect: '감싼다', truth: '감은 자리가 사라진다', uses: 3, use: true, from: 'store', store: 'cos', anchor: 'a1' });
+  it = I.addItem(it, alive, { name: '붕대', uses: 2, use: true, from: 'manual', anchor: '' });
+  const [a, b] = it.list;
+  assert.equal(I.canMerge(a, b), false);
+  const two = new Set(['a1', 'a2']);
+  let s = I.addItem({ list: [], log: [] }, two, { name: '붕대', effect: '감싼다', truth: '감은 자리가 사라진다', from: 'store', store: 'cos', anchor: 'a1' });
+  s = I.addItem(s, two, { name: '붕대', desc: '길에서 주운 붕대', from: 'story', anchor: 'a2' });
+  assert.equal(I.liveItems(s, two).length, 2);
+  assert.equal(I.liveItems(s, two).find((x) => x.from === 'story').truth, undefined);
 });

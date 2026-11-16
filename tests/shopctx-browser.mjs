@@ -1,5 +1,5 @@
 // 상점 「메인 요청에 붙이는 것」 격자 (2026-11-12 사용자: 「각 기능들 컨텍 포함 선택이 어디있지? 상점 관련된거 없는거 같은데」 → 가게마다 다른 격자).
-// 설정 → 상점: 줄 = 기본 상점·우주 쇼핑몰·백일몽 포인트몰·망상홈쇼핑, 칸 = 컨텍스트 포함 · 구매 · 팔기 · 문의 · 맞춤 주문 · 1:1 상담 · 방송 내용 · 시청자 채팅 · 내 채팅, 없는 것은 빈 칸(–). 그 아래 「최대 양」.
+// 설정 → 상점: 줄 = 기본 상점·우주 쇼핑몰·백일몽 포인트몰·망상홈쇼핑, 칸 = 컨텍스트 포함 · 구매 · 팔기 · 문의 · 맞춤 주문 · 1:1 상담 · 진열 · 방송 내용 · 시청자 채팅 · 내 채팅 · 스티커·상담원, 없는 것은 빈 칸(–). 「진열」「스티커·상담원」은 기본 끔. 그 아래 「최대 양」.
 // (망상홈쇼핑 줄·칸 셋은 1d2a285cc 「상점 「메인 요청에 붙이는 것」에 망상홈쇼핑 줄」에서 더함. 그 줄 값은 $hs_main · $hs_main_kinds(이름 목록 하나))
 // ① 격자 모양(줄·칸·빈 칸·기본값 전부 켬) ② 같은 페이지 「호출」 격자와 같은 치수·선·제목 ③ 칸마다 누르면 그 변수만 바뀌고 다시 누르면 돌아온다
 // ④ 「컨텍스트 포함」을 끄면 그 줄 나머지가 잠기고 값은 남는다 ⑤ 「최대 양」 수 상자(공통 규격, 큰 것) ⑥ 닫았다 열어도 같다 ⑦ 가로 넘침 없음 ⑧ 시작 전(새 채팅 기본값).
@@ -24,16 +24,16 @@ const ok = (v, m) => { assert.ok(v, m); checks++; };
 const TITLE = '메인 요청에 붙이는 것';
 const ROWS = ['기본 상점', '우주 쇼핑몰', '백일몽 포인트몰', '망상홈쇼핑'];
 const IDS = ['shop', 'cos', 'bm', 'hs'];
-const COLS = ['컨텍스트 포함', '구매', '팔기', '문의', '맞춤 주문', '1:1 상담', '방송 내용', '시청자 채팅', '내 채팅'];
-const KEYS = ['', 'buy', 'sell', 'ask', 'order', 'desk', 'show', 'chat', 'say'];
-/** 가게마다 있는 칸 (1 = 체크, – = 빈 칸) */
-const SHAPE = ['1 1 1 1 – – – – –', '1 1 – 1 1 – – – –', '1 1 – – – 1 – – –', '1 1 – – – – 1 1 1'];
+const COLS = ['컨텍스트 포함', '구매', '팔기', '문의', '맞춤 주문', '1:1 상담', '진열', '방송 내용', '시청자 채팅', '내 채팅', '스티커·상담원'];
+const KEYS = ['', 'buy', 'sell', 'ask', 'order', 'desk', 'shelf', 'show', 'chat', 'say', 'aside'];
+/** 가게마다 있는 칸 (1 = 체크, 0 = 기본 끔인 칸, – = 빈 칸) */
+const SHAPE = ['1 1 1 1 – – 0 – – – –', '1 1 – 1 1 – 0 – – – –', '1 1 – – – 1 0 – – – –', '1 1 – – – – – 1 1 1 0'];
 const HS_ALL = ['show', 'chat', 'say', 'buy'];
 /** 망상홈쇼핑 줄: 맨 앞 칸은 $hs_main, 나머지는 $hs_main_kinds(켠 것 이름 목록) */
 const varOf = (r, c) => (IDS[r] === 'hs' ? (c ? '$hs_main_kinds' : '$hs_main') : `${IDS[r] === 'shop' ? '$sh_main' : `$${IDS[r]}_sh_main`}${KEYS[c] ? `_${KEYS[c]}` : ''}`);
 /** 칸 하나를 껐을 때 / 켰을 때의 값 */
 const offOf = (r, c) => (IDS[r] === 'hs' && c ? HS_ALL.filter((k) => k !== KEYS[c]).join(',') : '0');
-const onOf = (r, c) => (IDS[r] === 'hs' && c ? HS_ALL.join(',') : '1');
+const onOf = (r, c) => (IDS[r] === 'hs' && c ? [...HS_ALL, ...(KEYS[c] === 'aside' ? ['aside'] : [])].join(',') : '1');
 
 /** 보이는 격자 하나를 읽는다 (PC·폰 쌍둥이 가운데 보이는 것) */
 const readGrid = (page, title) => page.evaluate((title) => {
@@ -94,8 +94,8 @@ async function run(vp, size, chat, fresh) {
   eq(g.h1, ['메인 요청', '붙일 것'], `${tag} 칸 묶음`);
   eq(g.h2, COLS, `${tag} 칸 이름`);
   eq(g.names, ROWS, `${tag} 줄 = 네 가게 (망상홈쇼핑 줄 포함)`);
-  eq(g.cells, SHAPE, `${tag} 기본값: 있는 칸은 전부 켬, 없는 칸은 –`);
-  eq(g.cells.join(' ').split(' ').filter((x) => x === '–').length, 20, `${tag} 빈 칸 20개`);
+  eq(g.cells, SHAPE, `${tag} 기본값: 있는 칸은 켬(「진열」「스티커·상담원」만 끔), 없는 칸은 –`);
+  eq(g.cells.join(' ').split(' ').filter((x) => x === '–').length, 24, `${tag} 빈 칸 24개`);
   ok(g.foot.startsWith('켜면 '), `${tag} 설명 첫 문장 「켜면 …」: ${g.foot.slice(0, 40)}`);
   ok(g.foot.includes('「맥락 반영」과는 방향이 반대'), `${tag} 방향 설명`);
   eq(g.clip, [], `${tag} 잘린 글 없음`);
@@ -113,19 +113,24 @@ async function run(vp, size, chat, fresh) {
 
   /* ③ 칸마다: 누르면 그 변수만 0, 다시 누르면 1 */
   for (let r = 0; r < ROWS.length; r++) for (let c = 1; c < COLS.length; c++) {
-    const has = SHAPE[r].split(' ')[c] === '1';
+    const def = SHAPE[r].split(' ')[c];
+    const has = def !== '–';
+    // 기본 켬인 칸은 끄고 다시 켠다. 기본 끔인 칸(진열, 스티커·상담원)은 켜고 다시 끈다
+    const flip = def === '1' ? offOf(r, c) : onOf(r, c);
+    const back = def === '1' ? onOf(r, c) : offOf(r, c);
     const before = await where();
     const done = await cell(r, c);
     eq(done, has, `${tag} ${ROWS[r]}·${COLS[c]}: ${has ? '누를 수 있다' : '빈 칸은 못 누른다'}`);
     if (!has) { eq(await where(), before, `${tag} 빈 칸: 아무것도 안 바뀜`); continue; }
-    eq(await val(varOf(r, c)), offOf(r, c), `${tag} ${ROWS[r]}·${COLS[c]} 끔 → ${varOf(r, c)}=${offOf(r, c)}`);
+    eq(await val(varOf(r, c)), flip, `${tag} ${ROWS[r]}·${COLS[c]} ${def === '1' ? '끔' : '켬'} → ${varOf(r, c)}=${flip}`);
     const now = (await readGrid(page, TITLE)).cells;
-    eq(now.map((x, i) => (i === r ? x.split(' ').map((y, j) => (j === c ? '1' : y)).join(' ') : x)), SHAPE, `${tag} 그 칸만 꺼짐`);
+    eq(now[r].split(' ')[c], def === '1' ? '0' : '1', `${tag} 그 칸이 바뀜`);
+    eq(now.map((x, i) => (i === r ? x.split(' ').map((y, j) => (j === c ? def : y)).join(' ') : x)), SHAPE, `${tag} 그 칸만 바뀜`);
     const after = await where();
     const changed = [...new Set([...Object.keys(after.chat), ...Object.keys(before.chat)])].filter((k) => after.chat[k] !== before.chat[k]).concat([...new Set([...Object.keys(after.prefs), ...Object.keys(before.prefs)])].filter((k) => after.prefs[k] !== before.prefs[k]));
     eq(changed, [varOf(r, c)], `${tag} 바뀐 변수는 하나`);
     await cell(r, c);
-    eq(await val(varOf(r, c)), onOf(r, c), `${tag} 다시 켬`);
+    eq(await val(varOf(r, c)), back, `${tag} 다시 ${def === '1' ? '켬' : '끔'}`);
   }
   eq((await readGrid(page, TITLE)).cells, SHAPE, `${tag} 전부 되돌림`);
 
@@ -137,14 +142,14 @@ async function run(vp, size, chat, fresh) {
     const row = (await readGrid(page, TITLE)).cells[r].split(' ');
     eq(row[0], '0', `${tag} 맨 앞 칸 꺼짐`);
     ok(row.slice(1).every((x) => x === '–' || x.startsWith('L')), `${tag} ${ROWS[r]} 나머지 칸 잠김: ${row.join(' ')}`);
-    if (r === 1) eq(row.join(' '), '0 L1 – L0 L1 – – – –', `${tag} 잠겨도 켜 둔 값·꺼 둔 값이 그대로 보인다`);
+    if (r === 1) eq(row.join(' '), '0 L1 – L0 L1 – L0 – – – –', `${tag} 잠겨도 켜 둔 값·꺼 둔 값이 그대로 보인다`);
     eq(await cell(r, 1), false, `${tag} 잠긴 칸은 못 누른다`);
   }
   await shot('master-off');
   await noOverflow('잠김');
   /* ⑥ 닫았다 열어도 같다 */
   await closeEditor(page, true); await openEditor(page, 'set:shop'); await sleep(400);
-  eq((await readGrid(page, TITLE)).cells, ['0 L1 L1 L1 – – – – –', '0 L1 – L0 L1 – – – –', '0 L1 – – – L1 – – –', '0 L1 – – – – L1 L1 L1'], `${tag} 다시 열어도 같은 값`);
+  eq((await readGrid(page, TITLE)).cells, ['0 L1 L1 L1 – – L0 – – – –', '0 L1 – L0 L1 – L0 – – – –', '0 L1 – – – L1 L0 – – – –', '0 L1 – – – – – L1 L1 L1 L0'], `${tag} 다시 열어도 같은 값`);
   for (let r = 0; r < ROWS.length; r++) await cell(r, 0);
   await cell(1, 3);
   eq((await readGrid(page, TITLE)).cells, SHAPE, `${tag} 다시 켜면 돌아온다`);

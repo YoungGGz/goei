@@ -264,9 +264,18 @@ export async function autoWriteWiki(ctx: ChatContext, messageIndex: number, open
   const target = showing && chatKey(showing) === chatKey(cur) ? env : quietEnv;
   const notice = wiki.notice;
   try {
-    const title = s.autoTitle === 'input' ? (s.autoQuery ? canon(cur)(s.autoQuery) : '') : await pickTitle(cur);
+    let title: string;
+    try {
+      title = await pickTitle(cur);
+    } catch (error) {
+      // 제목 고르기 요청이 요청 토큰 상한을 넘는 경우 등: 문서 작성 실패와 같이 위키 화면에 까닭을 남긴다
+      if (target !== quietEnv) {
+        wiki.notice = `자동 작성 제목을 고르지 못했어요. ${error instanceof Error ? error.message : String(error)}`;
+        target.render();
+      }
+      throw error;
+    }
     if (!title) {
-      if (target !== quietEnv) wiki.notice = '자동 작성 제목이 비어 있어요. 위키 설정에서 적어 주세요.';
       return;
     }
     const old = findDoc(cur.chat, title, cur.char.globalLore);
@@ -290,7 +299,9 @@ async function pickTitle(ctx: ChatContext): Promise<string> {
     }
   })();
   const s = wikiSettings(ctx.chat.scriptstate);
-  const { value } = await askModel(wikiTitlePrompt(source(ctx), candidates, [...written], names), s.model, (raw) => acceptTitle(raw, candidates), { ...genSettings(ctx.chat.scriptstate), staticModel: featureModel(ctx.chat.scriptstate, 'nw'), state: ctx.chat.scriptstate, label: '위키 제목' });
+  // 제목 고르기 요청에도 위키의 요청 토큰 상한을 건다: 넘으면 챗로그를 줄인다 (core/budget.ts)
+  const messages = fitPrompt(budgetFor(ctx.chat.scriptstate, 'nw'), () => ({ messages: wikiTitlePrompt(source(ctx), candidates, [...written], names) })).messages;
+  const { value } = await askModel(messages, s.model, (raw) => acceptTitle(raw, candidates), { ...genSettings(ctx.chat.scriptstate), staticModel: featureModel(ctx.chat.scriptstate, 'nw'), state: ctx.chat.scriptstate, label: '위키 제목' });
   return value;
 }
 
@@ -613,7 +624,7 @@ function settingsView(ctx: ChatContext): string {
   const s = wikiSettings(ctx.chat.scriptstate);
   // 줄은 정의표(core/setdef/wiki.ts)에서 온다
   const vals: Record<string, string> = {
-    auto: s.auto, auto_title: s.autoTitle, auto_query: s.autoQuery, length: s.length, mode: s.mode, model: s.model, refresh_previous: s.refreshPrevious ? '1' : '0',
+    auto: s.auto, length: s.length, mode: s.mode, model: s.model, refresh_previous: s.refreshPrevious ? '1' : '0',
     context: wikiContextOn(ctx.chat.scriptstate) ? '1' : '0', footnotes: s.footnotes, images: s.images, request: String(ctx.chat.scriptstate?.['$nw_writing_request'] ?? ''),
   };
   const wire: Wire = { cur: (k) => vals[k] ?? '', adv: (item) => advRow('nw', item, ctx.chat.scriptstate), advChips: (items, label) => advChipRow('nw', items, ctx.chat.scriptstate, label) };
@@ -1075,11 +1086,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
     case 'wiki-footnotes':
     case 'wiki-images':
     case 'wiki-auto':
-    case 'wiki-auto_title':
       await setVar(ctx, env, `$nw_${action.slice(5)}`, v);
-      return true;
-    case 'wiki-auto_query':
-      await setVar(ctx, env, '$nw_auto_query', v.trim().slice(0, 80));
       return true;
     case 'wiki-settings':
       if (wiki.view === 'settings') go('home');
@@ -1117,8 +1124,8 @@ export function previewWikiAuto(ctx: ChatContext): { title: LlmMessage[] | null;
       return {};
     }
   })();
-  const titleMsgs = s.autoTitle === 'model' && candidates.length ? wikiTitlePrompt(source(ctx), candidates, [...written], names) : null;
-  const title = s.autoTitle === 'input' ? (s.autoQuery ? canon(ctx)(s.autoQuery) : '') : candidates.find((c) => !written.has(c)) ?? candidates[0] ?? '';
+  const titleMsgs = candidates.length ? wikiTitlePrompt(source(ctx), candidates, [...written], names) : null;
+  const title = candidates.find((c) => !written.has(c)) ?? candidates[0] ?? '';
   if (!title) return { title: titleMsgs, article: null };
   const old = findDoc(ctx.chat, title, ctx.char.globalLore);
   const regenerate = !!old && !old.base;

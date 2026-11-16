@@ -55,27 +55,28 @@ export function shopGiveOn(vars: Vars, shop: GiveShop, key: GiveKey): boolean {
 export const SHOP_AMOUNTS = {
   turns: { label: '챗로그', min: 1, max: 8, unit: '턴' },
   refs: { label: '참조 로어북', min: 0, max: 12, unit: '개' },
+  /** 진열(새로 받기)·문의 요청에 같이 넘기는 지난 문의 대화. 저장해 두는 줄 수(40)가 상한이자 기본값 (= 전부) */
+  talk: { label: '지난 대화', min: 0, max: 40, unit: '줄' },
 } as const;
 export type ShopAmount = keyof typeof SHOP_AMOUNTS;
-export const isShopAmount = (v: string): v is ShopAmount => v === 'turns' || v === 'refs';
+export const isShopAmount = (v: string): v is ShopAmount => v === 'turns' || v === 'refs' || v === 'talk';
+/** 그 기능에 없는 양 칸 (「–」): 지난 문의 대화는 진열·문의 요청에만 들어간다 */
+export const shopAmountNone = (fn: ShopFn, key: ShopAmount): boolean => key === 'talk' && fn !== 'shelf' && fn !== 'talk';
 
 /** 기능 표·양 표 한 칸의 변수 (세 가게가 같이 쓴다) */
 export const shopFnVar = (fn: ShopFn, key: GiveKey | ShopAmount): string => `$sh_fn_${fn}_${key}`;
-/** 그 기능에 없는 칸 (「–」): 1:1 상담은 맥락(신분·상태창·괴이·챗로그)을 요청문에 넣는 자리가 없다 */
-export const shopFnNone = (fn: ShopFn, key: GiveKey): boolean => fn === 'desk' && key === 'ctx';
 /** 기능 표 한 칸이 켜져 있나 */
 export function shopFnOn(vars: Vars, fn: ShopFn, key: GiveKey): boolean {
-  if (shopFnNone(fn, key)) return false;
   const v = vars?.[shopFnVar(fn, key)];
   return v === '1' || v === '0' ? v === '1' : key === 'ctx' ? true : FN_DEF[key];
 }
-/** 이 기능의 양. 따로 정하지 않았으면 $sh_turns · $sh_refs */
+/** 이 기능의 양. 따로 정하지 않았으면 $sh_turns · $sh_refs (지난 대화는 전부) */
 export function shopFnNum(vars: Vars, fn: ShopFn, key: ShopAmount): number {
   const raw = vars?.[shopFnVar(fn, key)];
   const n = Number(raw);
   const a = SHOP_AMOUNTS[key];
   if (raw !== undefined && raw !== null && String(raw).trim() !== '' && Number.isInteger(n) && n >= a.min && n <= a.max) return n;
-  return shopSettings(vars)[key];
+  return key === 'talk' ? a.max : shopSettings(vars)[key];
 }
 
 const TOGGLE: Record<RefChip, keyof RefToggles> = { desc: 'description', authors: 'authors', persona: 'persona', active: 'active', related: 'related', secondary: 'secondary' };
@@ -87,12 +88,14 @@ export interface ShopGive {
   context: boolean;
   turns: number;
   refs: number;
+  /** 같이 넘길 지난 문의 대화의 줄 수 */
+  talk: number;
 }
 /** 이 가게의 이 기능 요청에 넘길 것: 가게 표와 기능 표가 둘 다 켜진 것만. vars = 채팅의 변수 그대로 (mallVars 를 거치지 않은 것) */
 export function shopGive(vars: Vars, shop: GiveShop, fn: ShopFn): ShopGive {
   const toggles = {} as RefToggles;
   for (const chip of REF_CHIP_KEYS) toggles[TOGGLE[chip]] = shopGiveOn(vars, shop, chip) && shopFnOn(vars, fn, chip);
-  return { toggles, context: shopGiveOn(vars, shop, 'ctx') && shopFnOn(vars, fn, 'ctx'), turns: shopFnNum(vars, fn, 'turns'), refs: shopFnNum(vars, fn, 'refs') };
+  return { toggles, context: shopGiveOn(vars, shop, 'ctx') && shopFnOn(vars, fn, 'ctx'), turns: shopFnNum(vars, fn, 'turns'), refs: shopFnNum(vars, fn, 'refs'), talk: shopFnNum(vars, fn, 'talk') };
 }
 
 /** 글(가게 이름·주인 이름)에 이름이 걸린 로어북 이름들 (소문자). 「참조 로어북」 수를 넘을 때 끝까지 남길 것 */

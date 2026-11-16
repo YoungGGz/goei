@@ -5,7 +5,8 @@ import { focus as F, phone as P, advanced, mainContext, G_POST_BASE, addUserPost
 const reg = { entries: [], byTerm: new Map(), byLore: new Map() };
 const msg = (id, sender, text, who) => ({ id, sender, text, kind: 'text', audience: [who], time: '' });
 const room = (id, cid, name, msgs) => ({ id, kind: 'dm', members: [cid], people: { [cid]: { id: cid, name } }, messages: msgs, draft: '', unread: 0 });
-const records = (t) => (t ? JSON.parse(t.split('\n')[2]).records : []);
+// 방 이름은 rooms 표에 한 번만 실리고 기록에는 방 ID 만 있다: 시험에서 보기 쉽게 기록마다 이름을 붙여 돌려준다
+const records = (t) => { if (!t) return []; const j = JSON.parse(t.split('\n')[2]); return j.records.map((r) => ({ title: j.rooms?.[r.room]?.title, ...r })); };
 
 test('focus: scene text takes the last turns without system prompts, names match with particles', () => {
   const scene = F.sceneText([{ role: 'system', content: '윤서아 시스템' }, { role: 'user', content: '옛 글' }, { role: 'assistant', content: '윤서아가 문을 열었다' }, { role: 'user', content: '따라간다' }], 1);
@@ -26,7 +27,10 @@ test('focus: phone main context puts scene-related rooms first, keeps a few newe
   const got = records(P.mainContext(st, { items: [] }, set, 'R', f));
   assert.equal(got.filter((r) => r.title === '윤서아').length, 5, '관련 방은 오래돼도 들어감');
   assert.equal(got.filter((r) => r.title === '박도윤').length, P.HISTORY.contextRecent, '관련 없는 방은 최근 몇 개만');
-  assert.deepEqual(got.map((r) => r.order), got.map((r) => r.order).slice().sort((a, b) => a - b));
+  // 순번은 싣지 않는다: 배열이 시간 순 (옛말 0~4 는 번호 1~5, 잡담 n 은 번호 100+n)
+  const order = got.map((r) => (r.title === '윤서아' ? 1 : 100) + Number(r.text.split(' ').pop()));
+  assert.deepEqual(order, order.slice().sort((a, b) => a - b));
+  assert.ok(got.every((r) => !('order' in r)));
   // 장면 관련 먼저를 끄면 원본처럼 최근 순
   advanced.applyAdvanced({ '$ph_adv_ctx_focus': '0' });
   const plain = records(P.mainContext(st, { items: [] }, set, 'R', f));

@@ -30,8 +30,8 @@ import { ITEM_LEFT_WORDS_DEFAULT, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT, I
 import { ICON_KIND_LABEL, normIcon } from '../core/iconmatch';
 import { keepOpen } from './panels';
 import { invOn, ITEM_SCOPE_VAR, ITEM_SKIP_MAX, ITEM_SKIP_VAR, itemScope, itemSkip, ITEM_ICON_POOL_VAR, itemIconPoolOn, ITEM_AUTO_VAR, ITEM_DETAIL_VAR, ITEM_LOGTURNS_MAX, ITEM_LOGTURNS_VAR, ITEM_RESUMED_VAR, ITEM_SPENT_VAR, ITEM_START_VAR, ITEM_STATE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, ITEM_USE_VAR, itemDetail, itemLogTurns, itemStartOn, itemStateOn, ITEM_LIMIT_DEFAULT, ITEM_LIMIT_VAR, ITEM_ICON_ALIAS_VAR, ITEM_ON_VAR, ITEM_SLOTS_MAX, ITEM_SLOTS_MIN, ITEM_SLOTS_VAR, itemAutoOn, itemLimit, itemSlots, ITEM_CARRY_MAX, ITEM_CARRY_MIN, ITEM_CARRY_PC_VAR, ITEM_CARRY_VAR, ITEM_EDIT_VAR, itemCarrySetting, itemEditOn, itemWeight } from '../core/items';
-import { SHOP_AMOUNTS, isGiveKey, isGiveShop, isShopAmount, isShopFn, shopFnNone, shopFnVar, shopGiveVar } from '../core/shopfn';
-import { SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags } from '../core/shop';
+import { SHOP_AMOUNTS, isGiveKey, isGiveShop, isShopAmount, isShopFn, shopAmountNone, shopFnVar, shopGiveVar } from '../core/shopfn';
+import { SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags } from '../core/shop';
 import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { updateChat, type ChatContext } from '../host/risu';
 import { barButtons, directoryBar, directoryDone, directoryDoneClear, directorySearch, directoryView } from './directory';
@@ -431,7 +431,8 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       s.assetOn ? D('asset-model', s.assetModel) : '',
       s.assetOn && s.assetModel === 'aux' ? D('asset-limit', String(s.assetLimit)) : '',
       s.assetOn ? D('asset-player', s.assetPlayer ? '1' : '0') : '',
-      s.assetOn ? D('img-send', '', { ctl: recentControl('img-send', getPrefs().imgSend, '태그를 남길 메시지 수', busy) }) : '',
+      s.assetOn && s.assetModel === 'main' ? D('img-scene', getPrefs().imgNamesScene ? '1' : '0') : '',
+      s.assetOn && s.assetModel === 'main' ? D('img-send', '', { ctl: recentControl('img-send', getPrefs().imgSend, '태그를 남길 메시지 수', busy) }) : '',
     ].join(''))}
     ${scope === 'chat' && s.assetOn && s.assetModel === 'aux' && note ? `<p class="gx-hint">최근 보충: ${esc(note)}</p>` : ''}
     ${s.assetOn ? group('그림 표시', [
@@ -706,6 +707,7 @@ export async function shopFamSet(ctx: ChatContext, env: SettingsEnv, scope: 'cha
       // 망상홈쇼핑 줄 (core/hslog.ts): 전체 켬/끔, 붙일 것 넷(이름 목록 하나에 적는다), 토큰 상한
       const hk = key.slice(8) as HsLogKind;
       if (key === 'main' && flag) patch = { [HS_MAIN_KEY.on]: raw };
+      else if (key === 'main_turns') { const t = HS_MAIN_SET.turns; const n = raw.trim() === '' ? 0 : int(t.lo, t.hi); if (n !== null) patch = { [HS_MAIN_KEY.turns]: String(n) }; }
       else if (key === 'main_tokens') { const t = HS_MAIN_SET.tokens; const n = raw.trim() === '' ? 0 : int(t.lo, t.hi); if (n !== null) patch = { [HS_MAIN_KEY.tokens]: String(n) }; }
       else if (key.startsWith('main_hs_') && flag && HS_LOG_KINDS.includes(hk)) {
         const cur = hsMainSettings(scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate).kinds;
@@ -732,11 +734,11 @@ export async function shopFamSet(ctx: ChatContext, env: SettingsEnv, scope: 'cha
     // 기능 표·양 표: 세 가게가 한 값 (col 은 늘 shop)
     const m = /^fn_([a-z]+)_([a-z]+)$/.exec(key);
     if (col === 'shop' && m && isShopFn(m[1])) {
-      if (isGiveKey(m[2]) && flag && !shopFnNone(m[1], m[2])) patch = { [shopFnVar(m[1], m[2])]: raw };
-      else if (isShopAmount(m[2])) { const n = int(SHOP_AMOUNTS[m[2]].min, SHOP_AMOUNTS[m[2]].max); if (n !== null) patch = { [shopFnVar(m[1], m[2])]: String(n) }; }
+      if (isGiveKey(m[2]) && flag) patch = { [shopFnVar(m[1], m[2])]: raw };
+      else if (isShopAmount(m[2]) && !shopAmountNone(m[1], m[2])) { const n = int(SHOP_AMOUNTS[m[2]].min, SHOP_AMOUNTS[m[2]].max); if (n !== null) patch = { [shopFnVar(m[1], m[2])]: String(n) }; }
     }
   } else if (col === 'shop') {
-    const FLAGS: Record<string, string> = { diverse: SHOP_DIVERSE_VAR, prev: SHOP_PREV_VAR, kick: SHOP_KICK_VAR };
+    const FLAGS: Record<string, string> = { diverse: SHOP_DIVERSE_VAR, prev: SHOP_PREV_VAR, kick: SHOP_KICK_VAR, talkstock: SHOP_TALK_STOCK_VAR };
     if (FLAGS[key] && flag) patch = { [FLAGS[key]]: raw };
     else if (key === 'thoughts' && ['off', 'inner', 'note'].includes(raw)) patch = { [SHOP_THOUGHTS_VAR]: raw };
     else if (key === 'turns') { const n = int(1, 8); if (n !== null) patch = { [SHOP_TURNS_VAR]: String(n) }; }
@@ -894,7 +896,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       // 고친 지침도 원래 글로 (2026-11-08 사용자: 지침마다 있던 「기본으로」를 없애고 초기화 한 곳으로)
       if (!settingsUi.notice) {
         for (const g of GUIDE_NAMES) setGuideOverride(g, '');
-        await saveDefaults(env, (p) => ({ ...p, basic: {}, world: {}, theme: undefined, vars: {}, guides: undefined, imgPrompt: undefined, imgKeywords: undefined, walletStart: undefined, imgNamesOff: undefined, imgNamesExtra: undefined }));
+        await saveDefaults(env, (p) => ({ ...p, basic: {}, world: {}, theme: undefined, vars: {}, guides: undefined, imgPrompt: undefined, imgKeywords: undefined, walletStart: undefined, imgNamesOff: undefined, imgNamesExtra: undefined, imgNamesScene: undefined }));
         imgUi.template = null;
         imgUi.keywords = null;
         for (const f of resetHooks) f();
@@ -914,6 +916,10 @@ export async function handleSettings(action: string, value: string | undefined, 
   if (action === 'set-img-foldon') {
     await saveDefaults(env, (p) => ({ ...p, imgFoldOn: v === '0' ? false : undefined }));
     repaintTheme();
+    return true;
+  }
+  if (action === 'set-img-scene') {
+    await saveDefaults(env, (p) => ({ ...p, imgNamesScene: v === '1' ? true : undefined }));
     return true;
   }
   if (action === 'set-img-foldlock') {

@@ -1,6 +1,6 @@
 // 「괴담넷」 탭: 게시판·쪽지함. 생성은 새로고침·글 올리기·댓글·쪽지 보내기를 눌렀을 때만 한 번씩 부른다.
 // 원본은 채팅 입력창을 빌려 썼지만 여기서는 창 안의 입력칸에 쓴다. 생성은 창을 닫아도 계속되고 끝나면 원래 채팅에 저장한다.
-import { turnKeyAt } from '../core/shop';
+import { turnKeyAt, turnResultValid, type TurnMark } from '../core/shop';
 import { defGroups, setSeg, type Wire } from './setrow';
 import { GNET_SET } from '../core/setdef/gnet';
 import {
@@ -224,7 +224,8 @@ const viewing = (site: BoardSite) => { const u = uiFor(site); return { post: u.s
 
 // ── 작업 ──
 
-function refreshBoard(ctx: ChatContext, env: GnetEnv, automatic = false, joint?: Joint) {
+/** made: 자동 새로고침이 맞춰 만든 응답 (autoRefreshGnet 이 넘긴다) */
+function refreshBoard(ctx: ChatContext, env: GnetEnv, automatic = false, joint?: Joint, made?: TurnMark) {
   return run(ctx, env, automatic ? '채팅 응답에 맞춰 게시판을 새로 불러오는 중이에요.' : '게시판을 불러오는 중이에요.', async () => {
     const startLength = ctx.chat.message?.length ?? 0;
     const before = readGnet(ctx.chat);
@@ -237,8 +238,9 @@ function refreshBoard(ctx: ChatContext, env: GnetEnv, automatic = false, joint?:
     const { raw, value } = await generate(prompt.messages, s.model, (r) => withRaw(r, () => parseJsonPayload(r)), { ...retry(ctx.chat), first });
     let note = '';
     await upd(ctx, (chat) => {
-      if (automatic && (chat.message?.length ?? 0) !== startLength) {
-        note = '채팅이 이어져서 이번 자동 새로고침 결과는 저장하지 않았어요.';
+      // 채팅이 이어졌어도(뒤에 메시지가 붙음) 이 결과를 만든 응답이 그대로면 저장한다. 게시판이 그동안 바뀌었으면 아래 applyBoard 가 막는다
+      if (automatic && (chat.message?.length ?? 0) !== startLength && !(made && turnResultValid(chat, made))) {
+        note = '그 응답이 바뀌어서 이번 자동 새로고침 결과는 저장하지 않았어요.';
         return null;
       }
       const res = withRaw(raw, () => applyBoard(before, readGnet(chat), value, { nick, settings: s, date: dateNow(chat) }));
@@ -315,7 +317,8 @@ function bumpStats(p: GPost, n: number): void {
   p.votes += Math.floor(Math.random() * (n + 2));
 }
 
-/** 글 하나만 새로고침 (v0.16.26, 사용자 요청): 그 글에 새 댓글이 달리고 조회·추천이 는다. 다른 글·쪽지는 그대로 */
+/** 글 하나만 새로고침 (v0.16.26, 사용자 요청): 그 글에 새 댓글이 달리고 조회·추천이 는다. 쪽지는 그대로.
+ *  「지난 글 활동」(고급 설정 activity)이 켜져 있으면 댓글 달기와 같이 게시판의 다른 글도 요청에 넘기고, 돌아온 활동 댓글·조회·추천을 그 글들에 반영한다. 끄면 다른 글은 그대로 */
 function refreshPost(ctx: ChatContext, env: GnetEnv, postId: number) {
   return run(ctx, env, '이 글을 새로 불러오는 중이에요.', async () => {
     const chat = ctx.chat;
@@ -1063,7 +1066,7 @@ export async function autoRefreshGnet(base: ChatContext, messageIndex: number, o
   // 창이 다른 채팅을 보고 있으면 그 화면의 알림은 건드리지 않는다
   const target = showing && showing.charIndex === ctx.charIndex && showing.chatIndex === ctx.chatIndex ? env : { ...quietEnv }; // 사이트는 비교하지 않는다 (전수검사 11-13: 괴담갤·세정게·연어 마켓 자동 새로고침이 화면에 안 나왔다)
   const notice = gnet.notice;
-  await refreshBoard({ ...ctx, chat: saved }, target, true, joint);
+  await refreshBoard({ ...ctx, chat: saved }, target, true, joint, { index: messageIndex, data, turn: stamp });
   if (target !== env) gnet.notice = notice;
 }
 

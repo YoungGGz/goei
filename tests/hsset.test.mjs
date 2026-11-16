@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { homeshop, hslog, hsset, settings } from '../dist-test/core.mjs';
-const { hsSettings, HS_NUM, HS_KEY, HS_READ_DEFAULT, hsFormsDefault, HS_VAR, HS_AT_VAR, HS_ORDERS_VAR, HS_AUD_VAR } = homeshop;
+const { hsSettings, HS_NUM, HS_KEY, HS_READ_DEFAULT, HS_VAR, HS_AT_VAR, HS_ORDERS_VAR, HS_AUD_VAR } = homeshop;
 const { HOMESHOP_SET, HS_PAIRS, HS_DEF_TEXT, hsRowVars, HS_TEL_KEY, HS_RETRY_KEY } = hsset;
 const rows = HOMESHOP_SET.groups.flatMap((g) => g.rows);
 
@@ -12,8 +12,8 @@ test('망상홈쇼핑 설정: 묶음과 줄 — 이 페이지에만 있는 줄�
     ['편성', ['cue', 'chat']],
     ['방송 흐름', ['speed', 'hold', 'frame', 'chatGap', 'next', 'turn', 'lock']],
     ['남은 수량', ['left', 'drop', 'dropRate', 'dropFast', 'dropStep', 'soonAt', 'end']],
-    ['주문', ['barter', 'peek']],
-    ['컨텍스트 포함', ['call', 'forms', 'aud']],
+    ['주문', ['barter', 'talk', 'peek']],
+    ['컨텍스트 포함', ['call', 'aud']],
     ['진행자 동작', ['fill', 'fillCool', 'rareP', 'rareCool', 'read', 'clips']],
     ['방송 화면', ['tel', 'cut', 'bulb', 'tear', 'tearP', 'scan', 'scalePc', 'scalePh']],
   ]);
@@ -37,7 +37,6 @@ test('망상홈쇼핑 설정: 기본값·범위 (넘김 문서 2절)', () => {
   assert.deepEqual(s.read, ['고개 꺾기', '굳은 응시']);
   assert.equal(HS_READ_DEFAULT, '고개 꺾기, 굳은 응시');
   assert.deepEqual(HS_DEF_TEXT.read, [HS_KEY.read, HS_READ_DEFAULT, 200]);
-  assert.deepEqual(HS_DEF_TEXT.forms, [HS_KEY.forms, hsFormsDefault(), 200]);
   // 줄의 조작 범위는 HS_NUM 그대로
   for (const r of rows) {
     if (r.ctl.t === 'num') assert.deepEqual([r.ctl.lo, r.ctl.hi, r.ctl.unit], [HS_NUM[r.key].lo, HS_NUM[r.key].hi, HS_NUM[r.key].unit], r.key);
@@ -62,7 +61,9 @@ test('망상홈쇼핑 설정: 줄이 적는 변수를 읽는 쪽이 읽는다 (�
       if (uiRead.has(v)) continue;
       const num = Object.values(HS_NUM).find((d) => d.key === v);
       const val = num ? String(num.def === num.hi ? num.lo : num.hi) : r.ctl.t === 'seg' && r.ctl.opts.length > 2 ? '2' : r.ctl.t === 'seg' ? '0' : 'B:웃음=드물게';
-      assert.notEqual(JSON.stringify(hsSettings({ [v]: val })), base, `${r.key} → ${v} 를 아무도 읽지 않는다`);
+      // 켬/끔 줄은 기본이 켬인 것도 끔인 것도 있다(「인터넷에 상시 노출」은 기본 끔, 11-16): 반대 값을 적었을 때 바뀌는지 본다
+      const flip = !num && r.ctl.t === 'seg' && r.ctl.opts.length <= 2 ? ['0', '1'] : [val];
+      assert.ok(flip.some((x) => JSON.stringify(hsSettings({ [v]: x })) !== base), `${r.key} → ${v} 를 아무도 읽지 않는다`);
     }
   }
   assert.deepEqual([HS_TEL_KEY, HS_RETRY_KEY], ['$hs_tel', '$hs_retry']);
@@ -92,7 +93,7 @@ test('망상홈쇼핑 설정: 모든 설정 변수는 「기본값으로 저장�
 
 test('망상홈쇼핑: 메인 요청에 붙이는 값($hs_main·$hs_main_kinds·$hs_main_tokens)을 읽는 뜻', () => {
   const m = hslog.hsMainSettings;
-  assert.deepEqual(m({}), { on: true, kinds: ['show', 'chat', 'say', 'buy'], tokens: 3000 });
+  assert.deepEqual(m({}), { on: true, kinds: ['show', 'chat', 'say', 'buy'], tokens: 3000, turns: 0 });
   assert.equal(m({ $hs_main: '0' }).on, false);
   assert.equal(m({ $hs_main: '' }).on, true);
   assert.deepEqual(m({ $hs_main_kinds: 'buy, show' }).kinds, ['show', 'buy']);

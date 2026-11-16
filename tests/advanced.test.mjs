@@ -22,7 +22,7 @@ test('advanced: defaults match the original, invalid values fall back, changed k
   // 기능 상한이 0이면 공통 상한
   assert.equal(budgetFor({ '$gen_budget': '9000' }, 'ph'), 9000);
   assert.equal(budgetFor({ '$gen_budget': '9000', '$ph_adv_budget': '5000' }, 'ph'), 5000);
-  assert.deepEqual(genSettings({}), { language: null, retries: 1, retryModel: 'same', userMessages: true, concurrent: 0 });
+  assert.deepEqual(genSettings({}), { language: null, retries: 1, retryModel: 'same', userMessages: true, concurrent: 0, transientRetries: 2 });
   assert.equal(genSettings({ '$gen_lang': 'en' }).language, 'Write all output in English.');
   // 새 채팅 기본값으로 저장되는 변수
   for (const k of ['$ph_adv_turns', '$nw_adv_ctx_count', '$gen_lang', '$lb_cfg_lb-gn.adv_ctx_own', '$nw_context', '$ph_context_messages']) assert.ok(settings.PREF_VAR.test(k), k);
@@ -207,4 +207,25 @@ test('상시 로어북: 고를 수 있는 이름 목록 (폴더·내부 로어�
   assert.deepEqual(bookNames(abSrc()), ['📜Faction', '🙂Roster', '🏷️Tag', '소라 랜드']);
   assert.deepEqual(bookNames(abSrc({}, [{ comment: '내 메모', content: 'x' }, { comment: '🏷️tag', content: 'y' }])), ['📜Faction', '🙂Roster', '🏷️Tag', '소라 랜드', '내 메모']);
   assert.deepEqual(bookNames({ char: {}, chat: {} }), []);
+});
+
+test('advanced: 로어북 검색 깊이·예산, 세력 요약·요원 명단, 모델 오류 재시도 (기본값 = 전과 같음)', () => {
+  const { loreLimits, alwaysBookOn } = advanced;
+  assert.deepEqual(loreLimits({}), { depth: 0, budget: 0 }, '기본 0 = 카드 설정');
+  assert.deepEqual(loreLimits({ $gen_lore_depth: '4', $gen_lore_budget: '8000' }), { depth: 4, budget: 8000 });
+  assert.deepEqual(loreLimits({ $gen_lore_depth: '999' }), { depth: 0, budget: 0 }, '범위 밖은 기본값');
+  for (const k of ['tag', 'faction', 'roster']) assert.equal(alwaysBookOn({}, k), true, k);
+  const off = { $gen_lore_faction: '0', $gen_lore_roster: '0' };
+  assert.equal(alwaysBookOn(off, 'faction'), false);
+  assert.equal(alwaysBookOn(off, 'roster'), false);
+  assert.equal(alwaysBookOn(off, 'tag'), true, '태그 지침은 늘');
+  assert.equal(alwaysBookOn({ $gen_lore_faction: '0' }, 'roster'), true);
+  assert.equal(genSettings({ $gen_transient: '0' }).transientRetries, 0);
+  assert.deepEqual(advChanged({}, 'gen'), []);
+  for (const k of ['$gen_lore_depth', '$gen_lore_budget', '$gen_lore_faction', '$gen_lore_roster', '$gen_transient']) assert.ok(settings.PREF_VAR.test(k), k);
+  // 본편 조립기가 이 설정을 실제로 쓴다
+  const body = readFileSync(new URL('../src/body.ts', import.meta.url), 'utf8');
+  assert.match(body, /if \(!alwaysBookOn\(chat\.scriptstate, b\.kind\)\) continue;/);
+  assert.match(body, /loreOptions\(char, chat, mode, userOrTag\(\), loreLimits\(chat\.scriptstate\)\)/);
+  assert.match(body, /if \(type !== 'model' \|\| !Array\.isArray\(messages\)\) return messages;\n[^\n]*\n  if \(isOwnMainCall\(messages\)\) return messages;/);
 });

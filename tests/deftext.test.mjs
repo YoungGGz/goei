@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
-const out = await build({ stdin: { contents: `export * from './src/core/deftext'; export { rollDefaults, genresText, parseGenres, tiersText, parseTiers, mallRoll } from './src/core/malls'; export { deskAxesDefault, deskSettings } from './src/core/bmdesk'; export { hsFormsDefault, hsSettings } from './src/core/homeshop';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false });
+const out = await build({ stdin: { contents: `export * from './src/core/deftext'; export { rollDefaults, genresText, parseGenres, tiersText, parseTiers, mallRoll } from './src/core/malls'; export { deskAxesDefault, deskSettings } from './src/core/bmdesk'; export { hsSettings } from './src/core/homeshop';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false });
 const M = await import(`data:text/javascript;base64,${Buffer.from(out.outputFiles[0].text).toString('base64')}`);
 
 test('칸에 보일 글: 저장값이 없으면 기본값이 그대로 들어 있다', () => {
@@ -38,7 +38,6 @@ test('우주 쇼핑몰·포인트몰: 기본 목록을 그대로 두면 저장 �
   }
 });
 
-test('상담사 주사위 칸·출연 형태: 저장값이 없으면 읽는 쪽도 같은 기본값', () => {
+test('상담사 주사위 칸: 저장값이 없으면 읽는 쪽도 같은 기본값', () => {
   assert.equal(M.deskSettings({}).axes.length, M.deskAxesDefault().split('\n').length);
-  assert.deepEqual(M.hsSettings({}).forms, M.hsFormsDefault().split(',').map((x) => x.trim()));
 });

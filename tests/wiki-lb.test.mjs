@@ -14,8 +14,8 @@ test('위키: 설정 기본값과 자동 작성 설정 읽기', () => {
   assert.equal(s.footnotes, 'pop');
   assert.equal(s.images, 'infobox');
   assert.equal(s.auto, '0');
-  const t = wikiSettings({ '$nw_footnotes': 'inline', '$nw_images': 'body', '$nw_auto': 'turn', '$nw_auto_title': 'input', '$nw_auto_query': ' 오후역 ' });
-  assert.deepEqual([t.footnotes, t.images, t.auto, t.autoTitle, t.autoQuery], ['inline', 'body', 'turn', 'input', '오후역']);
+  const t = wikiSettings({ '$nw_footnotes': 'inline', '$nw_images': 'body', '$nw_auto': 'turn' });
+  assert.deepEqual([t.footnotes, t.images, t.auto], ['inline', 'body', 'turn']);
 });
 
 test('위키: 본문 그림은 제목·참고·챗로그에 나온 것만, 표정은 인물 문서에만', () => {

@@ -104,6 +104,23 @@ test('괴담톡: 보기 전용 방 요청·응답 (사이드스토리·혼잣말
   const list = [{ ...r, id: 'v_1', time: 't', unread: true }];
   assert.equal(V.viewUnread(list), 1);
   const next = PP.viewPrompt(src({ '$ph_view_pov': '에일린' }), {}, list);
-  assert.equal(JSON.parse(next.messages[1].content).previousRoom.name, '퇴근길');
+  assert.equal(JSON.parse(next.messages[1].content).rooms[0].name, '퇴근길');
+  // 방은 참여 인물로 가른다: 같은 인물들이면 그 방, 한 명이라도 다르면 새 방. 이름 순서·번호는 상관없다
+  const room = (people, pov = 'p1', preset = 'side') => ({ preset, pov, people: people.map((name, i) => ({ id: `p${i + 1}`, name })) });
+  assert.equal(V.matchView(list, room(['동료', '에일린']))?.id, 'v_1', '순서가 달라도 같은 인물들');
+  assert.equal(V.matchView(list, room(['에일린', '동료', '팀장'])), undefined, '한 명 늘면 다른 방');
+  assert.equal(V.matchView(list, room(['에일린'])), undefined, '한 명 줄어도 다른 방');
+  assert.equal(V.matchView(list, room(['에일린', '동료'], 'p1', 'multi')), undefined, '종류가 다르면 다른 방');
+  // 혼잣말·다중인격 혼잣말은 시점 인물로: 갈래 이름이 달라도 같은 사람의 방
+  const minds = [{ ...room(['에일린', '불안', '분노'], 'p1', 'multi'), id: 'v_m', name: 'x', messages: [], time: 't', unread: false }, { ...room(['한서', '체념'], 'p1', 'multi'), id: 'v_h', name: 'y', messages: [], time: 't', unread: false }];
+  assert.equal(V.matchView(minds, room(['에일린', '냉소'], 'p1', 'multi'))?.id, 'v_m');
+  assert.equal(V.matchView(minds, room(['체념', '한서'], 'p2', 'multi'))?.id, 'v_h');
+  assert.equal(V.matchView(minds, room(['에일린'], 'p1', 'mono')), undefined);
+  // 방이 여럿이면 같은 종류를 전부 최근 방부터 보내고, 말풍선은 방마다 설정 수만큼
+  const two = [...list, { ...room(['에일린', '팀장']), id: 'v_2', name: '회의실', messages: Array.from({ length: 9 }, (_, i) => ({ sender: 'p1', type: 'text', text: `m${i}` })), time: 't', unread: false }, ...minds];
+  const sent = V.viewRooms(two, 'side', 6);
+  assert.deepEqual(sent.map((x) => x.name), ['회의실', '퇴근길']);
+  assert.equal(sent[0].messages.length, 6);
+  assert.deepEqual(V.viewRooms(two, 'mono', 6), []);
   assert.equal(V.viewSettings({}).auto, 'manual');
 });

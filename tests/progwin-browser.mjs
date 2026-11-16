@@ -2,7 +2,7 @@
 // Risu 의 setInnerHTML 은 class·style 속성을 지운다 (시험 흉내도 그렇게 한다) → 그래도 칸·줄 모양이 살아 있어야 한다
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
-import { boot, launch, loadFixture } from './qc-settings-harness.mjs';
+import { boot, closeWin, launch, loadFixture, openWin } from './qc-settings-harness.mjs';
 
 const OUT = process.argv[2] || '.scratch/progwin';
 mkdirSync(OUT, { recursive: true });
@@ -42,6 +42,38 @@ for (const [vp, size] of [['pc', { width: 1280, height: 800, touch: false }], ['
       assert.ok(Math.abs(d2.x - (d.x - 200)) < 12 && Math.abs(d2.y - (d.y + 200)) < 12, `단추가 옮겨짐 ${JSON.stringify([d, d2])}`);
       assert.equal(await page.evaluate(() => document.querySelector('[x-goei-prog]').getAttribute('x-goei-open')), 'false', '끌고 놓아도 펼쳐지지 않음');
       await page.screenshot({ path: `${OUT}/${vp}-${theme}-moved.png` });
+    }
+    if (vp === 'phone') {
+      const host = () => page.evaluate(() => { const h = document.querySelector('[x-goei-prog]'); return { open: h.getAttribute('x-goei-open'), shown: getComputedStyle(h).display !== 'none' }; });
+      // 펼친 창은 도는 중이어도 바깥을 누르면 접힌다
+      if ((await host()).open !== 'true') { const b0 = await page.locator('[x-goei-prog] [data-dot]').boundingBox(); await page.mouse.click(b0.x + 14, b0.y + 20); await page.waitForFunction(() => document.querySelector('[x-goei-prog]').getAttribute('x-goei-open') === 'true'); await page.waitForTimeout(300); }
+      await page.mouse.click(60, 760);
+      await page.waitForFunction(() => document.querySelector('[x-goei-prog]').getAttribute('x-goei-open') === 'false');
+      await page.waitForTimeout(400);
+      // 막대는 위아래로만 끌린다 (오른쪽에 붙은 채), 놓아도 펼쳐지지 않고 자리를 기억한다
+      const d = await page.locator('[x-goei-prog] [data-dot]').boundingBox();
+      await page.mouse.move(d.x + 14, d.y + 20); await page.mouse.down(); await page.mouse.move(d.x - 120, d.y + 320, { steps: 8 }); await page.waitForTimeout(300); await page.mouse.up();
+      await page.waitForTimeout(500);
+      const d2 = await page.locator('[x-goei-prog] [data-dot]').boundingBox();
+      assert.ok(Math.abs(d2.x - d.x) < 1 && Math.abs(d2.y - (d.y + 300)) < 12, `막대가 위아래로만 옮겨짐 ${JSON.stringify([d, d2])}`);
+      assert.equal((await host()).open, 'false', '끌고 놓아도 펼쳐지지 않음');
+      await page.screenshot({ path: `${OUT}/${vp}-${theme}-moved.png` });
+      // 아래쪽에서 펼치면 카드가 화면 안에 있다
+      await page.mouse.click(d2.x + 14, d2.y + 20);
+      await page.waitForTimeout(500);
+      const c = await page.locator('[x-goei-prog] [data-card]').boundingBox();
+      assert.ok(c.y >= 0 && c.y + c.height <= 844, `카드가 화면 안 ${JSON.stringify(c)}`);
+      await page.screenshot({ path: `${OUT}/${vp}-${theme}-moved-open.png` });
+      await page.mouse.click(60, 60);
+      await page.waitForFunction(() => document.querySelector('[x-goei-prog]').getAttribute('x-goei-open') === 'false');
+      // 상황판을 열면 숨고, 닫으면 같은 자리에 다시 나온다
+      await openWin(page);
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('[x-goei-prog]')).display === 'none', null, { timeout: 5000 });
+      await page.screenshot({ path: `${OUT}/${vp}-${theme}-panel.png` });
+      await closeWin(page);
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('[x-goei-prog]')).display !== 'none', null, { timeout: 5000 });
+      const d3 = await page.locator('[x-goei-prog] [data-dot]').boundingBox();
+      assert.ok(Math.abs(d3.y - d2.y) < 2, `상황판을 닫은 뒤 자리 그대로 ${JSON.stringify([d2, d3])}`);
     }
     assert.deepEqual(errors, []);
     await page.close();

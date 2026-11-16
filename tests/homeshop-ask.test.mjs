@@ -41,11 +41,12 @@ function fakeRisu() {
   return { calls, release, asked };
 }
 
+// 방송에 닿는 채팅으로 본다(「인터넷에 상시 노출」 켬, 11-16: 기본은 접속 카드로만)
 test('망상홈쇼핑 편성: 그림 팩을 기다리는 사이 채팅을 옮겼으면 요청을 보내지 않는다', async () => {
   const M = await fresh();
   const R = fakeRisu();
-  const a = ctxOf(0, 'OLDMARK', { [M.HS_RETRY_KEY]: '0' });
-  const b = ctxOf(1, 'NEWMARK', { [M.HS_RETRY_KEY]: '0' });
+  const a = ctxOf(0, 'OLDMARK', { [M.HS_RETRY_KEY]: '0', $hs_net: '1' });
+  const b = ctxOf(1, 'NEWMARK', { [M.HS_RETRY_KEY]: '0', $hs_net: '1' });
   let cur = a;
   const env = { render() {}, refresh: async () => {}, current: () => cur };
   const done = M.homeshopAction('hs-refresh', undefined, a, env);
@@ -59,12 +60,12 @@ test('망상홈쇼핑 편성: 그림 팩을 기다리는 사이 채팅을 옮겼
 test('망상홈쇼핑 편성: 요청문은 그림 팩을 기다린 뒤의 채팅 값으로 만든다', async () => {
   const M = await fresh();
   const R = fakeRisu();
-  const a = ctxOf(0, 'OLDMARK', { [M.HS_RETRY_KEY]: '0' });
+  const a = ctxOf(0, 'OLDMARK', { [M.HS_RETRY_KEY]: '0', $hs_net: '1' });
   let cur = a;
   const env = { render() {}, refresh: async () => {}, current: () => cur };
   const done = M.homeshopAction('hs-refresh', undefined, a, env);
   await R.asked;
-  cur = ctxOf(0, 'NEWMARK', { [M.HS_RETRY_KEY]: '0' });
+  cur = ctxOf(0, 'NEWMARK', { [M.HS_RETRY_KEY]: '0', $hs_net: '1' });
   R.release();
   await done;
   assert.ok(R.calls.length > 0, '같은 채팅이면 요청은 나간다');

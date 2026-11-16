@@ -8,9 +8,7 @@ export const WIKI_SET: SetPage = {
     {
       title: '',
       rows: [
-        { key: 'auto', label: '자동 호출', common: 'auto', ctl: { t: 'seg', opts: [['0', '수동'], ['open', '창을 열 때'], ['turn', '매 턴']] }, help: '턴이 진행되면 문서 하나를 저절로 써요. 문서가 길어 호출 하나가 커요' },
-        { key: 'auto_title', label: '자동 작성 제목', ctl: { t: 'seg', opts: [['model', '모델이 고름'], ['input', '직접 입력']] }, help: '「모델이 고름」이면 명부 항목 가운데 이번 이야기에 맞는 것을 써요.' },
-        { key: 'auto_query', label: '직접 입력', show: { key: 'auto_title', eq: 'input' }, ctl: { t: 'text', ph: '문서 제목' } },
+        { key: 'auto', label: '자동 호출', common: 'auto', ctl: { t: 'seg', opts: [['0', '수동'], ['open', '창을 열 때'], ['turn', '매 턴']] }, help: '턴이 진행되면 명부 항목 가운데 이번 이야기에 맞는 문서 하나를 모델이 골라 저절로 써요. 제목 고르기와 문서 쓰기로 호출이 2회예요' },
         { key: 'model', label: '모델', common: 'model', ctl: { t: 'seg', opts: [['main', '메인 모델'], ['aux', '보조 모델']] }, help: '문서를 쓸 때 부를 모델이에요' },
       ],
     },

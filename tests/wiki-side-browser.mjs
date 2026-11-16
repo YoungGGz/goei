@@ -150,7 +150,7 @@ const box = (page, sel) => page.locator(sel).first().boundingBox();
   await page.evaluate(() => { window.__store['p:goei:prefs'] = JSON.stringify({ ...(JSON.parse(window.__store['p:goei:prefs'] || '{}')) }); });
   await open(page);
   // 폰: 위키는 하단 바 위 공용 서랍(손잡이)에서 연다 (2026-11-07 하단 바 재편)
-  await page.click('.gx-cgrip');
+  await page.locator('.gx-cgrip').dispatchEvent('click');
   await page.click('.gx-cdr.open .gx-cpanel [data-value="wk"]');
   await page.waitForSelector('.wk .wgrab');
   const edge = await box(page, '.wk .wgrab');

@@ -19,7 +19,7 @@ const B = G.G_POST_BASE;
 const post = (id, extra = {}) => ({ id, date: '2025.05.13 14:00', nick: `n${id}`, title: `t${id}`, views: 10, votes: 1, body: `b${id}`, mine: false, comments: [], ...extra });
 const msgs = (n) => Array.from({ length: n }, () => [{ role: 'user', data: 'u' }, { role: 'char', data: '응답' }]).flat();
 const scene = { scene: '', terms: [] };
-const titles = (t) => (t ? JSON.parse(t.split('\n')[2]).records.map((r) => r.title) : []);
+const titles = (t) => (t ? JSON.parse(t.split('\n').find((l) => l.startsWith('{'))).records.map((r) => r.title) : []);
 
 test('되살린 글을 모델이 유지해도 back 이 남아 본편 응답 뒤 보관함으로 간다', () => {
   const st = { seq: B + 5, posts: [post(B + 5)], archive: [post(B + 1, { mine: true, nick: '나', title: '옛 글' })], dms: [], sources: {} };

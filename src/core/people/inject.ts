@@ -2,11 +2,11 @@
 // 절 단위 혼합: 시트의 고정 절(Voice·Background·Abilities·Appearance)은 원문, 나머지는 기록.
 import { addressOf, affinityView, opennessOf, tasteOf, type AffinityOpts } from './affinity';
 import { liveEntries, plain, type Liveness } from './store';
-import { fixedSections } from './seed';
+import { fixedSections, seedTexts } from './seed';
 import { norm } from './store';
 import { OPENNESS_MAX, OPENNESS_STAGES, REGISTERS, SEXUAL_CHARS, STAGES, opennessStage, slotsFor, type Change, type OpennessStage, type Stage, type Entry, type PeopleStore, type Person, type SlotId } from './types';
-import { axesLinesEn } from './axes';
-import { SEXUAL_POLICY, sexualDirectorPolicy } from './sexual';
+import { axesLinesEn, liveEvidence } from './axes';
+import { SEXUAL_POLICY, isSexualAxis, sexualDirectorPolicy } from './sexual';
 import { guideTxt } from '../guides';
 import { SPEECH_ENTRY_CHARS, parseSpeechMarker } from './speech';
 
@@ -39,6 +39,10 @@ export interface BlockOpts extends AffinityOpts {
   qual?: Set<string>;
   /** 성격 6축 줄을 넣을지 (기능 axes) */
   axes?: boolean;
+  /** 승인 전 성격 관찰(모으는 중인 후보)도 6축 줄 아래에 넣을지 (설정 「성격 관찰 포함」). 성적 축 후보는 넣지 않는다 */
+  axesObserved?: boolean;
+  /** 블록에서 뺄 칸 (Director 가 같은 칸을 `slots` 로 따로 받을 때) */
+  omitSlots?: Set<SlotId>;
   /** 켜진 기능 (전용 칸을 넣을지 정함). 없으면 기본 칸만 */
   features?: Set<string>;
   /** 성적 욕망·이상성욕 글 (sexual.ts sexualTexts, 켜져 있고 글이 있을 때만). sexual_context_only 정책과 함께 넣는다 */
@@ -65,12 +69,26 @@ const FEATURE_GROUPS: { key: string; slots: SlotId[] }[] = [
 
 /** 예산을 넘으면 오래된 항목부터 뺀다: 지난 일 → 아는 것 → 행동 → 장면 → 목표 순. 다른 절은 그대로 */
 export const TRIM_ORDER: (keyof Person['slots'])[] = ['history', 'knowledge', 'behavior', 'scene', 'threads'];
+/** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수 */
+export const OBSERVED_MAX = 4;
+
+/** 블록에 실을 칸 항목 (글자 예산으로 줄이기 전). request.ts 의 넘침 줄이기도 이 항목으로 글자를 센다 */
+export function blockEntries(p: Person, live: Liveness, o: Pick<BlockOpts, 'sheet' | 'mode' | 'omitSlots'> = {}): Partial<Record<keyof Person['slots'], Entry[]>> {
+  const kept: Partial<Record<keyof Person['slots'], Entry[]>> = {};
+  for (const k of Object.keys(p.slots) as (keyof Person['slots'])[]) kept[k] = o.omitSlots?.has(k as SlotId) ? [] : liveEntries(p.slots[k], live);
+  // 시트 전체를 넣는 방식이면 그 시트의 Identity·Character 절에서 옮긴 시작값 항목은 뺀다 (시트 원문에 같은 줄이 있다). 이야기에서 생긴 항목·고친 항목은 남긴다
+  if (o.sheet && (o.mode ?? 'split') === 'append') {
+    const dup = seedTexts(o.sheet);
+    for (const k of ['identity', 'personality'] as const) if (kept[k]) kept[k] = kept[k]!.filter((e) => !(e.src === 'seed' && dup.has(e.text)));
+  }
+  return kept;
+}
 
 /** 한 인물의 블록. 비어 있는 절은 빼고, 보통(무관심) 단계면 관계 줄을 짧게 */
 export function personBlock(p: Person, store: PeopleStore, live: Liveness, changes: Change[], o: BlockOpts = {}): string {
   const user = o.user ?? '{{user}}';
-  const kept: Partial<Record<keyof Person['slots'], Entry[]>> = {};
-  for (const k of Object.keys(p.slots) as (keyof Person['slots'])[]) kept[k] = liveEntries(p.slots[k], live);
+  const kept = blockEntries(p, live, o);
+  const mode = o.mode ?? 'split';
   // 글자 예산: 넘치면 오래된 항목부터 뺀다 (글자 수 기준, 항목 수 상한 없음)
   if (o.maxChars) {
     const size = () => Object.values(kept).reduce((n, l) => n + (l ?? []).reduce((m, e) => m + e.text.length + 3, 0), 0);
@@ -80,13 +98,22 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
   const out: string[] = [main('PEOPLE.BLOCK.HEAD', { name: p.name })];
   // 호칭으로 적어 둔 기록: 머리의 이름이 이름이 아니라는 것을 알린다 (본편이 호칭을 이름처럼 부르지 않게)
   if (p.provisional) out.push(main('PEOPLE.BLOCK.PROVISIONAL', { name: p.name }));
-  const mode = o.mode ?? 'split';
   if (o.sheet && mode === 'append') out.push(o.sheet.trim());
   const id = slot('identity');
   if (id.length) out.push(main('PEOPLE.BLOCK.IDENTITY') + '\n' + lines(id));
   const per = slot('personality');
   if (per.length) out.push(main('PEOPLE.BLOCK.PERSONALITY') + '\n' + lines(per));
   if (o.axes) out.push(main('PEOPLE.BLOCK.AXES') + '\n' + axesLinesEn(p.axes).join('\n') + (p.patterns?.length ? '\n' + main('PEOPLE.BLOCK.PATTERNS') + '\n' + p.patterns.map((t) => `- ${plain(t, 300)}`).join('\n') : ''));
+  if (o.axes && o.axesObserved) {
+    // 모으는 중인 후보 가운데 살아 있는 관찰이 있는 것, 관찰이 많은 것부터 넷까지
+    const seen = Object.values(p.candidates ?? {})
+      .filter((c) => c.status === 'collecting' && !isSexualAxis(c.axis))
+      .map((c) => ({ c, n: liveEvidence(c, live).length }))
+      .filter((x) => x.n > 0)
+      .sort((a, b) => b.n - a.n)
+      .slice(0, OBSERVED_MAX);
+    if (seen.length) out.push(main('PEOPLE.BLOCK.AXES_OBSERVED') + '\n' + seen.map(({ c }) => main('PEOPLE.BLOCK.AXES_OBSERVED_ITEM', { axis: c.axis === 'pattern' ? 'pattern' : main(`PEOPLE.AXIS_LABEL.${c.axis}`), direction: c.direction, pattern: plain(c.pattern, 120) })).join('\n'));
+  }
   // 성적 욕망·이상성욕 (원본 people_profile 의 sexual_desire/paraphilia + policy sexual_context_only)
   if (o.sexual && (o.sexual.desire || o.sexual.paraphilia)) out.push((o.sexualPolicy === false ? main('PEOPLE.BLOCK.SEXUAL', { policy: SEXUAL_POLICY }) : main('PEOPLE.BLOCK.SEXUAL_POLICY', { policy: SEXUAL_POLICY, policy_text: sexualDirectorPolicy() })) + '\n' + [o.sexual.desire ? `- ${main('PEOPLE.BLOCK.SEXUAL_DESIRE', { text: plain(o.sexual.desire, SEXUAL_CHARS) })}` : '', o.sexual.paraphilia ? `- ${main('PEOPLE.BLOCK.PARAPHILIA', { text: plain(o.sexual.paraphilia, SEXUAL_CHARS) })}` : ''].filter(Boolean).join('\n'));
   if (o.sheet && mode === 'split') for (const s of fixedSections(o.sheet)) out.push(`${s.name}:\n${s.body}`);

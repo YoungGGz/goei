@@ -121,14 +121,34 @@ await tapGrip(); await finish();
 const n2 = await geo();
 ok(n2.open && n2.nav.t - n2.lastBottom >= PAD_MIN && n2.hitAbove === 'panel', '인터넷 안: 열림 모습', JSON.stringify([n2.nav.t - n2.lastBottom, n2.hitAbove]));
 await tapGrip(); await finish();
-// 설정 창의 폰 바에는 서랍이 없다 (그대로)
+// 설정 창의 폰 바에는 설정 전용 서랍이 있다 (기능·세계·지침·점검·닫기)
 await tapGrip(); await finish();
 await page.evaluate(() => document.querySelector('.gx-cdr.open .gx-cpanel [data-action="ed-open"]').click());
 await sleep(900);
 const ed = await page.evaluate(() => ({ nav: !!document.querySelector('.gw-nav'), cdr: !!document.querySelector('.gw-nav .gx-cdr') }));
-ok(ed.nav && !ed.cdr, '설정 창: 폰 바가 있고 서랍은 없다', JSON.stringify(ed));
+ok(ed.nav && ed.cdr, '설정 창: 폰 바와 설정 전용 서랍이 있다', JSON.stringify(ed));
 await closeEditor(page, true).catch(() => {});
 await sleep(400);
+
+// ⑨ 손잡이는 눌리지 않고(그 자리의 누르기는 뒤로 간다), 하단 바를 위로 쓸면 열리고 바·서랍 줄을 아래로 쓸면 닫힌다. 쓸고 놓아도 바의 메뉴는 안 바뀐다 (11-15)
+await goTab('board');
+if ((await geo()).open) { await tapGrip(); await finish(); }
+const s0 = await geo();
+const gripHit = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest('.gx-cgrip'), { x: (s0.grip.l + s0.grip.r) / 2, y: (s0.grip.t + s0.grip.b) / 2 });
+ok(!gripHit, '손잡이는 눌리지 않는다');
+const swipe = async (x, y, dy) => { await page.mouse.move(x, y); await page.mouse.down(); await page.mouse.move(x, y + dy / 2, { steps: 3 }); await page.mouse.move(x, y + dy, { steps: 3 }); await page.mouse.up(); await finish(); };
+const tabNow = () => page.evaluate(() => document.querySelector('.gx-mtrack > .gx-nb.on')?.getAttribute('data-value') ?? '');
+const t0 = await tabNow();
+await swipe(60, s0.nav.t + 30, -50);
+ok((await geo()).open, '바를 위로 쓸면 열린다');
+ok((await tabNow()) === t0, '쓸고 놓아도 메뉴가 안 바뀐다', JSON.stringify([t0, await tabNow()]));
+await swipe(60, s0.nav.t + 20, 40);
+ok(!(await geo()).open, '바를 아래로 쓸면 닫힌다');
+await swipe(330, s0.nav.t + 30, -50);
+const s1 = await geo();
+await swipe(200, (s1.panel.t + s1.panel.b) / 2, 40);
+ok(!(await geo()).open, '서랍 줄을 아래로 쓸어도 닫힌다');
+ok((await tabNow()) === t0, '서랍을 쓸어 닫아도 메뉴가 안 바뀐다');
 
 // ⑧ 움직임 줄이기
 await page.emulateMedia({ reducedMotion: 'reduce' });

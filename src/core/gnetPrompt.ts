@@ -139,7 +139,7 @@ export function commentTimeRule(now: string, b?: GnetBooks): string {
 export function boardJson(posts: GPost[]): string {
   return JSON.stringify({
     posts: posts.map((p) => ({
-      author: p.nick, id: p.id, ...(p.tag ? { tag: p.tag } : {}), title: p.title, time: /(\d\d:\d\d)/.exec(p.date)?.[1] ?? '', date: p.date, views: p.views, upvotes: p.votes,
+      author: p.nick, id: p.id, ...(p.tag ? { tag: p.tag } : {}), title: p.title, date: p.date, views: p.views, upvotes: p.votes,
       content: p.body, mine: p.mine, comments: p.comments.map((c) => ({ author: c.nick, ...whenField(p, c), content: c.body, parent: c.parent, mine: c.mine })),
     })),
   });
@@ -160,6 +160,9 @@ function boardExtras(src: RefSource, b: GnetBooks, write: boolean): { guideline:
   }
   return { guideline: parts.filter(Boolean).join('\n\n'), format };
 }
+
+/** 「다른 글 활동」을 끈 요청: 지난 글을 넣지 않는다 (지침은 ACTIVITY.DISABLED 절) */
+const noActivity = (): ReturnType<typeof activityContext> => ({ posts: [], snapshots: new Map() });
 
 const seed = () => Math.floor(Math.random() * 2147483647).toString(36);
 
@@ -204,10 +207,13 @@ export interface PublicPrompt extends GnetPrompt {
 export function postPrompt(src: RefSource, st: GState, input0: string, plan: IncomingPlan, factionNames: Record<string, string>, tag = ''): PublicPrompt {
   const b = gnetBooks(src);
   const input = tag ? fillVars(b.txt('POST.INPUT_TAG'), { tag, input: input0 }) : input0;
-  const activity = activityContext(st, null, fnHistory(src.chat.scriptstate, 'gn', 'post'));
+  const activity = HISTORY.activity ? activityContext(st, null, fnHistory(src.chat.scriptstate, 'gn', 'post')) : noActivity();
   const guideline = [b.read('LB'), b.read('ATTACHMENTS'), b.read('TITLE.GUIDELINE'), b.read('REACT.GUIDELINE'), b.read('PUBLIC.GUIDELINE'), incomingRules(b, plan), activityRules(b, activity.posts), boardExtras(src, b, false).guideline].filter(Boolean).join('\n\n');
-  const extras = input + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts);
-  return { ...pack(src, b, 'post', 'THOUGHTS.ACTION', guideline, `${b.read('PUBLIC.POST_FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}\n${b.txt('POST.TAG_FORMAT')}`, extras, factionNames), activity };
+  // 선쪽지의 출처가 지금 쓰는 글(번호 0)이면 그 내용은 위 input 에 이미 있다
+  const extras = input + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts, plan.post?.id === 0 ? 'draft' : undefined);
+  // 말머리를 글쓴이가 골랐으면(연어 마켓) 그 말머리를 쓰므로 모델에게 post.tag 를 쓰게 하지 않는다
+  const tagFormat = tag ? '' : `\n${b.txt('POST.TAG_FORMAT')}`;
+  return { ...pack(src, b, 'post', 'THOUGHTS.ACTION', guideline, `${b.read('PUBLIC.POST_FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}${tagFormat}`, extras, factionNames), activity };
 }
 
 export interface CommentPrompt extends PublicPrompt {
@@ -234,6 +240,9 @@ export function commentPrompt(
   const selected = new Set<number>();
   for (let i = Math.max(1, total - limit + 1); i <= total; i++) selected.add(i);
   if (replyTo > 0) selected.add(replyTo);
+  // 선쪽지의 출처가 이 글의 댓글이면 그 댓글은 comments 에만 싣고 incomingOrigin 에는 index 만 넣는다
+  const fromHere = plan.allowed && plan.post?.id === p.id;
+  if (fromHere && plan.commentIndex && p.comments[plan.commentIndex - 1]) selected.add(plan.commentIndex);
   for (const i of [...selected]) {
     let n = i;
     const seen = new Set<number>();
@@ -248,9 +257,10 @@ export function commentPrompt(
     post: { id: p.id, author: p.nick, title: p.title, content: p.body }, comments, commentCount: total, replyTo,
     action, userHandle: nick,
   });
-  const activity = activityContext(st, p.id);
+  const activity = HISTORY.activity ? activityContext(st, p.id) : noActivity();
   const guideline = [b.read('LB'), b.read('ATTACHMENTS'), b.read('REACT.GUIDELINE'), b.read('PUBLIC.GUIDELINE'), incomingRules(b, plan), activityRules(b, activity.posts), boardExtras(src, b, false).guideline].filter(Boolean).join('\n\n');
-  const extras = task + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts);
+  // 선쪽지의 출처가 이 글이면 본문은 위 task 의 post 에 이미 있다
+  const extras = task + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'), activity.posts, fromHere ? 'post' : undefined);
   return { ...pack(src, b, fn, 'THOUGHTS.ACTION', guideline, `${b.read('PUBLIC.REACT_FORMAT')}\n${commentTimeRule(dateNow(src.chat), b)}`, extras, factionNames), activity, supplied: selected, total };
 }
 
@@ -261,17 +271,19 @@ export const POST_REFRESH_ACTION = '__POST_REFRESH__';
 /** 공개 글 참고의 안내 글 (지금 보는 게시판 지침의 PUBLIC.ACCESS 절, 비었으면 기본 지침 파일의 절) */
 export const publicAccess = (src: RefSource): string => guideTxt(SITE_GUIDE[viewSite(src.chat.scriptstate)], 'PUBLIC.ACCESS');
 
-/** 공개 글 참고 (원본 RC.gnetPublic): 쪽지에서 언급된 글을 앞에, 최대 8개. access = PUBLIC.ACCESS 절 글 */
-export function publicBoard(st: GState, query: string, access: string): { access: string; posts: unknown[] } | null {
+/** 공개 글 참고 (원본 RC.gnetPublic): 쪽지에서 언급된 글을 앞에, 최대 max 개(0이면 넣지 않음). access = PUBLIC.ACCESS 절 글.
+ *  origin: 같은 요청에 원글로 이미 실린 글 (쪽지 답장의 PUBLIC ORIGIN). 그 글의 본문이 원글과 같으면 여기서는 본문을 빼고 번호·제목·댓글만 넘긴다 */
+export function publicBoard(st: GState, query: string, access: string, max = 8, origin?: { postid: number; body: string }): { access: string; posts: unknown[] } | null {
   const ranked = st.posts.map((p, i) => ({ p, i, hit: (!!p.title && query.includes(p.title)) || new RegExp(`#${p.id}(?![\\d.])`).test(query) }));
   ranked.sort((a, b) => (a.hit !== b.hit ? (a.hit ? -1 : 1) : a.i - b.i));
   const rows: unknown[] = [];
   let used = 0;
   const cap = 6000;
   for (const { p } of ranked) {
-    if (rows.length >= 8) break;
+    if (rows.length >= max) break;
     const comments = p.comments.slice(-12).map((c, j, arr) => ({ id: p.comments.length - arr.length + j + 1, parent: c.parent, author: c.nick, ...whenField(p, c), content: trimTokens(c.body, LIMITS.quote_tokens) }));
-    const row = { id: p.id, title: p.title, author: p.nick, date: p.date, content: trimTokens(p.body, LIMITS.origin_tokens), comments };
+    const content = trimTokens(p.body, LIMITS.origin_tokens);
+    const row = { id: p.id, title: p.title, author: p.nick, date: p.date, ...(origin && origin.postid === p.id && origin.body === content ? {} : { content }), comments };
     while (JSON.stringify(row).length > (cap - used) * 2 && row.comments.length) row.comments.shift();
     const n = Math.ceil(JSON.stringify(row).length / 2);
     if (used + n <= cap) {
@@ -307,7 +319,7 @@ export function dmPrompt(src: RefSource, st: GState, nick: string, latest: strin
     });
   }
   let task = `${fillVars(b.txt('DM.STORY_TIME'), { time: dateNow(src.chat) })}\n${fill(b.read('DM.REQUEST'), { NICK: nick, ORIGIN: anchor, HISTORY: JSON.stringify(lines) })}`;
-  const pub = publicBoard(st, `${latest}\n${anchor}`, b.txt('PUBLIC.ACCESS'));
+  const pub = publicBoard(st, `${latest}\n${anchor}`, b.txt('PUBLIC.ACCESS'), HISTORY.dmPublic, source);
   if (pub) task += `\n${b.txt('DM.PUBLIC_HEAD')}\n${JSON.stringify(pub)}`;
   const identity = { speaker: { role: 'npc_correspondent', handle: nick }, owner: { role: 'user', handle: userHandle, personaName: guideTxt('Common', 'REFS.USER_NAME'), referenceOnly: true } };
   const about = /^## About the board\n[^\n]+/m.exec(b.read('LB'))?.[0] ?? '';
