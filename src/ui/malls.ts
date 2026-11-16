@@ -10,13 +10,11 @@ import { updateChat } from '../host/risu';
 import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
-import { hqState, pointsOn, pointsOrg, pointsVars, readPoints } from '../core/points';
-import { readDirectory } from '../core/world/directory';
-import type { LoreEntry } from '../core/types';
+import { pointsOn, pointsVars, readPoints } from '../core/points';
 import { addItem, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
-import { liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, worldMinute, type CosOrder } from '../core/orders';
+import { bmOrdersVars, liveBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
 import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, parseShelf, parseTalk, pointPrice, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
@@ -241,14 +239,6 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
   await env.refresh();
 }
 
-/** 포인트몰은 본사 안에서만 열린다 (2026-11-15 사용자). 거점은 명부 「거점」에서 포인트 조직에 묶인 곳(사용자가 고친 명부 그대로). 그런 거점이 없거나 위치 칸이 없으면 막지 않는다 */
-export function bmAtHq(ctx: ChatContext): boolean {
-  const org = pointsOrg();
-  const bases = readDirectory((ctx.char.globalLore ?? []) as LoreEntry[]).bases.filter((b) => b.org && b.org === org);
-  if (!bases.length) return true;
-  return hqState(ctx.chat, bases.flatMap((b) => [b.name, b.english, ...b.aliases])) !== 'out';
-}
-
 /** 사이트를 열 때: 「창을 열 때」이고 마지막 응답 뒤로 아직 안 짰으면 한 번 (처음이면 늘) */
 let liveEnv: MallEnv | null = null;
 export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): void {
@@ -256,7 +246,7 @@ export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): v
   sync(ctx);
   const s = mallSettings(ctx.chat.scriptstate, site);
   if (!s.on || s.auto === 'manual' || ui[site].loading) return;
-  if (site === 'bm' && (!loggedNick(ctx) || !bmAtHq(ctx))) return;
+  if (site === 'bm' && !loggedNick(ctx)) return;
   const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
   // 받아 둔 진열을 본 것으로 적는다 (「매 턴」이 안 본 진열을 다시 받지 않게)
   if (mallUnseen(ctx.chat.scriptstate, site, st.loaded)) {
@@ -275,7 +265,7 @@ export async function autoRefreshMall(ctx: ChatContext, site: MallSite): Promise
   const env: MallEnv = live && chatKey(live) === chatKey(ctx) ? liveEnv! : { render() {}, refresh: async () => {}, current: () => ctx };
   const s = mallSettings(ctx.chat.scriptstate, site);
   if (!s.on || s.auto !== 'turn') return;
-  if (site === 'bm' && (!pointsOn(ctx.chat) || !bmAtHq(ctx))) return;
+  if (site === 'bm' && !pointsOn(ctx.chat)) return;
   if (String(ctx.chat.scriptstate?.[atKey(site)] ?? '') === turnKey(ctx.chat)) return;
   const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
   // 받아 둔 진열을 아직 한 번도 안 열어 봤으면 새로 받지 않는다 (사용자 2026-11-15). 열면 그 진열이 보이고, 본 다음 턴부터 다시 받는다
@@ -297,7 +287,7 @@ export function previewMallShelf(ctx: ChatContext, site: MallSite): LlmMessage[]
 
 // ── 사기 ──
 
-/** 물건들을 산다: 가계부(우주몰 원·포인트몰 포인트)에서 빼고 소지품에 넣고 진열대에서 뺀다. 모자라면 하나도 안 산다 */
+/** 물건들을 산다: 가계부(우주몰 원·포인트몰 포인트)에서 빼고 진열대에서 뺀다. 우주몰 것은 소지품에, 포인트몰 것은 수령 대기(주문 조회)에 넣는다. 모자라면 하나도 안 산다 */
 async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<ShopItem[] | null> {
   const start = getPrefs().walletStart ?? WALLET_START_DEFAULT;
   let got: ShopItem[] | null = null;
@@ -312,6 +302,7 @@ async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<Sho
     if (walletBalance(w, alive) < total) return null;
     const anchor = lastBot(chat)?.key ?? '';
     let items = readItems(chat.scriptstate);
+    const waiting: BmOrder[] = [];
     let st = now;
     for (const it of list) {
       const walletId = it.price > 0 ? freshWalletId(w, `${site}_${it.id}`, anchor) : '';
@@ -320,11 +311,13 @@ async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<Sho
       // 기록 글은 지침 「메인 요청에 붙는 글」의 MALL.PAID.* 절 (본편에 「paid with …」로 간다)
       const extra = it.pay ? ` ${guideTxt('Main', 'MALL.PAID.EXTRA', { pay: it.pay })}` : '';
       const paid = p ? { paidWith: guideTxt('Main', 'MALL.PAID.POINTS', { price: it.price.toLocaleString('en-US'), mall: MALL_NAME[site], extra }) } : { price: it.price, ...(walletId ? { walletId } : {}), paidWith: guideTxt('Main', 'MALL.PAID.BANK', { mall: MALL_NAME[site], extra }) };
-      items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...paid });
+      // 포인트몰은 소지품이 아니라 수령 대기로 (2026-11-16 사용자: 받는 것은 회사에서). 「주문 조회」에서 받을 때 소지품에 들어간다
+      if (p) waiting.push({ id: walletId || `bm_${it.id}_${Date.now().toString(36)}${waiting.length}`, anchor, price: it.price, walletId: walletId || undefined, paidWith: paid.paidWith, item: { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight } });
+      else items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...paid });
       st = markSold(st, it.id, anchor);
     }
     got = list;
-    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? pointsVars(w) : walletVars(w)), ...itemsVars(items), ...mallVarsOf(site, st) } };
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? { ...pointsVars(w), ...bmOrdersVars([...liveBmOrders(chat.scriptstate, alive), ...waiting]) } : { ...walletVars(w), ...itemsVars(items) }), ...mallVarsOf(site, st) } };
   });
   return got;
 }
@@ -334,7 +327,7 @@ export async function mallAction(action: string, value: string | undefined, ctx:
   if (!action.startsWith('mall-')) return false;
   sync(ctx);
   // 돈이 오가는 동작은 처리 중 한 번만 (릴리스 점검 11-09: 두 번 누르면 두 번째 결과가 안내를 실패 문구로 덮었다)
-  const MONEY = ['mall-pay', 'mall-buy', 'mall-note-buy', 'mall-quote-accept', 'mall-custom-take', 'mall-sell'];
+  const MONEY = ['mall-pay', 'mall-buy', 'mall-note-buy', 'mall-quote-accept', 'mall-custom-take', 'mall-pickup', 'mall-pickup-all', 'mall-sell'];
   if (MONEY.includes(action)) {
     if (moneyBusy) return true;
     moneyBusy = true;
@@ -392,11 +385,11 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
     }
     case 'mall-buy': {
       // 포인트몰: 정가로 바로 구매 (로그인해야)
-      if (site !== 'bm' || !loggedNick(ctx) || !bmAtHq(ctx) || v.loading) return true;
+      if (site !== 'bm' || !loggedNick(ctx) || v.loading) return true;
       const it = st.items.find((x) => x.id === value && !x.sold);
       if (!it) return true;
       const got = await buy(ctx, site, [it.id]);
-      v.info = got ? `「${it.name}」 구매가 완료되었습니다. 지급 창구에서 받아 소지품에 들어갔습니다.` : '포인트가 부족하거나 품절된 상품입니다.';
+      v.info = got ? `「${it.name}」 구매가 완료되었습니다. 「주문 조회」에서 수령 대기 중입니다.` : '포인트가 부족하거나 품절된 상품입니다.';
       await env.refresh();
       return true;
     }
@@ -504,6 +497,31 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       });
       v.info = ok ? `「${o.item.name}」을 받았다. 소지품에 들어갔다.` : '받을 수 없는 상태다.';
       if (ok) v.took = o.id;
+      await env.refresh();
+      return true;
+    }
+    case 'mall-pickup':
+    case 'mall-pickup-all': {
+      // 포인트몰 수령: 「주문 조회」의 수령 대기를 소지품에 넣는다 (본사 대여창고에서 받는 것 — 플러그인은 위치를 따지지 않는다, 2026-11-16 사용자)
+      if (site !== 'bm' || !loggedNick(ctx)) return true;
+      const ids = action === 'mall-pickup' ? [value ?? ''] : undefined;
+      let n = 0;
+      let first = '';
+      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+        const alive = aliveAnchors(chat);
+        const anchor = lastBot(chat)?.key ?? '';
+        const { list, got } = takeBmOrders(liveBmOrders(chat.scriptstate, alive), anchor, ids);
+        if (!got.length) return null;
+        let items = readItems(chat.scriptstate);
+        for (const o of got) {
+          const it = o.item;
+          items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...(o.walletId ? { walletId: o.walletId } : {}), paidWith: o.paidWith ?? guideTxt('Main', 'MALL.PAID.POINTS', { price: o.price.toLocaleString('en-US'), mall: MALL_NAME[site], extra: '' }) });
+        }
+        n = got.length;
+        first = got[0].item.name;
+        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...bmOrdersVars(list) } };
+      });
+      v.info = n > 1 ? `상품 ${n}건을 수령했습니다. 소지품에 들어갔습니다.` : n ? `「${first}」을(를) 수령했습니다. 소지품에 들어갔습니다.` : '수령할 수 없는 상태입니다.';
       await env.refresh();
       return true;
     }
@@ -874,30 +892,47 @@ function bmHtml(ctx: ChatContext, mobile: boolean): string {
   const s = mallSettings(ctx.chat.scriptstate, site);
   const nick = loggedNick(ctx);
   const bal = balanceOf(ctx, site);
-  const hq = bmAtHq(ctx);
   const list = onShelf(st);
   const gnb = `<div class="bp-gnb"><b>백일몽 사내망</b><span>공지</span><span>포인트몰</span>${mobile ? '' : '<span class="r">보안 등급 C · 외부 반출 금지</span>'}</div>`;
   const me = nick ? `<div class="bp-me"><b>${esc(nick)}</b><div class="bp-pt"><small>보유 포인트</small>${pts(bal)}</div></div>` : '<button class="bp-login" data-action="br-login">로그인</button>';
   const hd = `<div class="bp-hd"><span class="bp-lg">${siteLogo('bm', 'bp-logo')}${esc(MALL_NAME.bm)}<small>임직원 복지</small></span>${me}</div>`;
   let body: string;
   if (!s.on) body = '<div class="bp-box">소지품·가계부가 꺼져 있어 이용할 수 없습니다.</div>';
-  else if (!hq) body = '<div class="bp-box bp-need"><b>사내망에 연결할 수 없습니다</b><p>포인트몰은 본사 안에서만 접속됩니다.</p></div>';
   else if (!nick) body = '<div class="bp-box bp-need"><b>로그인이 필요합니다</b><p>포인트몰은 임직원 계정으로 로그인한 뒤 이용할 수 있습니다.</p><button class="bp-buy" data-action="br-login">로그인</button></div>';
   else {
     const cats: [string, string][] = [['', '전체'], ...(s.feature ? [['rare', '이달의 한정'], ['sale', '특가']] as [string, string][] : [])];
     const shown = v.page === 'rare' ? list.filter((x) => x.tag === 'rare') : v.page === 'sale' ? list.filter((x) => x.tag === 'sale' && x.was) : list;
     const desk = deskSettings(ctx.chat.scriptstate).on ? `<button class="bp-desk${v.ask ? ' on' : ''}" data-action="mall-ask" data-value="" aria-pressed="${v.ask}">1:1 상담</button>` : '';
-    const side = `<nav class="bp-side${mobile ? ' m' : ''}">${cats.map(([k, l]) => `<button class="${v.page === k ? 'on' : ''}" data-action="mall-page" data-value="${k}" aria-pressed="${v.page === k}">${l}</button>`).join('')}${desk}</nav>`;
+    // 「주문 조회」: 산 물건은 여기서 수령 대기 → 받기 (2026-11-16 사용자: 받는 것은 회사에서). 우주몰과 같은 이름, 안 받은 수를 붙인다
+    const orders = liveBmOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat));
+    const waitN = orders.filter((o) => !o.taken).length;
+    const menu: [string, string][] = [...cats, ['orders', `주문 조회${waitN ? ` (${waitN})` : ''}`]];
+    const side = `<nav class="bp-side${mobile ? ' m' : ''}">${menu.map(([k, l]) => `<button class="${v.page === k ? 'on' : ''}" data-action="mall-page" data-value="${k}" aria-pressed="${v.page === k}">${l}</button>`).join('')}${desk}</nav>`;
     const note = mallNote(ctx.chat.scriptstate, site);
     const banner = `<div class="bp-ban">포인트는 현금으로 바꿀 수 없으며, 이 몰에서만 쓸 수 있습니다.${note ? `<br>${esc(note)}` : ''}</div>`;
     const info = v.info ? `<div class="bp-info" role="status">${esc(v.info)}</div>` : '';
     const grid = v.loading === 'shelf' && !list.length ? '<div class="bp-box">상품을 불러오는 중입니다…</div>'
       : !list.length ? `<div class="bp-box"><p>${st.loaded ? '모든 상품이 품절되었습니다.' : '등록된 상품이 없습니다.'}</p><button class="bp-buy" data-action="mall-refresh" ${v.loading ? 'disabled' : ''}>상품 불러오기</button></div>`
       : `<div class="bp-grid">${shown.map((x) => bmCard(x, bal, v, !!v.loading)).join('') || '<p class="bp-none">이 분류에는 상품이 없습니다.</p>'}</div>`;
-    body = `<div class="bp-wrap">${side}<div class="bp-main">${banner}${info}${failBox(v, 'bp-fail')}<h2>${v.page === 'rare' ? '이달의 한정' : v.page === 'sale' ? '특가' : '전체 상품'}${v.loading === 'shelf' && list.length ? ' <small>새 상품을 불러오는 중…</small>' : ''}</h2>${grid}</div></div>`;
+    body = v.page === 'orders'
+      ? `<div class="bp-wrap">${side}<div class="bp-main">${info}${bmOrders(orders, mobile, !!v.loading)}</div></div>`
+      : `<div class="bp-wrap">${side}<div class="bp-main">${banner}${info}${failBox(v, 'bp-fail')}<h2>${v.page === 'rare' ? '이달의 한정' : v.page === 'sale' ? '특가' : '전체 상품'}${v.loading === 'shelf' && list.length ? ' <small>새 상품을 불러오는 중…</small>' : ''}</h2>${grid}</div></div>`;
   }
-  const deskWin = v.ask && s.on && hq && nick && deskSettings(ctx.chat.scriptstate).on ? bmDesk(ctx, v, mobile) : '';
+  const deskWin = v.ask && s.on && nick && deskSettings(ctx.chat.scriptstate).on ? bmDesk(ctx, v, mobile) : '';
   return `<main class="ms ms-bm${mobile ? ' ms-m' : ''}">${gnb}${hd}${body}${deskWin}</main>`;
+}
+
+/** 포인트몰 「주문 조회」: 수령 대기 · 받음. PC 는 표, 폰은 줄마다 카드 (같은 배치를 쓰지 않는다). 받는 곳 안내는 로어북대로 본사 대여창고 */
+function bmOrders(orders: BmOrder[], mobile: boolean, busy: boolean): string {
+  const list = [...orders].reverse();
+  const waitN = list.filter((o) => !o.taken).length;
+  const head = `<div class="bp-oh"><h2>주문 조회</h2>${waitN ? `<button class="bp-buy bp-all" data-action="mall-pickup-all" ${busy ? 'disabled' : ''}>모두 받기</button>` : ''}</div><p class="bp-onote">본사 대여창고에서 받습니다.</p>`;
+  if (!list.length) return `${head}<div class="bp-box"><p>주문 내역이 없습니다.</p></div>`;
+  const state = (o: BmOrder) => (o.taken ? '<span class="bp-ost done">받음</span>' : '<span class="bp-ost">수령 대기</span>');
+  const take = (o: BmOrder) => (o.taken ? '' : `<button class="bp-buy bp-take" data-action="mall-pickup" data-value="${esc(o.id)}" ${busy ? 'disabled' : ''}>받기</button>`);
+  const picOf = (o: BmOrder) => `<span class="bp-opic">${itemPic({ name: o.item.name, icon: o.item.icon })}</span>`;
+  if (mobile) return `${head}<div class="bp-olist">${list.map((o) => `<div class="bp-orow${o.taken ? ' done' : ''}">${picOf(o)}<div class="bp-oinfo"><b>${esc(o.item.name)}</b><small>${pts(o.price)}</small></div><div class="bp-oact">${state(o)}${take(o)}</div></div>`).join('')}</div>`;
+  return `${head}<table class="bp-otb"><tr><th>상품</th><th>포인트</th><th>상태</th><th></th></tr>${list.map((o) => `<tr class="${o.taken ? 'done' : ''}"><td><span class="bp-oname">${picOf(o)}<b>${esc(o.item.name)}</b></span></td><td>${pts(o.price)}</td><td>${state(o)}</td><td>${take(o)}</td></tr>`).join('')}</table>`;
 }
 
 /** 1:1 상담 창: 포인트몰 톤(남색·금색·흰 바탕)의 사내 메신저. 위에 사원증 이름표, 연결 안내는 회색 줄, 내 말 남색·상담사 말 연회색 */

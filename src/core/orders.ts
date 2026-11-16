@@ -184,3 +184,56 @@ export function settleReady(chat: Chat, on: boolean, site = 'cos'): Chat['messag
   }
   return message;
 }
+
+// ── 포인트몰 수령 대기 (2026-11-16 사용자: 접속·구매는 어디서든, 받는 것은 회사에서) ──
+// 사면 포인트가 빠지고 물건은 소지품이 아니라 여기(수령 대기)로 온다. 주인공이 본사 대여창고에 갔을 때 「주문 조회」에서 「받기」를 누르면 그 턴에 소지품에 들어간다.
+// 플러그인도 모델도 위치를 따지지 않는다 (누르는 사람이 정한다). 살아 있음 규칙은 맞춤 주문과 같다 (liveOrders).
+
+export const BM_ORDERS_KEY = '$bm_orders';
+export const BM_ORDERS_MAX = 40;
+
+/** 수령 대기 한 줄. item 은 살 때 진열대의 것 그대로 (숨긴 진실 포함) */
+export type BmOrder = Pick<CosOrder, 'id' | 'anchor' | 'price' | 'item' | 'walletId' | 'taken' | 'takenKey'> & {
+  /** 본편에 「포인트로 삼」으로 넘길 글 (살 때 적어 둔다, 받을 때 물건에 그대로) */
+  paidWith?: string;
+};
+
+export function readBmOrders(vars: Vars): BmOrder[] {
+  const raw = String(vars?.[BM_ORDERS_KEY] ?? '');
+  if (!raw) return [];
+  try {
+    const arr: unknown = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((o): o is BmOrder => !!o && typeof o === 'object' && typeof (o as BmOrder).id === 'string' && !!(o as BmOrder).item && typeof (o as BmOrder).item.name === 'string');
+  } catch {
+    return [];
+  }
+}
+/** 살아 있는 수령 대기: 산 응답이 죽으면(다시 굴리기·삭제) 포인트가 돌아오니 대기도 없던 것으로, 받은 응답이 죽으면 물건이 죽으니 다시 「수령 대기」로 */
+export const liveBmOrders = (vars: Vars, alive: Set<string>): BmOrder[] =>
+  readBmOrders(vars)
+    .map((o) => (o.taken && o.takenKey && !alive.has(o.takenKey) ? { ...o, taken: false, takenKey: undefined } : o))
+    .filter((o) => o.taken || !o.anchor || alive.has(o.anchor));
+/** 아직 안 받은 것 */
+export const bmWaiting = (vars: Vars, alive: Set<string>): BmOrder[] => liveBmOrders(vars, alive).filter((o) => !o.taken);
+/** 넘치면 받은 것부터 오래된 순으로 버린다. 안 받은 것은 버리지 않는다 */
+export function pruneBmOrders(list: BmOrder[]): BmOrder[] {
+  const out = [...list];
+  while (out.length > BM_ORDERS_MAX) {
+    const i = out.findIndex((o) => o.taken);
+    if (i < 0) break;
+    out.splice(i, 1);
+  }
+  return out;
+}
+export const bmOrdersVars = (list: BmOrder[]): Record<string, string> => ({ [BM_ORDERS_KEY]: list.length ? JSON.stringify(pruneBmOrders(list)) : '' });
+/** 받은 것으로 적는다 (ids 가 없으면 안 받은 것 전부). 받은 줄들을 같이 돌려준다 */
+export function takeBmOrders(list: BmOrder[], takenKey: string, ids?: string[]): { list: BmOrder[]; got: BmOrder[] } {
+  const got: BmOrder[] = [];
+  const next = list.map((o) => {
+    if (o.taken || (ids && !ids.includes(o.id))) return o;
+    got.push(o);
+    return { ...o, taken: true, takenKey };
+  });
+  return { list: next, got };
+}

@@ -37,21 +37,6 @@ export function lastIdentity(chat: Chat): string {
 }
 
 
-/** 포인트몰은 본사(포인트 조직 거점)에서만 열린다 (2026-11-15 사용자). 마지막 상태창 위치 칸에 그 거점 이름·영문명·별칭이 들어 있으면 'in'.
- *  위치 칸이 한 번도 없었으면(위치 칸을 끈 구성 등) 'unknown' — 막지 않는다 */
-export function hqState(chat: Chat, names: string[]): 'in' | 'out' | 'unknown' {
-  const words = names.map((n) => String(n ?? '').trim().toLowerCase()).filter((n) => n.length > 1);
-  const msgs = chat.message ?? [];
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    const tags = findStatusTags(String((msgs[i] as { data?: unknown }).data ?? ''));
-    for (let k = tags.length - 1; k >= 0; k--) {
-      const place = tags[k].place.trim().toLowerCase();
-      if (place) return words.some((w) => place.includes(w)) ? 'in' : 'out';
-    }
-  }
-  return 'unknown';
-}
-
 /** 포인트 칸 「자동」 켜짐 표시 (POINTS_ON_VAR) 를 마지막 신분에 맞춘 값. 신분 칸이 아직 없으면 fallback(시작 세력 등)을 따른다. 바뀔 게 없으면 null */
 export function pointsFlagFor(chat: Chat, fallback = false): '1' | '0' | null {
   const id = lastIdentity(chat);

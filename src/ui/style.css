@@ -4500,6 +4500,32 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .ms-bm .bp-side .bp-desk { margin-top: 6px; border-top: 1px solid #dde1e8; padding-top: 11px; color: #1f2a44; font-weight: 700; }
 .ms-bm .bp-side .bp-desk.on { background: #f3f5f9; border-left-color: #f3d9a4; }
 .ms-bm.ms-m .bp-side .bp-desk { margin: 0 0 0 auto; border-top: 0; padding-top: 9px; }
+/* 포인트몰 「주문 조회」: 수령 대기 · 받음 (PC 표 / 폰 줄 카드) */
+.ms-bm .bp-oh { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.ms-bm .bp-oh h2 { margin: 0; }
+.ms-bm .bp-oh .bp-all { width: auto; margin: 0; padding: 8px 18px; }
+.ms-bm .bp-onote { margin: 0 0 14px; color: #7a6431; font-size: 12.5px; }
+.ms-bm .bp-otb { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #dde1e8; border-radius: 8px; overflow: hidden; }
+.ms-bm .bp-otb th { text-align: left; padding: 10px 14px; font-size: 12px; color: #596277; background: #f3f5f9; border-bottom: 1px solid #dde1e8; font-weight: 700; }
+.ms-bm .bp-otb td { padding: 10px 14px; border-bottom: 1px solid #eceff4; vertical-align: middle; color: #1f2a44; }
+.ms-bm .bp-otb tr:last-child td { border-bottom: 0; }
+.ms-bm .bp-otb th:nth-child(2), .ms-bm .bp-otb td:nth-child(2) { width: 120px; white-space: nowrap; }
+.ms-bm .bp-otb th:nth-child(3), .ms-bm .bp-otb td:nth-child(3) { width: 110px; }
+.ms-bm .bp-otb th:nth-child(4), .ms-bm .bp-otb td:nth-child(4) { width: 96px; text-align: right; }
+.ms-bm .bp-otb tr.done td { color: #8a93a6; }
+.ms-bm .bp-oname { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ms-bm .bp-opic { flex: none; width: 44px; height: 44px; display: grid; place-items: center; background: #f3f5f9; border-radius: 6px; overflow: hidden; }
+.ms-bm .bp-opic img { max-width: 40px; max-height: 40px; image-rendering: pixelated; }
+.ms-bm .bp-ost { display: inline-block; padding: 3px 9px; border-radius: 999px; background: #fff8e8; border: 1px solid #efdfb8; color: #7a6431; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ms-bm .bp-ost.done { background: #f3f5f9; border-color: #dde1e8; color: #8a93a6; font-weight: 500; }
+.ms-bm .bp-take { width: auto; margin: 0; padding: 7px 16px; display: inline-block; }
+.ms-bm .bp-olist { display: grid; gap: 8px; }
+.ms-bm .bp-orow { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 10px; background: #fff; border: 1px solid #dde1e8; border-radius: 8px; padding: 10px 12px; }
+.ms-bm .bp-orow.done { color: #8a93a6; }
+.ms-bm .bp-oinfo { display: grid; gap: 2px; min-width: 0; }
+.ms-bm .bp-oinfo b { overflow-wrap: anywhere; }
+.ms-bm .bp-oinfo small { color: #596277; }
+.ms-bm .bp-oact { display: grid; gap: 6px; justify-items: end; }
 .ms-bm .bd-win { position: absolute; z-index: 6; top: 108px; right: 28px; width: 380px; height: min(560px, calc(100% - 124px)); min-width: 300px; min-height: 260px; display: flex; flex-direction: column; background: #fff; border: 1px solid #c9cfdb; border-radius: 10px; box-shadow: 0 12px 32px rgba(31, 42, 68, .22); overflow: hidden; color: #1f2430; font: 13.5px 'Pretendard', 'Noto Sans KR', sans-serif; }
 .ms-bm .bd-wt { display: flex; align-items: center; gap: 8px; height: 38px; flex: none; padding: 0 6px 0 14px; background: #1f2a44; color: #fff; cursor: move; user-select: none; }
 .ms-bm .bd-wt b { font-size: 13.5px; }

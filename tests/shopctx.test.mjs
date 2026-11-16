@@ -51,7 +51,8 @@ const MARK = {
   '우주 문의(판 것)': [/just sold 여분 정장 to 우주 쇼핑몰/, 'cos', 'ask'],
   '우주 맞춤 주문(선납)': [/placed a custom order with 우주 쇼핑몰 for 「가림 내의」/, 'cos', 'order'],
   '우주 맞춤 주문(받은 것)': [/just bought[^;\n]*맞춤 장갑/, 'cos', 'order'],
-  '포인트몰 구매': [/just bought[^;\n]*복지 텀블러/, 'bm', 'buy'],
+  // 포인트몰에서 산 것은 「주문 조회」에서 받은 턴에 받는 법 줄로 간다 (2026-11-16 사용자: 받는 것은 회사에서) — 「방금 삼」에는 안 오른다
+  '포인트몰 구매': [/collects in person[^;\n]*백일몽 포인트몰: [^;\n]*복지 텀블러/, 'bm', 'buy'],
   '포인트몰 1:1 상담': [/counselor on the 백일몽 포인트몰 1:1 상담/, 'bm', 'desk'],
   '포인트몰에 판 것': [/just sold 낡은 사원증 to 백일몽 포인트몰/, 'bm', null],
 };
