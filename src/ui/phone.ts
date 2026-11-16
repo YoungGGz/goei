@@ -133,6 +133,9 @@ const PAGE = 40;
 const jobs = new Map<string, string>();
 const chatKey = (ctx: { charIndex: number; chatIndex: number }) => `${ctx.charIndex}:${ctx.chatIndex}`;
 export const phoneBusy = (ctx: { charIndex: number; chatIndex: number }) => jobs.has(chatKey(ctx));
+/** 응답은 받았고 본편 응답이 끝나기를 기다리는 자동 작업 (저장만 남음). 손 조작은 막지 않고, 다음 자동 작업만 미룬다 */
+const parked = new Set<string>();
+const autoBusy = (ctx: { charIndex: number; chatIndex: number }) => phoneBusy(ctx) || parked.has(chatKey(ctx));
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -153,7 +156,7 @@ function dir(ctx: ChatContext, chat = ctx.chat): Directory {
 
 const token = () => `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 
-async function run(ctx: ChatContext, env: PhoneEnv, label: string, work: () => Promise<string>): Promise<boolean> {
+async function run(ctx: ChatContext, env: PhoneEnv, label: string, work: (park: () => Promise<void>) => Promise<string>): Promise<boolean> {
   const key = chatKey(ctx);
   if (jobs.has(key)) {
     phone.notice = `${jobs.get(key)} 끝난 뒤 다시 눌러 주세요.`;
@@ -164,15 +167,28 @@ async function run(ctx: ChatContext, env: PhoneEnv, label: string, work: () => P
   phone.notice = '';
   phone.failure = null;
   env.render();
+  let held = true;
+  // 저장 전 대기: 작업 잠금을 먼저 풀어, 본편 응답을 기다리는 동안 손 조작이 막히지 않게 한다
+  const park = async () => {
+    if (!isWaiting()) return;
+    held = false;
+    jobs.delete(key);
+    parked.add(key);
+    env.render();
+    await whenIdle();
+  };
   try {
-    phone.notice = await work();
+    const note = await work(park);
+    if (held || !jobs.has(key)) phone.notice = note;
   } catch (error) {
+    if (!held && jobs.has(key)) return true;
     const msg = error instanceof Error ? error.message : String(error);
     phone.notice = msg;
     const raw = (error as { raw?: string }).raw;
     if (raw) phone.failure = { label, reason: msg, raw };
   } finally {
-    jobs.delete(key);
+    if (held) jobs.delete(key);
+    else parked.delete(key);
     await env.refresh();
   }
   return true;
@@ -387,7 +403,7 @@ async function createGroup(ctx: ChatContext, env: PhoneEnv) {
 /** 전체 새 메시지 확인 (원본 refreshInbox). automatic: 채팅 응답 뒤 자동 확인 */
 export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false, joint?: Joint) {
   const e = env ?? (automatic ? envForAuto(ctx) : envOr(env));
-  return run(ctx, e, automatic ? '새 메시지를 자동으로 확인하는 중이에요.' : '새 메시지를 확인하는 중이에요.', async () => {
+  return run(ctx, e, automatic ? '새 메시지를 자동으로 확인하는 중이에요.' : '새 메시지를 확인하는 중이에요.', async (park) => {
     const startLength = ctx.chat.message?.length ?? 0;
     const st = readPhone(ctx.chat);
     // 요청 때 있던 방: 확인 중에 지워졌으면 옛 사본으로 되살리지 않는다 (전수검사 11-13)
@@ -416,7 +432,7 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
     });
     let note = '';
     // 자동 확인은 사용자가 다음 말을 보낸 뒤에 끝날 수 있다: 본편 응답을 기다리는 동안에는 저장하지 않고, 대기가 풀린 뒤 앞 메시지가 그대로인지 확인하고 저장한다
-    if (automatic) await whenIdle();
+    if (automatic) await park();
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
       // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
       if (automatic && !chatPrefixKept(ctx.chat, chat)) {
@@ -477,7 +493,7 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
 /** 채팅 응답이 끝난 뒤 (main.ts onOutput), 또는 「창을 열 때」면 괴담톡 탭을 열 때 (openCheck). 같은 응답에는 한 번만 */
 export async function autoRefresh(ctx: ChatContext, messageIndex: number, env?: PhoneEnv, joint?: Joint): Promise<void> {
   const set = phoneSettings(ctx.chat.scriptstate);
-  if (!(env ? set.autoOpen : set.auto) || phoneBusy(ctx)) return;
+  if (!(env ? set.autoOpen : set.auto) || autoBusy(ctx)) return;
   const data = String(ctx.chat.message?.[messageIndex]?.data ?? '');
   if (!data.trim()) return;
   // 턴 열쇠: 같은 턴의 응답을 다시 굴려도 다시 부르지 않는다 (core/shop.ts turnKeyAt)
@@ -499,7 +515,7 @@ export async function autoRefresh(ctx: ChatContext, messageIndex: number, env?: 
 /** 보기 전용 방 자동 만들기 (「매 턴」은 채팅 응답 뒤, 「창을 열 때」는 탭을 열 때). 같은 응답에는 한 번 */
 export async function autoView(ctx: ChatContext, messageIndex: number, env?: PhoneEnv): Promise<void> {
   const set = viewSettings(ctx.chat.scriptstate);
-  if (!(env ? set.auto === 'open' : set.auto === 'turn') || phoneBusy(ctx)) return;
+  if (!(env ? set.auto === 'open' : set.auto === 'turn') || autoBusy(ctx)) return;
   const data = String(ctx.chat.message?.[messageIndex]?.data ?? '');
   if (!data.trim()) return;
   const stamp = turnKeyAt(ctx.chat, messageIndex);
@@ -822,7 +838,7 @@ function viewPane(ctx: ChatContext, d: Directory, busy: boolean): string {
 /** 보기 전용 방 하나 만들기 */
 function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
   const set = viewSettings(ctx.chat.scriptstate);
-  return run(ctx, env, `${VIEW_PRESETS[set.preset]}을 만드는 중이에요.`, async () => {
+  return run(ctx, env, `${VIEW_PRESETS[set.preset]}을 만드는 중이에요.`, async (park) => {
     const startLength = ctx.chat.message?.length ?? 0;
     const prompt = fitPrompt(fnBudget(ctx.chat.scriptstate, 'ph', 'view'), () => viewPrompt(source(ctx), names(ctx), readViews(ctx.chat.scriptstate)));
     const { value } = await askModel(prompt.messages, phoneSettings(ctx.chat.scriptstate).model, (raw) => parseView(raw, set.preset), {
@@ -832,7 +848,7 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
     let id = '';
     let roomName = value.name;
     // 본편 응답을 기다리는 동안에는 저장하지 않는다 (refreshInbox 와 같음)
-    if (automatic) await whenIdle();
+    if (automatic) await park();
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
       // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
       if (automatic && !chatPrefixKept(ctx.chat, chat)) {
@@ -1124,7 +1140,8 @@ function rosterPick(ctx: ChatContext, cur: string, keep: (c: Contact) => boolean
   const groups = new Map<string, Contact[]>();
   for (const c of people) groups.set(c.group ?? '', [...(groups.get(c.group ?? '') ?? []), c]);
   const opt = (c: Contact) => `<option value="${esc(c.name)}" ${c.name === cur.trim() ? 'selected' : ''}>${esc(c.name)}${c.rank ? ` · ${esc(c.rank)}` : ''}</option>`;
-  const body = [...groups].map(([g, list]) => (g ? `<optgroup label="${esc(g)}">${list.map(opt).join('')}</optgroup>` : list.map(opt).join(''))).join('');
+  const fnames = names(ctx);
+  const body = [...groups].map(([g, list]) => (g ? `<optgroup label="${esc(fnames[g] ?? g)}">${list.map(opt).join('')}</optgroup>` : list.map(opt).join(''))).join('');
   return `<select class="gx-select ph-pick-sel" data-change="ph-pop-pick" aria-label="명부에서 고르기"><option value="">명부에서 고르기</option>${body}</select>`;
 }
 
@@ -1235,6 +1252,8 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
     if (phone.notice === t) phone.notice = '';
   });
   const detail = phone.view !== 'list';
+  // 전화·연락처 추가 창이 떠 있으면 안내는 그 창 바탕 안에 띄운다 (창 바탕이 화면을 덮어 밖의 안내가 가려진다)
+  const pop = phone.pop === 'call' ? callView(ctx) : phone.pop === 'add' ? addView(ctx) : '';
   const tools = [
     tool('ph-refresh', ICONS.refresh, '새 메시지 확인', busy ? 'disabled' : '', '새로고침'),
     tool('ph-group', ICONS.group, '단톡 만들기', busy ? 'disabled' : '', '단톡'),
@@ -1254,8 +1273,7 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
       ${drawerHtml(tools, '', '', 'phone')}
     </section>
     <section class="ph-pane">${detail ? status : ''}${paneHtml(ctx, st, d, busy)}</section>
-    ${phone.pop === 'call' ? callView(ctx) : phone.pop === 'add' ? addView(ctx) : ''}
-    ${note}
+    ${pop ? pop.replace(/<\/div>$/, `${note}</div>`) : note}
   </main>`;
 }
 

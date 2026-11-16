@@ -354,7 +354,7 @@ test('자동 호출 결과: 플러그인이 응답에 붙였다 뗀 것(상점 �
 test('자동 확인·자동 관전: 본편 응답을 기다리는 동안에는 결과를 저장하지 않고 대기가 풀린 뒤 저장한다', () => {
   const ui = readFileSync(new URL('../src/ui/phone.ts', import.meta.url), 'utf8');
   // 두 곳 모두 저장(updateChat) 바로 앞에서 기다리고, 기다린 뒤 저장 안에서 앞 메시지를 다시 확인한다
-  assert.equal(ui.match(/if \(automatic\) await whenIdle\(\);\n    await updateChat\(ctx\.charIndex, ctx\.chatIndex, \(chat\) => \{\n[^\n]*\n      if \(automatic && !chatPrefixKept\(ctx\.chat, chat\)\)/g)?.length, 2);
+  assert.equal(ui.match(/if \(automatic\) await park\(\);\n    await updateChat\(ctx\.charIndex, ctx\.chatIndex, \(chat\) => \{\n[^\n]*\n      if \(automatic && !chatPrefixKept\(ctx\.chat, chat\)\)/g)?.length, 2);
   assert.match(ui, /function whenIdle\(\): Promise<void> \{\n  if \(!isWaiting\(\)\) return Promise\.resolve\(\);/);
 });
 

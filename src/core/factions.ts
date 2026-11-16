@@ -147,6 +147,9 @@ export function placeholdersReady(lore: LoreEntry[] | undefined): boolean {
 }
 
 const builtinType = (code: string): FactionType => (code === 'D00' ? 'civilian' : code === 'E00' ? 'freelancer' : 'org');
+/** 「모든 세력에게 열린 탭」을 가리는 기준 세력: 민간인은 빈 연락처로 시작하므로(명부 기본값) 세지 않는다.
+ *  이 세력들 모두에게 열린 탭이 새 세력에도 열리고, 소속 코드 없는 새 조직의 처음 탭이 된다 */
+export const OPEN_TO = BUILTIN.filter((f) => builtinType(f) !== 'civilian');
 
 /** 새 세력의 괴담톡 전용 탭 ID (F00 → T105) */
 export const extraTabId = (code: string) => `T${100 + code.charCodeAt(0) - 65}`;

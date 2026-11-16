@@ -88,10 +88,10 @@ export function matchView(list: ViewRoom[], value: Pick<ViewRoom, 'preset' | 'po
 }
 
 /** 같은 종류의 기존 방들 (모델에 보낼 모양, 최근 방부터). 모델이 인물 이름을 그대로 다시 쓰고 앞 내용을 되풀이하지 않게.
- *  limit = 넘길 말풍선 수 (양 표 「보기 전용 방」 줄의 지난 기록) — 방이 여럿이면 고르게 나눈다 */
+ *  limit = 방마다 넘길 말풍선 수 (양 표 「보기 전용 방」 줄의 지난 기록) */
 export function viewRooms(list: ViewRoom[], preset: ViewPreset, limit = VIEW_LIMITS.messages): unknown[] {
   const rooms = list.filter((x) => x.preset === preset).reverse();
-  const each = Math.max(1, Math.ceil(limit / Math.max(1, rooms.length)));
+  const each = Math.max(1, limit);
   return rooms.map((r) => ({
     name: r.name, pov: r.pov, participants: r.people,
     messages: r.messages.filter((m) => m.type !== 'time').slice(-each).map((m) => ({ sender: m.type === 'text' ? m.sender : '-', type: m.type, content: m.type === 'text' ? m.text : m.type === 'pause' ? m.text : '-' })),

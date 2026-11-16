@@ -4,7 +4,7 @@
 import type { Chat, ChatMessage, LoreEntry } from './types';
 import { readWorld } from './world/output';
 import { phoneTabsSection, readDirectory, rosterOf } from './world/directory';
-import { BUILTIN, extraFactions, extraTabs, factionType, isFactionCode } from './factions';
+import { OPEN_TO, extraFactions, extraTabs, factionType, isFactionCode } from './factions';
 import { dateNow, storyTurns, tokens, cut } from './gnet';
 import { attachmentRecords, describe, sitePicAsPhoto, stripForged } from './attach';
 import { pickRecords, related, type Focus, type Pick } from './focus';
@@ -208,10 +208,10 @@ function tabCatalog(lore: LoreEntry[]): { entries: TabDef[]; orders: Record<stri
     if (entries.some((e) => e.id === row.id)) continue;
     entries.push({ id: row.id, name: row.name || row.id, names: { ...row.name_by_faction }, visibleFor: new Set(row.visible_for) });
   }
-  // 새 세력: 기본 다섯 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다
+  // 새 세력: 민간인을 뺀 기본 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다
   const extra = extraFactions(lore).map((f) => f.code);
   if (extra.length) {
-    for (const e of entries) if (BUILTIN.every((f) => e.visibleFor.has(f))) for (const f of extra) e.visibleFor.add(f);
+    for (const e of entries) if (OPEN_TO.every((f) => e.visibleFor.has(f))) for (const f of extra) e.visibleFor.add(f);
     for (const t of extraTabs(lore)) if (!entries.some((e) => e.id === t.id)) entries.push({ id: t.id, name: t.name, names: {}, visibleFor: new Set(t.visibleFor) });
   }
   const orders: Record<string, string[]> = {};

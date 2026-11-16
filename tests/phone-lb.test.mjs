@@ -116,11 +116,11 @@ test('괴담톡: 보기 전용 방 요청·응답 (사이드스토리·혼잣말
   assert.equal(V.matchView(minds, room(['에일린', '냉소'], 'p1', 'multi'))?.id, 'v_m');
   assert.equal(V.matchView(minds, room(['체념', '한서'], 'p2', 'multi'))?.id, 'v_h');
   assert.equal(V.matchView(minds, room(['에일린'], 'p1', 'mono')), undefined);
-  // 방이 여럿이면 같은 종류를 전부 최근 방부터 보내고, 말풍선 수는 나눈다
+  // 방이 여럿이면 같은 종류를 전부 최근 방부터 보내고, 말풍선은 방마다 설정 수만큼
   const two = [...list, { ...room(['에일린', '팀장']), id: 'v_2', name: '회의실', messages: Array.from({ length: 9 }, (_, i) => ({ sender: 'p1', type: 'text', text: `m${i}` })), time: 't', unread: false }, ...minds];
   const sent = V.viewRooms(two, 'side', 6);
   assert.deepEqual(sent.map((x) => x.name), ['회의실', '퇴근길']);
-  assert.equal(sent[0].messages.length, 3);
+  assert.equal(sent[0].messages.length, 6);
   assert.deepEqual(V.viewRooms(two, 'mono', 6), []);
   assert.equal(V.viewSettings({}).auto, 'manual');
 });

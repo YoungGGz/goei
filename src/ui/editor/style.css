@@ -391,6 +391,8 @@
   .gw-tree { position: absolute; top: 52px; left: 0; bottom: 0; width: 260px; transform: translateX(-100%); visibility: hidden; transition: transform .18s, visibility .18s; z-index: 3; box-shadow: var(--shadow); }
   /* 닫힌 서랍은 화면 밖에 있어도 Tab·읽어 주기에 걸렸다 → visibility 로 숨김 (2026-10-28 QC) */
   .gw-win.drawer .gw-tree { transform: none; visibility: visible; }
+  /* 목록이 떠 있는 동안 본문 안의 조작은 눌리지 않는다: 누르면 본문 칸이 받아 목록만 닫는다 (index.ts 클릭 처리) */
+  .gw-win.drawer .gw-body > * { pointer-events: none; }
   .gw-page.split { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; height: auto; }
   /* 폰: 목록 대신 드롭다운 한 줄 (목록·검색·제목은 숨김) */
   .gw-list-pane { border-right: 0; border-bottom: 1px solid var(--line); max-height: none; }

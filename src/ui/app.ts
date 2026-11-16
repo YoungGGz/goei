@@ -1808,6 +1808,7 @@ function navStep(dir: -1 | 1): (() => void) | null {
   if (view.kind !== 'started') return null;
   if (evUi.pop && dir < 0) return () => void run('ev-pop', evUi.pop);
   if (agUi.pop && dir < 0) return () => void run('agent-info', agUi.pop);
+  if (tab === 'phone' && phone.pop && dir < 0) return go('ph-pop-close');
   if (!navHist.can(dir)) return null;
   return () => {
     const s = navHist.go(dir);
