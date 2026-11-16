@@ -233,7 +233,7 @@ export function cosFixed(vars: Vars): CosFixed[] {
       const x = o as Record<string, unknown>;
       const num = (v: unknown) => (Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : 0);
       const was = num(x.was);
-      return { id: String(x.id ?? '').slice(0, 24) || `f${Math.random().toString(36).slice(2, 8)}`, on: x.on !== false, pct: Math.max(0, Math.min(100, num(x.pct))), name: String(x.name ?? '').slice(0, 40), price: num(x.price), ...(was ? { was } : {}), desc: String(x.desc ?? '').slice(0, 80), effect: String(x.effect ?? '').slice(0, 60), truth: String(x.truth ?? '').slice(0, 200) };
+      return { id: String(x.id ?? '').slice(0, 24) || `f${Math.random().toString(36).slice(2, 8)}`, on: x.on !== false, pct: Math.max(0, Math.min(100, num(x.pct))), name: String(x.name ?? '').slice(0, 40), price: num(x.price), ...(was ? { was } : {}), desc: String(x.desc ?? '').slice(0, 200), effect: String(x.effect ?? '').slice(0, 200), truth: String(x.truth ?? '').slice(0, 200) };
     }).filter((x): x is CosFixed => !!x).slice(0, COS_FIXED_MAX);
   } catch {
     return COS_FIXED_DEFAULT;

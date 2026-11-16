@@ -96,13 +96,6 @@ export function endDesk(st: DeskState): DeskState {
   return { agent: null, talk: [], anchor: '', past };
 }
 
-/** 본편이 넘어간 뒤 다시 열 때: 연결만 되고 내가 한마디도 하지 않은 상담은 끝내지 않고 그대로 이어 쓴다 (받아 둔 상담사 카드와 첫 인사를 버리고 새로 만들지 않게).
- *  기준 응답과 줄에 적힌 응답 키를 지금 것으로 옮긴다. 이어 쓸 수 없으면(상담사 없음·내가 말한 상담) null */
-export function carryDesk(st: DeskState, key: string): DeskState | null {
-  if (!st.agent || !key || st.talk.some((l) => l.who === 'me')) return null;
-  return { ...st, anchor: key, talk: st.talk.map((l) => (l.who === 'op' ? { ...l, k: key } : l)) };
-}
-
 /** 새 상담사를 만들지, 지난 상담사를 다시 부를지 (다시 만나기 켬일 때 1/4) */
 export function pickAgain(st: DeskState, s: DeskSettings, rnd: () => number = Math.random): DeskAgent | null {
   if (!s.again || !st.past.length || rnd() >= 0.25) return null;

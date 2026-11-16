@@ -2073,7 +2073,7 @@ function browserBody(ctx: ChatContext): string {
   const page = br.list && isPhone() ? tabListHtml(o)
     : !t.site ? homeHtml(browserSites(ctx))
     : isBoardSite(t.site) ? gnetTab(ctx, gnetEnv, t.site)
-    : isMallSite(t.site) ? mallTab(ctx, wikiEnv, t.site)
+    : isMallSite(t.site) ? mallTab(ctx, wikiEnv, t.site, shown)
     : t.site === 'hs' ? homeshopTab(ctx, wikiEnv)
     : t.site === 'wk' ? wikiTab(ctx, wikiEnv)
     : soonHtml(t.site);

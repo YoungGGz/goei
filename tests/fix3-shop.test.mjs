@@ -179,16 +179,3 @@ test('문의로 물건 바꾸기: 기본(켬)은 전과 같고, 끄면 문의 �
   assert.equal(S.applyTalk(live, allNew, true, false).talk.at(-1).text, '싹 바꿨소.', '주인 대사는 남는다');
 });
 
-test('1:1 상담: 연결만 하고 말을 걸지 않은 상담은 턴이 넘어가도 이어 쓴다 (새로 만들지 않는다). 말을 건 상담은 전처럼 끝낸다', () => {
-  const agent = { id: 'a1', no: '0427', name: '김', rank: '대리', dept: '복지', intro: '', voice: '', dice: [] };
-  const idle = { agent, anchor: 'c1', past: [], talk: [{ who: 'sys', text: '연결' }, { who: 'op', text: '안녕하세요, 고객님.', k: 'c1' }] };
-  const kept = S.carryDesk(idle, 'c2');
-  assert.equal(kept.agent, agent);
-  assert.equal(kept.anchor, 'c2');
-  assert.deepEqual(kept.talk, [{ who: 'sys', text: '연결' }, { who: 'op', text: '안녕하세요, 고객님.', k: 'c2' }], '첫 인사는 지금 턴의 것으로 옮긴다');
-  assert.deepEqual(kept.past, []);
-  const used = { ...idle, talk: [...idle.talk, { who: 'me', text: '환불 돼요?', k: 'c1' }, { who: 'op', text: '확인해 드릴게요.', k: 'c1' }] };
-  assert.equal(S.carryDesk(used, 'c2'), null);
-  assert.equal(S.carryDesk({ agent: null, anchor: '', past: [], talk: [] }, 'c2'), null);
-  assert.equal(S.carryDesk(idle, ''), null);
-});

@@ -1073,8 +1073,9 @@ export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 
     guide === 'Cos' && !o ? fillGuide(g.ORDER, v) : '',
     st.identity.points ? fillGuide(g.POINT_SHOP, v) : '',
     [fillGuide(g.TALK_OUTPUT, v), o ? fillGuide(g.TALK_OUTPUT_OFFER, v) : '', guide === 'Cos' && !o ? fillGuide(g.TALK_OUTPUT_INFO, v) : '', guide === 'Cos' && !o ? fillGuide(g.TALK_OUTPUT_ORDER, v) : '', s.kick ? fillGuide(g.TALK_OUTPUT_END, v) : ''].filter(Boolean).join('\n'),
-    // 「문의로 물건 바꾸기」를 끄면 진열 규칙을 넣지 않는다. 우주몰 문의(팔기 중이 아닐 때)는 맞춤 주문 견적 줄에 쓰는 칸 설명만 짧게 넣는다 (지침 ORDER_COLUMNS 절)
-    s.talkStock ? SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true) : guide === 'Cos' && !o ? guideTxt(guide, 'ORDER_COLUMNS') : '',
+    // 「문의로 물건 바꾸기」를 끄면 진열 규칙을 넣지 않는다. 우주몰 문의(팔기 중이 아닐 때)는 맞춤 주문 견적 줄에 쓰는 칸 설명만 짧게 넣는다 (지침 ORDER_COLUMNS 절).
+    // 견적의 진실 칸도 설정 「진실 미리 정하기」를 따른다 (진열과 같은 TRUTH_* 절)
+    s.talkStock ? SHELF_RULES(g, s, st, guide, src.truthMode ?? 'mix', true) : guide === 'Cos' && !o ? `${guideTxt(guide, 'ORDER_COLUMNS')} ${guideTxt(guide, `TRUTH_${(src.truthMode ?? 'mix').toUpperCase()}`)}` : '',
     src.language ?? '',
   ].filter(Boolean).join('\n\n');
   // 내가 방금 한 말(마지막 줄)은 늘 넘긴다

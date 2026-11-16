@@ -19,7 +19,7 @@ import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, canc
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
-import { carryDesk, DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
+import { DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
 import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallSeenKey, mallUnseen, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
 import { SHOP_SIZE_HI, SHOP_SIZE_LO } from '../core/shop';
 import { onOffSwitch } from './controls';
@@ -239,6 +239,13 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
   await env.refresh();
 }
 
+/** 받아 둔 진열을 본 것으로 적는다 (「매 턴」이 안 본 진열을 다시 받지 않게). 진열을 화면에 그릴 때마다 부른다: 열어 둔 창에서 새로 받은 진열도 본 것이다 */
+function markSeen(ctx: ChatContext, site: MallSite): void {
+  if (!mallUnseen(ctx.chat.scriptstate, site, readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat)).loaded)) return;
+  const at = String(ctx.chat.scriptstate?.[atKey(site)] ?? '');
+  void updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[atKey(site)] ?? '') !== at || String(chat.scriptstate?.[mallSeenKey(site)] ?? '') === at ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [mallSeenKey(site)]: at } })).catch(() => null);
+}
+
 /** 사이트를 열 때: 「창을 열 때」이고 마지막 응답 뒤로 아직 안 짰으면 한 번 (처음이면 늘) */
 let liveEnv: MallEnv | null = null;
 export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): void {
@@ -248,11 +255,6 @@ export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): v
   if (!s.on || s.auto === 'manual' || ui[site].loading) return;
   if (site === 'bm' && !loggedNick(ctx)) return;
   const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
-  // 받아 둔 진열을 본 것으로 적는다 (「매 턴」이 안 본 진열을 다시 받지 않게)
-  if (mallUnseen(ctx.chat.scriptstate, site, st.loaded)) {
-    const at = String(ctx.chat.scriptstate?.[atKey(site)] ?? '');
-    void updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[mallSeenKey(site)] ?? '') === at ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [mallSeenKey(site)]: at } })).catch(() => null);
-  }
   if (st.loaded && String(ctx.chat.scriptstate?.[atKey(site)] ?? '') === turnKey(ctx.chat)) return;
   if (st.loaded && s.auto === 'turn') return;
   void ask(ctx, env, site, 'shelf', st);
@@ -704,13 +706,6 @@ async function deskOpen(ctx: ChatContext, env: MallEnv): Promise<boolean> {
   let st = readDesk(ctx.chat.scriptstate);
   const key = lastBot(ctx.chat)?.key ?? '';
   if (st.agent && st.anchor === key) return env.render(), true;
-  // 연결만 해 두고 말을 걸지 않은 상담은 턴이 넘어가도 그대로 이어 쓴다 (새 상담사를 다시 만들지 않는다)
-  const kept = carryDesk(st, key);
-  if (kept) {
-    await saveDesk(ctx, kept);
-    await env.refresh();
-    return true;
-  }
   if (st.agent) st = endDesk(st);
   const again = pickAgain(st, ds);
   if (again) {
@@ -971,9 +966,10 @@ function bmDesk(ctx: ChatContext, v: View, mobile: boolean): string {
 }
 
 /** 브라우저 탭 화면 */
-export function mallTab(ctx: ChatContext, env: MallEnv, site: MallSite): string {
+export function mallTab(ctx: ChatContext, env: MallEnv, site: MallSite, shown = false): string {
   sync(ctx);
   void env;
+  if (shown) markSeen(ctx, site);
   const mobile = isPhone();
   return site === 'cos' ? cosHtml(ctx, mobile) : bmHtml(ctx, mobile);
 }
@@ -1126,8 +1122,8 @@ function cosFixedGroup(ctx: ChatContext): string {
   const items = list.map((f) => `<div class="ms-fx${f.on ? '' : ' off'}">
       <div class="ms-fx-head">${text(f.id, 'name', f.name, '상품 이름', '이름', 40)}<span class="ph-inline"><span>확률</span>${num(f.id, 'pct', f.pct, '25', '확률', 100)}<span>%</span></span>${mseg('cos', `fx_on:${f.id}`, f.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']])}<button class="gx-mini danger" data-action="ms-fx-del" data-value="${esc(f.id)}" aria-label="지우기">×</button></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>값</span>${num(f.id, 'price', f.price, '999999', '값')}<span>원</span></span><span class="ph-inline"><span>할인 전</span>${num(f.id, 'was', f.was, '비우면 할인 없음', '할인 전 값')}<span>원</span></span></div>
-      <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>설명</span>${text(f.id, 'desc', f.desc, '겉보기 설명 (???·검열됨처럼 숨겨도 돼요)', '설명', 80)}</span></div>
-      <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>효과</span>${text(f.id, 'effect', f.effect, '화면에 보이는 광고 문구 (모호·검열·거짓·뚱딴지…)', '보이는 효과', 60)}</span></div>
+      <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>설명</span>${text(f.id, 'desc', f.desc, '겉보기 설명 (???·검열됨처럼 숨겨도 돼요)', '설명', 200)}</span></div>
+      <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>효과</span>${text(f.id, 'effect', f.effect, '화면에 보이는 광고 문구 (모호·검열·거짓·뚱딴지…)', '보이는 효과', 200)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>진실</span>${text(f.id, 'truth', f.truth, '숨긴 진짜 효과 — 메인 모델만 봐요. 비우면 「아무도 모름」', '진짜 효과', 200)}</span></div>
     </div>`).join('');
   const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini primary" data-action="ms-fx-add" ${list.length >= COS_FIXED_MAX ? 'disabled' : ''}>상품 추가</button></div>`;
