@@ -417,6 +417,7 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
   const offered = (mode === 'barter' ? ui.offer : call.offered).map((id) => mine.find((x) => x.id === id)).filter((x): x is Item => !!x);
   const meLine = mode === 'barter' ? guideTxt('Hs', 'CALL_OFFER', { names: offered.map((x) => x.name).join(', ') }) + (said ? ` ${said}` : '') : said;
   call.lines.push({ who: 'me', text: meLine.slice(0, 200) });
+  const offeredBefore = call.offered;
   if (mode === 'barter') call.offered = offered.map((x) => x.id);
   ui.opInput = '';
   ui.calling = true;
@@ -450,26 +451,30 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
     const buyer = userInfo().name || guideTxt('Hs', 'SAY_ME_NICK');
     saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: buyer, text: meLine, me: 1 }, { k: 'aside', p: show.at, who: hsLogOperator(), text: value.line }], show);
   } catch (error) {
-    // 실패하면 내 말을 되돌린다 (다시 보낼 수 있게)
+    // 실패하면 내 말과 내민 물건을 되돌린다 (다시 보낼 수 있게)
     if (ui.call === call) {
       call.lines.pop();
-      ui.opInput = mode === 'talk' ? said : ui.opInput;
+      call.offered = offeredBefore;
+      ui.opInput = said;
     }
     ui.info = `상담원과 연결되지 않았어요. ${error instanceof Error ? error.message.split('\n')[0] : ''}`;
   } finally {
     ui.calling = false;
+    env.render();
   }
-  env.render();
 }
 
 /** 전화 주문 확정: 고른 결제 방법의 조건대로 치르고(원은 가계부, 물건은 소지품에서 빠짐), 소지품에 미개봉 택배 상자가 바로 들어온다. 출연은 상자를 열 때 걸린다 (2026-11-16 사용자) */
 async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
   const s = hsSettings(ctx.chat.scriptstate);
   const pre = nowPart(ctx);
-  if (!pre.part || soldNow(pre.show) || !payOk(ctx, pre.part, s, ui.pay)) return env.render();
-  const terms = termsFor(pre.part, ui.pay);
+  if (!pre.part || soldNow(pre.show)) return env.render();
+  // 화면(callPop)이 보이는 결제 방법 그대로: 고른 방법이 이 상품에 안 맞으면 되는 첫 방법
+  const pay = payOk(ctx, pre.part, s, ui.pay) ? ui.pay : firstPay(ctx, pre.part, s);
+  if (!payOk(ctx, pre.part, s, pay)) return env.render();
+  ui.pay = pay;
+  const terms = termsFor(pre.part, pay);
   if (!terms || termsBlock(ctx, terms)) return env.render();
-  const pay = ui.pay;
   let ok = false;
   // 시청 기록: 주문 전에 본 것을 먼저 적고, 주문 줄은 아래 저장에 같이 적는다
   playerFlush();
@@ -507,15 +512,14 @@ async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
     o.boxId = itemId(anchor, name);
     ok = true;
     // 시청 기록의 주문 줄 (본편 참고 기록, core/hslog.ts). 주문 id 를 달아 두어 주문이 없던 일이 되면 본편에도 안 간다
-    // 값·출연 주문은 상담원의 확정 말도 같이 적는다 (맞교환·흥정은 통화 말이 이미 적혀 있다)
-    const opSaid = pay === 'won' || pay === 'appear' ? show.ops?.done ?? '' : '';
+    // 상담원의 확정 말도 같이 적는다 (맞교환·흥정의 통화 말은 조건을 내미는 말이라 확정 말이 아니다)
+    const opSaid = show.ops?.done ?? '';
     const bought = appendLog(chat.scriptstate, show, [{ k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how: o.how }), ref: o.id }, ...(opSaid ? [{ k: 'aside' as const, p: show.at, who: hsLogOperator(), text: opSaid }] : [])], turnKey(chat));
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...wallet, ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o]), ...bought } };
   });
   if (ok) {
     const ops = readShow(ctx.chat.scriptstate).ops;
-    const last = ui.call?.lines.filter((l) => l.who === 'op').pop()?.text;
-    ui.done = (pay === 'won' || pay === 'appear' ? ops?.done : last) || '주문이 접수되었습니다.';
+    ui.done = ops?.done || '주문이 접수되었습니다.';
     ui.offer = [];
     playerSay(guideTxt('Hs', 'PLAYER_SYS_NICK'), guideTxt('Hs', 'PLAYER_SYS_ORDER'), 'sys'); // 안내 줄도 흐른 채팅으로 반응 요청에 간다 (playerRecentChat)
     playerTake(1);
@@ -732,7 +736,7 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   const said = call?.lines.length ? call.lines : show.ops?.hello ? [{ who: 'op' as const, text: show.ops.hello }] : [];
   const lines = said.map((l) => (l.who === 'op' ? op(l.text) : `<p class="hs-me">${esc(l.text)}</p>`)).join('') + (ui.calling ? '<p class="hs-op wait"><i>상담원</i>…</p>' : '');
   const dealPanel = pay === 'barter' || pay === 'talk';
-  const talkIn = dealPanel ? `<div class="hs-in op"><input name="hs-op" data-input="hs-op" data-enter="hs-op" value="${esc(ui.opInput)}" maxlength="200" placeholder="${pay === 'barter' ? '한마디 덧붙이기 (없어도 됨)' : '상담원에게 할 말'}" aria-label="상담원에게 할 말"${ui.calling ? ' disabled' : ''}>${pay === 'talk' ? `<button data-action="hs-op"${needAttr('hs-op', ui.opInput, ui.calling)}>말하기</button>` : ''}</div>` : '';
+  const talkIn = dealPanel ? `<div class="hs-in op"><input name="hs-op" data-input="hs-op" data-enter="${pay === 'barter' ? 'hs-appraise' : 'hs-op'}" value="${esc(ui.opInput)}" maxlength="200" placeholder="${pay === 'barter' ? '한마디 덧붙이기 (없어도 됨)' : '상담원에게 할 말'}" aria-label="상담원에게 할 말"${ui.calling ? ' disabled' : ''}>${pay === 'talk' ? `<button data-action="hs-op"${needAttr('hs-op', ui.opInput, ui.calling)}>말하기</button>` : ''}</div>` : '';
   const mine = pay === 'barter' ? barterItems(ctx) : [];
   const pick = pay === 'barter' ? (mine.length ? `<div class="hs-pick">${mine.map((x) => `<button class="${ui.offer.includes(x.id) ? 'on' : ''}" data-action="hs-offer" data-value="${esc(x.id)}" aria-pressed="${ui.offer.includes(x.id)}"><span class="pic">${itemPic(x)}</span><span class="nm">${esc(x.name)}</span></button>`).join('')}</div><button class="hs-appraise" data-action="hs-appraise"${ui.calling || !ui.offer.length ? ' disabled' : ''}>감정 받기</button>` : '<p class="hs-none">내밀 물건이 없습니다.</p>') : '';
   const log = `<div class="hs-callog" aria-live="polite">${lines}</div>`;

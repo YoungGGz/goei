@@ -425,7 +425,8 @@ export function hsLine(line: string): { item: Omit<ShopItem, 'id'>; inst: number
   const it = parseLine(c.join('|'));
   if (!it || (price <= 0 && inst <= 0)) return null;
   const { pay: _p, tag: _t, was: _w, ...rest } = it;
-  return { item: rest, inst };
+  // 진실 칸이 비면 「아무도 모름」(?)으로: 광고 문구가 사실처럼 남지 않게 (우주몰과 같음)
+  return { item: rest.truth ? rest : { ...rest, truth: '?' }, inst };
 }
 /** 편성 응답: <title> · <shelf>(상점 줄) · <cue>(「#n」 아래 그 상품의 큐 줄) · <chat>(「#n」 아래 그 상품 동안의 닉|말) */
 export function parseShow(raw: string, moods: Map<string, string>): ShowReply {

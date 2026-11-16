@@ -382,7 +382,7 @@ test('망상홈쇼핑: 진실 칸(숨은 원래 용도)을 받아 상품에 둔�
   const raw = RAW.replace('누군가 받는다|\n', '누군가 받는다||받는 쪽이 대신 말을 시작한다 · 밤 열두 시 넘어 켜면\n');
   const r = parseShow(raw, moods);
   assert.equal(r.items[0].truth, '받는 쪽이 대신 말을 시작한다 · 밤 열두 시 넘어 켜면');
-  assert.equal(r.items[1].truth, undefined);
+  assert.equal(r.items[1].truth, '?', '진실 칸이 비면 아무도 모름(?)');
   const g = core1112.guideSections('Hs');
   assert.match(g.LINE, /\|진실$/);
   assert.match(g.BROADCAST, /진실/);
