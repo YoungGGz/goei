@@ -16,13 +16,12 @@ import { addWalletEntry, freshWalletId, readWallet, walletBalance, walletVars, W
 import { getPrefs } from '../core/settings';
 import { traitsText } from '../core/itemtraits';
 import { aliveAnchors } from '../core/wallet';
-import { addItem, addItemLog, itemLeft, liveItemsOf, readItems, itemsVars, removeItem, sellItem, type Item } from '../core/items';
+import { addItem, addItemLog, itemId, itemLeft, liveItemsOf, readItems, itemsVars, removeItem, sellItem, type Item } from '../core/items';
 import { userTurns } from '../core/request';
-import { deliverOrders } from '../core/hsship';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderArrived, orderOpened, orderPaid, ordersVars, paidOf, parseCue, parseOperator, parseShow, peelFragment, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
+import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, parseCue, parseOperator, parseShow, peelFragment, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
 import { mountPlayer, playerCut, playerHold, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
@@ -463,7 +462,7 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
   env.render();
 }
 
-/** 전화 주문 확정: 고른 결제 방법의 조건대로 치르고(원은 가계부, 물건은 소지품에서 빠짐). 택배 상자는 몰래 뽑은 턴에 닿고(0턴이면 바로), 출연은 상자를 열 때 걸린다 (2026-11-16 사용자) */
+/** 전화 주문 확정: 고른 결제 방법의 조건대로 치르고(원은 가계부, 물건은 소지품에서 빠짐), 소지품에 미개봉 택배 상자가 바로 들어온다. 출연은 상자를 열 때 걸린다 (2026-11-16 사용자) */
 async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
   const s = hsSettings(ctx.chat.scriptstate);
   const pre = nowPart(ctx);
@@ -495,20 +494,23 @@ async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
       walletId = freshWalletId(w0, `hs_${part.item.id}`, anchor);
       wallet = walletVars(addWalletEntry(w0, { id: walletId, anchor, amount: -terms.money, memo: `${part.item.name} (${hsName()})`, src: 'store' }, alive));
     }
-    const o = newOrder(chat, part.item, s, pay, terms);
+    const o = newOrder(chat, part.item, pay, terms);
     // 기록 글은 지침 「망상홈쇼핑」의 ORDER_* 절 (본편에 판 것·산 것으로 간다)
     const barterNote = guideTxt('Hs', 'ORDER_BARTER_NOTE');
     for (const g of terms.items) items = anchor ? sellItem(items, g.id, anchor, barterNote) : removeItem(items, g.id, 'sell', 'store', '', { note: barterNote });
-    if (walletId) o.walletId = walletId;
+    // 같은 이름의 상자가 이미 있으면(같은 상품을 다시 주문) 한 줄로 합쳐져 못 열게 되므로 번호를 붙인다
+    const mine = liveItemsOf(items, chat);
+    let name = HS_BOX.name(part.item.name);
+    for (let k = 2; k < 20 && mine.some((x) => x.id === itemId(anchor, name) || x.name === name); k++) name = `${HS_BOX.name(part.item.name).slice(0, 27)} ${k}`;
+    // 상자: 원 몫은 값으로(가계부와 이어짐), 나머지 대가(물건·그 밖)는 결제 글로. 출연은 상자를 열 때 걸리므로 여기 적지 않는다
+    items = addItem(items, alive, { name, desc: HS_BOX.desc, icon: HS_BOX.icon, weight: part.item.weight, from: 'store', store: 'hs', anchor, paidWith: orderPaid(o, false) || hsName(), ...(terms.money > 0 ? { price: terms.money, walletId } : {}) });
+    o.boxId = itemId(anchor, name);
     ok = true;
     // 시청 기록의 주문 줄 (본편 참고 기록, core/hslog.ts). 주문 id 를 달아 두어 주문이 없던 일이 되면 본편에도 안 간다
     // 값·출연 주문은 상담원의 확정 말도 같이 적는다 (맞교환·흥정은 통화 말이 이미 적혀 있다)
     const opSaid = pay === 'won' || pay === 'appear' ? show.ops?.done ?? '' : '';
     const bought = appendLog(chat.scriptstate, show, [{ k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how: o.how }), ref: o.id }, ...(opSaid ? [{ k: 'aside' as const, p: show.at, who: hsLogOperator(), text: opSaid }] : [])], turnKey(chat));
-    const next = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...wallet, ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o]), ...bought } };
-    // 닿는 턴이 0(주문한 턴)으로 뽑혔으면 상자가 바로 들어온다. 아니면 그 턴의 응답을 받은 뒤에 (body.ts)
-    const got = deliverOrders(next);
-    return got ? { ...next, scriptstate: { ...next.scriptstate, ...got } } : next;
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...wallet, ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o]), ...bought } };
   });
   if (ok) {
     const ops = readShow(ctx.chat.scriptstate).ops;
@@ -664,7 +666,7 @@ function schedPage(show: HsShow, s: HsSettings): string {
   return `<section class="hs-sec"><h4>편성표<small>${esc(show.title)}</small></h4>${lineup(show, s, true)}</section>`;
 }
 
-/** 주문 조회: 위 출연 장부(무이자 출연. 상자를 연 주문만 — 열기 전에는 걸리지 않는다), 아래 배송(오는 중 → 배송 완료 · 미개봉 → 수령 확인). 방청 접수가 있으면 맨 위 한 줄. 누르는 것 없음 */
+/** 주문 조회: 위 출연 장부(무이자 출연. 상자를 연 주문만 — 열기 전에는 걸리지 않는다), 아래 배송(배송 완료 · 미개봉 → 수령 확인). 방청 접수가 있으면 맨 위 한 줄. 누르는 것 없음 */
 function ordersPage(ctx: ChatContext): string {
   const alive = aliveAnchors(ctx.chat);
   const list = liveOrders(ctx.chat.scriptstate, alive).slice().reverse();
@@ -679,8 +681,7 @@ function ordersPage(ctx: ChatContext): string {
   }).join('');
   const shipRows = list.map((o) => {
     const opened = orderOpened(o, alive);
-    const state = opened ? '수령 확인' : orderArrived(o, alive) ? '배송 완료 · 미개봉' : '오는 중';
-    return `<li><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(o.how)}</small></span><span class="st${opened ? '' : ' on'}">${state}</span></li>`;
+    return `<li><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(o.how)}</small></span><span class="st${opened ? '' : ' on'}">${opened ? '수령 확인' : '배송 완료 · 미개봉'}</span></li>`;
   }).join('');
   return `<section class="hs-sec"><h4>주문 조회</h4>${audRow}
 <h5>출연 내역</h5>${debtRows ? `<ul class="hs-ol">${debtRows}</ul>` : '<p class="hs-none">출연 내역이 없습니다.</p>'}
@@ -713,7 +714,7 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   const head = `<div class="hs-pi"><span class="pic">${itemPic(part.item)}</span><span class="tx"><b>${esc(part.item.name)}</b><small>${esc(hsPayText(part))}</small></span></div>`;
   const op = (t: string) => (t ? `<p class="hs-op"><i>상담원</i>${esc(t)}</p>` : '');
   if (ui.done || ordered) {
-    return popShell('☎ 전화 주문', `${head}${op(ui.done || '주문이 접수되었습니다.')}<p class="hs-ok">${ordered && orderArrived(ordered, aliveAnchors(ctx.chat)) ? '택배 상자가 소지품에 도착했습니다.' : '택배 상자가 오는 중입니다.'}</p>`, '<button class="pri" data-action="hs-pop" data-value="">확인</button><button data-action="hs-page" data-value="orders">주문 조회</button>');
+    return popShell('☎ 전화 주문', `${head}${op(ui.done || '주문이 접수되었습니다.')}<p class="hs-ok">택배 상자가 소지품에 도착했습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">확인</button><button data-action="hs-page" data-value="orders">주문 조회</button>');
   }
   if (soldNow(show)) return popShell('☎ 전화 주문', `${head}<p class="hs-none">매진되어 더 이상 주문을 받지 않습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">끊기</button>');
   const call = ui.call?.pid === part.item.id ? ui.call : null;

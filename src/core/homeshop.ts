@@ -131,7 +131,7 @@ export const HS_KEY = {
   clips: '$hs_clips', read: '$hs_read', scalePc: '$hs_scale_pc', scalePhone: '$hs_scale_ph',
   next: '$hs_next', turn: '$hs_turn', lock: '$hs_lock', left: '$hs_left',
   drop: '$hs_drop', dropRate: '$hs_drop_rate', dropFast: '$hs_drop_fast', dropStep: '$hs_drop_step', soonAt: '$hs_soon_at', endLo: '$hs_end_lo', endHi: '$hs_end_hi',
-  callLo: '$hs_call_lo', callHi: '$hs_call_hi', shipLo: '$hs_ship_lo', shipHi: '$hs_ship_hi', forms: '$hs_forms', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk',
+  callLo: '$hs_call_lo', callHi: '$hs_call_hi', forms: '$hs_forms', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk',
 } as const;
 /** 숫자 칸 범위·기본값 (설정 화면과 읽기가 같이 쓴다) */
 export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: number; unit: string }> = {
@@ -163,8 +163,6 @@ export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: 
   endHi: { key: HS_KEY.endHi, lo: 1, hi: 99, def: 8, unit: '개' },
   callLo: { key: HS_KEY.callLo, lo: 1, hi: 60, def: 6, unit: '턴' },
   callHi: { key: HS_KEY.callHi, lo: 1, hi: 60, def: 12, unit: '턴' },
-  shipLo: { key: HS_KEY.shipLo, lo: 0, hi: 30, def: 0, unit: '턴' },
-  shipHi: { key: HS_KEY.shipHi, lo: 0, hi: 30, def: 3, unit: '턴' },
 };
 /** 출연 형태 기본 목록 (설정에서 고친다, 쉼표·줄바꿈으로 나눔) */
 /** 주문 전화번호 기본값 */
@@ -231,8 +229,6 @@ export interface HsSettings {
   /** 할부 호출: 다음 호출까지 턴 [최소, 최대] · 출연 형태 목록 */
   call: [number, number];
   forms: string[];
-  /** 전화 주문한 상자가 닿기까지 턴 [최소, 최대] (0 = 주문한 턴) */
-  ship: [number, number];
   /** 방청 신청 · 스티커 들추기 · 채팅 보내기 · 물건 맞교환 · 상담원과 흥정 */
   aud: boolean;
   peek: boolean;
@@ -286,7 +282,6 @@ export function hsSettings(vars: Vars): HsSettings {
     left: n(vars, 'left'),
     drop: { on: vars?.[HS_KEY.drop] !== '0', rate: n(vars, 'dropRate') / 100, fast: n(vars, 'dropFast') / 10, step: n(vars, 'dropStep'), soon: n(vars, 'soonAt'), end: pair(n(vars, 'endLo'), n(vars, 'endHi')) },
     call: pair(n(vars, 'callLo'), n(vars, 'callHi')),
-    ship: pair(n(vars, 'shipLo'), n(vars, 'shipHi')),
     forms: (() => { const f = String(vars?.[HS_KEY.forms] ?? '').split(/[,\n]/).map((x) => x.trim().slice(0, 30)).filter(Boolean); return f.length ? f : hsFormsDefault().split(',').map((x) => x.trim()); })(),
     aud: vars?.[HS_KEY.aud] !== '0',
     peek: vars?.[HS_KEY.peek] !== '0',
@@ -636,7 +631,7 @@ export function nextDrop(left: number, end: number, rest: { ms: number; planned:
 
 // ── 주문·할부 장부·택배 상자·방청 (설계 8-4 ~ 8-10) ──
 // 할부는 물건이 아니라 사람에게 붙는 장부다 (11-09 사용자: 물건에 붙이면 쓰거나 버릴 때 의무도 사라진다). 가계부는 건드리지 않는다.
-// 받는 법 (2026-11-16 사용자): 상자는 주문 때 몰래 뽑은 턴(설정 「상자가 닿기까지」)에 닿는다. 그때까지 「오는 중」이고 본편에는 아무것도 안 간다.
+// 받는 법 (2026-11-16 사용자): 주문하면 그 자리에서 미개봉 택배 상자가 소지품에 들어온다. 그 턴의 메인 요청에 받는 법(ARRIVE)을 한 번 넘긴다.
 // 계약은 상자를 열 때 맺어진다 (로어북: 여는 사람이 산 사람). 출연 호출 턴은 주문 때가 아니라 열 때 뽑아 적는다. 안 연 상자에는 출연이 걸리지 않는다.
 // 「몇 회 냈나」는 저장하지 않고 지금 턴 수로 센다 — 응답을 지우거나 다시 굴리면 저절로 되돌아간다 (가계부 방식).
 
@@ -660,26 +655,15 @@ export interface HsOrder {
   dues: number[];
   /** 상담원과 맺은 조건 (상자·물건의 결제 글을 만들 때 쓴다) */
   terms?: HsTerms;
-  /** 원 몫의 가계부 거래 id (상자와 물건에 같은 id 로 남긴다) */
-  walletId?: string;
-  /** 상자가 닿는 턴 (끝난 턴 수 doneTurns 기준). 주문 때 몰래 뽑아 적는다 */
-  arrive: number;
-  /** 상자를 넣은 응답 키 (아직 안 닿았으면 없음. 그 응답이 지워지면 상자도 없던 일이라 다시 닿는다) */
-  boxKey?: string;
   /** 소지품의 택배 상자 id · 연 응답 키 */
   boxId: string;
   openKey?: string;
 }
-/** 끝난 턴 수: 답까지 받은 유저 전송 횟수 (보내고 아직 답을 못 받은 턴은 빼고) */
-export const doneTurns = (chat: Chat): number => {
-  const list = chat.message ?? [];
-  return userTurns(chat) - (list.length && list[list.length - 1].role === 'user' ? 1 : 0);
-};
 export function readOrders(vars: Vars): HsOrder[] {
   try {
     const arr: unknown = JSON.parse(String(vars?.[HS_ORDERS_VAR] ?? '') || '[]');
     if (!Array.isArray(arr)) return [];
-    return arr.filter((o): o is HsOrder => !!o && typeof o === 'object' && typeof (o as HsOrder).id === 'string' && !!(o as HsOrder).item && typeof (o as HsOrder).item.name === 'string' && Array.isArray((o as HsOrder).dues)).map((o) => ({ ...o, how: String(o.how ?? ''), pay: o.pay ?? 'appear', arrive: typeof o.arrive === 'number' ? o.arrive : Number(o.turn) || 0, ...(o.boxKey === undefined && typeof o.arrive !== 'number' && o.boxId ? { boxKey: String(o.anchor ?? '') } : {}) }));
+    return arr.filter((o): o is HsOrder => !!o && typeof o === 'object' && typeof (o as HsOrder).id === 'string' && !!(o as HsOrder).item && typeof (o as HsOrder).item.name === 'string' && Array.isArray((o as HsOrder).dues)).map((o) => ({ ...o, how: String(o.how ?? ''), pay: o.pay ?? 'appear' }));
   } catch {
     return [];
   }
@@ -687,18 +671,8 @@ export function readOrders(vars: Vars): HsOrder[] {
 export const ordersVars = (list: HsOrder[]): Record<string, string> => ({ [HS_ORDERS_VAR]: list.length ? JSON.stringify(list.slice(-HS_ORDERS_MAX)) : '' });
 /** 살아 있는 주문 (주문한 응답이 남아 있는 것) */
 export const liveOrders = (vars: Vars, alive: Set<string>): HsOrder[] => readOrders(vars).filter((o) => !o.anchor || alive.has(o.anchor));
-/** 상자가 닿았나 (넣은 응답이 살아 있을 때만) */
-export const orderArrived = (o: HsOrder, alive: Set<string>): boolean => o.boxKey !== undefined && (!o.boxKey || alive.has(o.boxKey));
-/** 이 응답 뒤에 상자가 닿은 주문이 있나 (그 턴의 메인 요청에 받는 법 ARRIVE 를 한 번 붙인다. 같은 턴에 열어 버렸어도 닿은 것은 닿은 것) */
-export const boxLanded = (vars: Vars, lastKey: string, alive: Set<string>): boolean => !!lastKey && liveOrders(vars, alive).some((o) => o.boxKey === lastKey);
-/** 닿을 턴이 됐는데 아직 상자를 못 넣은 주문 (연 것은 빼고) */
-export const dueOrders = (chat: Chat): HsOrder[] => {
-  const alive = aliveAnchors(chat);
-  const done = doneTurns(chat);
-  return liveOrders(chat.scriptstate, alive).filter((o) => !orderArrived(o, alive) && !orderOpened(o, alive) && o.arrive <= done);
-};
-/** 닿는 턴 뽑기: 지금 끝난 턴에서 설정 「상자가 닿기까지」(최소~최대) 만큼 뒤. 0 이면 주문한 턴 */
-export const scheduleArrive = (done: number, ship: [number, number], rnd: () => number = Math.random): number => done + ship[0] + Math.floor(rnd() * (ship[1] - ship[0] + 1));
+/** 이 응답 뒤에 주문해 상자가 들어온 주문이 있나 (그 턴의 메인 요청에 받는 법 ARRIVE 를 한 번 붙인다. 같은 턴에 열어 버렸어도 들어온 것은 들어온 것) */
+export const boxLanded = (vars: Vars, lastKey: string, alive: Set<string>): boolean => !!lastKey && liveOrders(vars, alive).some((o) => o.anchor === lastKey);
 /** 낸 회차: 예정 턴이 지금 턴 이하인 것 */
 export const paidOf = (o: HsOrder, turnNow: number): number => o.dues.filter((d) => d <= turnNow).length;
 /** 상자를 열었나 (연 응답이 살아 있을 때만) */
@@ -754,10 +728,10 @@ export function parseOperator(raw: string, offered: { id: string; name: string }
   return { line, terms: t.money || t.items.length || t.appear || t.other ? t : null };
 }
 const boxName = (name: string) => guideTxt('Hs', 'BOX_NAME', { name }).slice(0, 30);
-/** 새 주문 (장부 줄). 상자가 닿는 턴만 뽑아 적는다. 상자는 그 턴에 넣고(core/hsship.ts deliverOrders), 출연 호출 턴은 상자를 열 때 뽑는다(openOrder) */
-export function newOrder(chat: Chat, item: ShopItem, s: Pick<HsSettings, 'ship'>, pay: HsPay, terms: HsTerms, rnd: () => number = Math.random): HsOrder {
+/** 새 주문 (장부 줄). 상자 물건은 부른 쪽이 소지품에 넣고 boxId 를 채운다. 출연 호출 턴은 상자를 열 때 뽑는다(openOrder) */
+export function newOrder(chat: Chat, item: ShopItem, pay: HsPay, terms: HsTerms): HsOrder {
   const { id: _id, sold: _s, soldKey: _k, tag: _t, was: _w, orig: _o, ...rest } = item;
-  return { id: `ho_${item.id}`, item: rest, n: terms.appear, how: termsText(terms), pay, terms, anchor: lastBot(chat)?.key ?? '', turn: userTurns(chat), dues: [], arrive: scheduleArrive(doneTurns(chat), s.ship, rnd), boxId: '' };
+  return { id: `ho_${item.id}`, item: rest, n: terms.appear, how: termsText(terms), pay, terms, anchor: lastBot(chat)?.key ?? '', turn: userTurns(chat), dues: [], boxId: '' };
 }
 /** 상자를 연 주문: 연 응답 키를 적고, 출연이 걸렸으면 이제 호출 턴을 뽑는다 (다른 연 주문의 호출 턴과 겹치지 않게) */
 export function openOrder(chat: Chat, o: HsOrder, s: Pick<HsSettings, 'call'>, openKey: string, rnd: () => number = Math.random): HsOrder {

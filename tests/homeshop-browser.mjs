@@ -16,7 +16,7 @@ const TRUTH = '건너편 교환대의 귀. 자정에 송신 단추를 세 번 �
 const REPLY = '첫 답.\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국|QC 괴이]';
 const VPS = [['pc', { width: 1280, height: 800, touch: false }], ['pcbig', { width: 1920, height: 1080, touch: false }], ['phone', 'phone']].filter(([v]) => !process.env.VP || process.env.VP.split(',').includes(v));
 for (const [vp, size] of VPS) {
-  const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $hs_net: '1', $hs_ship_lo: '0', $hs_ship_hi: '0', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_wallet: JSON.stringify({ start: 500000, log: [] }), $st_items: JSON.stringify(ITEMS0) } };
+  const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $hs_net: '1', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_wallet: JSON.stringify({ start: 500000, log: [] }), $st_items: JSON.stringify(ITEMS0) } };
   const { page, errors } = await boot(browser, fx, chat, size, { store: { 'p:goei:data-homeshop': distPack('goei-data-homeshop'), 'p:goei:data-items': distPack('goei-data-items') } });
   let n = 0;
   const shot = async (tag) => { await page.screenshot({ path: `${OUT}/${vp}-${String(++n).padStart(2, '0')}-${tag}.png` }); };

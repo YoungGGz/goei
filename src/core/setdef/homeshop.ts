@@ -14,7 +14,7 @@ const row = (key: string, label: string, ctl: SetCtl, help?: SetDef['help'], mor
 /** 최소·최대 줄: 줄 열쇠 → HS_NUM 의 두 열쇠 (화면이 지금 값을 읽을 때도 쓴다) */
 export const HS_PAIRS: Record<string, [string, string]> = {
   cue: ['cueMin', 'cueMax'], chat: ['chatMin', 'chatMax'], sayCue: ['sayCueMin', 'sayCueMax'], sayChat: ['sayChatMin', 'sayChatMax'],
-  call: ['callLo', 'callHi'], ship: ['shipLo', 'shipHi'], fill: ['fillLo', 'fillHi'], end: ['endLo', 'endHi'],
+  call: ['callLo', 'callHi'], fill: ['fillLo', 'fillHi'], end: ['endLo', 'endHi'],
 };
 const mm = (k: string): SetCtl => pair(...HS_PAIRS[k]);
 /** 줄 열쇠 → 그 줄이 적는 채팅 변수 (수 칸은 HS_NUM, 최소·최대는 HS_PAIRS 를 따른다). 화면의 처리기(ui/homeshop.ts)와 시험이 같이 본다 */
@@ -84,7 +84,6 @@ export const HOMESHOP_SET: SetPage = {
         row('barter', '물건 맞교환', on, '전화 주문에서 가진 물건을 내밀면 상담원이 감정해 받거나, 거절하거나, 더 내라고 해요. 감정할 때마다 한 번 호출해요.'),
         row('talk', '상담원과 흥정', on, '전화 주문에서 상담원에게 말로 조건을 정할 수 있어요. 한 마디마다 한 번 호출해요.'),
         row('peek', '스티커 들추기', on, '상품 스티커 창에서 모서리를 들추면 스티커 밑에 찍힌 원래 용도가 몇 글자만 보여요.'),
-        row('ship', '상자가 닿기까지', mm('ship'), '전화 주문을 확정한 뒤 택배 상자가 소지품에 들어오기까지의 턴 수예요. 주문할 때 이 사이에서 몰래 뽑아요. 0이면 주문한 턴에 바로 와요. 기다리는 동안에는 메인 요청에 아무것도 보내지 않고, 닿은 턴에 받는 법을 한 번 넘겨요. 글은 지침 → 망상홈쇼핑의 ARRIVE 절에서 고쳐요.'),
       ],
     },
     {

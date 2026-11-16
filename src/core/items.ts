@@ -825,7 +825,7 @@ export interface BlockUse {
 /** 면대면이 아닌 곳(망상홈쇼핑·우주 쇼핑몰·포인트몰)에서 산 물건이 어떻게 손에 들어왔는지: 산 턴에 한 번, 곳마다 한 줄 (11-15 사용자: 상자가 소지품에 갑자기 생겨 본편이 씹는다).
  *  글은 그 몰 지침의 ARRIVE 절(본편에 보내는 받는 법, 11-15 사용자: 소지품 지침에 넣지 말고 몰마다 자기 지침에). 절이 비었거나 몰이 아닌 곳(면대면 상점)은 아무것도 안 붙인다. 우주몰 맞춤 주문 수령은 우주몰과 같다 */
 const ARRIVE_GUIDE: Record<string, GuideName> = { hs: 'Hs', cos: 'Cos' };
-/** hsBox: 망상홈쇼핑은 「상자가 닿은 턴」에만 붙인다 (2026-11-16 사용자: 상자는 몰래 뽑은 턴에 닿는다). 산 물건 줄로는 가리지 않는다 — 상자를 연 턴의 속 물건도 store=hs 라 도착 글이 다시 갔다 */
+/** hsBox: 망상홈쇼핑은 주문해 「상자가 들어온 턴」에만 붙인다 (core/homeshop.ts boxLanded). 산 물건 줄로는 가리지 않는다 — 상자를 연 턴의 속 물건도 store=hs 라 도착 글이 다시 갔다 */
 export function arrivals(bought: Item[], hsBox = false): string[] {
   const stores = [...new Set(bought.map((e) => (e.store === 'cos-order' ? 'cos' : e.store ?? '')).filter((st) => st !== 'hs' && ARRIVE_GUIDE[st]))];
   if (hsBox) stores.unshift('hs');

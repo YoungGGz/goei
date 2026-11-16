@@ -9,7 +9,7 @@ const fx = loadFixture(new URL('../.scratch/fixture/fixture.json', import.meta.u
 const browser = await launch();
 const REPLY = '첫 답.\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국|QC 괴이]';
 const items0 = { list: [{ id: 'i_old', name: '낡은 손전등', desc: '', effect: '', use: false, state: 'ok', from: 'manual', anchor: '', at: '2025-01-01T00:00:00Z' }], log: [] };
-const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $hs_ship_lo: '0', $hs_ship_hi: '0', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify(items0) } };
+const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify(items0) } };
 const { page, errors } = await boot(browser, fx, chat, { width: 1280, height: 800, touch: false }, { store: { 'p:goei:data-homeshop': distPack('goei-data-homeshop'), 'p:goei:data-items': distPack('goei-data-items') } });
 const click = (sel) => page.evaluate((s) => { const els = [...document.querySelectorAll(s)]; const el = els.find((e) => e.getBoundingClientRect().width > 0) || els[0]; if (!el) return false; el.click(); return true; }, sel);
 const ss = () => page.evaluate(() => window.__chat.scriptstate);

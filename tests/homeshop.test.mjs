@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { homeshop } from '../dist-test/core.mjs';
-const { scheduleDues, scheduleArrive, doneTurns, openOrder, newOrder, ordersVars, liveOrders, paidOf, callNow, homeshopBlock, withHomeshop, boxOrder, HS_AUD_VAR, parseShow, applyShow, readShow, showVars, emptyShow, moodMap, hsSettings, HS_KEY, HS_NUM, parseClipGroups, clipsOf, idleState, nextIdle, moodClip, cueMs } = homeshop;
+const { scheduleDues, openOrder, newOrder, ordersVars, liveOrders, paidOf, callNow, homeshopBlock, withHomeshop, boxOrder, HS_AUD_VAR, parseShow, applyShow, readShow, showVars, emptyShow, moodMap, hsSettings, HS_KEY, HS_NUM, parseClipGroups, clipsOf, idleState, nextIdle, moodClip, cueMs } = homeshop;
 
 const meta = JSON.parse(readFileSync(new URL('../그림/홈쇼핑/homeshop.json', import.meta.url), 'utf8'));
 const moods = moodMap(meta);
@@ -102,23 +102,15 @@ test('망상홈쇼핑: 호출 턴은 간격 안에서 뽑고 다른 주문과 �
   assert.deepEqual(scheduleDues([], 5, 0, [6, 12]), [], '맞교환은 호출 없음');
 });
 
-test('망상홈쇼핑: 주문하면 닿는 턴만 뽑아 적고, 출연 호출 턴은 상자를 열 때 뽑는다', () => {
+test('망상홈쇼핑: 주문 때는 출연이 걸리지 않고, 출연 호출 턴은 상자를 열 때 뽑는다', () => {
   const c2 = chatOf(2);
   const terms = { money: 0, items: [], appear: 3, other: '' };
-  // 닿는 턴: 끝난 턴(2) + 설정 「상자가 닿기까지」 사이에서
-  assert.equal(newOrder(c2, ITEM, { ship: [0, 3] }, 'appear', terms, () => 0).arrive, 2, '0턴 = 주문한 턴');
-  assert.equal(newOrder(c2, ITEM, { ship: [0, 3] }, 'appear', terms, () => 0.99).arrive, 5);
-  assert.equal(scheduleArrive(2, [2, 2], () => 0.5), 4);
-  // 보내고 아직 답을 못 받은 턴은 끝난 턴이 아니다
-  assert.equal(doneTurns(c2), 2);
-  assert.equal(doneTurns({ message: [...c2.message, { role: 'user', data: 'go', chatId: 'u' }] }), 2);
-  const o0 = newOrder(c2, ITEM, { ship: [1, 1] }, 'appear', terms, () => 0);
+  const o0 = newOrder(c2, ITEM, 'appear', terms);
   assert.equal(o0.n, 3);
   assert.deepEqual(o0.dues, [], '주문 때는 출연이 걸리지 않는다');
-  assert.equal(o0.boxKey, undefined, '아직 안 닿음');
-  // 안 닿은 주문·닿았지만 안 연 주문에는 호출이 없다
+  // 안 연 주문에는 호출이 없다
   const at = (turns, vars) => ({ ...chatOf(turns), message: [...chatOf(turns - 1).message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars });
-  const sealed = { ...o0, boxKey: 'c5', boxId: 'box1', dues: [5, 8, 11] };
+  const sealed = { ...o0, boxId: 'box1', dues: [5, 8, 11] };
   assert.equal(homeshopBlock(at(5, ordersVars([sealed]))), '', '안 연 상자는 묶지 않는다');
   assert.equal(callNow(at(5, ordersVars([sealed]))), null);
   // 3턴째 응답(c5) 뒤에 열었다: 그때부터 간격대로
@@ -156,7 +148,7 @@ test('망상홈쇼핑: 주문하면 닿는 턴만 뽑아 적고, 출연 호출 �
 
 test('망상홈쇼핑: 방청 신청은 바로 다음 턴에만 한 줄', () => {
   const c = chatOf(2);
-  const key = (() => { const o = newOrder(c, ITEM, { ship: [0, 0] }, 'appear', { money: 0, items: [], appear: 3, other: '' }); return o.anchor; })();
+  const key = (() => { const o = newOrder(c, ITEM, 'appear', { money: 0, items: [], appear: 3, other: '' }); return o.anchor; })();
   const vars = { [HS_AUD_VAR]: JSON.stringify({ anchor: key, no: '4821', name: '나' }) };
   const next = { message: [...c.message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars };
   assert.ok(homeshopBlock(next).includes('4821'));
