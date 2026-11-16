@@ -724,10 +724,11 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   if (soldNow(show)) return popShell('☎ 전화 주문', `${head}<p class="hs-none">매진되어 더 이상 주문을 받지 않습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">끊기</button>');
   const call = ui.call?.pid === part.item.id ? ui.call : null;
   const pay = payOk(ctx, part, s, ui.pay) ? ui.pay : firstPay(ctx, part, s);
+  const payWhy = (p: HsPay) => (p === 'won' && part.item.price > 0 ? '가계부가 꺼져 있음' : '이 상품은 안 됨');
   const btn = (p: HsPay) => {
     const ok = payOk(ctx, part, s, p);
     const i = payInfo(part, p);
-    const why = ok ? i.sub : p === 'won' && part.item.price > 0 ? '가계부가 꺼져 있음' : '이 상품은 안 됨';
+    const why = ok ? i.sub : payWhy(p);
     return mobile
       ? `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}" title="${esc(why)}"${ok ? '' : ' disabled'}>${esc(i.short)}</button>`
       : `<button class="${pay === p ? 'on' : ''}" data-action="hs-pay" data-value="${p}" aria-pressed="${pay === p}"${ok ? '' : ' disabled'}><b>${esc(i.title)}</b><small>${esc(why)}</small></button>`;
@@ -746,7 +747,9 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   const orderBtn = `<button class="pri" data-action="hs-order"${terms && !block && !ui.calling ? '' : ' disabled'}>${esc(label)}</button>`;
   const warn = block ? `<p class="hs-warn">${esc(block)}</p>` : '';
   if (mobile) {
-    const body = `<div class="hs-pays chips">${PAYS.map(btn).join('')}</div>${pick ? `<div class="hs-offer">${pick}</div>` : ''}${log}${talkIn}`;
+    // 폰 칩은 좁아 까닭을 못 적는다(누름 풍선도 없다): 꺼진 칩의 까닭을 칩 줄 아래 한 줄로
+    const off = PAYS.filter((p) => !payOk(ctx, part, s, p)).map((p) => `${payInfo(part, p).short}: ${payWhy(p)}`).join(' · ');
+    const body = `<div class="hs-pays chips">${PAYS.map(btn).join('')}</div>${off ? `<p class="hs-payno">${esc(off)}</p>` : ''}${pick ? `<div class="hs-offer">${pick}</div>` : ''}${log}${talkIn}`;
     return popShell(title, body, `${dealPanel ? termsCard(terms) : ''}${warn}<div class="hs-ft">${orderBtn}<button data-action="hs-pop" data-value="">끊기</button></div>`, 'call m');
   }
   // PC: 좌우로 나눈다 (11-15 사용자) — 왼쪽 [상품 · 결제 방법 · 맞교환 물건 · 조건 · 주문], 오른쪽 상담원 통화 칸이 위에서 아래까지
