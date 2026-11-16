@@ -643,13 +643,15 @@ function lineup(show: HsShow, s: HsSettings, col = false): string {
 function onAir(ctx: ChatContext, show: HsShow, s: HsSettings, mobile: boolean): string {
   const { part, ordered } = nowPart(ctx);
   const ended = show.loaded && show.at >= show.parts.length;
+  // 접속 카드가 없어 방송에 닿지 않는 동안 (core/homeshop.ts hsReach): 화면의 「신호 없음」과 같은 말로
+  const lost = s.on && !hsReach(ctx.chat);
   const bar = `<div class="hs-bar"><span class="hs-on${show.loaded && !ended ? '' : ' off'}">${show.loaded && !ended ? 'LIVE' : 'OFF'}</span><b>${esc(show.title || hsName())}</b>${part ? `<span class="hs-pt">${show.at + 1}부 <i>/ ${show.parts.length}부</i></span><button class="hs-nx" data-action="hs-next">${show.at + 1 < show.parts.length ? '다음 상품 ▶' : '방송 마치기 ■'}</button>` : ''}</div>`;
   const tv = `<div class="hs-tv">${bar}<div class="hs-mount" data-hs-mount="stage"></div></div>`;
   const prod = part
     ? `<div class="hs-prod"><button class="hs-icon" data-action="hs-pop" data-value="peek" aria-label="상품 스티커 보기">${itemPic(part.item)}<span class="hs-stk" aria-hidden="true"></span></button>
 <div class="tx"><small>지금 방송 중 · ${show.at + 1}부</small><b>${esc(part.item.name)}</b><p>${esc(part.item.desc)}</p></div>
 <div class="pr"><small>오늘 방송에서만</small><b>${esc(hsPayText(part))}</b></div></div>`
-    : `<div class="hs-prod none"><div class="tx"><b>${ended ? '오늘 방송은 끝났습니다' : '방송 준비 중입니다'}</b><p>${ended ? '새 편성은 새로 고침으로 받아요.' : '잠시만 기다려 주세요.'}</p></div></div>`;
+    : `<div class="hs-prod none"><div class="tx"><b>${ended ? '오늘 방송은 끝났습니다' : lost ? '신호가 없습니다' : '방송 준비 중입니다'}</b><p>${ended ? '새 편성은 새로 고침으로 받아요.' : lost ? '지금은 방송이 잡히지 않습니다.' : '잠시만 기다려 주세요.'}</p></div></div>`;
   const sold = !!part && !ordered && soldNow(show);
   const ord = `<div class="hs-ord"><button class="call" data-action="hs-pop" data-value="call" ${part && !ordered && !sold ? '' : 'disabled'}>☎ ${ordered ? '주문 완료' : sold ? '매진' : '전화 주문'}</button><button data-action="hs-pop" data-value="peek" ${part ? '' : 'disabled'}>상품 스티커 보기</button>${s.aud ? '<button class="aud" data-action="hs-pop" data-value="aud">★ 방청 신청</button>' : ''}</div>`;
   const chatIn = s.say ? `<div class="hs-in"><input name="hs-say" data-input="hs-say" data-enter="hs-say" value="${esc(ui.input)}" maxlength="80" placeholder="${ui.saying ? '보내는 중…' : '채팅 보내기'}" aria-label="채팅 보내기"${ui.saying || !part ? ' disabled' : ''}><button data-action="hs-say"${ui.saying || !part ? ' disabled' : ''}>보내기</button></div>` : '';
