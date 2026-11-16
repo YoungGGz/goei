@@ -17,6 +17,10 @@ Record how and why in `state`; add one `history` line.
 Add this key to the JSON output: "shop":{"name":"<Korean ≤30 chars>","owner":"<name or empty>","m":"<shop_check.m>"} or null.
 @@END
 
+@@SECTION PICKUP_KEY
+Add this key to the JSON output: "pickup":["<name from pickup_check.items>"].
+@@END
+
 @@SECTION SPEECH.VARIETY
 ## Speech variety (user setting)
 The user switched on speech variety. These lines add to the `speech` slot rules above and win where they differ.

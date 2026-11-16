@@ -482,6 +482,12 @@ The chat keeps the user's character's inventory; `items_now` lists what they car
 <<SHOP_JUDGE>>
 Return `shop` as one object when there is a shop (`name` = 가게 이름, `owner` = 주인 이름 or empty, `m` = `shop_check.m`), otherwise `null`.
 <<END:shop>>
+<<SECTION:pickup>>
+## 15f. Welfare mall pickup
+
+`pickup_check.items` are goods the user's character bought earlier at 백일몽 포인트몰 and set out to collect in person at the headquarters rental storage; `pickup_check.m` is the response in which that attempt happens. Judge one thing from that response: which of them does the user's character actually receive there?
+Return `pickup` as the list of those names, copied exactly; an item the response does not show being received is left out, and none received is `[]`. Never report these goods in `items`.
+<<END:pickup>>
 <<SECTION:tidy>>
 ## 11. Tidying an oversized record
 
@@ -603,6 +609,9 @@ The object has these keys. Every key listed here is present.
 <<SECTION:shop>>
  "shop":{"name":"<Korean ≤30 chars>","owner":"<name or empty>","m":"m2"},
 <<END:shop>>
+<<SECTION:pickup>>
+ "pickup":["<name from pickup_check.items>"],
+<<END:pickup>>
 <<SECTION:next_note>>
  "next_note":[{"who":"<name>","now":"<English ≤120 chars>","must_not_reveal":["<≤80 chars>"]}],
 <<END:next_note>>

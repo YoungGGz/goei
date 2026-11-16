@@ -11,10 +11,10 @@ import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { pointsOn, pointsVars, readPoints } from '../core/points';
-import { addItem, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
+import { addItem, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
-import { bmOrdersVars, liveBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
+import { bmGoing, bmOrdersVars, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
 import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, parseShelf, parseTalk, pointPrice, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
@@ -502,14 +502,25 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
     }
     case 'mall-pickup':
     case 'mall-pickup-all': {
-      // 포인트몰 수령: 「주문 조회」의 수령 대기를 소지품에 넣는다 (본사 대여창고에서 받는 것 — 플러그인은 위치를 따지지 않는다, 2026-11-16 사용자)
+      // 포인트몰 수령 (2026-11-16 사용자: 갈 수 없는 상황인데 받아 버리면 뜬금없다): 누르면 「수령하러 감」만 적고, 다음 본편 요청에 「받으러 간다」가 한 번 간다.
+      // 그 응답을 갱신기가 읽고 실제로 받았다고 한 것만 소지품에 들어온다 (host/people.ts). 못 받았으면 다음 응답 뒤 「수령 대기」로 돌아온다.
+      // 판단할 곳이 없는 구성(core/items.ts bmPickupConfirm)에서는 누르면 바로 들어온다
       if (site !== 'bm' || !loggedNick(ctx)) return true;
       const ids = action === 'mall-pickup' ? [value ?? ''] : undefined;
       let n = 0;
       let first = '';
+      let went = false;
       await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
         const alive = aliveAnchors(chat);
         const anchor = lastBot(chat)?.key ?? '';
+        if (bmPickupConfirm(chat.scriptstate)) {
+          const r = requestBmOrders(liveBmOrders(chat.scriptstate, alive), anchor, ids);
+          if (!r.got.length) return null;
+          went = true;
+          n = r.got.length;
+          first = r.got[0].item.name;
+          return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...bmOrdersVars(r.list) } };
+        }
         const { list, got } = takeBmOrders(liveBmOrders(chat.scriptstate, alive), anchor, ids);
         if (!got.length) return null;
         let items = readItems(chat.scriptstate);
@@ -521,7 +532,8 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         first = got[0].item.name;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...bmOrdersVars(list) } };
       });
-      v.info = n > 1 ? `상품 ${n}건을 수령했습니다. 소지품에 들어갔습니다.` : n ? `「${first}」을(를) 수령했습니다. 소지품에 들어갔습니다.` : '수령할 수 없는 상태입니다.';
+      if (went) v.info = n > 1 ? `상품 ${n}건을 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.` : `「${first}」을(를) 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.`;
+      else v.info = n > 1 ? `상품 ${n}건을 수령했습니다. 소지품에 들어갔습니다.` : n ? `「${first}」을(를) 수령했습니다. 소지품에 들어갔습니다.` : '수령할 수 없는 상태입니다.';
       await env.refresh();
       return true;
     }
@@ -915,7 +927,7 @@ function bmHtml(ctx: ChatContext, mobile: boolean): string {
       : !list.length ? `<div class="bp-box"><p>${st.loaded ? '모든 상품이 품절되었습니다.' : '등록된 상품이 없습니다.'}</p><button class="bp-buy" data-action="mall-refresh" ${v.loading ? 'disabled' : ''}>상품 불러오기</button></div>`
       : `<div class="bp-grid">${shown.map((x) => bmCard(x, bal, v, !!v.loading)).join('') || '<p class="bp-none">이 분류에는 상품이 없습니다.</p>'}</div>`;
     body = v.page === 'orders'
-      ? `<div class="bp-wrap">${side}<div class="bp-main">${info}${bmOrders(orders, mobile, !!v.loading)}</div></div>`
+      ? `<div class="bp-wrap">${side}<div class="bp-main">${info}${bmOrders(orders, mobile, !!v.loading, bmPickupConfirm(ctx.chat.scriptstate) ? lastBot(ctx.chat)?.key ?? '' : null)}</div></div>`
       : `<div class="bp-wrap">${side}<div class="bp-main">${banner}${info}${failBox(v, 'bp-fail')}<h2>${v.page === 'rare' ? '이달의 한정' : v.page === 'sale' ? '특가' : '전체 상품'}${v.loading === 'shelf' && list.length ? ' <small>새 상품을 불러오는 중…</small>' : ''}</h2>${grid}</div></div>`;
   }
   const deskWin = v.ask && s.on && nick && deskSettings(ctx.chat.scriptstate).on ? bmDesk(ctx, v, mobile) : '';
@@ -923,13 +935,15 @@ function bmHtml(ctx: ChatContext, mobile: boolean): string {
 }
 
 /** 포인트몰 「주문 조회」: 수령 대기 · 받음. PC 는 표, 폰은 줄마다 카드 (같은 배치를 쓰지 않는다). 받는 곳 안내는 로어북대로 본사 대여창고 */
-function bmOrders(orders: BmOrder[], mobile: boolean, busy: boolean): string {
+function bmOrders(orders: BmOrder[], mobile: boolean, busy: boolean, lastKey: string | null): string {
   const list = [...orders].reverse();
-  const waitN = list.filter((o) => !o.taken).length;
+  // 「수령하러 감」: 받기를 누르고 아직 다음 응답이 안 나온 줄 (lastKey 가 null 이면 확인 없이 바로 받는 구성)
+  const going = (o: BmOrder) => lastKey !== null && bmGoing(o, lastKey);
+  const waitN = list.filter((o) => !o.taken && !going(o)).length;
   const head = `<div class="bp-oh"><h2>주문 조회</h2>${waitN ? `<button class="bp-buy bp-all" data-action="mall-pickup-all" ${busy ? 'disabled' : ''}>모두 받기</button>` : ''}</div><p class="bp-onote">본사 대여창고에서 받습니다.</p>`;
   if (!list.length) return `${head}<div class="bp-box"><p>주문 내역이 없습니다.</p></div>`;
-  const state = (o: BmOrder) => (o.taken ? '<span class="bp-ost done">받음</span>' : '<span class="bp-ost">수령 대기</span>');
-  const take = (o: BmOrder) => (o.taken ? '' : `<button class="bp-buy bp-take" data-action="mall-pickup" data-value="${esc(o.id)}" ${busy ? 'disabled' : ''}>받기</button>`);
+  const state = (o: BmOrder) => (o.taken ? '<span class="bp-ost done">받음</span>' : going(o) ? '<span class="bp-ost go">수령하러 감</span>' : '<span class="bp-ost">수령 대기</span>');
+  const take = (o: BmOrder) => (o.taken || going(o) ? '' : `<button class="bp-buy bp-take" data-action="mall-pickup" data-value="${esc(o.id)}" ${busy ? 'disabled' : ''}>받기</button>`);
   const picOf = (o: BmOrder) => `<span class="bp-opic">${itemPic({ name: o.item.name, icon: o.item.icon })}</span>`;
   if (mobile) return `${head}<div class="bp-olist">${list.map((o) => `<div class="bp-orow${o.taken ? ' done' : ''}">${picOf(o)}<div class="bp-oinfo"><b>${esc(o.item.name)}</b><small>${pts(o.price)}</small></div><div class="bp-oact">${state(o)}${take(o)}</div></div>`).join('')}</div>`;
   return `${head}<table class="bp-otb"><tr><th>상품</th><th>포인트</th><th>상태</th><th></th></tr>${list.map((o) => `<tr class="${o.taken ? 'done' : ''}"><td><span class="bp-oname">${picOf(o)}<b>${esc(o.item.name)}</b></span></td><td>${pts(o.price)}</td><td>${state(o)}</td><td>${take(o)}</td></tr>`).join('')}</table>`;

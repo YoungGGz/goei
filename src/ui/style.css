@@ -4493,7 +4493,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .ms-bm.ms-m .bp-lg small, .ms-bm.ms-m .bp-me > b { display: none; }
 .ms-bm.ms-m .bp-wrap { grid-template-columns: minmax(0, 1fr); padding: 12px; gap: 12px; }
 .ms-bm.ms-m .bp-side { flex-direction: row; overflow-x: auto; padding: 0; scrollbar-width: none; }
-.ms-bm.ms-m .bp-side button { white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; }
+/* 폰 메뉴 줄: 「주문 조회 (n)」가 들어와 「1:1 상담」이 오른쪽에서 잘렸다 (2026-11-16) — 글자는 그대로 두고 옆 여백만 줄여 한 줄에 다 들어오게 */
+.ms-bm.ms-m .bp-side button { white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; padding-left: 9px; padding-right: 9px; flex: none; }
 .ms-bm.ms-m .bp-side button.on { border-bottom-color: #1f2a44; }
 .ms-bm.ms-m .bp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 /* 1:1 상담 (11-09 사용자: 포인트몰 톤의 사내 메신저, 우주몰처럼 끌어 옮기고 닫는 팝업 — ui/popwin.ts) */
@@ -4517,6 +4518,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .ms-bm .bp-opic { flex: none; width: 44px; height: 44px; display: grid; place-items: center; background: #f3f5f9; border-radius: 6px; overflow: hidden; }
 .ms-bm .bp-opic img { max-width: 40px; max-height: 40px; image-rendering: pixelated; }
 .ms-bm .bp-ost { display: inline-block; padding: 3px 9px; border-radius: 999px; background: #fff8e8; border: 1px solid #efdfb8; color: #7a6431; font-size: 12px; font-weight: 700; white-space: nowrap; }
+.ms-bm .bp-ost.go { background: #eaf0fb; border-color: #c4d2ee; color: #1f2a44; }
 .ms-bm .bp-ost.done { background: #f3f5f9; border-color: #dde1e8; color: #8a93a6; font-weight: 500; }
 .ms-bm .bp-take { width: auto; margin: 0; padding: 7px 16px; display: inline-block; }
 .ms-bm .bp-olist { display: grid; gap: 8px; }

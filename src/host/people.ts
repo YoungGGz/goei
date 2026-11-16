@@ -9,7 +9,7 @@ import { isWaiting, onWaiting } from './waiting';
 import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, pruneScene } from '../core/people/store';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
-import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, type ApplyReport } from '../core/people/updater';
+import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, pickupKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, type ApplyReport } from '../core/people/updater';
 import { applyConsolidate, buildConsolidate, consolidateUserText, parseConsolidate, runTidy, type ConsolidateReport } from '../core/people/consolidate';
 import { peopleSettings, PP, type PeopleSettings } from '../core/people/settings';
 import { seedPerson } from '../core/people/seed';
@@ -27,8 +27,8 @@ import { findStatusTags } from '../core/world/status';
 import { colConfig } from '../core/world/statuscols';
 import { mentionsPoints, pointsOn, pointsVars, readPoints, syncPointsToStatus } from '../core/points';
 import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
-import { applyItemChanges, settleBmPickups, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
-import { bmOrdersVars, liveBmOrders } from '../core/orders';
+import { applyItemChanges, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
+import { bmAsked, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
 import { getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
@@ -328,7 +328,12 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const lastChar = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' ? i : a), -1);
       const shopAt = !o.scope?.only && shopOn(fresh.chat.scriptstate) && shopJudgeBy(fresh.chat.scriptstate).by === 'updater' && batches[b].includes(lastChar) ? lastChar : -1;
       const shopSelf = shopAt >= 0 ? [...exclude, userInfo().name] : [];
-      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat) : [] });
+      // 포인트몰 수령 확인 (2026-11-16 사용자): 「받기」를 누른 바로 다음 응답이 이 묶음에 들어 있으면, 받으러 간 물건을 그 응답에서 실제로 받았는지 묻는다.
+      // 받으러 간 줄 = 그 응답 바로 앞 응답 때 누른 것 (core/orders.ts bmAsked). 다시 읽기(only)는 하지 않는다
+      const prevChar = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' && i < lastChar ? i : a), -1);
+      const prevKey = prevChar >= 0 ? messageKey(fresh.chat.message[prevChar], prevChar) : '';
+      const pickNames = !o.scope?.only && lastChar >= 0 && batches[b].includes(lastChar) && bmPickupConfirm(fresh.chat.scriptstate) ? bmAsked(liveBmOrders(fresh.chat.scriptstate, aliveAnchors(fresh.chat)), prevKey).map((x) => x.item.name) : [];
+      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat) : [] });
       // 지침은 자료를 본 뒤 조립한다 (저장 상한을 넘긴 인물이 있으면 정리 절을 켠다)
       const sections = enabledSections(settings);
       if (input.tidy.length) sections.add('tidy');
@@ -337,7 +342,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       if (pointsUse) sections.add('points');
       if (itemsOn) sections.add('items');
       if (!input.people.length) dropNoPeople(sections, settings);
-      const system = updaterSystem(settings, sections, fresh.chat.scriptstate, !!input.shop);
+      const system = updaterSystem(settings, sections, fresh.chat.scriptstate, !!input.shop, !!input.pickup);
       input.system = system;
       if (input.overBudget.length) {
         // 2026-11-07 사용자 결정(W4, 원본 writerInputBudgetTokens): 확정 응답 글이 상한을 넘으면 접어서 보내지 않고 거부한다. 읽음 표시도 안 한다
@@ -349,7 +354,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       }
       // 장면 인물이 없어도 소지품·가계부는 이 갱신기가 읽는다 (11-08 전수점검: 혼자 있는 장면에서 얻은 물건·쓴 돈이 기록되지 않았다).
       // 읽을 돈·물건이 있나: 소지품 읽기가 켜져 있거나, 가계부가 켜져 있고 글에 금액이 있거나 어림도 받을 때 (아래 다시 읽기 판단에 쓴다)
-      const moneyOrItems = !!input.shop || itemsOn || (walletOn && (walletLoose(fresh.chat.scriptstate) || batches[b].some((i) => mentionsAmount(messageText(String(fresh.chat.message[i]?.data ?? '')))))) || (pointsUse && batches[b].some((i) => mentionsPoints(messageText(String(fresh.chat.message[i]?.data ?? '')))));
+      const moneyOrItems = !!input.shop || !!input.pickup || itemsOn || (walletOn && (walletLoose(fresh.chat.scriptstate) || batches[b].some((i) => mentionsAmount(messageText(String(fresh.chat.message[i]?.data ?? '')))))) || (pointsUse && batches[b].some((i) => mentionsPoints(messageText(String(fresh.chat.message[i]?.data ?? '')))));
       // 여느 갱신은 장면 인물이 없어도 부른다: 기록에 없는 사람(새 이름, 이름 없는 인물, 명부 인물)이 처음 나온 응답일 수 있고, 그 판단은 모델이 한다.
       // 다시 읽기(only)는 그 인물만 다루니, 그 인물 기록이 없고 읽을 돈·물건도 없으면 부르지 않는다 (읽음 표시는 안 바꿈)
       if (o.scope?.only && !input.people.length && !moneyOrItems) {
@@ -431,11 +436,20 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           if (p) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...pointsVars(p) } };
         }
         // 소지품 변화를 목록($st_items)에 (core/items.ts applyItemChanges). 소모성 횟수는 「사용」 기록으로 이미 셈 — 여기선 본문이 말한 변화만
-        if (report.items.length) {
+        // 포인트몰 수령 확인: 받았다고 한 것만 「받음」으로 바꾸고 산 그대로의 물건을 넣는다. 같은 물건의 「얻음」 줄은 뺀다 (core/items.ts confirmBmPickups)
+        let itemChanges = report.items;
+        if (report.pickup) {
+          const alive = aliveAnchors(next);
+          const orders = liveBmOrders(next.scriptstate, alive);
+          const done = confirmBmPickups(readItems(next.scriptstate), orders, bmAsked(orders, prevKey), report.pickup.names, alive, report.pickup.anchor, itemChanges);
+          itemChanges = done.changes;
+          if (done.got.length) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(done.it), ...bmOrdersVars(done.orders) } };
+        }
+        if (itemChanges.length) {
           // 판정 표·「두고 옴」 말은 이 채팅의 설정으로 (core/itemrules.ts). order = 메시지 차례 (사용자가 버린 물건은 버린 뒤의 메시지가 근거일 때만 되살린다)
           setItemRules(next.scriptstate);
           // 포인트몰 수령 대기 중인 물건을 본문이 먼저 받았으면 새로 만들지 않고 그 대기 줄을 받은 것으로 (core/items.ts settleBmPickups)
-          const bm = settleBmPickups(readItems(next.scriptstate), liveBmOrders(next.scriptstate, aliveAnchors(next)), aliveAnchors(next), report.items);
+          const bm = settleBmPickups(readItems(next.scriptstate), liveBmOrders(next.scriptstate, aliveAnchors(next)), aliveAnchors(next), itemChanges);
           if (bm.settled) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...bmOrdersVars(bm.orders) } };
           const it = applyItemChanges(bm.it, aliveAnchors(next), bm.changes, { state: itemStateOn(next.scriptstate), skipKinds: ITEM_SCOPE_SKIP[itemScope(next.scriptstate)], order: (next.message ?? []).map((m, i) => messageKey(m, i)) });
           next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it) } };
@@ -509,13 +523,19 @@ export function renameAlways(raw: unknown, renamed: { from: string; to: string }
 
 /** 갱신기 지침 조립 (실제 호출·미리보기 같은 길). 상점 판단을 맡으면 「상점」 절을 켜고 기준 글(지침 「상점」 SHOP_RULE·SHOP_JUDGE)을 채운다.
  *  지침을 고쳐 둔 사용자는 고친 글에 상점 절이 없을 수 있어 기본 글의 절을 덧붙인다 (릴리스 점검 11-09: 안 그러면 상점이 매 턴 닫혔다) */
-function updaterSystem(settings: PeopleSettings, sections: Set<string>, vars: Record<string, unknown> | undefined, shop: boolean): string {
+function updaterSystem(settings: PeopleSettings, sections: Set<string>, vars: Record<string, unknown> | undefined, shop: boolean, pickup = false): string {
   const base = promptFor(settings);
   if (shop) sections.add('shop');
+  if (pickup) sections.add('pickup');
   let system = assemblePrompt(base, sections, settings.rules, settings.lang, speechVarietyBlock(settings, 'writer'), sexualWriterSection(settings));
   if (shop && !base.includes('<<SECTION:shop>>')) {
     const def = settings.prompt === 'compact' ? UPDATER_COMPACT : UPDATER_DETAILED;
     system += `\n\n${sectionBody(def, 'shop') ?? ''}\n${shopKeyLine()}`;
+  }
+  // 수령 확인 절도 같다: 고쳐 둔 지침에 없으면 기본 글의 절과 출력 칸 안내를 덧붙인다 (안 그러면 받으러 가도 늘 못 받는다)
+  if (pickup && !base.includes('<<SECTION:pickup>>')) {
+    const def = settings.prompt === 'compact' ? UPDATER_COMPACT : UPDATER_DETAILED;
+    system += `\n\n${sectionBody(def, 'pickup') ?? ''}\n${pickupKeyLine()}`;
   }
   return system.replace('<<SHOP_RULE>>', () => (shop ? shopRule(vars) : '')).replace('<<SHOP_JUDGE>>', () => (shop ? shopJudgeGuide() : ''));
 }

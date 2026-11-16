@@ -91,6 +91,8 @@ export interface UpdateInput {
   used: UsedNow[];
   /** 상점 판단 (설정 「상점 판단」이 갱신기일 때, core/shop.ts shopJudgeBy): 판단할 응답의 m 꼬리표. 없으면 null */
   shop: { m: string } | null;
+  /** 포인트몰 수령 확인 (2026-11-16): 받으러 간 응답의 m 꼬리표와 그때 받으러 간 물건 이름. 없으면 null */
+  pickup: { m: string; items: string[] } | null;
 }
 
 /** 소지품 절 자료: 지금 가진 것 (core/items.ts). 판정(사용·남은 횟수·장착)과 상태를 같이 준다 */
@@ -195,6 +197,8 @@ export interface BuildOpts {
   away?: { name: string; place?: string }[];
   /** 상점 판단 (갱신기가 판단할 때): 판단할 응답 위치(가장 최근 응답)와 주인공 이름들 */
   shop?: { at: number; self: string[] } | null;
+  /** 포인트몰 수령 확인: at = 받으러 간 응답 번호, items = 받으러 간 물건 이름 */
+  pickup?: { at: number; items: string[] } | null;
   /** 명부의 요원 줄 (host/people.ts rosterOf). 설정 「명부 대조」가 켜져 있으면 기록이 없는 줄을 자료 roster 로 보낸다 */
   roster?: RosterRow[];
 }
@@ -342,6 +346,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     return liveEntries(p.slots.history, live).some(after) || Object.values(store.docs).some((d) => d.type === 'event' && liveEntries(d.entries, live).some(after));
   });
   const shopM = o.shop && !o.only?.length && confirmedIdx.has(o.shop.at) ? [...tags].find(([, i]) => i === o.shop!.at)?.[0] ?? '' : '';
+  const pickM = o.pickup?.items.length && !o.only?.length && confirmedIdx.has(o.pickup.at) ? [...tags].find(([, i]) => i === o.pickup!.at)?.[0] ?? '' : '';
   const data = {
     request_ref: `pp_${Date.now().toString(36)}`,
     // 세력 평판 수치도 같은 계기 이름을 쓴다: 호감이 글로만·꺼짐이어도 세력 수치가 켜져 있으면 넣는다 (전수검사 11-13)
@@ -391,9 +396,11 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     used_now: o.items && o.used?.length ? o.used.map((u) => ({ name: u.name, times: u.n, consumable: u.left !== undefined, uses_left: u.left })) : undefined,
     // 상점 판단 (11-09): 가장 최근 응답 끝에 주인공이 물건을 살 수 있는 곳이 있나. 기준 글은 지침 「상점」 SHOP_RULE (본편 표식 지침과 같은 글)
     shop_check: shopM ? { m: shopM, protagonist: o.shop!.self.filter(Boolean) } : undefined,
-    want: { shop: !!shopM || undefined, new_people: true, next_note: wantNote, address: o.settings.features.has('register'), identity: true, transactions: typeof o.wallet === 'number', point_transactions: typeof o.points === 'number' || undefined, items: !!o.items },
+    // 포인트몰 수령 확인 (2026-11-16): 주인공이 받으러 간 물건을 그 응답에서 실제로 받았나. 글은 갱신기 지침 pickup 절
+    pickup_check: pickM ? { m: pickM, items: o.pickup!.items } : undefined,
+    want: { shop: !!shopM || undefined, pickup: !!pickM || undefined, new_people: true, next_note: wantNote, address: o.settings.features.has('register'), identity: true, transactions: typeof o.wallet === 'number', point_transactions: typeof o.points === 'number' || undefined, items: !!o.items },
   };
-  return { shop: shopM ? { m: shopM } : null, system: o.system, data, indexes: batch, tags, people: chosen, confirmed: confirmedIdx, overBudget, names: o.names, tidy: o.settings.tidy === 'same' ? over : [], factions: factionCodes, factionNames: o.factionNames ?? {}, clock, review, turn, wallet: typeof o.wallet === 'number', points: typeof o.points === 'number', items: o.items ? o.items.map((e) => e.name) : null, itemsWorn: o.items ? o.items.filter((e) => e.equipped).map((e) => e.name) : [], used: o.items ? o.used ?? [] : [] };
+  return { shop: shopM ? { m: shopM } : null, pickup: pickM ? { m: pickM, items: o.pickup!.items } : null, system: o.system, data, indexes: batch, tags, people: chosen, confirmed: confirmedIdx, overBudget, names: o.names, tidy: o.settings.tidy === 'same' ? over : [], factions: factionCodes, factionNames: o.factionNames ?? {}, clock, review, turn, wallet: typeof o.wallet === 'number', points: typeof o.points === 'number', items: o.items ? o.items.map((e) => e.name) : null, itemsWorn: o.items ? o.items.filter((e) => e.equipped).map((e) => e.name) : [], used: o.items ? o.used ?? [] : [] };
 }
 
 // ── 자료에 싣는 안내 글: 지침 「인물 기록 갱신기(덧붙임)」의 절 (설정 → 지침에서 고침) ──
@@ -405,6 +412,8 @@ export const trackingRule = (): string => guideTxt('UpdaterExtra', 'TRACKING_RUL
 const resolvedPrefix = (): string => guideTxt('UpdaterExtra', 'ENTRY.RESOLVED');
 /** 고쳐 둔 갱신기 지침에 상점 절이 없을 때 덧붙이는 출력 칸 안내 (host/people.ts updaterSystem) */
 export const shopKeyLine = (): string => guideTxt('UpdaterExtra', 'SHOP_KEY');
+/** 고쳐 둔 갱신기 지침에 수령 확인 절이 없을 때 덧붙이는 출력 칸 안내 */
+export const pickupKeyLine = (): string => guideTxt('UpdaterExtra', 'PICKUP_KEY');
 
 // ── 지침 조립 ──
 
@@ -495,6 +504,8 @@ export interface UpdateResult {
   sexual_init?: { who: string; sexual_desire?: string | null; paraphilia?: string | null; m: string; quote: string }[];
   /** 상점 판단 (shop_check 가 있을 때): 지금 상점이 있으면 하나, 없으면 null */
   shop?: { name?: string; owner?: string | null; m?: string; quote?: string } | null;
+  /** 포인트몰 수령 확인 (pickup_check 가 있을 때): 그 응답에서 실제로 받은 물건 이름 */
+  pickup?: unknown;
   /** 바꾸지 않은 이유·빠진 규칙 (원본 issues[]). 빈 답인지 「확인했는데 변화 없음」인지 가른다 (2026-11-07) */
   issues?: { code?: string; who?: string | null; reason?: string }[];
 }
@@ -537,6 +548,8 @@ export interface ApplyReport {
   items: ItemChange[];
   /** 상점 판단 결과 (판단을 맡았을 때만): 있으면 가게, 없으면 null. undefined = 맡지 않음 */
   shop?: { index: number; name: string; owner: string } | null;
+  /** 포인트몰 수령 확인: 물었으면 늘 있다. names = 받았다고 한 이름 (물은 것 가운데, 답 칸이 없으면 빈 목록 = 못 받음), anchor = 판단한 응답 키 */
+  pickup?: { anchor: string; names: string[] };
 }
 export interface ItemChange {
   anchor: string;
@@ -1460,6 +1473,24 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     const ev = evidenceLoose(input.shop.m);
     if (typeof ev !== 'string') report.shop = name ? { index: ev.index, name, owner: plain(t?.owner, 30) } : null;
     if (t && !name) drop('shop', t, '가게 이름 없음');
+  }
+
+  // 6c-1b. 포인트몰 수령 확인 (2026-11-16 사용자): 받으러 간 물건(pickup_check.items) 가운데 그 응답에서 실제로 받았다고 한 이름만.
+  // 장면 전체로 보는 판단이라 인용은 받지 않는다 (상점 판단과 같다). 물은 이름이 아니면 버린다. 답 칸이 없으면 하나도 못 받은 것
+  if (input.pickup && !ctx.only?.length) {
+    const ev = evidenceLoose(input.pickup.m);
+    if (typeof ev !== 'string') {
+      const raw = Array.isArray(r.pickup) ? r.pickup : [];
+      const names: string[] = [];
+      const pool = [...input.pickup.items]; // 같은 이름을 둘 샀으면 답한 수만큼만
+      for (const t of raw.slice(0, 40)) {
+        const n = plain(typeof t === 'string' ? t : (t as { name?: unknown } | null)?.name, 60);
+        const at = pool.findIndex((x) => sameItemName(x, n));
+        if (at >= 0) names.push(...pool.splice(at, 1));
+        else drop('pickup', t, '받으러 간 물건이 아님');
+      }
+      report.pickup = { anchor: ev.anchor, names };
+    }
   }
 
   // 6c-2. 소지품 (2026-11-07, core/items.ts): 본문에 분명히 적힌 변화만, 인용 필수. update·gone 은 목록에 있는 이름만, 같은 이름은 한 번. 다시 읽기(only)에서는 받지 않는다
