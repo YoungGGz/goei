@@ -21,7 +21,7 @@ import { cleanIcon, itemsRule, itemEquip, itemState, stripGrades, itemUses, item
 import { leftWordIn, offWordIn } from '../itemrules';
 import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
 import { imgTagNames } from '../imgtag';
-import { changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
+import { capScene, changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
 import type { Feature, PeopleSettings } from './settings';
 import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
 
@@ -1621,7 +1621,10 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       if (who && !ctx.exclude?.includes(who) && !present.includes(who)) present.push(who);
     }
     const last = Math.max(...input.indexes);
-    if (list[last]) (store.scene ??= {})[messageKey(list[last], last)] = present;
+    if (list[last]) {
+      (store.scene ??= {})[messageKey(list[last], last)] = present;
+      capScene(store, chat, messageKey(list[last], last));
+    }
   }
 
   if (!ctx.keepRead) markRead(store, chat, input.indexes);

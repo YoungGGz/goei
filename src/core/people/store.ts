@@ -375,6 +375,19 @@ export function pruneScene(store: PeopleStore, chat: Chat): void {
   if (!Object.keys(store.scene).length) delete store.scene;
 }
 
+/** 장면 인물 목록을 남겨 두는 응답 수. 쓰는 것은 요청 바로 앞 응답의 목록 하나다 (select.ts carriedScene) —
+ *  마지막 응답들을 지우거나 다시 굴려도 그 앞 응답의 목록이 있도록 채팅 뒤쪽 몇 개만 둔다 */
+export const SCENE_KEEP = 20;
+/** 장면 인물 목록을 채팅 뒤쪽 SCENE_KEEP 개 응답 것만 남긴다. keep = 방금 적은 응답 (지난 응답을 뒤늦게 읽은 것이면 다음 묶음이 쓰도록 남긴다) */
+export function capScene(store: PeopleStore, chat: Chat, keep?: string): void {
+  if (!store.scene) return;
+  const keys = Object.keys(store.scene);
+  if (keys.length <= SCENE_KEEP) return;
+  const at = new Map(msgs(chat).map((m, i) => [messageKey(m, i), i]));
+  const recent = new Set(keys.filter((k) => at.has(k)).sort((a, b) => at.get(b)! - at.get(a)!).slice(0, SCENE_KEEP));
+  for (const k of keys) if (!recent.has(k) && k !== keep) delete store.scene[k];
+}
+
 export function putChange(store: PeopleStore, c: Change): boolean {
   if (store.log.some((x) => x.id === c.id)) return false;
   store.log.push({ ...c, reason: plain(c.reason, 80), ...(c.quote ? { quote: plain(c.quote, 60) } : {}) });

@@ -96,3 +96,30 @@ test('호칭으로 올라온 이름이 이름 표의 인물(별명 포함)이면
   U.applyUpdate(s2, c, in2, { new_people: [{ name: '사장님', aliases: [], m: tagOf(in2, 1), quote: '사장님이 고개를 들었다', identity: '미확인', provisional: true }] }, { settings: settings() });
   assert.equal(s2.people.사장님.provisional, true);
 });
+
+test('장면 인물 유지: 응답별 목록은 채팅의 최근 응답 것만 남는다 (응답마다 한 줄씩 끝없이 쌓이지 않는다)', () => {
+  const store = T.emptyStore();
+  store.people.김철수 = npc('김철수');
+  const s = settings();
+  const msgs = [];
+  const N = S.SCENE_KEEP + 15;
+  for (let n = 1; n <= N; n++) {
+    msgs.push(['user', '걸었다', `u${n}`], ['char', '김철수가 따라왔다.', `c${n}`]);
+    const c = chat(...msgs);
+    const input = U.buildUpdate(c, store, [msgs.length - 1], { settings: s, system: '', values: {}, names: Sel.namesWith(store, B.allNames()) });
+    U.applyUpdate(store, c, input, { present: ['김철수'] }, { settings: s });
+  }
+  const keys = Object.keys(store.scene);
+  assert.equal(keys.length, S.SCENE_KEEP);
+  assert.deepEqual(keys.sort(), Array.from({ length: S.SCENE_KEEP }, (_, i) => `c${N - i}`).sort(), '채팅 뒤쪽 응답 것이 남는다');
+  const c = chat(...msgs);
+  assert.deepEqual(Sel.carriedScene(store, c), ['김철수']);
+  // 마지막 응답을 다시 굴려도 바로 앞 응답의 목록은 남아 있다
+  assert.deepEqual(Sel.carriedScene(store, c, msgs.length - 1), ['김철수']);
+  // 지난 응답을 뒤늦게 읽으면 그 목록은 다음 묶음이 쓸 수 있게 남는다 (최근 것 밖이어도)
+  delete store.read.c3;
+  const old = U.buildUpdate(c, store, [5], { settings: s, system: '', values: {}, names: Sel.namesWith(store, B.allNames()) });
+  U.applyUpdate(store, c, old, { present: ['김철수'] }, { settings: s });
+  assert.deepEqual(store.scene.c3, ['김철수']);
+  assert.equal(Object.keys(store.scene).length, S.SCENE_KEEP + 1);
+});
