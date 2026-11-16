@@ -49,6 +49,10 @@ const ANSWERED = [
   [',"reactions":"-"}]}.', '}]}.'],
   [' reactions is "-" or space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants.', ' At most 30 messages; each text content at most 600 characters.'],
   ['OUTPUT CONTRACT\nReturn exactly {"name":"room name"', 'EMOJI REACTIONS\nA text message in the output may also carry "reactions": space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants. Omit it when there are none.\n\nOUTPUT CONTRACT\nReturn exactly {"name":"room name"'],
+  // 11-16 인수 검토: 남긴 글의 말머리 두 절이 부딪치던 것, 다양성 강화가 쓰는 벌 설명(확률 낮은 벌)
+  ["do not copy its author, title, date, content, tag or saved comments.", "do not copy its author, title, date, content, saved tag or saved comments."],
+  ["{id, views, upvotes, comments}, where id is its saved ID", "{id, views, upvotes, comments}, plus tag only where the post category rule asks for one; id is its saved ID"],
+  ["uses alternativePosts, the second candidate.", "uses the board with the lower probability."],
   // 11-15 사용자: 같은 말 되풀이 줄이기. 상태창 이어 쓰기 안내는 직전 상태 블록에서 한 번만 (다시 물을 때의 분석 지시는 11-16 사용자 결정으로 원문 그대로)
   [' block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.', ' block just before the latest user input; follow the note in that block.'],
 ];

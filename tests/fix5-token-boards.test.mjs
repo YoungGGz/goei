@@ -30,7 +30,7 @@ test('댓글 달기: 대상 글의 본문·댓글은 요청에 한 번만 들어
   assert.equal(count(text, '저도 봤어요'), 1, '대상 글 댓글은 작업 입력에만');
   const o = optionsOf(text);
   // 출처 댓글은 작업 입력 comments 의 index 로만 (본문은 comments 와 action 에)
-  assert.deepEqual(o.incomingOrigin, { post: 100002, title: '글 100002', author: 'n100002', comment: { index: 2 } });
+  assert.deepEqual(o.incomingOrigin, { post: 100002, comment: { index: 2 } });
   assert.equal(count(text, '무섭네요'), 2);
   assert.equal(JSON.parse(text.slice(0, text.indexOf('\nCOMBINED OUTPUT OPTIONS:')).split('\n').pop()).comments.find((c) => c.index === 2).content, '무섭네요');
   const target = o.activityPosts.find((x) => x.id === 100002);
@@ -346,6 +346,8 @@ test('다양성 강화: 확률이 더 낮은 벌을 쓰고, 확률이 없거나 
   assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: 0.05, alternativeProb: 0.05 }), B);
   assert.equal(C.sampledBoard({ posts: A, alternativePosts: B }), B, '확률 없음');
   assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: 'x', alternativeProb: 0.1 }), B);
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: null, alternativeProb: 0.06 }), B, '빈 확률 칸은 0 이 아니다');
+  assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: '', alternativeProb: 0.06 }), B);
   assert.equal(C.sampledBoard({ posts: A, alternativePosts: [] }), A, '두 번째 벌이 비면 첫 벌');
   assert.equal(C.sampledBoard({ posts: [], alternativePosts: B, postsProb: 0.01, alternativeProb: 0.09 }), B, '첫 벌이 비면 두 번째 벌');
 });

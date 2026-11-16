@@ -754,8 +754,9 @@ export function sampledBoard(value: Record<string, unknown>): unknown {
   const alt = Array.isArray(value.alternativePosts) && value.alternativePosts.length ? value.alternativePosts : null;
   if (!alt) return value.posts;
   const posts = Array.isArray(value.posts) && value.posts.length ? value.posts : null;
-  const p = Number(value.postsProb);
-  const a = Number(value.alternativeProb);
+  const num = (v: unknown) => (typeof v === 'number' || (typeof v === 'string' && v.trim()) ? Number(v) : NaN);
+  const p = num(value.postsProb);
+  const a = num(value.alternativeProb);
   if (posts && Number.isFinite(p) && Number.isFinite(a) && p < a) return posts;
   return alt;
 }
@@ -1224,8 +1225,7 @@ export function incomingTask(plan: IncomingPlan, head: string, activityPosts?: A
   if (plan.allowed && plan.post) {
     if (inTask !== 'draft') {
       body.incomingOrigin = {
-        ...(inTask === 'post' ? { post: plan.post.id } : {}),
-        title: plan.post.title, author: plan.post.nick, ...(inTask === 'post' ? {} : { content: plan.post.body }),
+        ...(inTask === 'post' ? { post: plan.post.id } : { title: plan.post.title, author: plan.post.nick, content: plan.post.body }),
         ...(plan.comment ? { comment: inTask === 'post' && plan.commentIndex ? { index: plan.commentIndex } : { author: plan.comment.nick, content: plan.comment.body } } : {}),
       };
     }
