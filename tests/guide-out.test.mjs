@@ -55,6 +55,8 @@ const ANSWERED = [
   ["uses alternativePosts, the second candidate.", "uses the board with the lower probability."],
   // 11-16 사용자: 상점 주인은 주인공 자료(신분·최근 본문)를 읽은 사람이 아니다
   ["The protagonist is the player. Write everything in Korean unless told otherwise. Prices are in Korean won", "The protagonist is the player. The material about the protagonist (identity, recent story) is for you as the writer: the owner has not read it and knows only what happens in the shop, what the protagonist says or shows there, and what the story has already shown this owner to know. Write everything in Korean unless told otherwise. Prices are in Korean won"],
+  // 11-16 사용자: 우주몰 운영자도 주인공 자료를 읽은 것이 아니다
+  ["The \"owner\" is the 운영자. Buying is a bank transfer", "The \"owner\" is the 운영자. The material about the protagonist (identity, recent story) is for you as the writer: the 운영자 has not read it and knows the customer only by what they type and buy on this page. Buying is a bank transfer"],
   // 11-15 사용자: 같은 말 되풀이 줄이기. 상태창 이어 쓰기 안내는 직전 상태 블록에서 한 번만 (다시 물을 때의 분석 지시는 11-16 사용자 결정으로 원문 그대로)
   [' block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.', ' block just before the latest user input; follow the note in that block.'],
 ];
