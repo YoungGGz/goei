@@ -21,8 +21,7 @@ test('llm: 재시도 문구에 원인 분석, 동시 요청 수를 넘지 않는
   const calls = [];
   globalThis.risuai = { runLLMModel: async (o) => (calls.push(o), { type: 'success', result: calls.length === 1 ? 'bad' : 'ok' }) };
   await generate([{ role: 'user', content: 'Q' }], 'aux', (r) => { if (r === 'bad') throw new Error('형식'); return r; }, { retries: 1, retryModel: 'same' });
-  assert.match(calls[1].messages.at(-1).content, /Work out the error source silently/);
-  assert.doesNotMatch(calls[1].messages.at(-1).content, /lb-process/, '지워 버릴 분석 글을 쓰라고 하지 않는다');
+  assert.match(calls[1].messages.at(-1).content, /analyze the error source/);
 
   let live = 0;
   let peak = 0;

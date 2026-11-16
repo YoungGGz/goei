@@ -49,8 +49,7 @@ const ANSWERED = [
   [',"reactions":"-"}]}.', '}]}.'],
   [' reactions is "-" or space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants.', ' At most 30 messages; each text content at most 600 characters.'],
   ['OUTPUT CONTRACT\nReturn exactly {"name":"room name"', 'EMOJI REACTIONS\nA text message in the output may also carry "reactions": space-separated emoji with counts such as "👍2", used sparingly and never above the number of other participants. Omit it when there are none.\n\nOUTPUT CONTRACT\nReturn exactly {"name":"room name"'],
-  // 11-15 사용자: 버려지는 출력·같은 말 되풀이 줄이기. 다시 물을 때 지워 버릴 분석 칸을 쓰게 하지 않고, 상태창 이어 쓰기 안내는 직전 상태 블록에서 한 번만
-  ['First analyze the error source step-by-step in a short <lb-process> block, then print', 'Work out the error source silently, then print'],
+  // 11-15 사용자: 같은 말 되풀이 줄이기. 상태창 이어 쓰기 안내는 직전 상태 블록에서 한 번만 (다시 물을 때의 분석 지시는 11-16 사용자 결정으로 원문 그대로)
   [' block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.', ' block just before the latest user input; follow the note in that block.'],
 ];
 const moved = Object.entries(OLD.sections).flatMap(([file, list]) => list.map(([name, body]) => ({ file, name, body })));

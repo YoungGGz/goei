@@ -42,7 +42,7 @@ export interface CraftMessage {
   content: string;
 }
 
-/** 다시 물을 때 붙이는 지시: 원인은 속으로만 따지고 고친 결과만 쓰게 한다 (분석 칸을 쓰게 하면 그 글은 버려진다). 옛 글대로 <lb-process> 칸이 와도 모델 호출이 지운다.
+/** 다시 물을 때 붙이는 원인 분석 지시 (원본은 생각 단계를 꺼도 이렇게 한다). <lb-process> 칸은 모델 호출이 지운다.
  *  글은 지침 「요청 공통」의 RETRY.ANALYZE 절, 생각 단계 머리말(원본 lb.thoughts, 모드별)은 THOUGHTS.* 절, 비망록 작업 머리는 MEMO.JOB_TITLE 절 (설정 → 지침에서 고침) */
 export const retryAnalyze = (): string => guideTxt('Common', 'RETRY.ANALYZE');
 

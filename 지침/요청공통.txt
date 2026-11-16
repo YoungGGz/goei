@@ -17,7 +17,7 @@ The previous reply was rejected and nothing was saved. Reply again from the same
 @@END
 
 @@SECTION RETRY.ANALYZE
-Work out the error source silently, then print only the required node with the corrected data in it, without apologies, explanations, or preambles.
+First analyze the error source step-by-step in a short <lb-process> block, then print only the required node with the corrected data in it, without apologies, explanations, or preambles.
 @@END
 
 @@SECTION REITERATE
