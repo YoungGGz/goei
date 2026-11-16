@@ -1,4 +1,5 @@
 0
+- 2026-11-16 16:51 KST 사용자 「남페소 페르소나 정면을 화풍으로 넣고 뽑아봐. 그리고 화풍 없이도 뽑아보고. 픽센도 다시 뽑고 전체 다시 뽑아」: 공장 정면 256 — 화풍 남A(pro/proflash/object) 3 + 화풍 없음(pro/proflash/object) 3 + pixen 1
 - 2026-11-16 16:36 KST 사용자 「전부 뽑아」: 공장 정면 256 4기능(generate-image-v2, create-image-pro-flash, create-1-direction-object, create-image-pixen) 각 1회
 - 2026-11-16 14:02 KST 사용자 「그걸로 한번 뽑아봐 그럼」: 스팡달 standard realistic_female 96 1회
 - 2026-11-16 13:28 KST 사용자 「제대로 검증받고 둘다 뽑아」: 스팡달 pro create_from_concept 96 1회(15gen) + edit_image_pixen 96x96 1회
@@ -12,3 +13,10 @@
 - 사용: 공장 정면 pixen
 - 사용: 공장 정면 proflash
 - 사용: 공장 정면 object
+- 사용: 공장 정면 r2 A_pro
+- 사용: 공장 정면 r2 A_proflash
+- 사용: 공장 정면 r2 B_pro
+- 사용: 공장 정면 r2 A_object
+- 사용: 공장 정면 r2 B_object
+- 사용: 공장 정면 r2 B_proflash
+- 사용: 공장 정면 r2 pixen
