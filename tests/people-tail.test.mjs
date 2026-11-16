@@ -81,3 +81,18 @@ test('뒤 경계: 이름 뒤 호칭·서술은 그대로 잡는다', () => {
   assert.deepEqual(m('철수세미를 샀다.'), []);
   assert.deepEqual(m("Jay's coat"), ['Jay']);
 });
+
+test('호칭으로 올라온 이름이 이름 표의 인물(별명 포함)이면 이름 있는 인물로 등록한다 (「이름 아님」 표시 없이)', () => {
+  const c = chat(['user', '가게에 들어갔다', 'u1'], ['char', '사장님이 고개를 들었다.', 'c1']);
+  const names = [{ name: '사장', aliases: ['사장님'], titles: [] }];
+  const store = T.emptyStore();
+  const input = U.buildUpdate(c, store, [1], { settings: settings(), system: '', values: {}, names });
+  const rep = U.applyUpdate(store, c, input, { new_people: [{ name: '사장님', aliases: [], m: tagOf(input, 1), quote: '사장님이 고개를 들었다', identity: '미확인', provisional: true }] }, { settings: settings() });
+  assert.deepEqual(rep.applied.newPeople, ['사장']);
+  assert.ok(!store.people.사장.provisional);
+  // 표에 없는 호칭은 그대로 호칭 기록
+  const s2 = T.emptyStore();
+  const in2 = U.buildUpdate(c, s2, [1], { settings: settings(), system: '', values: {}, names: [] });
+  U.applyUpdate(s2, c, in2, { new_people: [{ name: '사장님', aliases: [], m: tagOf(in2, 1), quote: '사장님이 고개를 들었다', identity: '미확인', provisional: true }] }, { settings: settings() });
+  assert.equal(s2.people.사장님.provisional, true);
+});

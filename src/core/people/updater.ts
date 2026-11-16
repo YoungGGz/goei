@@ -735,7 +735,9 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     // 이름 없는 인물(호칭으로 올린 것)을 받을지는 설정이 정한다. 어떤 호칭이 기록할 만한지는 모델이 판단한다 (지침 4절).
     // 호칭으로 올라와 기다리던 이름은 다시 올 때 표시가 빠져 있어도 호칭이다 (같은 글자의 같은 인물이다)
     const pend = store.pending[name];
-    const provisional = n.provisional === true || pend?.provisional === true;
+    // 이름 표의 인물(표의 이름·별명으로 온 것)은 호칭으로 올라와도 이름 있는 인물이다: 표시를 남기면 메인 요청에 「이름이 아님」이 붙고 이름 옮기기의 대상이 된다
+    const inTable = input.names.some((e) => norm(e.name) === norm(name));
+    const provisional = !inTable && (n.provisional === true || pend?.provisional === true);
     if (provisional && !ctx.settings.newUnnamed) {
       drop('new_people', n, '이름 없는 인물 기록 꺼짐', name);
       continue;
