@@ -131,7 +131,7 @@ export const HS_KEY = {
   clips: '$hs_clips', read: '$hs_read', scalePc: '$hs_scale_pc', scalePhone: '$hs_scale_ph',
   next: '$hs_next', turn: '$hs_turn', lock: '$hs_lock', left: '$hs_left',
   drop: '$hs_drop', dropRate: '$hs_drop_rate', dropFast: '$hs_drop_fast', dropStep: '$hs_drop_step', soonAt: '$hs_soon_at', endLo: '$hs_end_lo', endHi: '$hs_end_hi',
-  callLo: '$hs_call_lo', callHi: '$hs_call_hi', forms: '$hs_forms', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk',
+  callLo: '$hs_call_lo', callHi: '$hs_call_hi', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk',
 } as const;
 /** 숫자 칸 범위·기본값 (설정 화면과 읽기가 같이 쓴다) */
 export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: number; unit: string }> = {
@@ -164,13 +164,10 @@ export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: 
   callLo: { key: HS_KEY.callLo, lo: 1, hi: 60, def: 6, unit: '턴' },
   callHi: { key: HS_KEY.callHi, lo: 1, hi: 60, def: 12, unit: '턴' },
 };
-/** 출연 형태 기본 목록 (설정에서 고친다, 쉼표·줄바꿈으로 나눔) */
 /** 주문 전화번호 기본값 */
 export const HS_TEL_DEFAULT = '080-404-0000';
 /** 내 채팅을 읽는 동안 진행자 컷에서 대기와 번갈아 트는 동작 (이름은 영문·우리말 어느 쪽이든) */
 export const HS_READ_DEFAULT = '고개 꺾기, 굳은 응시';
-/** 출연 형태 기본값 (지침 「망상홈쇼핑」의 FORMS_DEFAULT 절, 호출 CALL 절의 {form} 으로 간다) */
-export const hsFormsDefault = (): string => guideTxt('Hs', 'FORMS_DEFAULT');
 export type HsAuto = 'manual' | 'open';
 export type HsScale = 'auto' | 'fit' | '0.5' | '1' | '2';
 export interface HsRules {
@@ -226,9 +223,8 @@ export interface HsSettings {
   /** 남은 수량 시작 값 */
   left: number;
   drop: HsDrop;
-  /** 할부 호출: 다음 호출까지 턴 [최소, 최대] · 출연 형태 목록 */
+  /** 시연 호출: 상자를 연 뒤 불려 가기까지 턴 [최소, 최대] */
   call: [number, number];
-  forms: string[];
   /** 방청 신청 · 스티커 들추기 · 채팅 보내기 · 물건 맞교환 · 상담원과 흥정 */
   aud: boolean;
   peek: boolean;
@@ -282,7 +278,6 @@ export function hsSettings(vars: Vars): HsSettings {
     left: n(vars, 'left'),
     drop: { on: vars?.[HS_KEY.drop] !== '0', rate: n(vars, 'dropRate') / 100, fast: n(vars, 'dropFast') / 10, step: n(vars, 'dropStep'), soon: n(vars, 'soonAt'), end: pair(n(vars, 'endLo'), n(vars, 'endHi')) },
     call: pair(n(vars, 'callLo'), n(vars, 'callHi')),
-    forms: (() => { const f = String(vars?.[HS_KEY.forms] ?? '').split(/[,\n]/).map((x) => x.trim().slice(0, 30)).filter(Boolean); return f.length ? f : hsFormsDefault().split(',').map((x) => x.trim()); })(),
     aud: vars?.[HS_KEY.aud] !== '0',
     peek: vars?.[HS_KEY.peek] !== '0',
     say: vars?.[HS_KEY.say] !== '0',
@@ -408,8 +403,9 @@ export interface ShowReply { title: string; items: Omit<ShopItem, 'id'>[]; insts
 export function hsLine(line: string): { item: Omit<ShopItem, 'id'>; inst: number } | null {
   const cells = lineCells(line);
   if (cells.length < 2) return null;
-  const inPrice = /(\d+)\s*회/.exec(cells[1] ?? '');
-  const inst = Math.min(99, Number(/\d+/.exec(cells[7] ?? '')?.[0] ?? inPrice?.[1] ?? 0) || 0);
+  const inPrice = /\d+\s*회|시연/.exec(cells[1] ?? '');
+  const c7 = (cells[7] ?? '').trim();
+  const inst = inPrice || /^(o|○|yes|y)$/i.test(c7) || Number(/\d+/.exec(c7)?.[0] ?? 0) > 0 ? 1 : 0;
   const price = inPrice ? 0 : costOf(cells[1] ?? '')?.price ?? 0;
   const c = [...cells];
   c[1] = String(price);
@@ -514,7 +510,7 @@ export const showVars = (st: HsShow): Record<string, string> => ({ [HS_VAR]: JSO
 export function hsPayText(part: Pick<HsPart, 'item' | 'inst'>): string {
   const won = part.item.price > 0 ? part.item.price.toLocaleString('en-US') : '';
   const n = part.inst ?? 0;
-  return won && n ? guideTxt('Hs', 'PAY_BOTH', { won, n }) : won ? guideTxt('Hs', 'PAY_WON', { won }) : n ? guideTxt('Hs', 'PAY_APPEAR', { n }) : '';
+  return won && n ? guideTxt('Hs', 'PAY_BOTH', { won }) : won ? guideTxt('Hs', 'PAY_WON', { won }) : n ? guideTxt('Hs', 'PAY_APPEAR') : '';
 }
 
 /** FNV-1a (같은 상품이면 늘 같은 조각) */
@@ -699,7 +695,7 @@ export function termsText(t: HsTerms, money = true): string {
   const parts = [
     money && t.money > 0 ? guideTxt('Hs', 'ORDER_WON', { won: t.money.toLocaleString('en-US') }) : '',
     t.items.length ? guideTxt('Hs', 'ORDER_BARTER', { gave: t.items.map((x) => x.name).join(', ') }) : '',
-    t.appear > 0 ? guideTxt('Hs', 'ORDER_INSTALLMENT', { n: t.appear }) : '',
+    t.appear > 0 ? guideTxt('Hs', 'ORDER_INSTALLMENT') : '',
     t.other ? guideTxt('Hs', 'ORDER_OTHER', { other: t.other }) : '',
   ].filter(Boolean);
   return parts.join(` ${guideTxt('Hs', 'ORDER_JOIN').trim() || '+'} `);
@@ -713,12 +709,12 @@ export function parseOperator(raw: string, offered: { id: string; name: string }
   const t: HsTerms = { money: 0, items: [], appear: 0, other: '' };
   const key = (n: string) => n.replace(/\s+/g, '').toLowerCase();
   for (const l of body.split('\n')) {
-    const m = /^\s*[-*•]?\s*(money|돈|원|items?|물건|appear|출연|other|기타)\s*[|:：]\s*(.+)$/i.exec(l);
+    const m = /^\s*[-*•]?\s*(money|돈|원|items?|물건|demo|시연|appear|출연|other|기타)\s*[|:：]\s*(.+)$/i.exec(l);
     if (!m) continue;
     const k = m[1].toLowerCase();
     const v = m[2].trim();
     if (/^(money|돈|원)$/.test(k)) t.money = costOf(v)?.price ?? 0;
-    else if (/^(appear|출연)$/.test(k)) t.appear = Math.min(99, Number(/\d+/.exec(v)?.[0] ?? 0));
+    else if (/^(demo|시연|appear|출연)$/.test(k)) t.appear = /^(no|none|x|0|-|없음)$/i.test(v) ? 0 : 1;
     else if (/^(other|기타)$/.test(k)) t.other = clean(v, 60);
     else for (const n of v.split(/[;；,、]/)) {
       const hit = offered.find((o) => key(o.name) === key(n.replace(/[「」『』"']/g, '')));
@@ -731,7 +727,7 @@ const boxName = (name: string) => guideTxt('Hs', 'BOX_NAME', { name }).slice(0, 
 /** 새 주문 (장부 줄). 상자 물건은 부른 쪽이 소지품에 넣고 boxId 를 채운다. 출연 호출 턴은 상자를 열 때 뽑는다(openOrder) */
 export function newOrder(chat: Chat, item: ShopItem, pay: HsPay, terms: HsTerms): HsOrder {
   const { id: _id, sold: _s, soldKey: _k, tag: _t, was: _w, orig: _o, ...rest } = item;
-  return { id: `ho_${item.id}`, item: rest, n: terms.appear, how: termsText(terms), pay, terms, anchor: lastBot(chat)?.key ?? '', turn: userTurns(chat), dues: [], boxId: '' };
+  return { id: `ho_${item.id}`, item: rest, n: terms.appear ? 1 : 0, how: termsText(terms), pay, terms, anchor: lastBot(chat)?.key ?? '', turn: userTurns(chat), dues: [], boxId: '' };
 }
 /** 상자를 연 주문: 연 응답 키를 적고, 출연이 걸렸으면 이제 호출 턴을 뽑는다 (다른 연 주문의 호출 턴과 겹치지 않게) */
 export function openOrder(chat: Chat, o: HsOrder, s: Pick<HsSettings, 'call'>, openKey: string, rnd: () => number = Math.random): HsOrder {
@@ -785,9 +781,7 @@ export function homeshopBlock(chat: Chat): string {
   const lines: string[] = [];
   const call = callNow(chat);
   if (call && g.CALL) {
-    const { order: o, nth } = call;
-    const form = s.forms[(o.id.length + nth * 7 + o.turn) % s.forms.length];
-    lines.push(fillGuide(g.CALL, { item: o.item.name, nth: String(nth), total: String(o.n), left: String(o.n - nth), form }));
+    lines.push(fillGuide(g.CALL, { item: call.order.item.name }));
   }
   const aud = readAudience(chat.scriptstate);
   if (aud && s.aud && g.AUDIENCE && aud.anchor === (lastBot(chat)?.key ?? '')) lines.push(fillGuide(g.AUDIENCE, { no: aud.no, name: aud.name }));

@@ -83,16 +83,16 @@ for (const [vp, size] of VPS) {
   await click('[data-action="hs-pop"][data-value="call"]'); await page.waitForTimeout(300); await shot('call');
   assert.equal(await page.locator('[data-action="hs-pay"]').count(), 4, '결제 네 가지');
   assert.ok((await page.textContent('.hs-pop')).includes('380,000원'), '원 값');
-  assert.ok((await page.textContent('.hs-pop')).includes('출연 6회'), '출연');
+  assert.ok((await page.textContent('.hs-pop')).includes('시연 참여'), '시연');
   assert.ok((await page.textContent('.hs-op')).includes('주문 도와드리겠습니다'), '상담원 인사');
   // 흥정: 상담원(사람이 아닌 채널 직원) 요청 한 번
   await click('[data-action="hs-pay"][data-value="talk"]'); await page.waitForTimeout(200);
-  await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<operator>출연이라면 네 번은 주셔야겠습니다, 고객님. 머리카락도 조금 보내 주시고요.</operator>\n<terms>\nappear|4\nother|머리카락 한 줌\n</terms>' }]; });
-  await page.fill('[data-input="hs-op"]', '출연 두 번으로 안 될까요');
+  await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<operator>시연에 나와 주시고 머리카락도 조금 보내 주시면 됩니다, 고객님.</operator>\n<terms>\ndemo|yes\nother|머리카락 한 줌\n</terms>' }]; });
+  await page.fill('[data-input="hs-op"]', '돈 대신 시연으로 안 될까요');
   await click('[data-action="hs-op"]');
   await page.waitForFunction(() => !!document.querySelector('.hs-terms') && document.querySelector('.hs-terms').textContent.includes('머리카락'), null, { timeout: 15000 });
   { const req = await page.evaluate(() => window.__calls.llm.at(-1).messages.map((m) => m.content).join('\n'));
-    assert.ok(req.includes('not a human') && req.includes('출연 두 번으로 안 될까요'), '흥정 요청: 상담원 지침 + 내 말'); }
+    assert.ok(req.includes('not a human') && req.includes('돈 대신 시연으로 안 될까요'), '흥정 요청: 상담원 지침 + 내 말'); }
   await page.waitForTimeout(200); await shot('call-talk');
   // 맞교환: 물건 고르기 → 감정 받기
   await click('[data-action="hs-pay"][data-value="barter"]'); await page.waitForTimeout(200);

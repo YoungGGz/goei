@@ -594,7 +594,7 @@ function drawCg(f: PlayerFeed, r: Run, t: number): void {
   const pay = hsPayText(part);
   const art = cutArt(r.cut);
   const board = r.flags.price && r.cut !== 'C' && r.cut !== 'D'
-    ? `<div class="hs-board hs-b${art}">${won ? `<span class="big">${esc(won)}</span>${n ? `<span class="sm">무이자 출연 ${n}회</span>` : ''}` : `<span><span class="sm">무이자 출연 </span><span class="big">${n}회</span></span>`}<span class="sm">오늘 방송에서만</span></div>` : '';
+    ? `<div class="hs-board hs-b${art}">${won ? `<span class="big">${esc(won)}</span>${n ? `<span class="sm">${esc(guideTxt('Hs', 'PAY_APPEAR'))}</span>` : ''}` : `<span class="big">${esc(guideTxt('Hs', 'PAY_APPEAR'))}</span>`}<span class="sm">오늘 방송에서만</span></div>` : '';
   const tag = r.flags.sold ? '매진' : r.flags.rush ? CUE_EVENT_LABEL.rush : '';
   const key = [r.part, r.cut, r.flags.price, r.flags.soon, r.flags.sold, r.flags.rush, r.flags.call, r.left, f.tel, stage?.classList.contains('sm')].join('|');
   if (cg.dataset.h !== key) {

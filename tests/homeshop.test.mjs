@@ -32,7 +32,7 @@ test('망상홈쇼핑: 편성 응답을 상품·큐시트·채팅으로 읽는�
   assert.equal(r.title, '금요 심야 특집');
   assert.deepEqual(r.items.map((i) => i.name), ['행운의 무전기', '잠들지 않는 베개']);
   // 값 칸의 「무이자 N회」는 출연으로 읽고 원 값은 0 (돈으로는 안 판다 — 공짜 주문이 되지 않게)
-  assert.deepEqual(r.insts, [6, 3]);
+  assert.deepEqual(r.insts, [1, 1]);
   assert.equal(r.items[0].price, 0);
   assert.deepEqual(r.cues.map((c) => c.length), [3, 2]);
   assert.deepEqual(r.cues[0].map((c) => c.cut), ['A', 'C', 'B']);
@@ -106,27 +106,26 @@ test('망상홈쇼핑: 주문 때는 출연이 걸리지 않고, 출연 호출 �
   const c2 = chatOf(2);
   const terms = { money: 0, items: [], appear: 3, other: '' };
   const o0 = newOrder(c2, ITEM, 'appear', terms);
-  assert.equal(o0.n, 3);
+  assert.equal(o0.n, 1, '주문 한 건에 시연 한 번');
   assert.deepEqual(o0.dues, [], '주문 때는 출연이 걸리지 않는다');
   // 안 연 주문에는 호출이 없다
   const at = (turns, vars) => ({ ...chatOf(turns), message: [...chatOf(turns - 1).message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars });
-  const sealed = { ...o0, boxId: 'box1', dues: [5, 8, 11] };
+  const sealed = { ...o0, boxId: 'box1', dues: [5] };
   assert.equal(homeshopBlock(at(5, ordersVars([sealed]))), '', '안 연 상자는 묶지 않는다');
   assert.equal(callNow(at(5, ordersVars([sealed]))), null);
   // 3턴째 응답(c5) 뒤에 열었다: 그때부터 간격대로
   const c3 = { ...chatOf(3), scriptstate: ordersVars([sealed]) };
   const o = openOrder(c3, sealed, { call: [3, 3] }, 'c5', () => 0);
   assert.equal(o.openKey, 'c5');
-  assert.deepEqual(o.dues, [6, 9, 12]);
+  assert.deepEqual(o.dues, [6]);
   const vars = ordersVars([o]);
   assert.equal(homeshopBlock(at(5, vars)), '');
   const b6 = homeshopBlock(at(6, vars));
-  assert.ok(b6.startsWith('[망상홈쇼핑]') && b6.includes('행운의 무전기') && b6.includes('appearance 1 of 3'), b6);
+  assert.ok(b6.startsWith('[망상홈쇼핑]') && b6.includes('행운의 무전기') && b6.includes('the demonstration owed') && !/\{\w+\}/.test(b6), b6);
   assert.equal(homeshopBlock(at(7, vars)), '', '지나면 다시 안 보냄');
-  assert.equal(callNow(at(9, vars)).nth, 2);
+  assert.equal(callNow(at(9, vars)), null, '한 번뿐');
   assert.equal(paidOf(o, 5), 0);
-  assert.equal(paidOf(o, 9), 2);
-  assert.equal(paidOf(o, 99), 3);
+  assert.equal(paidOf(o, 9), 1);
   const msgs = withHomeshop([{ role: 'system', content: 'S' }, { role: 'user', content: 'go' }], at(6, vars));
   assert.equal(msgs.length, 3);
   assert.equal(msgs[1].role, 'system');
@@ -137,7 +136,7 @@ test('망상홈쇼핑: 주문 때는 출연이 걸리지 않고, 출연 호출 �
   // 다른 연 주문의 호출 턴과 겹치면 한 턴 미룬다
   const other = { ...sealed, id: 'ho_x2', boxId: 'box2' };
   const c3b = { ...chatOf(3), scriptstate: ordersVars([o, other]) };
-  assert.deepEqual(openOrder(c3b, other, { call: [3, 3] }, 'c5', () => 0).dues, [7, 10, 13]);
+  assert.deepEqual(openOrder(c3b, other, { call: [3, 3] }, 'c5', () => 0).dues, [7]);
   // 주문한 응답이 지워지면 장부도 없던 일
   const gone = { message: c2.message.slice(0, 2), scriptstate: vars };
   assert.equal(liveOrders(gone.scriptstate, new Set(gone.message.map((m) => m.chatId))).length, 0);
@@ -304,28 +303,28 @@ test('망상홈쇼핑: 큐 낱말은 영어로 주고, 영어·우리말 둘 다
 });
 
 test('망상홈쇼핑 편성 요청문: 누가 무엇을 아는지(KNOWS)가 들어가고, 스티커 밑 글·맞교환 말은 청하지 않는다 (11-15: 스티커는 진실 칸에서, 맞교환은 상담원 요청이 따로)', () => {
-  const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '원 값, 무이자 출연 N회' }, prev: [] };
+  const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '원 값, 다음 방송 시연 참여' }, prev: [] };
   const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
   const fill = { cue: '6 to 10', chat: '12 to 18', cuts: '와이드, 바스트', moods: '말하기', moods_b: '-', events: '가격 공개' };
   const sys = core1112.programPrompt(src, homeshop.hsSettings({}).shop, fill).find((m) => m.role === 'system').content;
   assert.match(sys, /Who knows what: /);
   assert.match(sys, /<\/chat>\n<operator>\nhello\|[^\n]+\ndone\|[^\n]+\n<\/operator>\n<cue>:/);
   assert.doesNotMatch(sys, /<peek>|barter\||\{[a-z_]+\}|\n\n\n/);
-  assert.match(sys, /이름\|값\|쓰임\|그림\|무게\|설명\|효과\|출연\|진실/);
-  assert.match(sys, /출연: how many appearances/);
+  assert.match(sys, /이름\|값\|쓰임\|그림\|무게\|설명\|효과\|시연\|진실/);
+  assert.match(sys, /시연: O if the channel sells/);
   const raw = `<title>밤 편성</title>\n<shelf>\n무전기|-|-|기기/무전기/radio|0.3|받는다||4|\n</shelf>\n<cue>\n#1\nwide|talk|어서 오세요|-\n</cue>\n<chat>\n#1\nㅇㅇ|와\n</chat>\n<operator>\nhello|네 고객님\ndone|접수했습니다\n</operator>`;
   const r = homeshop.parseShow(raw, new Map());
   assert.deepEqual(r.ops, { hello: '네 고객님', done: '접수했습니다' });
   assert.equal(r.items[0].price, 0, '값 「-」= 돈으로는 안 팖, 상품은 남는다');
-  assert.deepEqual(r.insts, [4]);
+  assert.deepEqual(r.insts, [1]);
 });
 
 test('망상홈쇼핑 상품 줄: 원 값·출연 칸 (둘 다 없으면 버림) · 값 글', () => {
   const { hsLine, hsPayText } = homeshop;
   const a = hsLine('부적|1,200,000|-|부적/부적/talisman|0.01|붉은 종이||3|');
   assert.equal(a.item.price, 1200000);
-  assert.equal(a.inst, 3);
-  assert.equal(hsPayText({ item: a.item, inst: a.inst }), '1,200,000원 · 무이자 출연 3회');
+  assert.equal(a.inst, 1);
+  assert.equal(hsPayText({ item: a.item, inst: a.inst }), '1,200,000원 · 다음 방송 시연 참여');
   const b = hsLine('부적|800000|-|부적/부적/talisman|0.01|붉은 종이||-|');
   assert.equal(b.inst, 0);
   assert.equal(hsPayText({ item: b.item, inst: 0 }), '800,000원');
@@ -338,9 +337,9 @@ test('망상홈쇼핑 상담원: 응답의 말·조건 읽기 (내민 물건만 
   const offered = [{ id: 'i1', name: '은 나침반' }, { id: 'i2', name: '붕대' }];
   const r = parseOperator('<operator>\n고객님, 이건 저희가 받기 어렵네요.\n</operator>\n<terms>\nmoney|300,000\nitems|은 나침반; 없는 물건\nappear|2\nother|계약서 한 장\n</terms>', offered);
   assert.equal(r.line, '고객님, 이건 저희가 받기 어렵네요.');
-  assert.deepEqual(r.terms, { money: 300000, items: [{ id: 'i1', name: '은 나침반' }], appear: 2, other: '계약서 한 장' });
-  assert.equal(termsText(r.terms), '300,000원 + 「은 나침반」 맞교환 + 무이자 출연 2회 + 계약서 한 장');
-  assert.equal(termsText(r.terms, false), '「은 나침반」 맞교환 + 무이자 출연 2회 + 계약서 한 장');
+  assert.deepEqual(r.terms, { money: 300000, items: [{ id: 'i1', name: '은 나침반' }], appear: 1, other: '계약서 한 장' });
+  assert.equal(termsText(r.terms), '300,000원 + 「은 나침반」 맞교환 + 다음 방송 시연 참여 + 계약서 한 장');
+  assert.equal(termsText(r.terms, false), '「은 나침반」 맞교환 + 다음 방송 시연 참여 + 계약서 한 장');
   assert.equal(parseOperator('<operator>안 됩니다</operator><terms>none</terms>', offered).terms, null);
   assert.throws(() => parseOperator('<terms>none</terms>', offered), /operator/);
 });

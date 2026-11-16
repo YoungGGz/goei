@@ -675,16 +675,15 @@ function ordersPage(ctx: ChatContext): string {
   const audRow = aud && (!aud.anchor || alive.has(aud.anchor)) ? `<div class="hs-audrow">★ 방청 신청 접수 · 접수번호 <b>${esc(aud.no)}</b></div>` : '';
   const debts = list.filter((o) => o.n > 0 && orderOpened(o, alive));
   const debtRows = debts.map((o) => {
-    const paid = Math.min(o.n, paidOf(o, turn));
-    const left = o.n - paid;
-    return `<li class="${left ? '' : 'done'}"><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>무이자 출연 ${o.n}회 · 다녀옴 ${paid}회</small></span><span class="bar"><i style="width:${Math.round((paid / o.n) * 100)}%"></i></span><span class="st${left ? ' on' : ''}">${left ? `${left}회 남음` : '완납'}</span></li>`;
+    const left = paidOf(o, turn) < 1;
+    return `<li class="${left ? '' : 'done'}"><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(guideTxt('Hs', 'PAY_APPEAR'))}</small></span><span class="st${left ? ' on' : ''}">${left ? '대기' : '다녀옴'}</span></li>`;
   }).join('');
   const shipRows = list.map((o) => {
     const opened = orderOpened(o, alive);
     return `<li><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(o.how)}</small></span><span class="st${opened ? '' : ' on'}">${opened ? '수령 확인' : '배송 완료 · 미개봉'}</span></li>`;
   }).join('');
   return `<section class="hs-sec"><h4>주문 조회</h4>${audRow}
-<h5>출연 내역</h5>${debtRows ? `<ul class="hs-ol">${debtRows}</ul>` : '<p class="hs-none">출연 내역이 없습니다.</p>'}
+<h5>시연 참여 내역</h5>${debtRows ? `<ul class="hs-ol">${debtRows}</ul>` : '<p class="hs-none">시연 참여 내역이 없습니다.</p>'}
 <h5>배송</h5>${shipRows ? `<ul class="hs-ol">${shipRows}</ul><p class="hs-tip">택배 상자는 소지품에서 「열기」로 엽니다.</p>` : '<p class="hs-none">주문 내역이 없습니다.</p>'}</section>`;
 }
 
@@ -696,7 +695,7 @@ const popShell = (title: string, body: string, foot = '', cls = '') =>
 /** 결제 방법 네 가지의 이름·설명. 폰 칩은 짧은 이름 (설명은 PC 단추의 풍선 글) */
 function payInfo(part: HsPart, pay: HsPay): { title: string; short: string; sub: string } {
   if (pay === 'won') { const t = part.item.price > 0 ? `${part.item.price.toLocaleString('en-US')}원` : '돈으로 결제'; return { title: t, short: t, sub: '가계부에서 바로 결제' }; }
-  if (pay === 'appear') return { title: part.inst ? `무이자 출연 ${part.inst}회` : '출연으로 결제', short: part.inst ? `출연 ${part.inst}회` : '출연', sub: '지금 내는 돈 없음 · 나중에 방송 출연' };
+  if (pay === 'appear') return { title: guideTxt('Hs', 'PAY_APPEAR'), short: '시연 참여', sub: '지금 내는 돈 없음 · 다음 방송에서 시연' };
   if (pay === 'barter') return { title: '물건 맞교환', short: '맞교환', sub: '가진 물건을 내밀고 감정' };
   return { title: '상담원과 흥정', short: '흥정', sub: '조건을 말로 정하기' };
 }
@@ -737,12 +736,12 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   const log = `<div class="hs-callog" aria-live="polite">${lines}</div>`;
   const terms = termsFor(part, pay);
   const block = terms ? termsBlock(ctx, terms) : '';
-  const label = pay === 'won' ? `${part.item.price.toLocaleString('en-US')}원 결제` : pay === 'appear' ? `출연 ${part.inst ?? 0}회로 주문` : '이 조건으로 주문';
+  const label = pay === 'won' ? `${part.item.price.toLocaleString('en-US')}원 결제` : pay === 'appear' ? '시연 참여로 주문' : '이 조건으로 주문';
   const orderBtn = `<button class="pri" data-action="hs-order"${terms && !block && !ui.calling ? '' : ' disabled'}>${esc(label)}</button>`;
   const warn = block ? `<p class="hs-warn">${esc(block)}</p>` : '';
   if (mobile) {
     const body = `<div class="hs-pays chips">${PAYS.map(btn).join('')}</div>${pick ? `<div class="hs-offer">${pick}</div>` : ''}${log}${talkIn}`;
-    return popShell(title, body, `${dealPanel ? termsCard(terms) : ''}${warn}${orderBtn}`, 'call m');
+    return popShell(title, body, `${dealPanel ? termsCard(terms) : ''}${warn}<div class="hs-ft">${orderBtn}<button data-action="hs-pop" data-value="">끊기</button></div>`, 'call m');
   }
   // PC: 좌우로 나눈다 (11-15 사용자) — 왼쪽 [상품 · 결제 방법 · 맞교환 물건 · 조건 · 주문], 오른쪽 상담원 통화 칸이 위에서 아래까지
   const side = `<div class="hs-side"><div class="sc">${head}<div class="hs-pays list">${PAYS.map(btn).join('')}</div>${pick ? `<div class="hs-offer">${pick}</div>` : ''}</div><div class="ft">${dealPanel ? termsCard(terms) || '<div class="hs-terms none"><small>상담원 조건</small><b>아직 없음</b></div>' : ''}${warn}<div class="hs-ft">${orderBtn}<button data-action="hs-pop" data-value="">끊기</button></div></div></div>`;

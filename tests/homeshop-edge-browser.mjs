@@ -34,7 +34,7 @@ let st = await ss();
 assert.equal(JSON.parse(st.$hs_orders).length, 1, '주문 한 건');
 assert.equal(JSON.parse(st.$st_items).list.filter((x) => x.name.includes('택배 상자')).length, 1, '상자 한 개');
 const o1 = JSON.parse(st.$hs_orders)[0];
-assert.deepEqual([o1.pay, o1.n, o1.dues.length], ['appear', 6, 0], '출연은 상자를 열 때 걸린다 (2026-11-16)');
+assert.deepEqual([o1.pay, o1.n, o1.dues.length], ['appear', 1, 0], '시연은 상자를 열 때 걸린다 (2026-11-16)');
 console.log('① ok', o1.anchor, o1.boxId);
 // ② 응답 다시 굴리기 → 주문·상자 사라짐, 다시 주문 가능
 await click('.hs-pop header [data-action="hs-pop"]');

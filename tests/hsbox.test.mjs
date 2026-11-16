@@ -28,7 +28,7 @@ test('택배 상자: 주문하면 바로 소지품에 들어오고, 다음 요�
   assert.ok(boxOrder(chat.scriptstate, o.boxId, keys(chat)), '안 연 상자');
   const text = core.inventoryText(sent(chat));
   assert.ok(text.includes(arriveText), text);
-  assert.ok(!text.includes('무이자 출연'), '상자에는 출연을 적지 않는다 (열 때 걸린다)');
+  assert.ok(!text.includes('시연 참여'), '상자에는 출연을 적지 않는다 (열 때 걸린다)');
   chat = answered(sent(chat), 'r1');
   assert.ok(!core.inventoryText(sent(chat)).includes(arriveText), '그다음 턴에는 다시 가지 않는다');
 });
@@ -53,8 +53,8 @@ test('택배 상자: 연 턴에는 받는 법이 다시 가지 않고, 출연은
   const text = core.inventoryText(sent(chat));
   assert.ok(text.includes('행운의 무전기'), text);
   assert.ok(!text.includes(arriveText), '상자를 연 턴에 도착 글이 다시 가지 않는다');
-  assert.ok(text.includes('무이자 출연 3회'), '연 물건에는 치른 것 전부(출연 포함)');
-  assert.deepEqual(readOrders(chat.scriptstate)[0].dues, [6, 9, 12], '출연 호출은 연 때부터');
+  assert.ok(text.includes('다음 방송 시연 참여'), '연 물건에는 치른 것 전부(출연 포함)');
+  assert.deepEqual(readOrders(chat.scriptstate)[0].dues, [6], '시연 호출은 연 때부터, 한 번');
 });
 
 test('택배 상자: 원으로 치른 주문의 상자는 값과 거래 id 를 잇는다', () => {
