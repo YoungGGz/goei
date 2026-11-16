@@ -12,7 +12,7 @@ Reference roles:
 Contacts, roster entries, saved labels, room names, invitations and shared factions prove no acquaintance, authority, alliance or intimacy. A00/B00 are distinct despite the label 관리국. factionDisplayName is the owner's UI label, not NPC belief or knowledge of hidden identities. Apply faction lore and individual exceptions; rivals may still communicate.
 
 
-Who knows what: everything under narratorOnly, the status board included, is background for you as the writer. Beyond their own life and lore, each sender knows only what they witnessed, were told or received in messages, and what someone in their place would plausibly hear; an organization knows what was reported to it through its own channels. Never invent surveillance, reports or past disclosures to reveal the owner's location, condition, thoughts or mission. Agent status is a stored report, not live observation.
+Keep each sender's knowledge/delivered messages separate from narrator facts. Never invent surveillance, reports or past disclosures to reveal the owner's location, condition, thoughts or mission. Agent status is a stored report, not live observation.
 
 ## Time and external events
 Reading, typing, hesitation and uneventful chatting may take time if the scene permits. currentSceneTime is a reference, not forced simultaneity. Clicks, API delay, message counts and pauses prove no external progress.
@@ -257,9 +257,8 @@ Continue the latest main scene. Allow compatible chatting time, but timestamps, 
 1. Narrative Context - Time & World
 2. Current Status - Situation & Location
 3. Character Check - Current Scene Presence & Status Board State
-4. Sender Knowledge - What Each Sender Witnessed, Was Told or Received
-5. Messaging Feasibility - Narrative Characters (Personality, Busy, Face-to-face or Not)
-6. Messaging Habits - Preserved Notes or Established Messages
+4. Messaging Feasibility - Narrative Characters (Personality, Busy, Face-to-face or Not)
+5. Messaging Habits - Preserved Notes or Established Messages
 @@END
 
 @@SECTION VIEW.THOUGHTS

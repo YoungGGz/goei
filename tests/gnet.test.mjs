@@ -174,7 +174,7 @@ test('prompts from the real card: frame, CBS settled, privacy branch, references
   assert.ok(sys.includes('incomingAllowed=true permits'));
   assert.ok(user.startsWith('[참고 자료 — 작중 인물에게 자동 공개되지 않음]\n'));
   assert.ok(user.includes('[활성 로어북: 현재 발생 상황]') && user.includes('Anomalies: 소라 랜드 발생'));
-  assert.ok(user.includes('[최근 본문 — 작가용 배경]\n[user]\n소라 랜드로 간다'));
+  assert.ok(user.includes('[최근 본문]\n[user]\n소라 랜드로 간다'));
   assert.ok(user.includes(`Every newly generated post ID must be greater than ${mine.id}`));
   assert.ok(user.includes('"incomingAllowed":true'));
   assert.ok(!/\bB00\b/.test(user), '소속 코드는 이름으로');
