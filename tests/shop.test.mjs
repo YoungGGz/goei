@@ -197,7 +197,7 @@ test('포인트 상점: currency points 면 정체에 표시, 「900p」 값도 
   const won = parseShelf(raw.replace('currency: points', 'currency: won'), null);
   assert.equal(won.identity.points, undefined);
   assert.equal(won.items[1].pay, '10000p', '원 상점에서는 포인트 값을 원으로 바꾸지 않음');
-  const st = applyShelf(readShop(settleShop(chat('x\n[shop: 임직원 복지몰]'), 3).vars), r, shopSettings({}));
+  const st = applyShelf(readShop(settleShop(chat('x\n[shop: 사내 매점]'), 3).vars), r, shopSettings({}));
   assert.equal(readShop(shopVars(st)).identity.points, true, '저장했다 읽어도 포인트 상점');
   const sys = talkPrompt({ st, refs: '', story: '', status: '', situation: '', identity: '', language: null }, shopSettings({}))[0].content;
   assert.ok(sys.includes("Baekilmong's point shop"), '포인트 상점 절');

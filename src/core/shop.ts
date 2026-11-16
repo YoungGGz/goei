@@ -73,9 +73,25 @@ export function ownShops(vars: Vars): OwnShop[] {
   }
 }
 const ownNames = (o: OwnShop) => [o.name, ...o.alias.split(/[,，、]/)].map((x) => x.trim()).filter(Boolean);
-/** 표식의 가게 이름에 맞는 켜진 고유 상점 */
+/** 표식의 가게 이름에 맞는 켜진 고유 상점. 이름·별칭이 똑같은 줄이 먼저, 없으면 표식 이름 안에 이름·별칭이 들어 있는 줄 (11-16 사용자: 모델이 「임직원 복지몰」처럼
+ *  다르게 적어도 플러그인이 알아본다). 여러 줄이 걸리면 가장 긴 이름이 맞은 줄. 두 글자 미만인 이름은 들어 있나로 보지 않는다 */
 export function ownShopOf(vars: Vars, shop: string): OwnShop | null {
-  return ownShops(vars).find((o) => o.on && o.name && ownNames(o).some((n) => sameShopName(n, shop))) ?? null;
+  const list = ownShops(vars).filter((o) => o.on && o.name);
+  const exact = list.find((o) => ownNames(o).some((n) => sameShopName(n, shop)));
+  if (exact) return exact;
+  const want = normName(shop);
+  let best: OwnShop | null = null;
+  let len = 1;
+  for (const o of list) {
+    for (const n of ownNames(o)) {
+      const k = normName(n);
+      if (k.length > len && want.includes(k)) {
+        best = o;
+        len = k.length;
+      }
+    }
+  }
+  return best;
 }
 /** 화면 카드용: 정리된 표식의 주인 칸이 `@web:사이트` 이면 그 사이트 id */
 export const webSiteOfOwner = (owner: string): string => (/^@web:([a-z0-9_-]{1,12})$/i.exec(owner.trim())?.[1] ?? '');
@@ -456,11 +472,12 @@ export function settleShop(chat: Chat, responseIndex: number, self: string[] = [
   const norm = (s: string) => s.replace(/\s+/g, '').toLowerCase();
   const me = new Set(self.map(norm).filter(Boolean));
   const found = on ? findShopTag(text) : null;
-  // 고유 상점 (11-09): 인터넷 접속(@web)이면 그 몰 사이트를 여는 표식으로 바꾸고 상점 방문은 열지 않는다. 직접 간 곳은 「직접 가면 쓸 창」이 없으면 열지 않는다
+  // 고유 상점 (11-09): 인터넷 접속(@web)이면 그 몰 사이트를 여는 표식으로 바꾸고 상점 방문은 열지 않는다.
+  // 인터넷 전용 가게(사이트는 있고 「직접 가면 쓸 창」이 없는 줄)는 주인 칸이 무엇이든 접속 표식으로 바로잡는다 (11-16 사용자: 모델이 표식을 어떻게 내든 인터넷 창을 띄운다)
   const own = found ? ownShopOf(chat.scriptstate, found.shop) : null;
   const webAsk = !!found && found.owner.trim().toLowerCase().startsWith(WEB_OWNER);
-  const site = webAsk && own?.web ? own.web : '';
-  const mine = !!found && (webAsk ? !site : (!!found.owner && me.has(norm(found.owner))) || (!!own && !own.visit));
+  const site = own?.web && (webAsk || !own.visit) ? own.web : '';
+  const mine = !!found && !site && (webAsk || (!!found.owner && me.has(norm(found.owner))) || (!!own && !own.visit));
   const web = !mine && !!site;
   const tag = mine || web ? null : found;
   const webRaw = web ? `[shop: ${own!.name}|${WEB_OWNER}:${site}]` : '';

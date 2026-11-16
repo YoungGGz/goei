@@ -8,7 +8,7 @@ const fx = loadFixture(new URL('../.scratch/fixture/fixture.json', import.meta.u
 const out = process.argv[2] ?? '/tmp/points-shop-shots';
 mkdirSync(out, { recursive: true });
 
-const CHAR = '사원증을 대자 복지몰 화면이 켜졌다.\n[▣|2025.01.01|02:47 PM|☀️|4°C|백일몽 본사|없음|없음|없음|백일몽/사원|140000|1000]\n[shop: 임직원 복지몰|]';
+const CHAR = '사원증을 대자 복지몰 화면이 켜졌다.\n[▣|2025.01.01|02:47 PM|☀️|4°C|백일몽 본사|없음|없음|없음|백일몽/사원|140000|1000]\n[shop: 사내 매점|]';
 const SHELF = `<shop-identity>
 sells: 임직원 복지 물품, 회사 물약
 never: 현금 거래
