@@ -63,3 +63,12 @@ test('택배 상자: 원으로 치른 주문의 상자는 값과 거래 id 를 �
   assert.equal(box.price, 39000);
   assert.equal(box.walletId, 'w1');
 });
+
+test('우주몰 맞춤 주문을 받은 턴에는 제 받는 법(ARRIVE_ORDER)이 간다: 송금 순간이 아니다 (2026-11-16)', () => {
+  const order = core.guideTxt('Cos', 'ARRIVE_ORDER').trim();
+  const site = core.guideTxt('Cos', 'ARRIVE').trim();
+  assert.ok(order && !/transfer lands/.test(order) && /transfer lands/.test(site));
+  assert.deepEqual(core.arrivals([{ name: '맞춤 장갑', store: 'cos-order' }]), [order]);
+  assert.deepEqual(core.arrivals([{ name: '우주 양말', store: 'cos' }]), [site]);
+  assert.deepEqual(core.arrivals([{ name: '우주 양말', store: 'cos' }, { name: '맞춤 장갑', store: 'cos-order' }]), [site, order]);
+});

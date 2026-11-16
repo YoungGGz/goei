@@ -417,3 +417,7 @@ classical martial arts, sci-fi, fantasy, cyberpunk, steampunk, ancient, occult, 
 @@SECTION ARRIVE
 the protagonist's 우주 쇼핑몰 website purchase arrives this turn: the moment the transfer lands, a small spatial rift opens right where they are and the goods drop out of it; show it in a beat and never explain it
 @@END
+
+@@SECTION ARRIVE_ORDER
+the protagonist's 우주 쇼핑몰 custom order, paid for earlier and finished now, arrives this turn: a small spatial rift opens right where they are and the finished thing drops out of it; show it in a beat and never explain it
+@@END

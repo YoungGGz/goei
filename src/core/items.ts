@@ -823,13 +823,14 @@ export interface BlockUse {
 }
 
 /** 면대면이 아닌 곳(망상홈쇼핑·우주 쇼핑몰·포인트몰)에서 산 물건이 어떻게 손에 들어왔는지: 산 턴에 한 번, 곳마다 한 줄 (11-15 사용자: 상자가 소지품에 갑자기 생겨 본편이 씹는다).
- *  글은 그 몰 지침의 ARRIVE 절(본편에 보내는 받는 법, 11-15 사용자: 소지품 지침에 넣지 말고 몰마다 자기 지침에). 절이 비었거나 몰이 아닌 곳(면대면 상점)은 아무것도 안 붙인다. 우주몰 맞춤 주문 수령은 우주몰과 같다 */
-const ARRIVE_GUIDE: Record<string, GuideName> = { hs: 'Hs', cos: 'Cos' };
+ *  글은 그 몰 지침의 ARRIVE 절(본편에 보내는 받는 법, 11-15 사용자: 소지품 지침에 넣지 말고 몰마다 자기 지침에). 절이 비었거나 몰이 아닌 곳(면대면 상점)은 아무것도 안 붙인다.
+ *  우주몰 맞춤 주문 수령은 제 절(ARRIVE_ORDER): 값은 주문할 때 이미 냈으니 「송금이 들어가는 순간」이 아니다 (2026-11-16) */
+const ARRIVE_GUIDE: Record<string, [GuideName, string]> = { hs: ['Hs', 'ARRIVE'], cos: ['Cos', 'ARRIVE'], 'cos-order': ['Cos', 'ARRIVE_ORDER'] };
 /** hsBox: 망상홈쇼핑은 주문해 「상자가 들어온 턴」에만 붙인다 (core/homeshop.ts boxLanded). 산 물건 줄로는 가리지 않는다 — 상자를 연 턴의 속 물건도 store=hs 라 도착 글이 다시 갔다 */
 export function arrivals(bought: Item[], hsBox = false): string[] {
-  const stores = [...new Set(bought.map((e) => (e.store === 'cos-order' ? 'cos' : e.store ?? '')).filter((st) => st !== 'hs' && ARRIVE_GUIDE[st]))];
+  const stores = [...new Set(bought.map((e) => e.store ?? '').filter((st) => st !== 'hs' && ARRIVE_GUIDE[st]))];
   if (hsBox) stores.unshift('hs');
-  return stores.map((st) => guideTxt(ARRIVE_GUIDE[st], 'ARRIVE').trim()).filter(Boolean);
+  return stores.map((st) => guideTxt(...ARRIVE_GUIDE[st]).trim()).filter(Boolean);
 }
 
 /** 포인트몰에서 산 것을 이번 턴에 받았으면 한 줄 (2026-11-16 사용자: 받는 것은 회사에서 — 「주문 조회」의 받기). 산 것은 전의 일이라 「방금 삼」에는 올리지 않고, 받는 법(그 몰 지침 ARRIVE 절)에 이름을 넣어 넘긴다 */
