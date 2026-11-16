@@ -287,7 +287,7 @@ export function shopTable(vars: State, busy = false): string {
   const giveFn: CkBand = { title: '넘길 내용', groups: [{ name: '', opts: GIVE_OPTS, kind: 'check' }],
     marks: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => shopFnOn(v, f.key, k))),
     acts: SHOP_FNS.map((f) => SHOP_GIVE_KEYS.map((k) => `s:shop:fn_${f.key}_${k}=${shopFnOn(v, f.key, k) ? '0' : '1'}`)),
-    foot: helpBox('가게 표와 기능 표에서 모두 켠 것만 넘겨요. 「–」는 그곳에 없는 값이에요.') };
+    foot: helpBox('가게 표와 기능 표에서 모두 켠 것만 넘겨요.') };
   const AMT = ['turns', 'refs', 'talk'] as const;
   const amountFn: CkBand = { title: '넘길 양', groups: AMT.map((k) => ({ name: SHOP_AMOUNTS[k].label, opts: [SHOP_AMOUNTS[k].unit], kind: 'num' as const })),
     marks: SHOP_FNS.map((f) => AMT.map((k) => (shopAmountNone(f.key, k) ? null : { n: shopFnNum(v, f.key, k), lo: SHOP_AMOUNTS[k].min, hi: SHOP_AMOUNTS[k].max }))),
