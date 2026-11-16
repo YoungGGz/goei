@@ -21,7 +21,7 @@ import { userTurns } from '../core/request';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, parseCue, parseOperator, parseShow, peelFragment, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
+import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, parseCue, parseOperator, parseShow, peelFragment, stickerLook, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
 import { mountPlayer, playerCut, playerHold, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
@@ -267,7 +267,7 @@ export async function homeshopAction(action: string, value: string | undefined, 
       env.render();
       // 들춰 보인 몇 글자도 시청 기록에 적는다 (스티커 밑에 찍힌 원래 용도의 조각)
       const { show, part } = nowPart(ctx);
-      const frag = part && hsSettings(ctx.chat.scriptstate).peek ? peelFragment(part.item.truth, part.item.id, peelCap()) : '';
+      const frag = part && hsSettings(ctx.chat.scriptstate).peek ? peelFragment(part.item.truth, part.item.id, peelCap(part.item.id)) : '';
       if (frag) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogSticker(), text: frag }], show);
       return true;
     }
@@ -628,7 +628,8 @@ function scaleOf(s: HsSettings, phone: boolean): number {
 
 const failBox = () => (ui.notice ? `<div class="hs-err" role="alert"><span>${esc(ui.notice).replace(/\n/g, '<br>')}</span>${ui.failRaw ? '<button data-action="hs-raw">받은 글 보기</button>' : ''}<button data-action="hs-refresh">다시 연결</button></div>` : '');
 /** 스티커 밑에 보이는 글자 수: 젖힌 모서리 크기에 맞춘다 (폰은 모서리가 조금 작다) */
-const peelCap = (): number => (isPhone() ? 7 : 8);
+/** 젖힌 모서리에 들어가는 글자 수: 그 상품 스티커가 젖혀지는 크기에서 나온다 (style.css .hs-sticker 의 --pmax · 글자 크기와 같은 값) */
+const peelCap = (id: string): number => Math.max(3, Math.floor(((isPhone() ? 124 : 132) * stickerLook(id).lim - 32) / 14.5));
 
 /** 편성 카드 줄. 아직 방송 안 한 부는 가린다 (11-09 사용자: 다음 상품은 방송에서 공개) */
 function lineup(show: HsShow, s: HsSettings, col = false): string {
@@ -764,14 +765,21 @@ function peekPop(ctx: ChatContext, s: HsSettings): string {
   if (!part) return '';
   const it = part.item;
   const mobile = isPhone();
-  const frag = s.peek ? peelFragment(it.truth, it.id, peelCap()) : '';
-  const under = s.peek ? `<div class="hs-und" aria-hidden="true"><div class="emb"><span>■■■ ■■■■ ■■</span>${frag ? `<b>${esc(frag)}</b>` : '<b class="none">■■■■</b>'}</div></div>` : '';
+  const look = stickerLook(it.id);
+  const frag = s.peek ? peelFragment(it.truth, it.id, peelCap(it.id)) : '';
+  // 스티커 밑에 찍힌 원래 글 한 줄: 조각이 들리는 모서리에 오고, 스티커 안쪽으로 이어지는 이웃 몇 글자가 젖힌 세모에 걸친 만큼만 비친다 (글 전체는 화면에 싣지 않는다). 숨은 효과가 없으면 아무 글도 없다
+  const truth = String(it.truth ?? '').replace(/\s+/g, ' ').trim();
+  const at = frag ? truth.indexOf(frag) : -1;
+  const right = look.corner === 'br' || look.corner === 'tr';
+  const near = at < 0 ? '' : right ? truth.slice(Math.max(0, at - 6), at) : truth.slice(at + frag.length, at + frag.length + 6);
+  const emb = at < 0 ? '' : `<div class="emb">${right ? `<span class="pre">${esc(near)}</span>` : ''}<b>${esc(frag)}</b>${right ? '' : `<span class="post">${esc(near)}</span>`}</div>`;
+  const under = s.peek ? `<div class="hs-und" aria-hidden="true">${emb}</div>` : '';
   const corner = s.peek ? `<span class="flapw" aria-hidden="true"><span class="flap"></span></span><button class="corner" data-action="hs-lift" aria-label="스티커 모서리 들추기"${ui.lifted ? ' disabled' : ''}></button>` : '';
-  const cls = `hs-sticker${ui.lifted ? ' lifted anim' : ''}`;
+  const cls = `hs-sticker c-${look.corner}${ui.lifted ? ' lifted anim' : ''}`;
   const hint = s.peek && !ui.lifted ? `<p class="hs-peelhint">${mobile ? '스티커를 <i>눌러</i> 들춰 보세요' : '모서리를 <i>잡아 끌거나 눌러</i> 들춰 보세요'}</p>` : '';
   // 폰은 모서리가 작고 화면 끝이라 스티커 어디를 눌러도 모서리부터 젖힌다
   const tap = mobile && s.peek && !ui.lifted ? ' data-action="hs-lift"' : '';
-  return popShell('상품 스티커', `<div class="${cls}"${tap} style="--from:${ui.peelFrom || 0.12}">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
+  return popShell('상품 스티커', `<div class="${cls}"${tap} style="--from:${ui.peelFrom || 0.12};--lim:${look.lim};--tilt:${look.tilt}deg">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
 }
 
 function audPop(): string {
@@ -832,10 +840,13 @@ function peelDrag(corner: HTMLButtonElement): void {
   });
   corner.addEventListener('pointermove', (e) => {
     if (!start) return;
-    // 모서리에서 왼쪽 위(대각선)로 간 거리 / 젖힐 수 있는 최대
-    const d = (start.x - e.clientX + start.y - e.clientY) / Math.SQRT2;
+    // 들리는 모서리에서 스티커 안쪽(대각선)으로 간 거리 / 젖힐 수 있는 최대
+    const sx = st.classList.contains('c-br') || st.classList.contains('c-tr') ? 1 : -1;
+    const sy = st.classList.contains('c-br') || st.classList.contains('c-bl') ? 1 : -1;
+    const d = (sx * (start.x - e.clientX) + sy * (start.y - e.clientY)) / Math.SQRT2;
     if (Math.abs(d) > 4) moved = true;
-    const max = parseFloat(getComputedStyle(st).getPropertyValue('--pmax')) || 132;
+    const cs = getComputedStyle(st);
+    const max = (parseFloat(cs.getPropertyValue('--pmax')) || 132) * (parseFloat(cs.getPropertyValue('--lim')) || 1);
     peel = Math.max(0.12, Math.min(1, 0.12 + d / max));
     st.style.setProperty('--peel', String(peel));
   });

@@ -532,6 +532,12 @@ function fnv(t: string): number {
   for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
   return h;
 }
+/** 상품마다 다른 스티커 (11-15 사용자: 전부 같은 방향으로만 모서리가 들린다): 들리는 모서리 · 젖혀지는 정도(1 = 가장 많이) · 붙인 기울기(도). seed = 상품 id (다시 열어도 같다) */
+export type StickerCorner = 'br' | 'bl' | 'tr' | 'tl';
+export function stickerLook(id: string): { corner: StickerCorner; lim: number; tilt: number } {
+  const h = fnv(`stk:${id}`);
+  return { corner: (['br', 'bl', 'tr', 'tl'] as const)[h % 4], lim: [0.66, 0.78, 0.9, 1][(h >>> 3) % 4], tilt: (((h >>> 6) % 9) - 4) * 0.5 };
+}
 /** 스티커를 들추면 보이는 숨은 효과(진실) 몇 글자 (11-15 사용자: 원래 효과의 일부 문자만 살짝).
  *  어절 하나에서 시작해 cap 글자 안에서 이웃 어절을 붙인다. 진실이 없거나 아무도 모르면(?) 빈 글. seed = 상품 id (다시 열어도 같은 조각) */
 export function peelFragment(truth: string | undefined, seed: string, cap: number): string {
