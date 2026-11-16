@@ -302,6 +302,10 @@ function rightOk(text: string, end: number): { ok: boolean; honor: boolean } {
   return { ok: true, honor: HONOR.includes(sfx) || sfx === '아' || sfx === '야' };
 }
 
+/** 한국어 이름·키가 end 에서 끝났을 때 그 자리가 낱말의 끝인가: 글자가 아니거나, 조사·호칭이 붙었을 때만.
+ *  「탐미주의적」「여자친구」처럼 이름이 더 긴 낱말의 앞부분이면 아니다. 인물 이름 찾기(people/select.ts)도 이 규칙을 쓴다 */
+export const nameEndsAt = (text: string, end: number): boolean => rightOk(text, end).ok;
+
 /** 한 글에서 모든 항목의 키가 걸린 자리. 겹치면 가장 긴 이름만 (가짜 관리국 ⊃ 관리국) */
 export function findHits(text: string, entries: ManagedEntry[]): KeyHit[] {
   if (!text) return [];
