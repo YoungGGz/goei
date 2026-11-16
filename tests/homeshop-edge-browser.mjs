@@ -9,7 +9,7 @@ const fx = loadFixture(new URL('../.scratch/fixture/fixture.json', import.meta.u
 const browser = await launch();
 const REPLY = '첫 답.\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국|QC 괴이]';
 const items0 = { list: [{ id: 'i_old', name: '낡은 손전등', desc: '', effect: '', use: false, state: 'ok', from: 'manual', anchor: '', at: '2025-01-01T00:00:00Z' }], log: [] };
-const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify(items0) } };
+const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $hs_ship_lo: '0', $hs_ship_hi: '0', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify(items0) } };
 const { page, errors } = await boot(browser, fx, chat, { width: 1280, height: 800, touch: false }, { store: { 'p:goei:data-homeshop': distPack('goei-data-homeshop'), 'p:goei:data-items': distPack('goei-data-items') } });
 const click = (sel) => page.evaluate((s) => { const els = [...document.querySelectorAll(s)]; const el = els.find((e) => e.getBoundingClientRect().width > 0) || els[0]; if (!el) return false; el.click(); return true; }, sel);
 const ss = () => page.evaluate(() => window.__chat.scriptstate);
@@ -34,7 +34,7 @@ let st = await ss();
 assert.equal(JSON.parse(st.$hs_orders).length, 1, '주문 한 건');
 assert.equal(JSON.parse(st.$st_items).list.filter((x) => x.name.includes('택배 상자')).length, 1, '상자 한 개');
 const o1 = JSON.parse(st.$hs_orders)[0];
-assert.deepEqual([o1.pay, o1.n, o1.dues.length], ['appear', 6, 6]);
+assert.deepEqual([o1.pay, o1.n, o1.dues.length], ['appear', 6, 0], '출연은 상자를 열 때 걸린다 (2026-11-16)');
 console.log('① ok', o1.anchor, o1.boxId);
 // ② 응답 다시 굴리기 → 주문·상자 사라짐, 다시 주문 가능
 await click('.hs-pop header [data-action="hs-pop"]');
