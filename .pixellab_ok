@@ -1,4 +1,5 @@
 0
+- 2026-11-16 16:36 KST 사용자 「전부 뽑아」: 공장 정면 256 4기능(generate-image-v2, create-image-pro-flash, create-1-direction-object, create-image-pixen) 각 1회
 - 2026-11-16 14:02 KST 사용자 「그걸로 한번 뽑아봐 그럼」: 스팡달 standard realistic_female 96 1회
 - 2026-11-16 13:28 KST 사용자 「제대로 검증받고 둘다 뽑아」: 스팡달 pro create_from_concept 96 1회(15gen) + edit_image_pixen 96x96 1회
 - 2026-11-16 13:12 KST 사용자 「해봐」: 여A edit_image_pixen 24x88 1회
@@ -7,3 +8,7 @@
 - 사용: 스팡달 edit_image_pixen 96x96
 - 사용: 스팡달 pro create_from_concept 96
 - 사용: 스팡달 standard realistic_female 96
+- 사용: 공장 정면 pro
+- 사용: 공장 정면 pixen
+- 사용: 공장 정면 proflash
+- 사용: 공장 정면 object
