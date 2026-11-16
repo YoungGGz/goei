@@ -1,5 +1,5 @@
 // 망상홈쇼핑 방송 화면 확인 (2026-11-11, 작업용): node tests/homeshop-browser.mjs <사진 폴더>
-// 인터넷 즐겨찾기로 열기 → 편성(상품·큐시트·채팅) 한 번 호출 → 방송이 큐시트대로 흐른다 → 스티커 들추기 → 전화 주문(흥정·맞교환 감정 → 맞교환으로 주문) → 설정 페이지
+// (「인터넷에 상시 노출」을 켠 채팅) 인터넷 즐겨찾기로 열기 → 편성(상품·큐시트·채팅) 한 번 호출 → 방송이 큐시트대로 흐른다 → 스티커 들추기 → 전화 주문(흥정·맞교환 감정 → 맞교환으로 주문) → 설정 페이지
 import { mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { boot, closeEditor, closeWin, goNode, launch, loadFixture, openEditor, openWin } from './qc-settings-harness.mjs';
@@ -16,7 +16,7 @@ const TRUTH = '건너편 교환대의 귀. 자정에 송신 단추를 세 번 �
 const REPLY = '첫 답.\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국|QC 괴이]';
 const VPS = [['pc', { width: 1280, height: 800, touch: false }], ['pcbig', { width: 1920, height: 1080, touch: false }], ['phone', 'phone']].filter(([v]) => !process.env.VP || process.env.VP.split(',').includes(v));
 for (const [vp, size] of VPS) {
-  const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $hs_ship_lo: '0', $hs_ship_hi: '0', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_wallet: JSON.stringify({ start: 500000, log: [] }), $st_items: JSON.stringify(ITEMS0) } };
+  const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $hs_net: '1', $hs_ship_lo: '0', $hs_ship_hi: '0', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_wallet: JSON.stringify({ start: 500000, log: [] }), $st_items: JSON.stringify(ITEMS0) } };
   const { page, errors } = await boot(browser, fx, chat, size, { store: { 'p:goei:data-homeshop': distPack('goei-data-homeshop'), 'p:goei:data-items': distPack('goei-data-items') } });
   let n = 0;
   const shot = async (tag) => { await page.screenshot({ path: `${OUT}/${vp}-${String(++n).padStart(2, '0')}-${tag}.png` }); };
@@ -163,6 +163,59 @@ for (const [vp, size] of VPS) {
   if (errors.length) console.log(vp, 'page errors:', errors.slice(0, 5));
   assert.deepEqual(errors, []);
   console.log(vp, 'ok');
+  await page.close();
+}
+// 기본(「인터넷에 상시 노출」 끔, 2026-11-16 사용자: 접속 카드로만): 즐겨찾기에 없다 → 마지막 응답의 카드로 열린다 → 새 응답에 카드가 없으면 「신호 없음」, 주문 조회는 보인다
+for (const [vp, size] of VPS.filter(([v]) => v !== 'pc')) {
+  const TAGGED = 'TV를 켰다.\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국|QC 괴이]\n[shop: 망상홈쇼핑|@web:hs]';
+  const base = { $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0' };
+  const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: TAGGED, chatId: 'c1' }], scriptstate: base };
+  const { page, errors } = await boot(browser, fx, chat, size, { store: { 'p:goei:data-homeshop': distPack('goei-data-homeshop'), 'p:goei:data-items': distPack('goei-data-items') } });
+  const shot = async (tag) => { await page.screenshot({ path: `${OUT}/${vp}-card-${tag}.png` }); };
+  const click = (sel) => page.evaluate((s) => { const els = [...document.querySelectorAll(s)]; const el = els.find((e) => e.getBoundingClientRect().width > 0) || els[0]; if (!el) return false; el.click(); return true; }, sel);
+  await openWin(page); await page.waitForTimeout(300);
+  if (await page.evaluate(() => document.querySelector('.gw')?.hidden === false)) await closeEditor(page, true);
+  // 1) 즐겨찾기·서랍에 없다
+  if (vp !== 'phone') { if (!(await page.locator('.br').count())) await click('[data-action="nav-tab"][data-value="net"]'); await page.waitForSelector('.br-bm'); assert.equal(await page.locator('.br-bm[data-value="hs"]').count(), 0, '즐겨찾기에 없음'); }
+  else { await click('.gx-cgrip'); await page.waitForTimeout(300); assert.equal(await page.locator('[data-action="br-site"][data-value="hs"]').count(), 0, '서랍에 없음'); }
+  await page.waitForTimeout(300); await shot('1-no-bookmark');
+  assert.equal(await page.evaluate(() => (window.__calls.llm ?? []).length), 0, '창을 안 열었으면 편성 호출이 없다');
+  await closeWin(page); await page.waitForTimeout(200);
+  // 2) 마지막 응답의 카드로 연다
+  await page.evaluate((r) => { window.__llm = [{ type: 'success', result: r }]; }, SHOW);
+  const html = await page.evaluate((t) => window.__calls.handlers.display(t), TAGGED);
+  assert.ok(html.includes('data-goei-shop="hs"'), '접속하기 카드');
+  await page.evaluate((h) => { const d = document.createElement('div'); d.id = 'chat-card'; d.style.cssText = 'position:fixed;left:20px;top:240px;width:340px;z-index:1'; d.innerHTML = h; document.body.appendChild(d); }, html);
+  await page.click('#chat-card [data-goei-shop]');
+  await page.evaluate(() => { document.getElementById('chat-card').style.visibility = 'hidden'; });
+  await page.waitForSelector('.gx-netsolo .hs-l3', { timeout: 15000 });
+  await page.waitForTimeout(1500); await shot('2-opened-by-card');
+  assert.equal(await page.evaluate(() => window.__calls.llm.length), 1, '카드로 열면 편성을 한 번 받는다');
+  assert.equal(await page.evaluate(() => document.querySelector('.hs-ord .call').disabled), false, '전화 주문 됨');
+  // 3) 새 응답에 카드가 없다: 지난 응답의 카드를 눌러 열어도(화면에 남아 있었다 치고) 방송은 「신호 없음」
+  await closeWin(page); await page.waitForTimeout(200);
+  await page.evaluate(() => { window.__chat.message.push({ role: 'user', data: '집을 나선다', chatId: 'u2' }, { role: 'char', data: '문이 닫힌다.\n[▣|2025.01.01|03:10 AM|☀️|4°C|관리국|QC 괴이]', chatId: 'c2' }); });
+  await page.evaluate(() => { document.getElementById('chat-card').style.visibility = 'visible'; });
+  await page.click('#chat-card [data-goei-shop]');
+  await page.evaluate(() => { document.getElementById('chat-card').style.visibility = 'hidden'; });
+  await page.waitForSelector('.gx-netsolo .hs', { timeout: 8000 });
+  await page.waitForTimeout(1200); await shot('3-stale-card-no-signal');
+  const st = await page.evaluate(() => ({ note: document.querySelector('.hs-note')?.textContent ?? '', call: document.querySelector('.hs-ord .call')?.disabled, say: document.querySelector('.hs-in button')?.disabled, aud: !!document.querySelector('[data-action="hs-pop"][data-value="aud"]'), next: !!document.querySelector('[data-action="hs-next"]'), llm: window.__calls.llm.length }));
+  assert.deepEqual(st, { note: '신호 없음', call: true, say: true, aud: false, next: false, llm: 1 }, `닿지 않는 화면 ${JSON.stringify(st)}`);
+  await click('[data-action="hs-page"][data-value="orders"]'); await page.waitForTimeout(300); await shot('4-orders-still');
+  assert.ok(await page.locator('.hs-sec').count(), '주문 조회는 보인다');
+  // 4) 설정을 켜면 표식 없이 즐겨찾기에 있고 방송이 나온다
+  await page.evaluate(() => { window.__chat.scriptstate.$hs_net = '1'; });
+  await closeWin(page); await openWin(page); await page.waitForTimeout(300);
+  if (await page.evaluate(() => document.querySelector('.gw')?.hidden === false)) await closeEditor(page, true);
+  await page.waitForTimeout(300);
+  if (vp !== 'phone') { if (!(await page.locator('.br').count())) await click('[data-action="nav-tab"][data-value="net"]'); await page.waitForSelector('.br-bm[data-value="hs"]'); await shot('5-setting-on-bookmark'); await click('.br-bm[data-value="hs"]'); }
+  else { await click('.gx-cgrip'); await page.waitForSelector('[data-action="br-site"][data-value="hs"]'); await page.waitForTimeout(300); await shot('5-setting-on-bookmark'); await click('[data-action="br-site"][data-value="hs"]'); }
+  await page.waitForSelector('.hs-scr', { timeout: 8000 }); await page.waitForTimeout(1500); await shot('6-setting-on-open');
+  assert.deepEqual(await page.evaluate(() => [document.querySelector('.hs-note')?.textContent ?? '', document.querySelector('.hs-scr').getBoundingClientRect().width > 0]), ['', true], '설정을 켜면 방송이 나온다');
+  if (errors.length) console.log(vp, 'card page errors:', errors.slice(0, 5));
+  assert.deepEqual(errors, []);
+  console.log(vp, 'card ok');
   await page.close();
 }
 await browser.close();

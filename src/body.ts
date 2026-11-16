@@ -679,8 +679,9 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 상점 표식 `[shop: 가게|주인]`: 이 응답 기준으로 상점 상태를 맞추고 지난 응답의 표식은 지운다 (core/shop.ts settleShop). 설정이 꺼져 있어도 남은 표식은 정리
     // 주인공 자기 가게는 상점이 아니다 (11-09 사용자: 마덕희로 플레이 → 헐값매입 상점이 뜸): 캐릭터 플레이 요원 이름·페르소나 이름
     const selfNames = hasShopTag(raw) ? [playerAgent((await getChar<LoreChar>(arg.characterIndex).catch(() => null))?.globalLore, (latest ?? chat).scriptstate)?.name ?? '', userInfo().name] : [];
+    // 이 응답에 표식이 없고 방문 중인 상점이 없어도 돌린다: 접속 표식(`@web:사이트`)은 방문 상태를 남기지 않아, 건너뛰면 지난 응답의 접속 카드가 남았다 (11-16). 바뀔 것이 없으면 settleShop 이 null
     // 갱신기가 상점을 판단하면(설정 「상점 판단」, 11-09) 여기서는 건드리지 않는다: 갱신기가 표식을 붙이고 같은 정리를 돌린다 (host/people.ts). 그래야 같은 가게에 머무는 동안 방문 기록이 지워지지 않는다
-    if ((shopJudgeBy((latest ?? chat).scriptstate).by === 'main' || !shopOn((latest ?? chat).scriptstate)) && (hasShopTag(raw) || (latest ?? chat).scriptstate?.['$st_shop']) && settleShop(latest ?? chat, arg.messageIndex, selfNames)) {
+    if ((shopJudgeBy((latest ?? chat).scriptstate).by === 'main' || !shopOn((latest ?? chat).scriptstate)) && settleShop(latest ?? chat, arg.messageIndex, selfNames)) {
       latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
         const r = settleShop(cur, arg.messageIndex, selfNames);
         return r ? { ...cur, ...(r.message ? { message: r.message } : {}), scriptstate: { ...(cur.scriptstate ?? {}), ...r.vars } } : null;

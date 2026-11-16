@@ -3,7 +3,7 @@
 // 상품 줄·요청문·참고 자료는 상점(core/shop.ts)을 그대로 쓰고, 설정 값만 사이트 것($hs_sh_*, 우주몰·포인트몰과 같은 방식).
 // 여기는 순수 계산: 설정·저장 모양·응답 해석·동작 고르기. 화면은 ui/homeshop.ts, 그림은 host/homeshop.ts.
 import { expectOf, type PackSpec } from './datapack';
-import { costOf, lastBot, lineCells, parseLine, shopSettings, ShopError, SHOP_CTX_VAR, SHOP_SHARED_VARS, type ShopItem, type ShopSettings } from './shop';
+import { costOf, findShopTag, lastBot, lineCells, parseLine, shopSettings, webSiteOfOwner, ShopError, SHOP_CTX_VAR, SHOP_SHARED_VARS, type ShopItem, type ShopSettings } from './shop';
 import type { Chat } from './types';
 import { userTurns, type PromptMessage } from './request';
 import { aliveAnchors } from './wallet';
@@ -17,6 +17,16 @@ export const HS_SITE = 'hs';
 /** 방송 이름·진행자 이름 (지침 「망상홈쇼핑」의 CHANNEL_NAME · HOST_NAME 절). 화면과 요청이 같은 절을 부를 때 읽는다 (2026-11-15 사용자) */
 export const hsName = (): string => guideTxt('Hs', 'CHANNEL_NAME');
 export const hsHost = (): string => guideTxt('Hs', 'HOST_NAME');
+/** 지금 방송에 닿을 수 있나 (2026-11-16 사용자: 접속 카드로만, 늘 열림은 설정).
+ *  설정 「인터넷에 상시 노출」이 켜져 있으면 늘. 꺼져 있으면(기본) 마지막 응답에 이 사이트의 접속 표식(`[shop: …|@web:hs]`)이 붙어 있을 때만 —
+ *  표식은 「상점 판단」이 응답마다 정하고 지난 응답 것은 지워지므로(core/shop.ts settleShop) 따로 기억하는 것이 없다 */
+export function hsReach(chat: Chat): boolean {
+  const s = hsSettings(chat.scriptstate);
+  if (!s.on) return false;
+  if (s.net) return true;
+  const tag = findShopTag(lastBot(chat)?.text ?? '');
+  return !!tag && webSiteOfOwner(tag.owner) === HS_SITE;
+}
 /** 편성 상태 (상품·큐시트·채팅·지금 부) */
 export const HS_VAR = '$hs_show';
 /** 「창을 열 때」 자동 호출: 마지막으로 편성을 받은 응답 */
@@ -253,7 +263,7 @@ export function hsSettings(vars: Vars): HsSettings {
   const size: [number, number] = vars?.[hsKey('$sh_min')] === undefined && vars?.[hsKey('$sh_max')] === undefined ? [3, 5] : shop.size;
   return {
     on: vars?.[HS_KEY.on] !== '0',
-    net: vars?.[HS_KEY.net] !== '0',
+    net: vars?.[HS_KEY.net] === '1',
     auto: vars?.[HS_KEY.auto] === 'manual' ? 'manual' : 'open',
     shop: { ...shop, on: true, size, feature: false, kick: false },
     chat: pair(n(vars, 'chatMin'), n(vars, 'chatMax')),

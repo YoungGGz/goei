@@ -62,7 +62,9 @@ test('망상홈쇼핑 설정: 줄이 적는 변수를 읽는 쪽이 읽는다 (�
       if (uiRead.has(v)) continue;
       const num = Object.values(HS_NUM).find((d) => d.key === v);
       const val = num ? String(num.def === num.hi ? num.lo : num.hi) : r.ctl.t === 'seg' && r.ctl.opts.length > 2 ? '2' : r.ctl.t === 'seg' ? '0' : 'B:웃음=드물게';
-      assert.notEqual(JSON.stringify(hsSettings({ [v]: val })), base, `${r.key} → ${v} 를 아무도 읽지 않는다`);
+      // 켬/끔 줄은 기본이 켬인 것도 끔인 것도 있다(「인터넷에 상시 노출」은 기본 끔, 11-16): 반대 값을 적었을 때 바뀌는지 본다
+      const flip = !num && r.ctl.t === 'seg' && r.ctl.opts.length <= 2 ? ['0', '1'] : [val];
+      assert.ok(flip.some((x) => JSON.stringify(hsSettings({ [v]: x })) !== base), `${r.key} → ${v} 를 아무도 읽지 않는다`);
     }
   }
   assert.deepEqual([HS_TEL_KEY, HS_RETRY_KEY], ['$hs_tel', '$hs_retry']);
