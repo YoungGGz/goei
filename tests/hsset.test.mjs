@@ -12,7 +12,7 @@ test('망상홈쇼핑 설정: 묶음과 줄 — 이 페이지에만 있는 줄�
     ['편성', ['cue', 'chat']],
     ['방송 흐름', ['speed', 'hold', 'frame', 'chatGap', 'next', 'turn', 'lock']],
     ['남은 수량', ['left', 'drop', 'dropRate', 'dropFast', 'dropStep', 'soonAt', 'end']],
-    ['주문', ['barter', 'talk', 'peek']],
+    ['주문', ['barter', 'talk', 'peek', 'ship']],
     ['컨텍스트 포함', ['call', 'forms', 'aud']],
     ['진행자 동작', ['fill', 'fillCool', 'rareP', 'rareCool', 'read', 'clips']],
     ['방송 화면', ['tel', 'cut', 'bulb', 'tear', 'tearP', 'scan', 'scalePc', 'scalePh']],
@@ -29,7 +29,7 @@ test('망상홈쇼핑 설정: 묶음과 줄 — 이 페이지에만 있는 줄�
 test('망상홈쇼핑 설정: 기본값·범위 (넘김 문서 2절)', () => {
   const D = { chatMin: [30, 0, 120], chatMax: [40, 0, 120], cueMin: [12, 2, 20], cueMax: [16, 2, 20], sayCueMin: [1, 1, 6], sayCueMax: [3, 1, 6], sayChatMin: [2, 0, 12], sayChatMax: [5, 0, 12],
     chatGap: [22, 5, 100], speed: [11, 3, 40], hold: [12, 0, 50], frame: [110, 50, 250], tearP: [6, 0, 100], fillLo: [3, 1, 30], fillHi: [6, 1, 30], fillCool: [8, 0, 60], rareP: [10, 0, 100], rareCool: [20, 0, 120],
-    next: [0, 0, 60], left: [30, 1, 999], dropRate: [100, 10, 400], dropFast: [20, 10, 50], dropStep: [3, 1, 20], soonAt: [5, 0, 99], endLo: [2, 1, 99], endHi: [8, 1, 99], callLo: [6, 1, 60], callHi: [12, 1, 60] };
+    next: [0, 0, 60], left: [30, 1, 999], dropRate: [100, 10, 400], dropFast: [20, 10, 50], dropStep: [3, 1, 20], soonAt: [5, 0, 99], endLo: [2, 1, 99], endHi: [8, 1, 99], callLo: [6, 1, 60], callHi: [12, 1, 60], shipLo: [0, 0, 30], shipHi: [3, 0, 30] };
   assert.deepEqual(Object.keys(HS_NUM).sort(), Object.keys(D).sort());
   for (const [k, [def, lo, hi]] of Object.entries(D)) assert.deepEqual([HS_NUM[k].def, HS_NUM[k].lo, HS_NUM[k].hi], [def, lo, hi], k);
   const s = hsSettings({});

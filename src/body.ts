@@ -68,6 +68,7 @@ import { buildImgPrompt, imgCharacters, imgPromptConfig, imgSceneNames, stripImg
 import { withStatusBlock, type StatusShape } from './core/statusctx';
 import { settleItemUse, withInventory } from './core/items';
 import { withHomeshop } from './core/homeshop';
+import { deliverOrders } from './core/hsship';
 import { hsMainContext, hsMainOn, hsMainRules, hsMainSettings } from './core/hslog';
 import { hasShopTag, settleShop, shopJudgeBy, shopOn } from './core/shop';
 import { renderReadyCard, renderShopCard, setShopOpener } from './host/shopcard';
@@ -692,6 +693,16 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
         latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
           const message = settleReady(cur, cosReadyMode(cur.scriptstate) !== 'off');
           return message ? { ...cur, message } : null;
+        }).catch(() => null)) ?? latest;
+      }
+    }
+    // 망상홈쇼핑 택배 상자: 닿을 턴이 된 주문의 상자를 이 응답에 묶어 소지품에 넣는다 (core/hsship.ts, 2026-11-16 사용자). 다음 턴 메인 요청이 받는 법(ARRIVE)을 한 번 넘긴다
+    {
+      const base = latest ?? ((await risuai.getChatFromIndex(arg.characterIndex, arg.chatIndex)) as Chat | null);
+      if (base && deliverOrders(base)) {
+        latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+          const vars = deliverOrders(cur);
+          return vars ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...vars } } : null;
         }).catch(() => null)) ?? latest;
       }
     }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { homeshop } from '../dist-test/core.mjs';
-const { scheduleDues, newOrder, ordersVars, liveOrders, paidOf, callNow, homeshopBlock, withHomeshop, boxOrder, HS_AUD_VAR, parseShow, applyShow, readShow, showVars, emptyShow, moodMap, hsSettings, HS_KEY, HS_NUM, parseClipGroups, clipsOf, idleState, nextIdle, moodClip, cueMs } = homeshop;
+const { scheduleDues, scheduleArrive, doneTurns, openOrder, newOrder, ordersVars, liveOrders, paidOf, callNow, homeshopBlock, withHomeshop, boxOrder, HS_AUD_VAR, parseShow, applyShow, readShow, showVars, emptyShow, moodMap, hsSettings, HS_KEY, HS_NUM, parseClipGroups, clipsOf, idleState, nextIdle, moodClip, cueMs } = homeshop;
 
 const meta = JSON.parse(readFileSync(new URL('../그림/홈쇼핑/homeshop.json', import.meta.url), 'utf8'));
 const moods = moodMap(meta);
@@ -102,36 +102,61 @@ test('망상홈쇼핑: 호출 턴은 간격 안에서 뽑고 다른 주문과 �
   assert.deepEqual(scheduleDues([], 5, 0, [6, 12]), [], '맞교환은 호출 없음');
 });
 
-test('망상홈쇼핑: 할부 장부는 턴 수로 납부를 세고, 호출 턴에만 본편에 한 번 넣는다', () => {
+test('망상홈쇼핑: 주문하면 닿는 턴만 뽑아 적고, 출연 호출 턴은 상자를 열 때 뽑는다', () => {
   const c2 = chatOf(2);
-  const o = { ...newOrder(c2, ITEM, { call: [3, 3] }, 'appear', { money: 0, items: [], appear: 3, other: '' }, () => 0), boxId: 'box1' };
-  assert.equal(o.n, 3);
-  assert.deepEqual(o.dues, [5, 8, 11]);
+  const terms = { money: 0, items: [], appear: 3, other: '' };
+  // 닿는 턴: 끝난 턴(2) + 설정 「상자가 닿기까지」 사이에서
+  assert.equal(newOrder(c2, ITEM, { ship: [0, 3] }, 'appear', terms, () => 0).arrive, 2, '0턴 = 주문한 턴');
+  assert.equal(newOrder(c2, ITEM, { ship: [0, 3] }, 'appear', terms, () => 0.99).arrive, 5);
+  assert.equal(scheduleArrive(2, [2, 2], () => 0.5), 4);
+  // 보내고 아직 답을 못 받은 턴은 끝난 턴이 아니다
+  assert.equal(doneTurns(c2), 2);
+  assert.equal(doneTurns({ message: [...c2.message, { role: 'user', data: 'go', chatId: 'u' }] }), 2);
+  const o0 = newOrder(c2, ITEM, { ship: [1, 1] }, 'appear', terms, () => 0);
+  assert.equal(o0.n, 3);
+  assert.deepEqual(o0.dues, [], '주문 때는 출연이 걸리지 않는다');
+  assert.equal(o0.boxKey, undefined, '아직 안 닿음');
+  // 안 닿은 주문·닿았지만 안 연 주문에는 호출이 없다
+  const at = (turns, vars) => ({ ...chatOf(turns), message: [...chatOf(turns - 1).message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars });
+  const sealed = { ...o0, boxKey: 'c5', boxId: 'box1', dues: [5, 8, 11] };
+  assert.equal(homeshopBlock(at(5, ordersVars([sealed]))), '', '안 연 상자는 묶지 않는다');
+  assert.equal(callNow(at(5, ordersVars([sealed]))), null);
+  // 3턴째 응답(c5) 뒤에 열었다: 그때부터 간격대로
+  const c3 = { ...chatOf(3), scriptstate: ordersVars([sealed]) };
+  const o = openOrder(c3, sealed, { call: [3, 3] }, 'c5', () => 0);
+  assert.equal(o.openKey, 'c5');
+  assert.deepEqual(o.dues, [6, 9, 12]);
   const vars = ordersVars([o]);
-  // 4턴: 아직. 요청 때는 새 유저 메시지가 붙어 있다
-  const at = (turns) => ({ ...chatOf(turns), message: [...chatOf(turns - 1).message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars });
-  assert.equal(homeshopBlock(at(4)), '');
-  const b5 = homeshopBlock(at(5));
-  assert.ok(b5.startsWith('[망상홈쇼핑]') && b5.includes('행운의 무전기') && b5.includes('appearance 1 of 3'), b5);
-  assert.equal(homeshopBlock(at(6)), '', '지나면 다시 안 보냄');
-  assert.equal(callNow(at(8)).nth, 2);
-  assert.equal(paidOf(o, 4), 0);
-  assert.equal(paidOf(o, 8), 2);
+  assert.equal(homeshopBlock(at(5, vars)), '');
+  const b6 = homeshopBlock(at(6, vars));
+  assert.ok(b6.startsWith('[망상홈쇼핑]') && b6.includes('행운의 무전기') && b6.includes('appearance 1 of 3'), b6);
+  assert.equal(homeshopBlock(at(7, vars)), '', '지나면 다시 안 보냄');
+  assert.equal(callNow(at(9, vars)).nth, 2);
+  assert.equal(paidOf(o, 5), 0);
+  assert.equal(paidOf(o, 9), 2);
   assert.equal(paidOf(o, 99), 3);
-  const msgs = withHomeshop([{ role: 'system', content: 'S' }, { role: 'user', content: 'go' }], at(5));
+  const msgs = withHomeshop([{ role: 'system', content: 'S' }, { role: 'user', content: 'go' }], at(6, vars));
   assert.equal(msgs.length, 3);
   assert.equal(msgs[1].role, 'system');
-  assert.equal(withHomeshop(msgs, at(5)).length, 3, '두 번 넣지 않음');
+  assert.equal(withHomeshop(msgs, at(6, vars)).length, 3, '두 번 넣지 않음');
+  // 연 응답을 지우거나 다시 굴리면 출연도 없던 일 (다시 열 때 새로 뽑는다)
+  const rerolled = { ...at(6, vars), message: at(6, vars).message.filter((m) => m.chatId !== 'c5') };
+  assert.equal(callNow(rerolled), null);
+  // 다른 연 주문의 호출 턴과 겹치면 한 턴 미룬다
+  const other = { ...sealed, id: 'ho_x2', boxId: 'box2' };
+  const c3b = { ...chatOf(3), scriptstate: ordersVars([o, other]) };
+  assert.deepEqual(openOrder(c3b, other, { call: [3, 3] }, 'c5', () => 0).dues, [7, 10, 13]);
   // 주문한 응답이 지워지면 장부도 없던 일
   const gone = { message: c2.message.slice(0, 2), scriptstate: vars };
-  assert.equal(liveOrders(gone.scriptstate, new Set(gone.message.map((m) => m.chatId))).length <= 1, true);
-  assert.equal(boxOrder(vars, 'box1', new Set([o.anchor])).id, o.id);
-  assert.equal(boxOrder(vars, 'nope', new Set([o.anchor])), null);
+  assert.equal(liveOrders(gone.scriptstate, new Set(gone.message.map((m) => m.chatId))).length, 0);
+  assert.equal(boxOrder(ordersVars([sealed]), 'box1', new Set([sealed.anchor, 'c5'])).id, sealed.id);
+  assert.equal(boxOrder(ordersVars([sealed]), 'nope', new Set([sealed.anchor, 'c5'])), null);
+  assert.equal(boxOrder(vars, 'box1', new Set([o.anchor, 'c5'])), null, '연 상자는 다시 못 연다');
 });
 
 test('망상홈쇼핑: 방청 신청은 바로 다음 턴에만 한 줄', () => {
   const c = chatOf(2);
-  const key = (() => { const o = newOrder(c, ITEM, { call: [3, 3] }, 'appear', { money: 0, items: [], appear: 3, other: '' }); return o.anchor; })();
+  const key = (() => { const o = newOrder(c, ITEM, { ship: [0, 0] }, 'appear', { money: 0, items: [], appear: 3, other: '' }); return o.anchor; })();
   const vars = { [HS_AUD_VAR]: JSON.stringify({ anchor: key, no: '4821', name: '나' }) };
   const next = { message: [...c.message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars };
   assert.ok(homeshopBlock(next).includes('4821'));
