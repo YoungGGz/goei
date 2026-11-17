@@ -28,7 +28,7 @@ const names = [{ name: '쟈알디', aliases: [], titles: [] }];
 const c = chat(['user', '출근했다', 'u1'], ['char', '쟈알디가 커피를 내밀었다. "고마웠어, 어제." 눈을 피했다.', 'c1']);
 
 test('설정: 수치 끔 = 정성 모드, 취향 띠는 호감 수치가 꺼지면 같이 꺼진다', () => {
-  assert.ok(St.peopleSettings({}).qualitative.has('suspicion') && St.peopleSettings({}).features.has('rhythm'), '기본값: 의심 정성·리듬 켬 (11-07 사용자 결정)');
+  assert.ok(St.peopleSettings({}).qualitative.has('suspicion') && !St.peopleSettings({}).features.has('rhythm'), '기본값: 의심 정성 (11-07), 리듬 끔 (11-17 사용자 결정)');
   const s = St.peopleSettings(qualState);
   assert.deepEqual([...s.qualitative].sort(), ['affinity', 'openness', 'suspicion']);
   assert.equal(s.numeric.size, 0);
