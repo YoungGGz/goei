@@ -340,10 +340,8 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   const roster = o.settings.rosterCap > 0 && rosterAll.length > o.settings.rosterCap ? [...rosterAll.filter(rosterNear), ...rosterAll.filter((r) => !rosterNear(r))].slice(0, o.settings.rosterCap) : rosterAll;
   // 대기 이름: 근거 응답이 채팅에 살아 있는 줄만 싣는다 (다시 굴리거나 지운 응답에서만 나온 이름은 이야기에 없던 이름이다).
   // 설정 「이름 없는 인물 기록」이 꺼져 있으면 호칭으로 올라온 줄도 뺀다 (다시 와도 받지 않는다)
-  // 이번에 읽는 글에 그 이름(또는 별칭)이 나온 줄만 싣는다: 한 번 스치고 다시 안 나오는 이름이 요청마다 끝없이 실리지 않게 (2026-11-17 사용자. 문서 relatedDocs 와 같은 규칙).
-  // 호칭으로 올라온 줄은 그대로 싣는다: 이름이 밝혀지는 글에 호칭이 다시 안 나와도 이름 옮기기(renames)의 from 이 되어야 한다
-  const namedNow = (name: string, row: { aliases: string[] }) => [name, ...row.aliases].some((w) => !!w && texts.some((t) => t.includes(w)));
-  const waiting = fresh ? Object.entries(store.pending).filter(([name, row]) => live.at.has(row.anchor) && (row.provisional ? o.settings.newUnnamed : namedNow(name, row))) : [];
+  // 대기 줄은 근거 응답이 채팅 뒤쪽 FOLD_KEEP_MSGS 밖으로 나가면 버려진다 (store.ts prunePending) — 여기서는 살아 있는 것을 그대로 싣는다
+  const waiting = fresh ? Object.entries(store.pending).filter(([, row]) => live.at.has(row.anchor) && (o.settings.newUnnamed || !row.provisional)) : [];
   const held = waiting.map(([name]) => name);
   // 호칭: 호칭으로 적어 둔 기록 전부 + 호칭으로 올라와 기다리는 이름. 이름 옮기기(renames)의 from 이 될 수 있는 이름이 이것이다
   const handles = fresh && o.settings.newUnnamed ? [...Object.values(store.people).filter((p) => p.provisional).map((p) => p.name), ...waiting.filter(([, row]) => row.provisional).map(([name]) => name)] : [];
@@ -736,7 +734,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     return true;
   };
   // 근거 응답이 채팅에서 사라진 대기 줄은 먼저 버린다 (다시 굴린 응답이 2턴 규칙의 「다른 응답」으로 세어지지 않게)
-  prunePending(store, chat);
+  prunePending(store, chat, ctx.settings.newPeople !== 'confirm');
   let newCount = 0;
   for (const n of ctx.only?.length ? [] : r.new_people ?? []) {
     const given = plain(n?.name, 40);

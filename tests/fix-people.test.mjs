@@ -111,6 +111,15 @@ test('리듬: 문서 연산 remove 로 닫은 떡밥은 끝난 단계로 적히�
   assert.deepEqual(Rh.rhythmNow(store, live), []);
 });
 
+test('저장 정리: 등록 대기 이름은 근거 응답이 뒤쪽 200 메시지 밖이면 버린다 (확인 뒤 등록은 그대로) (2026-11-17)', () => {
+  const c = chatOf(150);
+  const mk = () => { const s = T.emptyStore(); s.pending = { 옛이름: { anchor: 'c10', aliases: [] }, 새이름: { anchor: 'c140', aliases: [] }, 사라짐: { anchor: 'gone', aliases: [] } }; return s; };
+  const a = mk(); S.prunePending(a, c, true);
+  assert.deepEqual(Object.keys(a.pending), ['새이름']);
+  const b = mk(); S.prunePending(b, c);
+  assert.deepEqual(Object.keys(b.pending), ['옛이름', '새이름']);
+});
+
 test('저장 정리: 다음 턴 메모는 최근 응답 20개 것만 남긴다 (2026-11-17)', () => {
   const c = chatOf(30);
   const store = T.emptyStore();

@@ -361,10 +361,16 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
 }
 
 /** 등록 대기 줄(pending)에서 근거 응답이 채팅에 없는 것을 버린다 (다시 굴리거나 지운 응답에서만 나온 이름).
- *  남겨 두면 사라진 응답이 2턴 규칙의 「처음 본 것」으로 세어지고, 그 이름이 갱신기 자료(held_names)로 계속 나간다 */
-export function prunePending(store: PeopleStore, chat: Chat): void {
+ *  남겨 두면 사라진 응답이 2턴 규칙의 「처음 본 것」으로 세어지고, 그 이름이 갱신기 자료(held_names)로 계속 나간다.
+ *  expire: 근거 응답이 채팅 뒤쪽 FOLD_KEEP_MSGS 메시지 밖인 줄도 버린다 (한 번 스치고 다시 안 나온 이름이 끝없이 남아 요청마다 실리지 않게, 2026-11-17).
+ *  그 뒤에 다시 나오면 처음 본 것으로 다시 센다. 「확인 뒤 등록」은 사용자가 고를 목록이라 expire 를 주지 않는다 */
+export function prunePending(store: PeopleStore, chat: Chat, expire = false): void {
   const at = anchorPositions(chat);
-  for (const [name, row] of Object.entries(store.pending)) if (!at.has(row.anchor)) delete store.pending[name];
+  const cut = expire ? msgs(chat).length - FOLD_KEEP_MSGS : -1;
+  for (const [name, row] of Object.entries(store.pending)) {
+    const pos = at.get(row.anchor);
+    if (pos === undefined || (pos >= 0 && pos < cut)) delete store.pending[name];
+  }
 }
 
 /** 장면 인물 목록(scene)에서 채팅에 없는 응답의 것을 버린다 (다시 굴리거나 지운 응답) */
