@@ -14,7 +14,7 @@ const out = await build({
       export { guideSections } from './src/core/guides';
       export { mallVarsOf, readMall, mallAtKey, mallSeenKey, mallUnseen } from './src/core/malls';
       export { aliveAnchors } from './src/core/wallet';
-      export { markSold, capShelf, readShop, applyShelf, shopSettings } from './src/core/shop';
+      export { markSold, capShelf, readShop, applyShelf, shopSettings, storyStamp, talkPrompt, reviveShop } from './src/core/shop';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
@@ -157,4 +157,23 @@ test('진열대 자르기: 파는 물건과 산 물건을 따로 센다 — 산 
   const st = M.readMall(M.mallVarsOf('cos', base), 'cos');
   assert.equal(st.items.filter((x) => !x.sold).length, 8);
   assert.equal(st.items.filter((x) => x.sold).length, 40);
+});
+
+test('쇼핑몰 문의: 지금까지 산 것을 한 줄씩 (산 때|이름|값|효과), 일반 가게는 이름만 (2026-11-17)', () => {
+  const it = (id, extra = {}) => ({ id, name: id, price: 12000, desc: '긴 설명', effect: '어둠을 비춘다', ...extra });
+  const base = { shop: 'S', owner: '', key: 'k', loaded: true, identity: { sells: '', never: '', prices: '' }, items: [it('손전등'), it('밧줄')], talk: [{ who: 'me', text: '안녕' }], closed: false, prev: [], sell: null, sales: [] };
+  let st = M.markSold(base, '손전등', 'r1', '11.17 22:40');
+  st = M.markSold(st, '밧줄', 'r1');
+  assert.equal(st.items[0].soldAt, '11.17 22:40');
+  const s = M.shopSettings({});
+  const text = (g) => M.talkPrompt({ st, refs: '', story: '', status: '', situation: '', identity: '' }, s, g).map((m) => m.content).join('\n');
+  const cos = text('Cos');
+  assert.ok(cos.includes('[지금까지 산 것: 산 때|이름|값|효과]\n11.17 22:40|손전등|12000|어둠을 비춘다\n-|밧줄|12000|어둠을 비춘다'), cos.slice(-400));
+  assert.ok(text('Bm').includes('11.17 22:40|손전등|12000p|어둠을 비춘다'));
+  assert.ok(text('Shop').includes('[이번 방문에 산 것]\n손전등, 밧줄'));
+  // 산 응답이 사라지면 산 때도 같이 지운다
+  const back = M.reviveShop(st, new Set());
+  assert.ok(!back.items[0].sold && back.items[0].soldAt === undefined);
+  // 작중 날짜·시각은 마지막 상태창에서
+  assert.equal(M.storyStamp({ message: [{ role: 'char', data: '글' }] }), '');
 });

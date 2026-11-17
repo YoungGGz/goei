@@ -15,7 +15,7 @@ import { addItem, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVa
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
 import { bmGoing, bmOrdersVars, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
-import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, parseShelf, parseTalk, pointPrice, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
+import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, storyStamp, parseShelf, parseTalk, pointPrice, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
@@ -316,7 +316,7 @@ async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<Sho
       // 포인트몰은 소지품이 아니라 수령 대기로 (2026-11-16 사용자: 받는 것은 회사에서). 「주문 조회」에서 받을 때 소지품에 들어간다
       if (p) waiting.push({ id: walletId || `bm_${it.id}_${Date.now().toString(36)}${waiting.length}`, anchor, price: it.price, walletId: walletId || undefined, paidWith: paid.paidWith, item: { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight } });
       else items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...paid });
-      st = markSold(st, it.id, anchor);
+      st = markSold(st, it.id, anchor, storyStamp(chat));
     }
     got = list;
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? { ...pointsVars(w), ...bmOrdersVars([...liveBmOrders(chat.scriptstate, alive), ...waiting]) } : { ...walletVars(w), ...itemsVars(items) }), ...mallVarsOf(site, st) } };

@@ -12,6 +12,7 @@
 import type { Chat } from './types';
 import { cleanIcon, ITEM_ON_VAR, itemEquip, itemUses, itemWeight, kindOfIcon, parseTraits, traitsFor, traitsText, type ItemEquip } from './items';
 import { colConfig } from './world/statuscols';
+import { findStatusTags } from './world/status';
 import { messageKey } from './people/store';
 import { parseWon } from './wallet';
 import { craftMessages, type CraftMessage, type ThoughtsMode } from './craft';
@@ -258,6 +259,8 @@ export interface ShopItem {
   sold?: boolean;
   /** 산 응답 키 — 그 응답이 지워지면(다시 굴리기) 돈이 돌아오니 진열대에도 되살린다 (11-09 전수점검) */
   soldKey?: string;
+  /** 산 때의 작중 날짜·시각 (상태창 글 그대로). 상태창이 없으면 없음 (2026-11-17 사용자) */
+  soldAt?: string;
   /** 숨긴 진짜 효과 (11-09 사용자: 우주몰은 보이는 효과가 광고 문구 — 모호·검열·거짓·뚱딴지·가끔 진실 — 이고 진짜는 플레이어·소지품에 안 보이고 본편 모델만 안다) */
   truth?: string;
 }
@@ -898,11 +901,25 @@ export function sayToOwner(st: ShopState, text: string): ShopState {
   return { ...st, talk: talk.slice(-40) };
 }
 
-/** 구입: 진열대에서 빠지고(sold) 산 값이 남는다. 없거나 이미 샀으면 그대로 */
-export function markSold(st: ShopState, id: string, key = ''): ShopState {
+/** 지금 작중 날짜·시각: 마지막 상태창의 날짜·시각 글 그대로. 상태창이 없으면 빈 글 */
+export function storyStamp(chat: Chat): string {
+  const list = chat.message ?? [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i];
+    if (m.role !== 'char' || typeof m.data !== 'string') continue;
+    const tags = findStatusTags(m.data);
+    if (!tags.length) continue;
+    const tag = tags[tags.length - 1];
+    return clean(`${tag.date ?? ''} ${tag.time ?? ''}`, 40);
+  }
+  return '';
+}
+
+/** 구입: 진열대에서 빠지고(sold) 산 값이 남는다. 없거나 이미 샀으면 그대로 at = 산 때의 작중 날짜·시각 */
+export function markSold(st: ShopState, id: string, key = '', at = ''): ShopState {
   const it = st.items.find((x) => x.id === id && !x.sold);
   if (!it) return st;
-  return { ...st, items: st.items.map((x) => (x.id === id ? { ...x, sold: true, ...(key ? { soldKey: key } : {}) } : x)) };
+  return { ...st, items: st.items.map((x) => (x.id === id ? { ...x, sold: true, ...(key ? { soldKey: key } : {}), ...(at ? { soldAt: at } : {}) } : x)) };
 }
 /** 산·선납한 응답이 지워졌으면(다시 굴리기·삭제) 가계부 거래와 소지품이 같이 죽으니, 진열대·쪽지·견적도 안 산 것으로 되살린다 (11-09 전수점검: 돈은 돌아왔는데 다시 살 수 없었다) */
 export function reviveShop(st: ShopState, alive: Set<string>): ShopState {
@@ -910,7 +927,7 @@ export function reviveShop(st: ShopState, alive: Set<string>): ShopState {
   const drop = <T extends object>(x: T, flag: string, keyName: string): T => { const { [flag]: _f, [keyName]: _k, ...rest } = x as Record<string, unknown>; return rest as T; };
   return {
     ...st,
-    items: st.items.map((x) => (x.sold && dead(x.soldKey) ? drop(x, 'sold', 'soldKey') : x)),
+    items: st.items.map((x) => (x.sold && dead(x.soldKey) ? (({ soldAt: _a, ...r }) => r as ShopItem)(drop(x, 'sold', 'soldKey')) : x)),
     // 판 응답이 지워졌으면 판 것도 없던 일로 (전수검사 11-13)
     sales: st.sales.filter((x) => !dead(x.k)),
     ...(st.notes ? { notes: st.notes.map((n) => (n.bought && dead(n.boughtKey) ? drop(n, 'bought', 'boughtKey') : n)) } : {}),
@@ -1069,7 +1086,11 @@ export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 
   const shelf = shelfItems(st).map((x) => `${x.name}|${x.pay ? (x.price ? `${x.pay} + ${x.price}` : x.pay) : x.price}|${traitsText(x)}|${x.icon ?? '-'}|${x.weight ?? '-'}|${x.desc}|${x.effect}|${x.tag === 'rare' ? guideTxt(guide, 'TAG_RARE') : x.tag === 'sale' && x.was ? guideTxt(guide, 'TAG_SALE', { was: x.was }) : ''}${secret ? `|${x.truth ?? '-'}` : ''}`).join('\n') || guideTxt(guide, 'SHELF_EMPTY');
   // 우주몰 진열 줄 끝 칸(숨긴 진짜 효과) 안내: 지침의 SECRET_NOTE 절
   const secretNote = secret ? `\n${guideTxt(guide, 'SECRET_NOTE')}` : '';
-  const sold = soldItems(st).map((x) => x.name).join(', ');
+  // 쇼핑몰(우주 쇼핑몰·포인트몰)은 방문이 따로 없어 지금까지 산 것이 남는다: 한 물건에 한 줄로 산 때·이름·값·효과를 넘긴다 (지침의 BOUGHT_LINE 절, 2026-11-17 사용자).
+  // 일반 가게는 이번 방문에 산 것의 이름만
+  const sold = guide === 'Shop'
+    ? soldItems(st).map((x) => x.name).join(', ')
+    : soldItems(st).map((x) => guideTxt(guide, 'BOUGHT_LINE', { when: x.soldAt || '-', name: x.name, price: x.pay ? (x.price ? `${x.pay} + ${x.price}` : x.pay) : x.price, effect: x.effect || '-' })).join('\n');
   const o = st.sell;
   const g = G(guide);
   // 줄 꼴·진열 규칙은 그 몰 것으로 (우주몰은 진실 칸·SHELF_SECRET 절) (전수검사 11-13)
