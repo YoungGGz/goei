@@ -1,7 +1,7 @@
 // 저장 정리 (2026-11-17 사용자: 원본처럼). 응답마다 쌓이는 인물 기록·문서 줄 가운데 죽은 것을 치운다.
 // 원본 리수폿은 문서마다 지금 상태 하나 + 지난 이력 60개(WIKI_RETENTION history)만 둔다.
 import type { Chat } from '../types';
-import { anchorPositions, isAlive, liveEntries, liveness, type Liveness } from './store';
+import { anchorPositions, isAlive, liveEntries, liveness, SCENE_KEEP, type Liveness } from './store';
 import { hookActive, parseHookHead } from './rhythm';
 import type { Entry, PeopleStore } from './types';
 
@@ -55,4 +55,18 @@ export function pruneEntries(store: PeopleStore, chat: Chat): number {
     if (kept.length !== all.length) { dropped += all.length - kept.length; l.set(kept); }
   }
   return dropped;
+}
+
+/** 다음 턴 메모(변경 기록의 note) 정리. 버린 줄 수.
+ *  쓰이는 것은 인물마다 가장 최근의 살아 있는 메모 하나다 (updater.ts latestNote).
+ *  마지막 응답들을 지우거나 다시 굴려도 그 앞 응답의 메모가 있도록, 장면 인물 목록과 같이 채팅 뒤쪽 SCENE_KEEP 개 응답의 메모만 남긴다 (2026-11-17 사용자) */
+export function pruneNotes(store: PeopleStore, chat: Chat): number {
+  const list = Array.isArray(chat.message) ? chat.message : [];
+  const bots = list.map((m, i) => (m.role === 'char' ? i : -1)).filter((i) => i >= 0);
+  if (bots.length <= SCENE_KEEP) return 0;
+  const cut = bots[bots.length - SCENE_KEEP];
+  const at = anchorPositions(chat);
+  const before = store.log.length;
+  store.log = store.log.filter((c) => c.kind !== 'note' || (at.get(c.anchor) ?? cut) >= cut);
+  return before - store.log.length;
 }

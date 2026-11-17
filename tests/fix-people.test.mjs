@@ -88,6 +88,19 @@ test('저장 정리: 사라진 응답의 줄은 버리고 지난 줄은 최근 6
   assert.equal(P.pruneEntries(store, c), 0, '다시 불러도 더 버리지 않음');
 });
 
+test('저장 정리: 다음 턴 메모는 최근 응답 20개 것만 남긴다 (2026-11-17)', () => {
+  const c = chatOf(30);
+  const store = T.emptyStore();
+  for (let k = 1; k <= 30; k++) {
+    store.log.push({ id: `n${k}`, anchor: `c${k}`, seq: 0, src: 'story', who: '쟈알디', kind: 'note', now: `memo ${k}`, reason: '다음 턴 메모' });
+    store.log.push({ id: `q${k}`, anchor: `c${k}`, seq: 1, src: 'story', who: '쟈알디', kind: 'cue', cue: '헌신', reason: 'r' });
+  }
+  assert.equal(P.pruneNotes(store, c), 10);
+  assert.deepEqual(store.log.filter((x) => x.kind === 'note').map((x) => x.id), Array.from({ length: 20 }, (_, i) => `n${i + 11}`));
+  assert.equal(store.log.filter((x) => x.kind === 'cue').length, 30, '호감 계기는 그대로');
+  assert.equal(U.latestNote(store, '쟈알디', S.liveness(c)).now, 'memo 30');
+});
+
 test('호감 단계: Director·갱신기도 성격 계수(temper)를 본편과 같이 쓴다', () => {
   const name = '게슈간';
   assert.notEqual(B.temperOf(name)?.open ?? 1, 1, '시험 인물은 temper 가 1이 아니어야');
