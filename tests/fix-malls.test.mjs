@@ -14,7 +14,7 @@ const out = await build({
       export { guideSections } from './src/core/guides';
       export { mallVarsOf, readMall, mallAtKey, mallSeenKey, mallUnseen } from './src/core/malls';
       export { aliveAnchors } from './src/core/wallet';
-      export { markSold } from './src/core/shop';
+      export { markSold, capShelf, readShop, applyShelf, shopSettings } from './src/core/shop';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
@@ -142,4 +142,19 @@ test('쇼핑몰 「매 턴」: 받아 둔 진열을 아직 안 열어 봤으면 
   assert.equal(M.mallUnseen({ [at]: 't:b', [seen]: 't:a' }, 'cos', true), true, '본 뒤 새로 받은 진열은 아직 안 봄');
   assert.equal(M.mallUnseen({}, 'cos', false), false, '진열이 없으면 받는다');
   assert.equal(M.mallUnseen({ [at]: 't:a' }, 'bm', true), false, '몰마다 따로');
+});
+
+test('진열대 자르기: 파는 물건과 산 물건을 따로 센다 — 산 것이 40개를 넘어도 진열대가 비지 않는다 (2026-11-17)', () => {
+  const it = (id, sold) => ({ id, name: id, price: 1, desc: '', effect: '', ...(sold ? { sold: true, soldKey: 'k' } : {}) });
+  const sold = Array.from({ length: 45 }, (_, i) => it(`s${i}`, true));
+  const open = Array.from({ length: 8 }, (_, i) => it(`n${i}`));
+  const out = M.capShelf([...sold, ...open]);
+  assert.deepEqual(out.filter((x) => !x.sold).map((x) => x.id), open.map((x) => x.id));
+  assert.deepEqual(out.filter((x) => x.sold).map((x) => x.id), sold.slice(5).map((x) => x.id), '산 것은 최근 40개');
+  assert.equal(M.capShelf(Array.from({ length: 50 }, (_, i) => it(`n${i}`))).length, 40);
+  // 저장에서 읽을 때도 같다
+  const base = { shop: 'S', owner: '', key: '', loaded: true, identity: { sells: '', never: '', prices: '' }, items: [...sold, ...open], talk: [], closed: false, prev: [], sell: null, sales: [] };
+  const st = M.readMall(M.mallVarsOf('cos', base), 'cos');
+  assert.equal(st.items.filter((x) => !x.sold).length, 8);
+  assert.equal(st.items.filter((x) => x.sold).length, 40);
 });

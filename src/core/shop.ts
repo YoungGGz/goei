@@ -57,6 +57,15 @@ export const OWN_SHOPS_DEFAULT: OwnShop[] = [
 /** 인터넷 접속 표시: 표식 주인 칸 (모델은 `@web`, 정리한 뒤에는 `@web:사이트`) */
 export const WEB_OWNER = '@web';
 export const OWN_MAX = 40;
+/** 진열대 목록 자르기: 파는 물건과 산 물건을 따로 센다 (파는 것 앞에서 SHELF_MAX 개, 산 것 최근 SHELF_MAX 개. 2026-11-17 사용자).
+ *  한 목록으로 앞에서 40개를 자르면, 쇼핑몰처럼 산 물건이 계속 남는 곳은 산 것이 40개가 된 뒤 새 물건이 전부 잘려 진열대가 비었다 */
+export const SHELF_MAX = 40;
+export function capShelf<T extends { sold?: boolean }>(items: T[]): T[] {
+  const sold = items.filter((x) => x.sold);
+  const dropSold = new Set(sold.slice(0, Math.max(0, sold.length - SHELF_MAX)));
+  let open = 0;
+  return items.filter((x) => (x.sold ? !dropSold.has(x) : ++open <= SHELF_MAX));
+}
 export function ownShops(vars: Vars): OwnShop[] {
   const raw = vars?.[SHOP_OWN_VAR];
   if (typeof raw !== 'string' || !raw.trim()) return OWN_SHOPS_DEFAULT.map((x) => ({ ...x }));
@@ -398,10 +407,10 @@ export function readShop(vars: Vars): ShopState | null {
         prices: clean(id.prices, 120),
         ...(id.points ? { points: true } : {}),
       },
-      items: (Array.isArray(o.items) ? o.items.filter(isItem) : []).map((x) => {
+      items: capShelf((Array.isArray(o.items) ? o.items.filter(isItem) : []).map((x) => {
         const { use: _u, uses: _n, equip: _e, icon: _i, weight: _w, ...rest } = x;
         return { ...rest, ...traitsOf(x), desc: clean(x.desc, 120), effect: clean(x.effect, 60) };
-      }).slice(0, 40),
+      })),
       talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-40),
       closed: !!o.closed,
       prev: Array.isArray(o.prev) ? o.prev.filter((x): x is string => typeof x === 'string').slice(-40) : [],
@@ -843,7 +852,7 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
     }
   }
   const closed = st.closed || (kick && r.closed);
-  return { ...st, items: items.slice(0, 40), talk: talk.slice(-40), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
+  return { ...st, items: capShelf(items), talk: talk.slice(-40), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
 }
 
 /** 견적 수락 표시 (없거나 이미 수락했으면 null) */
