@@ -101,7 +101,8 @@ export const FN_HISTORY: Record<FnFeature, Record<string, FnHist>> = {
   },
   ph: {
     reply: { min: 10, max: 1000, unit: '개', def: 100, base: 'room_history' },
-    check: { min: 10, max: 1000, unit: '개', def: 100, base: 'room_history' },
+    // 새 메시지 확인은 여러 방을 한 번에 넘기므로 방마다 최근 흐름만 (대화 상태 요약은 따로 실린다). 사용자 2026-11-17
+    check: { min: 10, max: 1000, unit: '개', def: 10 },
     // 보기 전용 방: 같은 종류의 앞 방 말풍선 (전에는 30개로 굳어 있었다)
     view: { min: 1, max: 300, unit: '개', def: 30 },
   },

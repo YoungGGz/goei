@@ -57,6 +57,7 @@ export const PHONE_SET: SetPage = {
         { key: 'adv_cd_incoming', label: '선톡 받은 뒤 쉬는 턴', ctl: { t: 'adv', item: 'cd_incoming' } },
         { key: 'group_invites', label: '단톡방 초대 받기', ctl: onOff('0'), inline: pct('group_invite_chance') },
         { key: 'adv_cd_invite', label: '초대 받은 뒤 쉬는 턴', ctl: { t: 'adv', item: 'cd_invite' } },
+        { key: 'adv_check_rooms', label: '기록을 넘길 방', ctl: { t: 'adv', item: 'check_rooms' } },
         { key: 'adv_check_contacts', label: '선톡·초대 후보', ctl: { t: 'adv', item: 'check_contacts' } },
         { key: 'banter', label: '단톡 수다', ctl: onOff('0'), inline: pct('banter_chance'), help: '새 메시지를 확인할 때 이 확률로 내 단톡방 하나에서 사람들끼리 대화가 오가요. 응답이 길어져요' },
         { key: 'banter', label: '단톡 수다 줄 수', ctl: { t: 'minmax', lo: BANTER_ROWS[0], hi: BANTER_ROWS[1], unit: '줄', act: 'num' }, help: `수다 한 번에 오가는 말 수예요(${BANTER_ROWS[0]}~${BANTER_ROWS[1]}). 그 안에서 모델이 정해요` },

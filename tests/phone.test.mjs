@@ -451,3 +451,34 @@ test('관전: 반응 칸은 이모지 반응이 켜져 있고 혼잣말이 아�
   assert.match(sys({ '$ph_view_preset': 'mono' }), /At most 30 messages; each text content at most 600 characters\./);
   assert.doesNotMatch(sys({}), /__VIEW_LIMIT/);
 });
+
+test('확인 요청: 말풍선은 최근에 말이 오간 방 몇 개만, 인물 로어북은 그 방 인원에게만 붙는다', { skip: !realLore }, () => {
+  const chat = chatOf({ '$ph_incoming': '1' }, [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }]);
+  const d = P.directory(realLore, chat);
+  const st = P.blankState();
+  const talk = d.contacts.slice(0, 12);
+  for (const c of talk) {
+    const r = dmRoom(c.id, { people: { [c.id]: P.personOf(c) } });
+    st.rooms[r.id] = r; st.order.push(r.id);
+    for (let i = 0; i < 15; i++) P.push(st, r, i % 2 ? 'me' : c.id, `${c.id} 말 ${i}`, '');
+  }
+  const run = (vars = {}) => JSON.parse(PP.refreshPrompt({ char: { globalLore: realLore }, chat: { ...chat, scriptstate: { ...chat.scriptstate, ...vars } } }, st, d, {}, () => 0).prompt.messages[1].content);
+  const body = run();
+  const withTalk = body.rooms.filter((r) => r.messages.length);
+  assert.equal(withTalk.length, 10, '기본: 방 10개만 말풍선과 함께');
+  assert.ok(withTalk.every((r) => r.messages.length === 10), '방마다 최근 10개');
+  // 가장 나중에 말이 오간 방(마지막에 넣은 방)이 들어가고, 가장 오래된 두 방은 방 정보와 대화 상태만
+  const old = body.rooms.filter((r) => [talk[0].id, talk[1].id].some((id) => r.id === `dm_${id}`));
+  assert.ok(old.length === 2 && old.every((r) => !r.messages.length && r.conversationState && !r.candidateOnly));
+  assert.ok(withTalk.some((r) => r.id === `dm_${talk[11].id}`));
+  // 인물 로어북: 말풍선과 함께 넘긴 방의 인원만
+  const lore = new Set(body.participants.filter((p) => p.lore).map((p) => p.sender));
+  const full = new Set(withTalk.flatMap((r) => r.activeMembers));
+  assert.ok(lore.size > 0 && [...lore].every((id) => full.has(id)), '그 밖의 사람에게는 로어북 글이 없다');
+  const blank = body.participants.filter((p) => !full.has(p.sender));
+  assert.ok(blank.length > 0 && blank.every((p) => p.lore === ''));
+  assert.ok(blank.some((p) => p.hasCharacterLore), '로어북이 있는지는 그대로 알린다');
+  // 설정: 0 = 전부
+  assert.equal(run({ '$ph_adv_check_rooms': '0' }).rooms.filter((r) => r.messages.length).length, 12);
+  assert.equal(run({ '$ph_adv_check_rooms': '3' }).rooms.filter((r) => r.messages.length).length, 3);
+});

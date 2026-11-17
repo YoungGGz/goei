@@ -134,8 +134,8 @@ const dropSitePicGuide = (text: string): string => (text.includes('__SITE_PICS__
 
 /** limit = 넘길 말풍선 수 (양 표의 그 기능 줄 「지난 기록」) */
 export function roomPacket(r: PRoom, reactions = false, limit = HISTORY.room): RoomPacket {
-  const messages = r.messages
-    .slice(-limit)
+  // limit 0 = 말풍선 없이 방 정보와 대화 상태만 (새 메시지 확인의 오래 조용한 방)
+  const messages = (limit > 0 ? r.messages.slice(-limit) : [])
     .filter((m) => m.kind !== 'pause' || !hiddenPause(m.text))
     .map((m) => ({
       sender: m.sender === 'system' ? '-' : m.sender,
@@ -173,7 +173,8 @@ interface Participant {
   narratorOnlyAgentStatus?: unknown;
 }
 
-function participant(src: RefSource, c: PPerson, related: boolean, status: boolean, names: Record<string, string>): Participant {
+/** withLore=false: 인물 로어북 글은 싣지 않고 있는지만 알린다 (그 사람 정보는 상시 로어북의 명단으로 본다) */
+function participant(src: RefSource, c: PPerson, related: boolean, status: boolean, names: Record<string, string>, withLore = true): Participant {
   let lore = '';
   if (related) {
     const candidates = c.custom ? [c.name] : c.lore ? [c.lore] : [`${c.english} ${c.name}`, `${c.name} ${c.english}`, c.name, c.english ?? ''];
@@ -186,7 +187,7 @@ function participant(src: RefSource, c: PPerson, related: boolean, status: boole
     }
   }
   return {
-    sender: c.id, name: c.name, faction: c.group, factionDisplayName: names[c.group ?? ''] ?? c.group, rank: c.rank, department: c.department, lore,
+    sender: c.id, name: c.name, faction: c.group, factionDisplayName: names[c.group ?? ''] ?? c.group, rank: c.rank, department: c.department, lore: withLore ? lore : '',
     hasCharacterLore: !!lore.trim(), manuallySavedContact: !!c.custom, contactMemo: c.custom ? c.note ?? '' : undefined,
     narratorOnlyAgentStatus: status && c.agentId ? agentStatus(src.chat, c.agentId) : undefined,
   };
@@ -389,8 +390,14 @@ export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names:
   }
   const rooms: RoomPacket[] = [];
   const memo = new Map<string, Participant>();
+  // 말풍선과 함께 넘기는 방은 가장 최근에 말이 오간 방부터 「기록을 넘길 방」 수만큼 (candidates 앞쪽이 listedRooms 차례 = 최근 순).
+  // 그 밖의 방은 방 정보와 대화 상태만, 대화한 적 없는 연락처는 지금처럼 빈 방으로 넘긴다.
+  // 인물 로어북 글은 말풍선과 함께 넘기는 방의 인원에게만 붙인다
+  const fullMax = advNum(chat.scriptstate, 'ph', 'check_rooms');
+  const full = new Set(candidates.filter((r) => r.messages.length > 0).slice(0, fullMax > 0 ? fullMax : undefined).map((r) => r.id));
+  const loreFor = new Set(candidates.filter((r) => full.has(r.id)).flatMap((r) => r.members));
   for (const r of candidates) {
-    const packet = roomPacket(r, set.reactions, history);
+    const packet = roomPacket(r, set.reactions, !r.messages.length || full.has(r.id) ? history : 0);
     packet.action = { type: 'refresh' };
     packet.receiveMessages = refreshAllowed(chat, r, set, incomingOn)[0];
     // 대화가 없는 연락처 방은 빈 칸(대화 상태·참여자·pov·action 등)을 싣지 않는다
@@ -398,7 +405,7 @@ export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names:
     selected.set(r.id, r);
     receive.set(r.id, packet.receiveMessages);
     for (const cid of r.members) {
-      if (!memo.has(cid)) memo.set(cid, participant(src, dir.map.get(cid) ?? r.people[cid] ?? { id: cid, name: cid }, t.related && !trimRelated(), set.status, names));
+      if (!memo.has(cid)) memo.set(cid, participant(src, dir.map.get(cid) ?? r.people[cid] ?? { id: cid, name: cid }, t.related && !trimRelated(), set.status, names, loreFor.has(cid)));
     }
   }
   // 단톡 수다: NPC가 둘 이상인 내 단톡방 하나를 골라 대화 한 조각을 꼭 만들게 한다
