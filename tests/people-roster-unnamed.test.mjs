@@ -190,8 +190,11 @@ test('갱신기 자료: 명부 대조(roster)·호칭 기록(handles)·대기 �
   }
   // 호칭: 장면 인물로 뽑히지 않은 호칭 기록 + 호칭으로 올라와 기다리는 이름 (이름 옮기기의 from 이 될 수 있는 것을 모델이 가려 본다)
   assert.deepEqual(data.handles, ['붉은 코트의 여자', '모자 쓴 남자']);
-  // 대기 이름: 근거 응답이 채팅에 있는 줄만 (지운 응답에서만 나온 이름은 싣지 않는다)
-  assert.deepEqual(data.held_names, ['모자 쓴 남자', '박 대리']);
+  // 대기 이름: 근거 응답이 채팅에 있는 줄만 (지운 응답에서만 나온 이름은 싣지 않는다).
+  // 이름으로 올라온 줄은 이번에 읽는 글에 그 이름이 나올 때만 싣는다 (2026-11-17). 호칭으로 올라온 줄은 늘 싣는다
+  assert.deepEqual(data.held_names, ['모자 쓴 남자']);
+  const c2 = chat(['user', '복도로 나갔다', 'u1'], ['char', '박 대리가 고개를 돌렸다.', 'c1']);
+  assert.deepEqual(U.buildUpdate(c2, store, [1], { settings: settings(), system: '', values: {}, names: Sel.namesWith(store, B.allNames(ROSTER)), roster: ROSTER }).data.held_names, ['모자 쓴 남자', '박 대리']);
   assert.ok(data.known_names.includes('붉은 코트의 여자'));
   // 세력 코드는 명부의 세력 이름으로 싣는다
   const coded = ROSTER.find((r) => r !== recorded && r !== excluded && /^[A-Z]\d\d$/.test(r.affiliation));
@@ -200,7 +203,8 @@ test('갱신기 자료: 명부 대조(roster)·호칭 기록(handles)·대기 �
   assert.equal(build(settings({ $pp_roster_hint: '0' })).roster, undefined);
   const named = build(settings({ $pp_new_unnamed: '0' }));
   assert.equal(named.handles, undefined);
-  assert.deepEqual(named.held_names, ['박 대리'], '호칭으로 올라온 줄은 다시 와도 받지 않으니 싣지 않는다');
+  assert.equal(named.held_names, undefined, '호칭으로 올라온 줄은 다시 와도 받지 않으니 싣지 않는다');
+  assert.deepEqual(U.buildUpdate(c2, store, [1], { settings: settings({ $pp_new_unnamed: '0' }), system: '', values: {}, names: Sel.namesWith(store, B.allNames(ROSTER)), roster: ROSTER }).data.held_names, ['박 대리']);
   // 다시 읽기(only)는 새 인물을 받지 않으니 그 자료도 없다
   const only = build(settings(), { only: [recorded.name] });
   assert.equal(only.roster, undefined);
