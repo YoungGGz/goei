@@ -52,14 +52,14 @@ export const PP_DEFAULTS: Record<string, string> = {
   sexual_desire: '1', paraphilia: '1', explicit_style: '1',
   affinity: '1', register: '1', perception: '1',
   /** 말투의 다변화 (원본 features.register.variety off/one/two · change ask/auto · signLimit 1~9). 2026-11-07 K. core/people/speech.ts */
-  register_variety: 'one', register_change: 'ask', register_sign_limit: '3', perception_ext: '1', suspicion: '1',
+  register_variety: 'one', register_change: 'ask', register_sign_limit: '3', perception_ext: '0', suspicion: '1',
   docs_event: '1', docs_location: '1', docs_faction: '1', docs_item: '1', npc_emotion: '1',
   /** 수치 사용 (1) / 정성 모드 (0). 호감·의심·음란도 (리수폿 E). 취향 띠는 호감 수치가 켜져 있을 때만 */
   /** 2026-11-07 사용자 결정(O): 의심은 원본처럼 정성(글)이 기본. 수치는 스위치로 */
   num_affinity: '1', num_suspicion: '0', num_openness: '1',
-  /** 리수폿 선택 기능: 취향 띠·음란도 기본 끔 */
+  /** 음란도 기본 끔. 취향 띠 기본 켬·인식 확장 기본 끔 (사용자 2026-11-17: 원본 리수폿 실제 동작에 맞춤) */
   /** 2026-11-17 사용자 결정: 서사 리듬 기본 끔 (원본 리수폿도 전용 모드에서 꺼져 있음) */
-  taste: '0', openness: '0', rhythm: '0',
+  taste: '1', openness: '0', rhythm: '0',
   /** 세력 평판 (docs/설계안_세력평판.md). 기본 켬. 본편 주입 켬. 구간 경계 [우호, 호의, 중립, 경계 하한]. 몹 목격 무게 half/full/off */
   faction_rep: '1',
   /** 세력 평판 수치 (1) / 정성 모드 (0): 갱신기가 단계(적대…우호)와 이유만 판단, 계기 점수·구간 경계·몹 목격 무게 안 씀 (11-07 사용자: 호감·의심·음란도처럼 따라간다) */

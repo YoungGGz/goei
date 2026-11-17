@@ -29,8 +29,9 @@ const chat = (...msgs) => ({ message: msgs.map(([role, data, chatId]) => ({ role
 const names = [{ name: '쟈알디', aliases: [], titles: [] }];
 const c = chat(['user', '출근', 'u1'], ['char', '쟈알디가 눈을 가늘게 떴다. 손을 잡았다. 부끄러워 물러섰다.', 'c1'], ['user', 'x', 'u2'], ['char', '쟈알디가 웃었다. 키스했다.', 'c2']);
 
-test('기본 끔: 기능이 꺼져 있으면 지침·자료·반영 어디에도 없다', () => {
-  const s = settings();
+test('끔: 기능이 꺼져 있으면 지침·자료·반영 어디에도 없다', () => {
+  // 취향 띠는 2026-11-17 부터 기본 켬이라 여기서는 끈 값을 명시한다
+  const s = { ...St.peopleSettings({ $pp_director: 'note', $pp_rhythm: '0', $pp_taste: '0' }) };
   assert.ok(!s.features.has('taste') && !s.features.has('openness') && !s.features.has('rhythm'));
   const sys = U.assemblePrompt(P.promptFor(s), U.enabledSections(s), '');
   assert.ok(!sys.includes('Taste band') && !sys.includes('Openness') && !sys.includes('Narrative rhythm') && !sys.includes('"taste"'));
