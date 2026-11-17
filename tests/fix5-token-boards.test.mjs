@@ -394,3 +394,27 @@ test('새로고침: 내 글도 참조할 글 수 안의 것만 넘기고, 안 �
   const res = C.applyBoard(st, structuredClone(st), value, { nick: '나', settings: C.gnetSettings({}), date: '2025.01.01 11:00', sent: prompt.sent });
   assert.deepEqual(res.st.posts.find((p) => p.id === 100001).comments.map((c) => c.body), ['옛 댓글']);
 });
+
+test('쪽지 원글: 글이 살아 있으면 본문을 상대마다 또 적지 않고, 글이 사라지면 사본을 남긴다', () => {
+  const st = board();
+  for (const q of st.posts) q.id += 2000000;
+  st.seq += 2000000;
+  const long = '긴 본문 '.repeat(200);
+  st.posts[2].body = long;
+  for (let i = 0; i < 30; i++) st.sources[`상대${i}`] = C.sourceFor(st.posts[2], 0);
+  st.sources['댓글상대'] = C.sourceFor(st.posts[1], 1);
+  const raw = C.encode(st);
+  assert.equal(count(raw, long.trim().slice(0, 40)) >= 1, true);
+  assert.equal(raw.split('\n').filter((l) => l.startsWith('T|') && l.includes('긴 본문')).length, 0, 'T 줄에는 본문이 없다');
+  const back = C.decode(raw);
+  assert.deepEqual(back.sources, st.sources, '읽으면 전과 같은 원글');
+  // 글이 게시판·보관함에서 사라진 뒤 저장: 사본이 T 줄에 남는다
+  back.posts = back.posts.filter((p) => p.id !== 2100001);
+  const raw2 = C.encode(back);
+  assert.equal(raw2.split('\n').filter((l) => l.startsWith('T|') && l.includes('긴 본문')).length, 30);
+  assert.deepEqual(C.decode(raw2).sources, st.sources);
+  // 보관함으로 간 글은 번호만으로 찾는다
+  const arch = C.decode(raw);
+  arch.archive.push(...arch.posts.splice(2, 1));
+  assert.deepEqual(C.decode(C.encode(arch)).sources, st.sources);
+});

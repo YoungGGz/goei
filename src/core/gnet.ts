@@ -292,11 +292,16 @@ export const blank = (): GState => ({ posts: [], archive: [], dms: [], sources: 
 export function decode(raw: unknown): GState {
   const st = blank();
   const map = new Map<number, GPost>();
+  const refill = new Map<string, number>();
   for (const line of String(raw ?? '').split('\n')) {
     const p = fields(line);
     if (p[0] === 'Q' && Number.isFinite(Number(p[1]))) st.seq = Math.max(st.seq, postId(p[1]) ?? 0);
     else if (p[0] === 'T' && p.length >= 6) {
-      st.sources[cut(p[1], 80)] = { postid: postId(p[2]) ?? 0, title: p[3], body: p[4], author: cut(p[5], 80), quote: p[6] ?? '', quoteAuthor: p[7] ?? '' };
+      const nick = cut(p[1], 80);
+      st.sources[nick] = { postid: postId(p[2]) ?? 0, title: p[3], body: p[4], author: cut(p[5], 80), quote: p[6] ?? '', quoteAuthor: p[7] ?? '' };
+      // 아홉째 칸 = 본문을 비워 적은 줄의 본문 글자 수 (encode 참고)
+      if (/^\d+$/.test(p[8] ?? '')) refill.set(nick, Number(p[8]));
+      else refill.delete(nick);
     } else if ((p[0] === 'P' || p[0] === 'A') && p.length >= 9) {
       // A = 보관함의 글 (P 와 같은 꼴). 옛 판은 모르는 줄이라 건너뛴다
       const id = postId(p[1]);
@@ -320,6 +325,12 @@ export function decode(raw: unknown): GState {
       st.dms.push({ nick: cut(p[1], 80), side: p[2] === 'me' ? 'me' : 'npc', body: p[3], unread: p[4] === '1', date: validDate(p[5] ?? '') });
     }
   }
+  // 원글 본문을 비워 적은 T 줄은 그 글에서 적어 둔 글자 수만큼 다시 채운다 (설정·토크나이저와 무관하게 저장 때와 같은 글)
+  for (const [nick, n] of refill) {
+    const s = st.sources[nick];
+    const post = map.get(s.postid);
+    if (post) Object.assign(s, { title: post.title, body: [...post.body].slice(0, n).join(''), author: post.nick });
+  }
   // 예전 낮은 번호는 한 번만 옮긴다 (원본과 같음)
   if (st.seq < G_POST_BASE) {
     for (const post of [...st.posts, ...st.archive]) post.id += G_POST_BASE;
@@ -328,6 +339,9 @@ export function decode(raw: unknown): GState {
   }
   return st;
 }
+
+/** 쪽지 원글로 넘기는 글 부분 (제목·자른 본문·글쓴이) */
+const sourceHead = (p: GPost) => ({ title: p.title, body: trimTokens(p.body, LIMITS.origin_tokens), author: p.nick });
 
 export function encode(st: GState): string {
   const out = ['GN1', `Q|${st.seq || G_POST_BASE}`];
@@ -339,7 +353,17 @@ export function encode(st: GState): string {
     out.push(['A', p.id, en(p.date), en(p.nick), en(p.title), p.views, p.votes, en(p.body), p.mine ? '1' : '0', en(p.tag ?? ''), p.scrap ? '1' : '0', p.voted ? '1' : '0', p.down ? '1' : '0'].join('|'));
     for (const c of p.comments) out.push(['AC', p.id, c.parent, en(c.nick), en(c.body), c.mine ? '1' : '0', c.unread ? '1' : '0', en(c.time ?? '')].join('|'));
   }
-  for (const [nick, s] of Object.entries(st.sources)) out.push(['T', en(nick), s.postid || 0, en(s.title), en(s.body), en(s.author), en(s.quote), en(s.quoteAuthor)].join('|'));
+  // 쪽지 원글: 그 글이 게시판·보관함에 그대로 있으면 본문을 상대마다 또 적지 않고 글 번호만 적는다 (decode 가 글에서 다시 채운다).
+  // 글이 없어졌거나 내용이 달라졌으면 가진 사본을 그대로 적는다
+  const byId = new Map([...st.posts, ...(st.archive ?? [])].map((p) => [p.id, p]));
+  for (const [nick, s] of Object.entries(st.sources)) {
+    const post = s.postid > 0 ? byId.get(s.postid) : undefined;
+    // 사본이 그 글의 앞부분과 똑같을 때만 비운다 (사본은 본문을 앞에서 자른 것)
+    const same = !!post && post.title === s.title && post.nick === s.author && post.body.startsWith(s.body);
+    out.push(same
+      ? ['T', en(nick), s.postid, '', '', '', en(s.quote), en(s.quoteAuthor), [...s.body].length].join('|')
+      : ['T', en(nick), s.postid || 0, en(s.title), en(s.body), en(s.author), en(s.quote), en(s.quoteAuthor)].join('|'));
+  }
   for (const d of st.dms) out.push(['D', en(d.nick), d.side, en(d.body), d.unread ? '1' : '0', en(d.date)].join('|'));
   return out.join('\n');
 }
@@ -644,7 +668,7 @@ export function findPublicSource(st: GState, nick: string): GSource | undefined 
 export function sourceFor(p: GPost, ci: number): GSource {
   const c = ci > 0 ? p.comments[ci - 1] : undefined;
   return {
-    postid: p.id, title: p.title, body: trimTokens(p.body, LIMITS.origin_tokens), author: p.nick,
+    postid: p.id, ...sourceHead(p),
     quote: c ? trimTokens(c.body, LIMITS.quote_tokens) : '', quoteAuthor: c ? c.nick : '',
   };
 }
