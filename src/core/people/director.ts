@@ -9,7 +9,7 @@ import { axesLinesEn } from './axes';
 import { temperOf } from './base';
 import { personBlock, unknownTo } from './inject';
 import { liveChanges, liveEntries, liveness, plain, hash } from './store';
-import { rhythmClock, rhythmClockLines } from './rhythm';
+import { rhythmClock, rhythmClockLines, rhythmNow } from './rhythm';
 import { speechVarietyBlock } from './speech';
 import { SEXUAL_POLICY, sexualAnyOn, sexualDirectorPolicy, sexualTexts } from './sexual';
 import type { PeopleSettings } from './settings';
@@ -72,7 +72,7 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
     };
   });
   const rhythm = s.directorFeatures && s.features.has('rhythm')
-    ? Object.values(store.docs).filter((d) => d.type === 'rhythm').flatMap((d) => liveEntries(d.entries, live).slice(-1).map((e) => ({ key: d.key, text: e.text })))
+    ? rhythmNow(store, live).map((r) => ({ key: r.doc.key, text: r.entry.text }))
     : [];
   // 자료가 실린 기능 절만 붙인다 (11-14 재검토 gtoken#5): 의심 칸이 빈 장면·리듬 기록이 없는 채팅·성적 글이 없는 인물에게 그 절은 요청에 없는 자료를 설명한다
   const hasData: Record<string, boolean> = {

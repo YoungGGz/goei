@@ -10,7 +10,7 @@ import { SEXUAL_FIELDS, SEXUAL_AXIS_OF, explicitOn, isSexualAxis, sexualAnyOn, s
 import { unknownTo } from './inject';
 import { seedPerson } from './seed';
 import { temperOf, type RosterRow } from './base';
-import { rhythmClock, rhythmClockLines, parseHookHead, turnAt, type RhythmClock } from './rhythm';
+import { rhythmClock, rhythmClockLines, rhythmNow, hookActive, parseHookHead, turnAt, type RhythmClock } from './rhythm';
 import { axesView, ensureAxes, isAxis, isDirection, observe, readAxes, setAxes, pruneCandidates } from './axes';
 import { AXES } from './types';
 import { factionNow, knownFactionCodes, sceneFactionCodes, stageMid, userFactionOf, factionName as factionNameOf } from './faction';
@@ -139,10 +139,10 @@ export function relatedDocs(store: PeopleStore, live: Liveness, settings: People
 
 const docItem = (d: Doc, e: Entry) => ({ type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) });
 
-/** 갱신기 자료의 문서 항목 (docs_now): 메인 요청과 같은 규칙(relatedDocs)으로 고른 사건·장소·세력·물건 항목 + 서사 리듬 기록(늘 전부).
+/** 갱신기 자료의 문서 항목 (docs_now): 메인 요청과 같은 규칙(relatedDocs)으로 고른 사건·장소·세력·물건 항목 + 서사 리듬 기록(문서마다 최신 줄, 끝난 떡밥 빼고 = rhythmNow).
  *  몫은 메인 요청과 같이 「컨텍스트 글자 상한 ÷ (장면 인물 수 + 1)」 */
 export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[]) {
-  const rhythm = settings.features.has(docFeature('rhythm') as Feature) ? Object.values(store.docs).filter((d) => d.type === 'rhythm').flatMap((d) => liveEntries(d.entries, live).map((e) => docItem(d, e))) : [];
+  const rhythm = settings.features.has(docFeature('rhythm') as Feature) ? rhythmNow(store, live).map((r) => docItem(r.doc, r.entry)) : [];
   const related = relatedDocs(store, live, settings, texts, scene, Math.floor(settings.blockCap / (scene.length + 1)), (d, e) => JSON.stringify(docItem(d, e)).length + 1);
   return [...related.map((r) => docItem(r.doc, r.entry)), ...rhythm];
 }
@@ -1250,7 +1250,8 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     }
     // 리듬 시계 (리수폿 H): 훅 행동은 응답당 1개, 새 훅은 간격·동시 상한을 채울 때만
     if (type === 'rhythm' && typeof d.key === 'string' && d.key.startsWith('hook:') && d.op !== 'remove' && input.clock) {
-      const isNew = !store.docs[`rhythm:${plain(d.key, 40)}`];
+      // 끝난 떡밥은 갱신기에 보내지 않으니, 같은 이름을 다시 쓰면 새로 심는 것으로 본다
+      const isNew = !input.clock.hooks.some((h) => h.key === plain(d.key, 40) && hookActive(h.stage));
       if (isNew && !input.clock.plantAllowed) {
         drop('doc', d, `새 훅을 심을 수 없음 (${input.clock.plantBlocked})`, d.key);
         continue;

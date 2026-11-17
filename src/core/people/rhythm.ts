@@ -2,7 +2,7 @@
 // 턴 = 확정된 응답(char 메시지) 수. 훅의 심은 턴·마지막 진전 턴은 문서 항목의 기준 메시지에서 읽는다.
 import type { Chat } from '../types';
 import { liveEntries, type Liveness } from './store';
-import { RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, type PeopleStore } from './types';
+import { RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, type Doc, type Entry, type PeopleStore } from './types';
 import { guideTxt } from '../guides';
 
 export type HookTier = (typeof RHYTHM_HOOK_TIERS)[number];
@@ -63,6 +63,24 @@ export function parseHookHead(text: string): { stage: HookStage; tier: HookTier;
   return { stage: m[1] as HookStage, tier: m[2] as HookTier, ext: !!m[3] };
 }
 
+/** 진행 중인 떡밥 단계인가 (resolved·retired 는 끝난 것) */
+export const hookActive = (stage: HookStage): boolean => ACTIVE.includes(stage);
+
+/** 요청(Director·메인 요청·갱신기)에 싣는 리듬 기록: 문서마다 최신 줄 하나.
+ *  끝난 떡밥(resolved·retired)은 싣지 않는다 (원본: 끝난 떡밥은 보관으로 돌린다. 2026-11-17 사용자) */
+export function rhythmNow(store: PeopleStore, live: Liveness): { doc: Doc; entry: Entry }[] {
+  const out: { doc: Doc; entry: Entry }[] = [];
+  for (const doc of Object.values(store.docs)) {
+    if (doc.type !== 'rhythm') continue;
+    const entry = liveEntries(doc.entries, live).slice(-1)[0];
+    if (!entry) continue;
+    const head = doc.key.startsWith('hook:') ? parseHookHead(entry.text) : null;
+    if (head && !hookActive(head.stage)) continue;
+    out.push({ doc, entry });
+  }
+  return out;
+}
+
 /** 지금 턴 기준의 훅 시계. upto = 마지막 확정 메시지 위치 (없으면 끝) */
 export function rhythmClock(store: PeopleStore, chat: Chat, live: Liveness, upto?: number): RhythmClock {
   const list = Array.isArray(chat.message) ? chat.message : [];
@@ -83,19 +101,28 @@ export function rhythmClock(store: PeopleStore, chat: Chat, live: Liveness, upto
       let min = live.at.get(e.anchor) ?? 0;
       const seen = new Set<string>([e.id]);
       for (let r = e.replaces ? byId.get(e.replaces) : undefined; r && !seen.has(r.id); r = r.replaces ? byId.get(r.replaces) : undefined) {
+        // 끝난 떡밥 줄에서 사슬을 끊는다: 같은 이름으로 다시 심은 떡밥은 새로 심은 턴부터 센다
+        const rh = parseHookHead(r.text);
+        if (rh && !hookActive(rh.stage)) break;
         seen.add(r.id);
         const pos = live.at.get(r.anchor);
         if (!r.void && !r.folded && pos !== undefined) min = Math.min(min, pos);
       }
       return min;
     };
-    const planted = turnAt(chat, Math.min(...es.map(rootPos)));
+    // 끝난 줄 뒤에 같은 이름으로 다시 심었으면 그 뒤 줄들만 센다
+    let from = 0;
+    for (let i = 0; i < es.length - 1; i++) {
+      const h = parseHookHead(es[i].text);
+      if (h && !hookActive(h.stage)) from = i + 1;
+    }
+    const planted = turnAt(chat, Math.min(...es.slice(from).map(rootPos)));
     const last = turnAt(chat, live.at.get(es[es.length - 1].anchor) ?? 0);
     lastPlant = lastPlant === null ? planted : Math.max(lastPlant, planted);
     const [lo, hi0] = HOOK_WINDOW[head.tier];
     const hi = hi0 + (head.ext ? HOOK_EXTEND[head.tier] : 0);
     const age = turn - planted;
-    const isActive = ACTIVE.includes(head.stage);
+    const isActive = hookActive(head.stage);
     if (isActive) active[head.tier]++;
     hooks.push({ key: d.key, tier: head.tier, stage: head.stage, planted, last, age, sinceLast: turn - last, window: [lo, hi], extended: head.ext, due: isActive && age >= lo && age <= hi, overdue: isActive && age > hi });
   }

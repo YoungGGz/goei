@@ -7,6 +7,7 @@ import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, rep
 import { loadContext, updateChat, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
 import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, pruneScene } from '../core/people/store';
+import { pruneEntries } from '../core/people/prune';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
 import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, pickupKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, type ApplyReport } from '../core/people/updater';
@@ -408,6 +409,8 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         // 다시 굴려(지워서) 채팅에서 사라진 응답이 만든 변경 줄만 버린다 (사용자 2026-11-14 F-1 (나)). 장면 인물 목록도 같이
         dropGoneChanges(s, cur);
         pruneScene(s, cur);
+        // 인물 기록·문서의 죽은 줄도 같은 때 치운다 (2026-11-17 사용자: 원본처럼 지난 이력 60개만)
+        pruneEntries(s, cur);
         let next = cur;
         // 이름을 옮긴 기록이 설정 「항상 포함할 인물」에 옛 호칭으로 적혀 있으면 새 이름으로 고쳐 적는다 (이름으로 적는 채팅 저장값은 인물 기록 밖에 이것뿐)
         const always = renameAlways(cur.scriptstate?.[PP('always')], report.applied.renamed);
