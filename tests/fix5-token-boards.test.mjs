@@ -92,7 +92,14 @@ test('새로고침: 선쪽지 출처는 그대로 본문과 함께 가고, 받�
   const plan = allowed(st);
   const all = optionsOf(userText(C.refreshPrompt(src(), st, plan, '나', {})));
   assert.equal(all.incomingOrigin.content, BODY, '출처 글이 작업 입력에 따로 없으니 본문과 함께');
-  assert.equal(all.previousIncoming.length, 6, '기본값: 전부');
+  assert.equal(all.previousIncoming.length, 6, '기본값 50통 안이면 전부');
+  const many = board();
+  many.dms = Array.from({ length: 60 }, (_, i) => ({ nick: `보낸이${i}`, side: 'npc', body: `쪽지 ${i}`, unread: false, date: '' }));
+  const def = optionsOf(userText(C.refreshPrompt(src(), many, allowed(many), '나', {})));
+  assert.equal(def.previousIncoming.length, 50, '기본값: 최근 50통');
+  assert.equal(def.previousIncoming[0].body, '쪽지 10');
+  const zero = optionsOf(userText(C.refreshPrompt(src({ [ADV('incoming_prev')]: '0' }), many, allowed(many), '나', {})));
+  assert.equal(zero.previousIncoming.length, 60, '0 = 전부');
   const two = optionsOf(userText(C.refreshPrompt(src({ [ADV('incoming_prev')]: '2' }), st, plan, '나', {})));
   assert.deepEqual(two.previousIncoming.map((m) => m.body), ['쪽지 4', '쪽지 5']);
   // 넘기지 않은 옛 쪽지와 같은 것이 와도 저장할 때 걸러진다
@@ -203,10 +210,10 @@ test('메인 요청: 장면과 무관하게 늘 넣는 최근 글·쪽지 수를
 
 test('새 설정의 기본값은 지금 동작 그대로다', () => {
   const v = (k) => C.advanced.advValue({}, 'gn', k);
-  assert.deepEqual(['activity', 'dm_public', 'incoming_prev', 'ctx_recent_posts', 'ctx_recent_dms'].map(v), ['1', '8', '0', '1', '5']);
+  assert.deepEqual(['activity', 'dm_public', 'incoming_prev', 'ctx_recent_posts', 'ctx_recent_dms'].map(v), ['1', '8', '50', '1', '5']);
   assert.deepEqual(C.advanced.advChanged({}, 'gn'), []);
   C.advanced.applyAdvanced({});
-  assert.deepEqual([C.HISTORY.activity, C.HISTORY.dmPublic, C.HISTORY.incomingPrev, C.CONTEXT.recentPosts, C.CONTEXT.recentDms], [true, 8, 0, 1, 5]);
+  assert.deepEqual([C.HISTORY.activity, C.HISTORY.dmPublic, C.HISTORY.incomingPrev, C.CONTEXT.recentPosts, C.CONTEXT.recentDms], [true, 8, 50, 1, 5]);
 });
 
 test('자동 새로고침 결과: 채팅이 이어져도 그 응답이 그대로면 쓰고, 다시 굴렸거나 지웠으면 쓰지 않는다', () => {

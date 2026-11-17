@@ -113,7 +113,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       items: [
         num('incoming_chance', '선쪽지 확률', 100, 0, 100, '%', { v: '$lb_cfg_lb-gn.incoming_chance' }),
         num('cooldown', '받은 뒤 쉬는 턴', 2, 0, 100, '턴', { zero: '안 쉼' }),
-        num('incoming_prev', '선쪽지에 참조할 받은 쪽지', 0, 0, 1000, '통', { zero: '전부' }),
+        num('incoming_prev', '선쪽지에 참조할 받은 쪽지', 50, 0, 1000, '통', { zero: '전부' }),
       ],
     },
     {
