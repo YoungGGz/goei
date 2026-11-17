@@ -23,7 +23,7 @@ import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } fro
 import { imgTagNames } from '../imgtag';
 import { capScene, changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
 import type { Feature, PeopleSettings } from './settings';
-import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
+import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type Doc, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 const msgs = (chat: Chat): ChatMessage[] => (Array.isArray(chat.message) ? chat.message : []);
@@ -113,18 +113,38 @@ export function cleanSpan(raw: string, cap: number): string {
   return `${head}\n${guideTxt('UpdaterExtra', 'SPAN.FOLD')}\n${tail}`;
 }
 
-/** 갱신기 자료의 문서 항목 (docs_now): 켜진 종류의 살아 있는 항목.
- *  설정 「기록 문서 항목 상한」(0 = 제한 없음)을 넘으면 장면과 관련된 항목(문서 이름이 이 묶음의 글에 나왔거나 장면 인물이 얽힘)을 최근 것부터, 남는 자리는 나머지를 최근 것부터 채운다. 싣는 차례는 그대로 */
-export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[]) {
-  const rows = Object.values(store.docs).filter((d) => settings.features.has(docFeature(d.type) as Feature)).flatMap((d) => {
+/** 장면과 관련된 문서 항목 고르기 (메인 요청의 기록 문서 블록과 갱신기 자료 docs_now 가 같이 쓰는 한 가지 규칙, 2026-11-17 사용자 결정):
+ *  켜진 종류의 살아 있는 항목 가운데 문서 이름이 texts 에 나왔거나 장면 인물이 얽힌 것을, 최근 것부터 maxChars 안에서 고르고 일어난 차례로 돌려준다.
+ *  크기는 부르는 쪽이 실제로 싣는 글의 길이(sizeOf)로 잰다. 서사 리듬 문서는 여기서 다루지 않는다 */
+export function relatedDocs(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[], maxChars: number, sizeOf: (d: Doc, e: Entry) => number, base = 0): { doc: Doc; entry: Entry }[] {
+  const rows: { pos: number; seq: number; doc: Doc; entry: Entry }[] = [];
+  for (const d of Object.values(store.docs)) {
+    if (d.type === 'rhythm' || !settings.features.has(docFeature(d.type) as Feature)) continue;
     const named = !!d.key && texts.some((t) => t.includes(d.key));
-    return liveEntries(d.entries, live).map((e) => ({ near: named || (e.who ?? []).some((n) => scene.includes(n)), pos: live.at.get(e.anchor) ?? -1, seq: e.seq, item: { type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) } }));
-  });
-  // 상한은 사건·장소·세력·물건 문서만 센다 (설정 도움말대로). 서사 리듬 기록은 세지 않고 늘 보낸다
-  const capped = rows.filter((r) => r.item.type !== 'rhythm');
-  if (settings.docsCap <= 0 || capped.length <= settings.docsCap) return rows.map((r) => r.item);
-  const keep = new Set([...capped].sort((a, b) => Number(b.near) - Number(a.near) || b.pos - a.pos || b.seq - a.seq).slice(0, settings.docsCap));
-  return rows.filter((r) => r.item.type === 'rhythm' || keep.has(r)).map((r) => r.item);
+    for (const e of liveEntries(d.entries, live)) {
+      if (!named && !(e.who ?? []).some((n) => scene.includes(n))) continue;
+      rows.push({ pos: live.at.get(e.anchor) ?? -1, seq: e.seq, doc: d, entry: e });
+    }
+  }
+  rows.sort((a, b) => a.pos - b.pos || a.seq - b.seq);
+  const kept: { doc: Doc; entry: Entry }[] = [];
+  let size = base;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    size += sizeOf(rows[i].doc, rows[i].entry);
+    if (size > maxChars) break;
+    kept.unshift({ doc: rows[i].doc, entry: rows[i].entry });
+  }
+  return kept;
+}
+
+const docItem = (d: Doc, e: Entry) => ({ type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) });
+
+/** 갱신기 자료의 문서 항목 (docs_now): 메인 요청과 같은 규칙(relatedDocs)으로 고른 사건·장소·세력·물건 항목 + 서사 리듬 기록(늘 전부).
+ *  몫은 메인 요청과 같이 「컨텍스트 글자 상한 ÷ (장면 인물 수 + 1)」 */
+export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[]) {
+  const rhythm = settings.features.has(docFeature('rhythm') as Feature) ? Object.values(store.docs).filter((d) => d.type === 'rhythm').flatMap((d) => liveEntries(d.entries, live).map((e) => docItem(d, e))) : [];
+  const related = relatedDocs(store, live, settings, texts, scene, Math.floor(settings.blockCap / (scene.length + 1)), (d, e) => JSON.stringify(docItem(d, e)).length + 1);
+  return [...related.map((r) => docItem(r.doc, r.entry)), ...rhythm];
 }
 
 /** 인물 기록을 자료용으로 (칸별 id·본문, 상한을 넘으면 오래된 history·scene 부터 뺀다) */

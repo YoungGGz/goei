@@ -86,8 +86,6 @@ export const PP_DEFAULTS: Record<string, string> = {
   block_cap: '16000',
   /** 사건·장소·세력·물건 문서 가운데 장면과 관련된 것을 메인 요청에 넣는다 (컨텍스트 글자 상한 안에서). 기본 켬 (사용자 2026-11-17) */
   docs_inject: '1',
-  /** 갱신기 자료(docs_now)에 싣는 사건·장소·세력·물건 문서 항목 수 상한. 0 = 제한 없음 */
-  docs_cap: '0',
   /** 승인 전 성격 관찰(후보)도 메인 요청의 인물 기록에 넣는다. 기본 끔 */
   axes_obs_inject: '0',
   /** 저장 상한을 넘긴 인물 정리: same = 같은 갱신 호출에 얹음(기본), separate = 별도 호출 */
@@ -159,8 +157,6 @@ export interface PeopleSettings {
   personCap: number;
   blockCap: number;
   docsInject: boolean;
-  /** 갱신기 자료의 문서 항목 수 상한 (0 = 제한 없음) */
-  docsCap: number;
   axesObsInject: boolean;
   tidy: 'same' | 'separate';
   /** 세력 평판 정성 모드 (num_faction_rep = 0) */
@@ -241,7 +237,6 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     personCap: num('person_cap', 2000, 40000),
     blockCap: num('block_cap', 4000, 64000),
     docsInject: v('docs_inject') === '1',
-    docsCap: num('docs_cap', 0, 1000),
     axesObsInject: v('axes_obs_inject') === '1',
     tidy: v('tidy') === 'separate' ? 'separate' : 'same',
     factionQual: v('faction_rep') === '1' && v('num_faction_rep') === '0',

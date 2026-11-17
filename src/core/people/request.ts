@@ -5,13 +5,13 @@ import type { Chat } from '../types';
 import { blockEntries, peopleBlock, personBlock, rhythmBlock, unknownTo, TRIM_ORDER } from './inject';
 import { nameMatcher, scenePeople, carriedScene, entriesOf } from './select';
 import { liveChanges, liveEntries, liveness, type Liveness } from './store';
-import { latestNote } from './updater';
+import { latestNote, relatedDocs } from './updater';
 import { rhythmClock, rhythmClockLines } from './rhythm';
 import { factionNow, factionsBlock, sceneFactionCodes, userFactionOf } from './faction';
 import { messageText } from '../refs';
 import { fixedSections } from './seed';
 import type { PeopleSettings } from './settings';
-import { docFeature, type PeopleStore, type Temper } from './types';
+import type { PeopleStore, Temper } from './types';
 import { guideTxt } from '../guides';
 
 export interface PromptMessage {
@@ -55,25 +55,10 @@ export function sceneFullByCode(chat: Chat, o: RequestOpts): boolean {
 export function docsBlockFor(chat: Chat, o: RequestOpts, people: string[], live: Liveness, maxChars: number): string {
   const list = Array.isArray(chat.message) ? chat.message : [];
   const texts = [...(o.input ? [o.input] : []), ...list.slice(-2).map((m) => messageText(String(m.data ?? '')))];
-  const rows: { pos: number; seq: number; line: string }[] = [];
-  for (const d of Object.values(o.store.docs)) {
-    if (d.type === 'rhythm' || !(o.settings.features as Set<string>).has(docFeature(d.type))) continue;
-    const named = !!d.key && texts.some((t) => t.includes(d.key));
-    for (const e of liveEntries(d.entries, live)) {
-      if (!named && !(e.who ?? []).some((n) => people.includes(n))) continue;
-      rows.push({ pos: live.at.get(e.anchor) ?? -1, seq: e.seq, line: guideTxt('Main', 'DOCS.ITEM', { type: d.type, key: d.key, text: e.text }) });
-    }
-  }
-  if (!rows.length) return '';
-  rows.sort((a, b) => a.pos - b.pos || a.seq - b.seq);
   const head = guideTxt('Main', 'DOCS.HEAD');
-  const kept: string[] = [];
-  let size = head.length;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    size += rows[i].line.length + 1;
-    if (size > maxChars) break;
-    kept.unshift(rows[i].line);
-  }
+  const line = (d: { type: string; key: string }, e: { text: string }) => guideTxt('Main', 'DOCS.ITEM', { type: d.type, key: d.key, text: e.text });
+  // 고르는 규칙은 갱신기 자료(docs_now)와 같다 (updater.ts relatedDocs)
+  const kept = relatedDocs(o.store, live, o.settings, texts, people, maxChars, (d, e) => line(d, e).length + 1, head.length).map((r) => line(r.doc, r.entry));
   return kept.length ? [head, ...kept].join('\n') : '';
 }
 

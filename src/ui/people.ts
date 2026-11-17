@@ -396,7 +396,6 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('recent_msgs', String(s.recentMsgs)),
     ppRow('prev_pairs', String(s.prevPairs)),
     ppRow('span_cap', String(s.spanCap)),
-    ppRow('docs_cap', String(s.docsCap)),
     ppRow('hypa', v('hypa') === '1' ? '1' : '0'),
     s.hypa ? ppRow('hypa_items', String(s.hypaItems)) : '',
     s.hypa ? ppRow('hypa_cap', String(s.hypaCap)) : '',
