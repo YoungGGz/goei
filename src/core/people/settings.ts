@@ -27,7 +27,7 @@ export const PP_DEFAULTS: Record<string, string> = {
   director_search: '1',
   director_features: '1',
   /** 리수폿 A: 장면 인물 고르기. code = 이름이 나온 사람(비용 0), model = 보조 모델이 이름 목록을 보고 고름 (턴당 +1회) */
-  router: 'code',
+  router: 'model',
   router_timeout: '60',
   /** 2026-11-07 (전수검사 4 의 L·M·P, 원본 trackedCharactersByScope·stageContext·Router 지침): 항상 포함할 인물(쉼표·줄바꿈), Router·Director 가 보는 최근 글 수, Router 에 덧붙일 지침 */
   always: '',
@@ -52,7 +52,7 @@ export const PP_DEFAULTS: Record<string, string> = {
   sexual_desire: '1', paraphilia: '1', explicit_style: '1',
   affinity: '1', register: '1', perception: '1',
   /** 말투의 다변화 (원본 features.register.variety off/one/two · change ask/auto · signLimit 1~9). 2026-11-07 K. core/people/speech.ts */
-  register_variety: 'off', register_change: 'ask', register_sign_limit: '3', perception_ext: '1', suspicion: '1',
+  register_variety: 'one', register_change: 'ask', register_sign_limit: '3', perception_ext: '1', suspicion: '1',
   docs_event: '1', docs_location: '1', docs_faction: '1', docs_item: '1', npc_emotion: '1',
   /** 수치 사용 (1) / 정성 모드 (0). 호감·의심·음란도 (리수폿 E). 취향 띠는 호감 수치가 켜져 있을 때만 */
   /** 2026-11-07 사용자 결정(O): 의심은 원본처럼 정성(글)이 기본. 수치는 스위치로 */
@@ -202,7 +202,7 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     directorReuse: v('director_reuse') !== '0',
     directorSearch: v('director_search') !== '0',
     directorFeatures: v('director_features') !== '0',
-    router: v('router') === 'model' ? 'model' : 'code',
+    router: v('router') === 'code' ? 'code' : 'model',
     routerTimeout: num('router_timeout', 5, 300),
     always: [...new Set(v('always').split(/[,\n]/).map((x) => x.trim().normalize('NFC')).filter(Boolean))].slice(0, 12),
     recentMsgs: num('recent_msgs', 0, 12),

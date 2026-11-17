@@ -47,7 +47,7 @@ test('본편: 코드 Router(이름 나온 사람) ∪ 모델 Router 가 고른 �
   store.people.데쥬레 = person('데쥬레');
   const s = St.peopleSettings({ $pp_router: 'model' });
   assert.equal(s.router, 'model');
-  assert.equal(St.peopleSettings({}).router, 'code');
+  assert.equal(St.peopleSettings({}).router, 'model');
   const base = { settings: s, store, sheetOf: () => null };
   assert.deepEqual(R.peopleBlockFor(c, base).people, ['쟈알디'], '코드: 이름이 나온 사람만');
   assert.deepEqual(R.peopleBlockFor(c, { ...base, people: ['데쥬레', '쟈알디', '없음'] }).people, ['쟈알디', '데쥬레'], '이름 나온 사람 먼저, 모델이 더 고른 사람 뒤에');
