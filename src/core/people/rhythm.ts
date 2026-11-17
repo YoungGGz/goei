@@ -64,6 +64,11 @@ export function parseHookHead(text: string): { stage: HookStage; tier: HookTier;
 }
 
 /** 진행 중인 떡밥 단계인가 (resolved·retired 는 끝난 것) */
+/** 떡밥 줄을 끝난 단계(retired)로 바꾼 글 (갱신기가 문서 연산 remove 로 닫을 때). 머리가 안 읽히면 null */
+export function retireHookText(text: string): string | null {
+  return parseHookHead(text) ? text.replace(/^\[stage:[a-z_]+\]/, '[stage:retired]') : null;
+}
+
 export const hookActive = (stage: HookStage): boolean => ACTIVE.includes(stage);
 
 /** 요청(Director·메인 요청·갱신기)에 싣는 리듬 기록: 문서마다 최신 줄 하나.
@@ -74,8 +79,11 @@ export function rhythmNow(store: PeopleStore, live: Liveness): { doc: Doc; entry
     if (doc.type !== 'rhythm') continue;
     const entry = liveEntries(doc.entries, live).slice(-1)[0];
     if (!entry) continue;
-    const head = doc.key.startsWith('hook:') ? parseHookHead(entry.text) : null;
-    if (head && !hookActive(head.stage)) continue;
+    // 떡밥 문서는 머리 표식이 읽히고 진행 중일 때만 싣는다 (시계 rhythmClock 이 세는 것과 같은 기준)
+    if (doc.key.startsWith('hook:')) {
+      const head = parseHookHead(entry.text);
+      if (!head || !hookActive(head.stage)) continue;
+    }
     out.push({ doc, entry });
   }
   return out;

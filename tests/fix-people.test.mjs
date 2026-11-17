@@ -65,27 +65,50 @@ test('리듬: 끝난 떡밥은 요청에 싣지 않고, 같은 이름으로 다�
   assert.ok(Rh.rhythmNow(store, live).some((r) => r.doc.key === 'hook:편지'));
 });
 
-test('저장 정리: 사라진 응답의 줄은 버리고 지난 줄은 최근 60개만 (2026-11-17)', () => {
-  const c = chatOf(100);
+test('저장 정리: 사라진 응답의 줄은 버리고, 지난 줄은 밀려난 때가 뒤쪽 200 메시지 밖이면 버린다 (2026-11-17)', () => {
+  const c = chatOf(150); // 메시지 300개: 경계 = 위치 100 (c50 의 위치 99 까지가 밖)
   const store = T.emptyStore();
   store.people['쟈알디'] = person('쟈알디');
   const list = (store.people['쟈알디'].slots.state = []);
-  // 응답마다 앞 줄을 고친 줄 100개: 살아 있는 것 1, 지난 줄 99
-  for (let i = 1; i <= 100; i++) list.push(entry(`e${i}`, `상태 ${i}`, `c${i}`, i > 1 ? { replaces: `e${i - 1}` } : {}));
+  // 응답마다 앞 줄을 고친 줄 150개: 살아 있는 것 1, 지난 줄 149
+  for (let i = 1; i <= 150; i++) list.push(entry(`e${i}`, `상태 ${i}`, `c${i}`, i > 1 ? { replaces: `e${i - 1}` } : {}));
   list.push(entry('gone', '다시 굴린 응답의 줄', 'c999'));
-  list.push(entry('mine', '직접 적은 줄', 'c998', { src: 'manual' }));
-  // 진행 중인 떡밥의 지난 줄은 남긴다
+  // 진행 중인 떡밥의 지난 줄은 남긴다, 끝난 떡밥은 같은 규칙으로 버린다
   store.docs['rhythm:hook:편지'] = { type: 'rhythm', key: 'hook:편지', entries: [entry('h1', '[stage:seeded] [tier:long] 편지', 'c1'), entry('h2', '[stage:hinted] [tier:long] 봉투', 'c2', { replaces: 'h1' })] };
+  store.docs['rhythm:hook:열쇠'] = { type: 'rhythm', key: 'hook:열쇠', entries: [entry('k1', '[stage:seeded] [tier:short] 열쇠', 'c1'), entry('k2', '[stage:resolved] [tier:short] 열쇠를 찾음', 'c3', { replaces: 'k1' })] };
+  // 정리 줄(기준 '#0')이 a 를 합치고, a 는 예전에 z 를 고쳤다: a 만 지워져 z 가 되살아나면 안 된다
+  const hist = (store.people['쟈알디'].slots.history = []);
+  hist.push(entry('z', '옛 행적', 'c120'), entry('a', '고친 행적', 'c140', { replaces: 'z' }), { ...entry('M', '합친 행적', '#0', { replaces: 'a' }), quote: undefined });
   const n = P.pruneEntries(store, c);
   const ids = store.people['쟈알디'].slots.state.map((e) => e.id);
   assert.ok(!ids.includes('gone'), '사라진 응답의 줄은 버림');
-  assert.ok(ids.includes('e100') && ids.includes('e40') && !ids.includes('e39'), '살아 있는 줄 + 최근에 밀려난 지난 줄 60개');
-  assert.equal(ids.length, 1 + P.HISTORY_KEEP);
-  assert.ok(!ids.includes('mine'), '직접 적은 줄은 ①에서는 남지만, 죽은 줄이라 ②에서 가장 오래된 것으로 밀려남');
+  // e_i 가 밀려난 때 = c_(i+1) 의 위치 2i+1. 100 보다 작으면 버림 → e1..e49 버림, e50 부터 남음
+  assert.ok(ids.includes('e150') && ids.includes('e50') && !ids.includes('e49'));
   assert.equal(store.docs['rhythm:hook:편지'].entries.length, 2);
-  assert.equal(n, 1 + 40);
-  assert.deepEqual(S.liveEntries(store.people['쟈알디'].slots.state, S.liveness(c)).map((e) => e.id), ['e100']);
+  assert.deepEqual(store.docs['rhythm:hook:열쇠'].entries.map((e) => e.id), ['k2']);
+  assert.deepEqual(hist.length, 3, '최근에 밀려난 줄은 사슬째 남는다');
+  const live = S.liveness(c);
+  assert.deepEqual(S.liveEntries(store.people['쟈알디'].slots.history, live).map((e) => e.id), ['M']);
+  assert.deepEqual(S.liveEntries(store.people['쟈알디'].slots.state, live).map((e) => e.id), ['e150']);
+  assert.equal(n, 1 + 49 + 1);
   assert.equal(P.pruneEntries(store, c), 0, '다시 불러도 더 버리지 않음');
+  // 오래된 사슬: a 가 경계 밖이면 a 와 z 를 같이 버린다 (z 만 남아 되살아나지 않는다)
+  const s2 = T.emptyStore();
+  s2.people['쟈알디'] = person('쟈알디');
+  s2.people['쟈알디'].slots.history = [entry('z', '옛 행적', 'c10'), entry('a', '고친 행적', 'c20', { replaces: 'z' }), { ...entry('M', '합친 행적', '#0', { replaces: 'a' }), quote: undefined }];
+  P.pruneEntries(s2, c);
+  assert.deepEqual(s2.people['쟈알디'].slots.history.map((e) => e.id), ['M']);
+});
+
+test('리듬: 문서 연산 remove 로 닫은 떡밥은 끝난 단계로 적히고, 리듬 문서는 열쇠마다 줄 하나 (2026-11-17)', () => {
+  assert.equal(Rh.retireHookText('[stage:hinted] [tier:short] 편지'), '[stage:retired] [tier:short] 편지');
+  assert.equal(Rh.retireHookText('표식 없음'), null);
+  const c = chatOf(10);
+  const live = S.liveness(c);
+  const store = T.emptyStore();
+  // 예전 저장: 「(해소)」가 붙어 머리가 안 읽히는 떡밥 줄은 싣지 않는다
+  store.docs['rhythm:hook:옛것'] = { type: 'rhythm', key: 'hook:옛것', entries: [entry('o1', '(해소) [stage:seeded] [tier:short] 옛것', 'c2')] };
+  assert.deepEqual(Rh.rhythmNow(store, live), []);
 });
 
 test('저장 정리: 다음 턴 메모는 최근 응답 20개 것만 남긴다 (2026-11-17)', () => {

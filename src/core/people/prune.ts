@@ -1,5 +1,6 @@
 // 저장 정리 (2026-11-17 사용자: 원본처럼). 응답마다 쌓이는 인물 기록·문서 줄 가운데 죽은 것을 치운다.
-// 원본 리수폿은 문서마다 지금 상태 하나 + 지난 이력 60개(WIKI_RETENTION history)만 둔다.
+// 원본 리수폿은 지금 상태 + 지난 이력 60개(WIKI_RETENTION history)만 둔다. 우리는 응답을 지우면 기록이 되돌아가야 하므로 개수가 아니라
+// 「채팅 뒤쪽 FOLD_KEEP_MSGS 메시지」를 경계로 쓴다 (호감 계기 합치기·음란도 합치기와 같은 경계).
 import type { Chat } from '../types';
 import { anchorPositions, changeId, foldLog, FOLD_KEEP_MSGS, isAlive, liveChanges, liveEntries, liveness, SCENE_KEEP, type Liveness } from './store';
 import { opennessOf, sumCues, type AffinityOpts } from './affinity';
@@ -9,18 +10,18 @@ import { AFF_MAX, AFF_MIN, FACTION_MAX, FACTION_MIN, factionOfWho, type Temper }
 import { hookActive, parseHookHead } from './rhythm';
 import type { Entry, PeopleStore } from './types';
 
-/** 남겨 두는 지난 줄 수 (원본 이력 보관 기본값) */
-export const HISTORY_KEEP = 60;
-
 /** 죽은 줄을 치운다. 버린 줄 수.
  *  ① 다시 굴리거나 지워서 채팅에서 사라진 응답의 줄은 버린다 (변경 기록의 dropGoneChanges 와 같은 규칙:
  *     직접 고친 줄(manual)·시작값(seed)·'#N' 기준은 남긴다).
- *  ② 그 밖의 지난 줄(새 줄로 고쳐진 것·정리로 합쳐진 것·취소한 것)은 채팅 전체에서 최근 HISTORY_KEEP 개만 남긴다.
- *     「최근」은 그 줄이 밀려난 때(고친 줄의 응답 위치) 기준.
+ *  ② 그 밖의 지난 줄(새 줄로 고쳐진 것·정리로 합쳐진 것·취소한 것)은 밀려난 때가 채팅 뒤쪽 FOLD_KEEP_MSGS 메시지 밖이면 버린다.
+ *     호감 계기 합치기와 같은 경계다: 그 안의 응답은 지우거나 다시 굴려도 옛 줄이 정확히 되살아난다.
+ *     「밀려난 때」 = 그 줄을 고친(합친) 줄의 응답 위치. 정리 줄처럼 기준이 '#0' 이면 밀려난 줄 자신의 위치.
+ *     어떤 줄을 버리면 그 줄이 가리고 있던 줄(replaces·from)도 같이 버린다: 가운데 줄만 없어져 더 옛 줄이 되살아나지 않게.
  *  진행 중인 떡밥의 지난 줄은 남긴다: 심은 턴을 그 사슬에서 읽는다 (rhythm.ts rootPos) */
 export function pruneEntries(store: PeopleStore, chat: Chat): number {
   const at = anchorPositions(chat);
   const live: Liveness = liveness(chat);
+  const cut = (Array.isArray(chat.message) ? chat.message.length : 0) - FOLD_KEEP_MSGS;
   const lists: { get: () => Entry[]; set: (l: Entry[]) => void; keepAll: boolean }[] = [];
   for (const p of Object.values(store.people)) {
     for (const k of Object.keys(p.slots) as (keyof typeof p.slots)[]) {
@@ -33,29 +34,29 @@ export function pruneEntries(store: PeopleStore, chat: Chat): number {
     lists.push({ get: () => d.entries, set: (l) => { d.entries = l; }, keepAll: !!head && hookActive(head.stage) });
   }
   let dropped = 0;
-  const past: { id: string; when: number; seq: number }[] = [];
   for (const l of lists) {
     const all = l.get();
-    const kept = all.filter((e) => e.src === 'manual' || e.src === 'seed' || e.anchor.startsWith('#') || at.has(e.anchor));
-    dropped += all.length - kept.length;
-    if (kept.length !== all.length) l.set(kept);
-    if (l.keepAll) continue;
-    const alive = new Set(liveEntries(kept, live).map((e) => e.id));
-    const pushedAt = new Map<string, number>();
-    for (const e of kept) {
-      if (!isAlive(e, live)) continue;
-      const pos = live.at.get(e.anchor) ?? -1;
-      for (const id of [...(e.replaces ? [e.replaces] : []), ...(e.from ?? [])]) pushedAt.set(id, Math.max(pushedAt.get(id) ?? -1, pos));
+    let kept = all.filter((e) => e.src === 'manual' || e.src === 'seed' || e.anchor.startsWith('#') || at.has(e.anchor));
+    if (!l.keepAll && cut > 0) {
+      const alive = new Set(liveEntries(kept, live).map((e) => e.id));
+      const byId = new Map(kept.map((e) => [e.id, e]));
+      const hides = (e: Entry) => [...(e.replaces ? [e.replaces] : []), ...(e.from ?? [])];
+      const pushedAt = new Map<string, number>();
+      for (const e of kept) {
+        if (!isAlive(e, live)) continue;
+        const pos = live.at.get(e.anchor) ?? -1;
+        for (const id of hides(e)) {
+          const own = live.at.get(byId.get(id)?.anchor ?? '') ?? -1;
+          pushedAt.set(id, Math.max(pushedAt.get(id) ?? -1, pos >= 0 ? pos : own));
+        }
+      }
+      const out = new Set(kept.filter((e) => !alive.has(e.id) && (pushedAt.get(e.id) ?? live.at.get(e.anchor) ?? -1) < cut).map((e) => e.id));
+      for (let grew = true; grew; ) {
+        grew = false;
+        for (const id of [...out]) for (const h of hides(byId.get(id)!)) if (byId.has(h) && !alive.has(h) && !out.has(h)) { out.add(h); grew = true; }
+      }
+      if (out.size) kept = kept.filter((e) => !out.has(e.id));
     }
-    for (const e of kept) if (!alive.has(e.id)) past.push({ id: e.id, when: pushedAt.get(e.id) ?? live.at.get(e.anchor) ?? -1, seq: e.seq });
-  }
-  if (past.length <= HISTORY_KEEP) return dropped;
-  past.sort((a, b) => b.when - a.when || b.seq - a.seq);
-  const out = new Set(past.slice(HISTORY_KEEP).map((x) => x.id));
-  for (const l of lists) {
-    if (l.keepAll) continue;
-    const all = l.get();
-    const kept = all.filter((e) => !out.has(e.id));
     if (kept.length !== all.length) { dropped += all.length - kept.length; l.set(kept); }
   }
   return dropped;

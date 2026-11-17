@@ -740,7 +740,7 @@ function slotList(all: Entry[], live: Liveness, key: string, row: (e: Entry, st:
   const showAll = peopleUi.oldAll.has(key);
   const shown = showAll ? old : old.slice(0, 20);
   const rest = old.length
-    ? `<details class="pp-oldbox" data-keep="${esc(key)}"${keepOpen(key)}><summary title="새 항목으로 바뀌었거나 합쳐졌거나 취소된 항목. 전부 저장돼 있고 되살릴 수 있어요">지난 항목<b>${old.length}</b></summary><ul class="pp-entries">${shown.map((e) => row(e, states.get(e.id)!)).join('')}</ul>${old.length > shown.length ? `<button class="gx-mini nw-more-btn" data-action="pp-old-more" data-value="${esc(key)}">${old.length - shown.length}개 더 보기</button>` : ''}</details>`
+    ? `<details class="pp-oldbox" data-keep="${esc(key)}"${keepOpen(key)}><summary title="새 항목으로 바뀌었거나 합쳐졌거나 취소된 항목. 최근 것은 되살릴 수 있고 오래된 것은 지워져요">지난 항목<b>${old.length}</b></summary><ul class="pp-entries">${shown.map((e) => row(e, states.get(e.id)!)).join('')}</ul>${old.length > shown.length ? `<button class="gx-mini nw-more-btn" data-action="pp-old-more" data-value="${esc(key)}">${old.length - shown.length}개 더 보기</button>` : ''}</details>`
     : '';
   return main + rest;
 }

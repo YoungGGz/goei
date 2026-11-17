@@ -10,7 +10,7 @@ import { SEXUAL_FIELDS, SEXUAL_AXIS_OF, explicitOn, isSexualAxis, sexualAnyOn, s
 import { unknownTo } from './inject';
 import { seedPerson } from './seed';
 import { temperOf, type RosterRow } from './base';
-import { rhythmClock, rhythmClockLines, rhythmNow, hookActive, parseHookHead, turnAt, type RhythmClock } from './rhythm';
+import { rhythmClock, rhythmClockLines, rhythmNow, hookActive, parseHookHead, retireHookText, turnAt, type RhythmClock } from './rhythm';
 import { axesView, ensureAxes, isAxis, isDirection, observe, readAxes, setAxes, pruneCandidates } from './axes';
 import { AXES } from './types';
 import { factionNow, knownFactionCodes, sceneFactionCodes, stageMid, userFactionOf, factionName as factionNameOf } from './faction';
@@ -1288,9 +1288,12 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     let replaces: string | undefined;
     // replace 없는 upsert: 문서가 비어 있으면 add, 항목이 하나뿐이면 그것을 고친다 (전수검사 11-13)
     const drid = typeof d.replace === 'string' ? d.replace.trim() : '';
-    const dop = d.op === 'upsert' && !drid && cur.length === 0 ? 'add' : d.op;
+    // 리듬 문서는 열쇠마다 지금 상태 하나다 (요청에도 최신 줄 하나만 싣는다, rhythm.ts rhythmNow):
+    // add 나 replace 없는 upsert 는 최신 줄을 고친다. 줄이 따로 쌓여 갱신기가 볼 수도 고칠 수도 없게 되지 않게 (2026-11-17)
+    const one = type === 'rhythm' && !drid && cur.length > 0 && (d.op === 'add' || d.op === 'upsert');
+    const dop = one ? 'upsert' : d.op === 'upsert' && !drid && cur.length === 0 ? 'add' : d.op;
     if (dop === 'upsert' || dop === 'remove') {
-      const target = drid ? cur.find((x) => x.id === drid) : dop === 'upsert' && cur.length === 1 ? cur[0] : undefined;
+      const target = drid ? cur.find((x) => x.id === drid) : one ? cur[cur.length - 1] : dop === 'upsert' && cur.length === 1 ? cur[0] : undefined;
       if (!target) {
         drop('doc', d, 'replace 가 실제 항목이 아님');
         continue;
@@ -1310,7 +1313,9 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       continue;
     }
     const seq = nextSeq(ev.anchor);
-    const body = dop === 'remove' ? `${resolvedPrefix()} ${cur.find((x) => x.id === replaces)!.text}`.slice(0, 200) : text;
+    // 떡밥을 remove 로 닫으면 끝난 단계(retired)로 적는다: 「(해소)」를 앞에 붙이면 머리 표식이 안 읽혀 끝난 떡밥으로 걸러지지 않았다
+    const gone = dop === 'remove' ? cur.find((x) => x.id === replaces)!.text : '';
+    const body = dop === 'remove' ? (type === 'rhythm' && key.startsWith('hook:') && retireHookText(gone)) || `${resolvedPrefix()} ${gone}`.slice(0, 200) : text;
     if (putDoc(store, type, key, { id: entryId(`${type}:${key}`, 'doc', ev.anchor, seq, body), text: body, src: 'story', anchor: ev.anchor, seq, ...(norm(str(d.quote)).length >= 3 ? { quote: d.quote } : {}), ...(replaces ? { replaces } : {}), ...(d.date ? { date: plain(d.date, 20) } : {}), ...(d.place ? { place: plain(d.place, 40) } : {}), ...(Array.isArray(d.who) ? { who: d.who.map((w) => plain(w, 30)).filter(Boolean).slice(0, 8) } : {}) })) report.applied.docs++;
   }
 
