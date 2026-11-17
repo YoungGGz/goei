@@ -11,7 +11,7 @@ import {
   applyEvents, bulletinUnread, callRecord, commitAnnouncements, commitInvitations, contactDetails, cooldownMark, directory, LIMITS, listedRooms,
   membership, parseRefresh, parseReply, personOf, phoneSettings, phoneTime, phoneValue, PH, PH_AUTO_LAST, PH_CONTACTS, PhoneError, push, readBulletins,
   readCustom, readPhone, readRoom, refreshAllowed, roomLabel, unreadCount, unsolicited, keepValid, lastReply, chatPrefixKept, validCallTarget, writeBulletins, writePhone,
-  chancePassed, parseReactions, mergeHabits, parseHabits, type Contact, type Directory, type PRoom, type PState, contactId, splitRecords, noticeSettings, phoneStorage, STORAGE_MAX, hiddenPause, noticeLabel,
+  chancePassed, parseReactions, mergeHabits, parseHabits, type Contact, type Directory, type PRoom, type PState, contactId, splitRecords, noticeSettings, phoneStorage, trimInvited, invitedCap, STORAGE_MAX, hiddenPause, noticeLabel,
   BANTER_ROWS,
 } from '../core/phone';
 import { refreshPrompt, refreshRetry, replyPrompt, viewPrompt } from '../core/phonePrompt';
@@ -472,6 +472,8 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
         if (visible === r.id) readRoom(r);
       }
       received += commitInvitations(cur, result.invitations, time);
+      // 초대받은 단톡방이 정한 수를 넘으면 오래 조용한 방부터 지운다 (지금 열어 둔 방은 남김)
+      trimInvited(cur, invitedCap(chat.scriptstate), phone.room);
       const b = readBulletins(chat);
       const notices = commitAnnouncements(b, cur, result.announcements, plan.announce, time);
       // 쉬는 턴도 시각과 같이 요청한 턴부터 센다: 늦게 저장돼 그사이 턴이 넘어갔어도 한 턴 더 쉬지 않게
@@ -1172,7 +1174,7 @@ function settingsView(ctx: ChatContext): string {
     view_preset: () => vs.preset, view_scope: () => vs.scope, view_size: () => vs.size, view_auto: () => vs.auto, view_pov: () => vs.pov,
     announcement_gap: () => String(notices.gap), announcement_history: () => String(notices.history), announcement_page_size: () => String(notices.page),
   };
-  for (const k of ['dm', 'group', 'notice'] as const) {
+  for (const k of ['dm', 'group', 'notice', 'invited'] as const) {
     special[`storage_auto_${k}`] = () => (phoneStorage(state, k).auto ? '1' : '0');
     special[`storage_limit_${k}`] = () => String(phoneStorage(state, k).limit);
   }
@@ -1546,7 +1548,7 @@ export async function handlePhone(action: string, value: string | undefined, ctx
       const [k, val] = v.split('=');
       const range: Record<string, [number, number]> = {
         incoming_chance: [0, 100], group_invite_chance: [0, 100], banter_chance: [0, 100], banter_min: BANTER_ROWS, banter_max: BANTER_ROWS, announcement_gap: [1, 100], announcement_history: [1, 50],
-        storage_limit_dm: [1, STORAGE_MAX], storage_limit_group: [1, STORAGE_MAX], storage_limit_notice: [1, STORAGE_MAX],
+        storage_limit_dm: [1, STORAGE_MAX], storage_limit_group: [1, STORAGE_MAX], storage_limit_notice: [1, STORAGE_MAX], storage_limit_invited: [1, STORAGE_MAX],
       };
       const r = range[k];
       const n = Math.floor(Number(val));

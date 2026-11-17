@@ -238,7 +238,8 @@ function narrator(src: RefSource, names: Record<string, string>, fn: string, t: 
 function crossRoom(body: Body, st: PState, limit: number): void {
   const wanted = new Set(body.participants.map((p) => p.sender));
   if (!wanted.size) return;
-  const covered = new Set((body.rooms ?? (body.room ? [body.room] : [])).map((r) => r.id));
+  // 말풍선을 실제로 실은 방만 뺀다: 말풍선 없이 넘긴 방(새 메시지 확인의 오래 조용한 방)의 말은 여기 상한 안에서 넘어간다
+  const covered = new Set((body.rooms ?? (body.room ? [body.room] : [])).filter((r) => r.messages.length > 0).map((r) => r.id));
   const counts = new Map<string, number>();
   const candidates: { room: PRoom; m: PMsg; allowed: Set<string> }[] = [];
   for (const [rid, r] of Object.entries(st.rooms)) {
@@ -394,12 +395,15 @@ export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names:
   // 그 밖의 방은 방 정보와 대화 상태만, 대화한 적 없는 연락처는 지금처럼 빈 방으로 넘긴다.
   // 인물 로어북 글은 말풍선과 함께 넘기는 방의 인원에게만 붙인다
   const fullMax = advNum(chat.scriptstate, 'ph', 'check_rooms');
-  const full = new Set(candidates.filter((r) => r.messages.length > 0).slice(0, fullMax > 0 ? fullMax : undefined).map((r) => r.id));
+  // 이번에 메시지를 받을 수 있는 방을 먼저 채운다 (받을 수 없는 방이 자리를 차지하지 않게)
+  const canReceive = new Map(candidates.map((r) => [r.id, refreshAllowed(chat, r, set, incomingOn)[0]]));
+  const talked = candidates.filter((r) => r.messages.length > 0);
+  const full = new Set([...talked.filter((r) => canReceive.get(r.id)), ...talked.filter((r) => !canReceive.get(r.id))].slice(0, fullMax > 0 ? fullMax : undefined).map((r) => r.id));
   const loreFor = new Set(candidates.filter((r) => full.has(r.id)).flatMap((r) => r.members));
   for (const r of candidates) {
     const packet = roomPacket(r, set.reactions, !r.messages.length || full.has(r.id) ? history : 0);
     packet.action = { type: 'refresh' };
-    packet.receiveMessages = refreshAllowed(chat, r, set, incomingOn)[0];
+    packet.receiveMessages = !!canReceive.get(r.id);
     // 대화가 없는 연락처 방은 빈 칸(대화 상태·참여자·pov·action 등)을 싣지 않는다
     rooms.push(packet.candidateOnly && !packet.messages.length ? ({ id: packet.id, kind: packet.kind, name: packet.name, activeMembers: packet.activeMembers, messages: packet.messages, candidateOnly: true, receiveMessages: packet.receiveMessages } as RoomPacket) : packet);
     selected.set(r.id, r);
@@ -410,7 +414,8 @@ export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names:
   }
   // 단톡 수다: NPC가 둘 이상인 내 단톡방 하나를 골라 대화 한 조각을 꼭 만들게 한다
   if (set.banter && chancePassed(set.banterChance, rng)) {
-    const groups = rooms.filter((x) => x.kind === 'group' && x.receiveMessages && x.activeMembers.length >= 2);
+    // 수다는 앞 대화를 이어 쓰는 것이라 말풍선과 함께 넘긴 방에서만 고른다
+    const groups = rooms.filter((x) => x.kind === 'group' && x.receiveMessages && x.activeMembers.length >= 2 && full.has(x.id));
     if (groups.length) groups[Math.min(groups.length - 1, Math.floor(rng() * groups.length))].banter = true;
   }
   const participants = [...memo.values()];
@@ -418,7 +423,8 @@ export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names:
   void _channel;
   const invite = invitationPacket(st, participants.map((p) => p.sender), inviteOn);
   const body: Body = {
-    rooms, participants, narratorOnly: narrator(src, names, 'check', t, JSON.stringify(rooms)),
+    // 관련 로어북은 말풍선과 함께 넘긴 방의 내용으로만 고른다 (그 밖의 방·후보의 이름으로 인물 로어북이 다시 딸려 오지 않게)
+    rooms, participants, narratorOnly: narrator(src, names, 'check', t, JSON.stringify(rooms.filter((x) => full.has(x.id)))),
     // 이번에 받을 수 없는 공지·초대는 자료(지난 공지, 후보·기존 단톡 목록)를 싣지 않는다: 그 자료를 쓰는 지침 절이 그때는 붙지 않는다
     announcementCheck: announce.allowed ? publicAnnounce : { allowed: false }, invitationCheck: invite.allowed ? invite : { allowed: false },
   };

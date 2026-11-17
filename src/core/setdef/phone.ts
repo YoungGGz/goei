@@ -3,8 +3,8 @@ import { BANTER_ROWS, NOTICE_PAGE_SIZES, STORAGE_MAX } from '../phone';
 import { onOff, type SetDef, type SetPage } from './types';
 
 const KEEP_HELP = '최근 기록만 남기고, 지운 대화는 흐름 요약으로 남겨요';
-const keep = (k: 'dm' | 'group' | 'notice', label: string): SetDef => ({
-  key: `storage_auto_${k}`, label, ctl: onOff('0'), help: KEEP_HELP,
+const keep = (k: 'dm' | 'group' | 'notice' | 'invited', label: string, help = KEEP_HELP): SetDef => ({
+  key: `storage_auto_${k}`, label, ctl: onOff('0'), help,
   inline: { key: `storage_limit_${k}`, lo: 1, hi: STORAGE_MAX, unit: '개', aria: '남길 수', whenOn: true, step: 5 },
 });
 const pct = (key: string) => ({ key, lo: 0, hi: 100, unit: '%', aria: '확률' });
@@ -97,6 +97,7 @@ export const PHONE_SET: SetPage = {
         keep('dm', '1:1 대화 정리'),
         keep('group', '단톡방 정리'),
         keep('notice', '공지 정리'),
+        keep('invited', '초대받은 단톡방 정리', '초대받은 단톡방이 이 수를 넘으면 오래 조용한 방부터 지워요. 내가 말한 방, 안 읽은 말이 있는 방, 내가 만든 방은 지우지 않아요'),
       ],
     },
     {

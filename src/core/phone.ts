@@ -51,7 +51,8 @@ export const LIMITS = {
   members: 9, room_name: 60, notice_title: 80, notice_issuer: 60, notice_tokens: 1200,
 };
 export const HISTORY = { room: 100, announcement: 10, context: 200, contextNotices: 1, contextTokens: 4000, turns: 8, focus: true, contextRecent: 8, contextViews: false, contextReactions: false, contextHabits: false };
-export const STORAGE = { dm: 40, group: 100, notice: 20 };
+// dm·group = 방마다 남길 말풍선, notice = 남길 공지, invited = 남길 초대받은 단톡방 수 (사용자 2026-11-17: 1:1 도 100, 초대받은 단톡방 20)
+export const STORAGE = { dm: 100, group: 100, notice: 20, invited: 20 };
 export const STORAGE_MAX = 20000;
 export const COOLDOWN = { incoming: 1, invitation: 3, announcement: 3 };
 export type StorageKind = keyof typeof STORAGE;
@@ -512,6 +513,27 @@ export function trimRooms(st: PState, caps: { dm: number; group: number } = STOR
     r.unread = Math.min(r.unread, incoming);
   }
 }
+
+/** 초대받은 단톡방 수 상한: 넘으면 오래 조용한 것부터 지운다. 지우는 것은 초대로 생긴 방 가운데 내가 말한 적 없고,
+ *  안 읽은 말·쓰다 만 글·진행 중인 요청이 없는 방뿐 (내가 만든 방, 내가 말한 방, keep = 지금 열어 둔 방은 수를 넘어도 남긴다). 지운 방 번호를 돌려준다 */
+export function trimInvited(st: PState, cap: number, keep?: string | null): string[] {
+  const invited = Object.values(st.rooms).filter((r) => r.kind === 'group' && !!r.inviter);
+  let over = invited.length - cap;
+  if (!(over > 0)) return [];
+  const last = (r: PRoom) => r.messages[r.messages.length - 1]?.id ?? 0;
+  const idle = invited
+    .filter((r) => r.id !== keep && !r.pending && !r.unread && !r.draft.trim() && !conversationState(r).ownerHasSpoken)
+    .sort((a, b) => last(a) - last(b));
+  const gone: string[] = [];
+  for (const r of idle) {
+    if (over-- <= 0) break;
+    delete st.rooms[r.id];
+    gone.push(r.id);
+  }
+  if (gone.length) st.order = st.order.filter((id) => !gone.includes(id));
+  return gone;
+}
+export const invitedCap = (state: Record<string, unknown> | undefined): number => storageCap(state, 'invited');
 
 /** 받기 허용 (원본 P.refreshAllowed). 이유 문장도 함께 */
 export function refreshAllowed(chat: Chat, r: PRoom, set: PhoneSettings, incomingPassed?: boolean): [boolean, string] {
