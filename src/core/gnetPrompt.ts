@@ -7,7 +7,7 @@ import { BOARD_GUIDE, viewSite, type BoardSite } from './boards';
 import { fillVars, guideDefaultSec, guideTxt, GUIDE_LABEL, type GuideName } from './guides';
 import { evaluate } from './cbs';
 import {
-  activityContext, findPost, gnetSettings, gnetVars, keyFigures, HISTORY, incomingTask, LIMITS, protectedPost, countText, trimTokens, postLimit,
+  activityContext, findPost, gnetSettings, gnetVars, keyFigures, HISTORY, incomingTask, LIMITS, protectedPost, countText, trimTokens, postLimit, recentComments,
   type ActivityPost, type ActivitySnapshot, type GPost, type GState, type GnetSettings, type IncomingPlan, GnetError, dateNow, whenField } from './gnet';
 import { applyAdvanced, genSettings } from './advanced';
 import { fnHistory, fnNum, fnRefs } from './reffn';
@@ -135,12 +135,21 @@ export function commentTimeRule(now: string, b?: GnetBooks): string {
   return fillVars(b ? b.txt('COMMENT.TIME_RULE') : guideTxt('GNet', 'COMMENT.TIME_RULE'), { now: now ? ` (${now})` : '' });
 }
 
+/** 새로고침에 넘기는 댓글: 최근 것과 그 윗댓글만 (recentComments). parent 는 넘긴 배열 안의 차례로 바꿔 적는다 (applyBoard 가 같은 차례로 읽는다) */
+function boardComments(p: GPost, sent: number[]) {
+  const pos = new Map(sent.map((n, i) => [n, i + 1]));
+  return sent.map((n) => {
+    const c = p.comments[n - 1];
+    return { author: c.nick, ...whenField(p, c), content: c.body, parent: pos.get(c.parent) ?? 0, mine: c.mine };
+  });
+}
+
 /** 저장된 글을 출력 형식(AUTO.FORMAT)과 같은 모양으로 */
-export function boardJson(posts: GPost[]): string {
+export function boardJson(posts: GPost[], sent?: Map<number, number[]>): string {
   return JSON.stringify({
     posts: posts.map((p) => ({
       author: p.nick, id: p.id, ...(p.tag ? { tag: p.tag } : {}), title: p.title, date: p.date, views: p.views, upvotes: p.votes,
-      content: p.body, mine: p.mine, comments: p.comments.map((c) => ({ author: c.nick, ...whenField(p, c), content: c.body, parent: c.parent, mine: c.mine })),
+      content: p.body, mine: p.mine, comments: boardComments(p, sent?.get(p.id) ?? recentComments(p)),
     })),
   });
 }
@@ -168,7 +177,12 @@ const seed = () => Math.floor(Math.random() * 2147483647).toString(36);
 
 // ── 작업별 ──
 
-export function refreshPrompt(src: RefSource, st: GState, plan: IncomingPlan, nick: string, factionNames: Record<string, string>): GnetPrompt {
+export interface RefreshPrompt extends GnetPrompt {
+  /** 넘긴 글 번호 → 넘긴 댓글 번호. applyBoard 가 응답의 댓글 번호를 이것으로 읽는다 */
+  sent: Map<number, number[]>;
+}
+
+export function refreshPrompt(src: RefSource, st: GState, plan: IncomingPlan, nick: string, factionNames: Record<string, string>): RefreshPrompt {
   const s = gnetSettings(src.chat.scriptstate);
   const b = gnetBooks(src);
   const guideline = [
@@ -185,17 +199,16 @@ export function refreshPrompt(src: RefSource, st: GState, plan: IncomingPlan, ni
       + `\n${fillVars(b.txt('SAMPLING.SEED'), { a: seed(), b: seed() })}`;
   }
   const protectedIds: number[] = [];
-  const reference = st.posts.filter((p, i) => {
-    const prot = protectedPost(s, p);
-    if (prot) protectedIds.push(p.id);
-    return prot || i < HISTORY.refresh;
-  });
+  // 보호 글도 「새로고침에 참조할 글」 수 안에 드는 것만 넘긴다. 안 넘긴 보호 글은 번호도 알리지 않고 applyBoard 가 그대로 지킨다
+  const reference = st.posts.slice(0, HISTORY.refresh);
+  for (const p of reference) if (protectedPost(s, p)) protectedIds.push(p.id);
+  const sent = new Map(reference.map((p) => [p.id, recentComments(p)]));
   const action = b.read('ACTION.REFRESH');
   const extras = fill(b.read('EXTENSION.REQUEST'), {
     TIME: dateNow(src.chat), USER_NICK: nick, KEEP_OWN: String(s.keepOwn), KEEP_REPLIED: String(s.keepReplied), PROTECTED: protectedIds.join(','),
-    POST_LIMIT: String(postLimit(s)), NEXT_ID: String(st.seq || 100000), ACTION: action, BOARD: boardJson(reference),
+    POST_LIMIT: String(postLimit(s)), NEXT_ID: String(st.seq || 100000), ACTION: action, BOARD: boardJson(reference, sent),
   }) + incomingTask(plan, b.txt('INCOMING.OPTIONS_HEAD'));
-  return pack(src, b, 'refresh', 'THOUGHTS.REFRESH', guideline.join('\n\n'), format, extras, factionNames);
+  return { ...pack(src, b, 'refresh', 'THOUGHTS.REFRESH', guideline.join('\n\n'), format, extras, factionNames), sent };
 }
 
 export interface PublicPrompt extends GnetPrompt {
@@ -234,24 +247,13 @@ export function commentPrompt(
     : action0 === POST_REFRESH_ACTION ? b.txt('ACTION.POST_REFRESH') : action0;
   const p = findPost(st, postId);
   if (!p) throw new GnetError('대상 글이 없어졌어요.');
-  // 원본과 같이: 글에 단 댓글은 "글" 범위(전체 댓글), 답글은 "댓글" 범위(최근 30개)
-  const limit = replyTo > 0 ? HISTORY.comment : HISTORY.post;
   const total = p.comments.length;
-  const selected = new Set<number>();
-  for (let i = Math.max(1, total - limit + 1); i <= total; i++) selected.add(i);
-  if (replyTo > 0) selected.add(replyTo);
   // 선쪽지의 출처가 이 글의 댓글이면 그 댓글은 comments 에만 싣고 incomingOrigin 에는 index 만 넣는다
   const fromHere = plan.allowed && plan.post?.id === p.id;
-  if (fromHere && plan.commentIndex && p.comments[plan.commentIndex - 1]) selected.add(plan.commentIndex);
-  for (const i of [...selected]) {
-    let n = i;
-    const seen = new Set<number>();
-    while (p.comments[n - 1] && !seen.has(n)) {
-      seen.add(n);
-      selected.add(n);
-      n = p.comments[n - 1].parent;
-    }
-  }
+  const selected = new Set(recentComments(p, HISTORY.comment, [
+    ...(replyTo > 0 ? [replyTo] : []),
+    ...(fromHere && plan.commentIndex && p.comments[plan.commentIndex - 1] ? [plan.commentIndex] : []),
+  ]));
   const comments = p.comments.map((c, i) => ({ index: i + 1, parent: c.parent, author: c.nick, ...whenField(p, c), content: c.body, mine: c.mine })).filter((c) => selected.has(c.index));
   const task = JSON.stringify({
     post: { id: p.id, author: p.nick, title: p.title, content: p.body }, comments, commentCount: total, replyTo,

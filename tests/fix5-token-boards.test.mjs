@@ -358,3 +358,39 @@ test('다양성 강화: 확률이 더 낮은 벌을 쓰고, 확률이 없거나 
   assert.equal(C.sampledBoard({ posts: A, alternativePosts: [] }), A, '두 번째 벌이 비면 첫 벌');
   assert.equal(C.sampledBoard({ posts: [], alternativePosts: B, postsProb: 0.01, alternativeProb: 0.09 }), B, '첫 벌이 비면 두 번째 벌');
 });
+
+test('새로고침: 댓글은 글마다 최근 30개와 그 윗댓글만 넘기고, 돌아온 번호는 넘긴 차례로 읽는다', () => {
+  const st = board();
+  // 댓글 80개: 1번은 뿌리, 75번은 1번의 답글, 나머지는 뿌리
+  st.posts[1].comments = Array.from({ length: 80 }, (_, i) => cm(`c${i + 1}`, `댓글 ${i + 1}`, i + 1 === 75 ? 1 : 0));
+  const plan = C.incomingPlan(src().chat, st, { ...C.gnetSettings({}), incoming: false }, '나', () => 0);
+  const prompt = C.refreshPrompt(src(), st, plan, '나', {});
+  const text = userText(prompt);
+  const line = text.split('\n').find((l) => l.includes('"posts"') && l.includes('댓글 80'));
+  const sent = JSON.parse(line.slice(line.indexOf('{"posts"'))).posts.find((p) => p.id === 100002).comments;
+  assert.equal(sent.length, 31, '최근 30개 + 75번의 윗댓글 1번');
+  assert.deepEqual([sent[0].content, sent[1].content, sent[30].content], ['댓글 1', '댓글 51', '댓글 80']);
+  assert.equal(sent.find((c) => c.content === '댓글 75').parent, 1, 'parent 는 넘긴 배열 안의 차례');
+  assert.ok(!text.includes('댓글 50"'), '옛 댓글은 안 넘긴다');
+  // 응답: 새 댓글만. parent 2 = 넘긴 둘째(저장 51번), parent 32 = 첫 새 댓글
+  const value = { posts: [{ id: 100002, comments: [{ author: '새1', content: '51번에 답', parent: 2 }, { author: '새2', content: '새1에 답', parent: 32 }, { author: '새3', content: '뿌리', parent: 0 }] }] };
+  const got = C.applyBoard(st, structuredClone(st), value, { nick: '나', settings: C.gnetSettings({}), date: '2025.01.01 11:00', sent: prompt.sent }).st.posts.find((p) => p.id === 100002).comments;
+  assert.equal(got.length, 83);
+  assert.deepEqual(got.slice(80).map((c) => c.parent), [51, 81, 0]);
+});
+
+test('새로고침: 내 글도 참조할 글 수 안의 것만 넘기고, 안 넘긴 내 글은 그대로 남는다', () => {
+  const st = board();
+  st.posts = [...Array.from({ length: 12 }, (_, i) => post(100100 + i)), post(100001, { mine: true, nick: '나', body: '뒤로 밀린 내 글' })];
+  st.seq = 100200;
+  const plan = C.incomingPlan(src().chat, st, { ...C.gnetSettings({}), incoming: false }, '나', () => 0);
+  st.posts[12].comments = [cm('a', '옛 댓글')];
+  const prompt = C.refreshPrompt(src(), st, plan, '나', {});
+  const text = userText(prompt);
+  assert.ok(!text.includes('뒤로 밀린 내 글'));
+  assert.ok(!text.includes('100001'), '안 넘긴 글은 번호도 알리지 않는다');
+  // 모델이 못 본 글을 돌려줘도 그 글은 그대로 둔다
+  const value = { posts: [{ id: 100201, author: 'x', title: '새 글', content: '새 본문', comments: [] }, { id: 100001, views: 99, comments: [{ author: 'z', content: '지어낸 댓글', parent: 0 }] }] };
+  const res = C.applyBoard(st, structuredClone(st), value, { nick: '나', settings: C.gnetSettings({}), date: '2025.01.01 11:00', sent: prompt.sent });
+  assert.deepEqual(res.st.posts.find((p) => p.id === 100001).comments.map((c) => c.body), ['옛 댓글']);
+});

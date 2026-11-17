@@ -243,7 +243,7 @@ function refreshBoard(ctx: ChatContext, env: GnetEnv, automatic = false, joint?:
         note = '그 응답이 바뀌어서 이번 자동 새로고침 결과는 저장하지 않았어요.';
         return null;
       }
-      const res = withRaw(raw, () => applyBoard(before, readGnet(chat), value, { nick, settings: s, date: dateNow(chat) }));
+      const res = withRaw(raw, () => applyBoard(before, readGnet(chat), value, { nick, settings: s, date: dateNow(chat), sent: prompt.sent }));
       const inc = saveIncoming(chat, res.st, (value as { incoming?: unknown }).incoming, plan);
       note = [res.notice, res.emptyComments ? '이번 게시판에는 댓글이 하나도 없어요.' : '', inc.note].filter(Boolean).join(' ');
       const figs = s.keyFigures ? mergeKeyFigures(chat.scriptstate, (value as { keyFigures?: unknown }).keyFigures) : null;

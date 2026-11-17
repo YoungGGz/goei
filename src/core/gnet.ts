@@ -108,7 +108,7 @@ export function gnetRetention(state: Record<string, unknown> | undefined): { aut
 }
 export const LIMITS = { replies_min: 0, replies: 4, post_tokens: 4000, title_tokens: 80, dm_tokens: 1500, comment_tokens: 1000, origin_tokens: 2000, quote_tokens: 1000, history_tokens: 1500 };
 /** dmPublic: 쪽지 답장에 같이 넘기는 공개 글 수 (0 = 안 넘김). incomingPrev: 선쪽지 겹침 확인용으로 넘기는 받은 쪽지 수 (0 = 전부). activity: 글 쓰기·댓글·글 하나 새로고침에 「다른 글 활동」을 넣는지 */
-export const HISTORY = { refresh: 10, post: 99999, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2, dmPublic: 8, incomingPrev: 50, activity: true };
+export const HISTORY = { refresh: 10, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2, dmPublic: 8, incomingPrev: 50, activity: true };
 export const CONTEXT = { posts: 5, comments: 10, dms: 30, tokens: 3000, includePosts: true, includeDms: true, ownOnly: false, focus: true, recentPosts: 1, recentDms: 5 };
 /** 개수 설정 (2026-11-08 사용자: 단계 고르기 대신 최소·최대 직접). 새로고침 글 수, 새 글마다 댓글 수, 지난 글에 새로 붙는 활동 댓글 수. 내 글·댓글에 달릴 새 답글 수는 고급 설정(replies_min·replies) */
 export const COUNT_RANGE = { post: [1, 20], cmt: [0, 20], act: [0, 20] } as const;
@@ -734,6 +734,9 @@ export interface BoardOptions {
   nick: string;
   settings: GnetSettings;
   date: string;
+  /** 요청에 실제로 넘긴 글과 그 댓글 번호 (refreshPrompt 가 돌려준 것). 여기 없는 저장 글은 모델이 못 본 글이라 응답이 와도 그대로 둔다.
+   *  안 주면 저장 글과 댓글이 전부 갔다고 읽는다 */
+  sent?: Map<number, number[]>;
 }
 
 // 요청에서 첨부 기록은 [ATTACHMENT An]으로 바뀌어 간다. 돌아온 유지 댓글을 저장 댓글과 맞춰 볼 때 쓴다 (전수검사 11-13)
@@ -780,6 +783,14 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     if (!isObj(raw)) continue;
     let pid = int(raw.id);
     const prev = pid !== null ? old.get(pid) : undefined;
+    // 요청에 안 넘긴 저장 글: 모델이 본문·댓글을 못 봤으므로 돌아온 것을 쓰지 않고 그대로 남긴다
+    if (prev && o.sent && !o.sent.has(prev.id)) {
+      if (!seen.has(prev.id)) {
+        seen.add(prev.id);
+        posts.push(prev);
+      }
+      continue;
+    }
     const author = str(raw.author).trim();
     if (!prev && (raw.mine === true || author === o.nick)) {
       skippedPosts++;
@@ -825,7 +836,9 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     // 옛 지침(저장 댓글을 그대로 다시 쓰고 번호는 돌려준 배열 차례)으로 온 응답도 받는다: 앞 k줄이 모두 저장 댓글과 같으면 옛 꼴.
     // 새 댓글 하나가 저장 댓글과 우연히 같아도(짧은 반응 줄) 새 꼴로 읽어 다른 새 댓글의 parent 번호를 지킨다.
     // 앞 k줄이 모두 같아도(저장 댓글 1개, 반복되는 짧은 반응) 어느 댓글의 parent 가 옛 꼴로는 자기 뒤(i+1 이상)이고 새 꼴로는 자기 앞이면 새 꼴
-    const savedCount = prev ? prev.comments.length : 0;
+    // 요청에는 저장 댓글 가운데 고른 것만 차례대로 갔다 (boardJson). 모델이 쓰는 번호는 그 차례(1..k)이고 새 댓글은 k+1..
+    const sent = prev ? o.sent?.get(prev.id) ?? prev.comments.map((_, i) => i + 1) : [];
+    const savedCount = sent.length;
     const sameAsSaved = (c: unknown): boolean => {
       if (!isObj(c)) return false;
       const a = str(c.author).trim();
@@ -838,7 +851,7 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     };
     const oldShape = comments.length >= savedCount && comments.slice(0, savedCount).every(sameAsSaved) && !comments.some(newOnlyParent);
     const onlyNew = savedCount > 0 && !oldShape;
-    if (onlyNew) for (let k = 1; k <= savedCount; k++) remap.set(k, k);
+    if (onlyNew) for (let k = 1; k <= savedCount; k++) remap.set(k, sent[k - 1]);
     comments.forEach((c, i) => {
       const n = onlyNew ? savedCount + i + 1 : i + 1;
       if (!isObj(c)) return void remap.set(n, false);
@@ -1099,21 +1112,31 @@ export interface ActivitySnapshot {
   commentsAllowed: boolean;
 }
 
+/** 요청에 넘길 댓글 번호 (1부터, 오름차순): 가장 새 `limit` 개 + extra + 그 댓글들이 답한 윗댓글 줄기.
+ *  다른 글 활동·새로고침·댓글 반응이 같이 쓴다 */
+export function recentComments(p: GPost, limit = HISTORY.comment, extra: number[] = []): number[] {
+  const selected = new Set<number>();
+  const total = p.comments.length;
+  const starts = [...extra];
+  for (let n = Math.max(1, total - limit + 1); n <= total; n++) starts.push(n);
+  for (const n of starts) {
+    let k = n;
+    const visited = new Set<number>();
+    while (p.comments[k - 1] && !visited.has(k)) {
+      visited.add(k);
+      selected.add(k);
+      k = p.comments[k - 1].parent;
+    }
+  }
+  return [...selected].sort((a, b) => a - b);
+}
+
 /** posts = 다른 글 활동으로 넘길 게시판 글 수 (글 쓰기는 기능 표의 「지난 기록」, 그 밖은 새로고침의 글 수) */
 export function activityContext(st: GState, targetId: number | null, posts_ = HISTORY.refresh): { posts: ActivityPost[]; snapshots: Map<number, ActivitySnapshot> } {
   const posts: ActivityPost[] = [];
   const snapshots = new Map<number, ActivitySnapshot>();
   for (const p of st.posts.slice(0, posts_)) {
-    const selected = new Set<number>();
-    for (let n = Math.max(1, p.comments.length - HISTORY.comment + 1); n <= p.comments.length; n++) {
-      let k = n;
-      const visited = new Set<number>();
-      while (p.comments[k - 1] && !visited.has(k)) {
-        visited.add(k);
-        selected.add(k);
-        k = p.comments[k - 1].parent;
-      }
-    }
+    const selected = new Set(recentComments(p));
     const allowed = p.id !== targetId;
     // 작업 대상 글은 본문·댓글이 작업 입력(post·comments)에 이미 있으므로 여기서는 번호·제목·수치만 넘긴다 (조회·추천 증가는 그대로 받는다)
     posts.push({
