@@ -7,7 +7,7 @@ import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, rep
 import { loadContext, updateChat, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
 import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, pruneScene } from '../core/people/store';
-import { pruneEntries, pruneNotes } from '../core/people/prune';
+import { foldCues, foldOpenness, pruneEntries, pruneNotes } from '../core/people/prune';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
 import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, pickupKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, type ApplyReport } from '../core/people/updater';
@@ -404,7 +404,6 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         });
         diag.report = report;
         // 되돌리기용 (리수폿 J-4): 이 갱신이 새로 만든 것. 다시 읽기(only)는 적지 않는다
-        // 변경 기록(store.log)은 접지 않고 전부 남긴다 (사용자 결정 나-80 ②). 여기서 접기 함수를 부르지 않는다
         if (!o.scope?.only) recordRun(s, before, new Date().toISOString(), report.applied.renamed);
         // 다시 굴려(지워서) 채팅에서 사라진 응답이 만든 변경 줄만 버린다 (사용자 2026-11-14 F-1 (나)). 장면 인물 목록도 같이
         dropGoneChanges(s, cur);
@@ -412,6 +411,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         // 인물 기록·문서의 죽은 줄도 같은 때 치운다 (2026-11-17 사용자: 원본처럼 지난 이력 60개만)
         pruneEntries(s, cur);
         pruneNotes(s, cur);
+        // 오래된 호감 계기는 숫자로 합친다 (2026-11-17 사용자: 원본처럼. 11-14 「전부 남기기」를 대신함)
+        foldCues(s, cur, settings, temperOf);
+        foldOpenness(s, cur);
         let next = cur;
         // 이름을 옮긴 기록이 설정 「항상 포함할 인물」에 옛 호칭으로 적혀 있으면 새 이름으로 고쳐 적는다 (이름으로 적는 채팅 저장값은 인물 기록 밖에 이것뿐)
         const always = renameAlways(cur.scriptstate?.[PP('always')], report.applied.renamed);

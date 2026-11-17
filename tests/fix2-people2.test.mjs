@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 const dir = '/tmp/audit_1113/fix2/people2';
 await mkdir(dir, { recursive: true });
 await build({
-  entryPoints: ['src/core/people/consolidate.ts', 'src/core/people/store.ts', 'src/core/people/types.ts', 'src/core/people/settings.ts', 'src/core/people/updater.ts', 'src/core/people/director.ts', 'src/core/people/affinity.ts', 'src/core/people/sexual.ts', 'src/core/itemrules.ts'],
+  entryPoints: ['src/core/people/consolidate.ts', 'src/core/people/store.ts', 'src/core/people/types.ts', 'src/core/people/settings.ts', 'src/core/people/updater.ts', 'src/core/people/director.ts', 'src/core/people/affinity.ts', 'src/core/people/sexual.ts', 'src/core/people/prune.ts', 'src/core/people/base.ts', 'src/core/itemrules.ts'],
   outdir: dir, outbase: 'src', bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' }, logLevel: 'silent',
 });
 const mod = async (n) => import(pathToFileURL(join(dir, `core/${n}.mjs`)));
@@ -21,6 +21,7 @@ const U = await mod('people/updater');
 const D = await mod('people/director');
 const A = await mod('people/affinity');
 const X = await mod('people/sexual');
+const B = await mod('people/base');
 const R = await mod('itemrules');
 
 const person = (name) => ({ name, faction: 'A00', seeded: { from: 'none', at: '' }, slots: {}, affinity: { base: 0 }, address: { toUser: '요원', register: '반말' }, express: 1, aliases: [] });
@@ -150,19 +151,49 @@ test('변경 기록: 지워진 메시지의 변경은 버리고, 상한을 넘�
   assert.equal(s2.log.length, 801);
 });
 
-// 사용자 결정 나-80 ②(전부 남기기): 접기 함수(foldLog)는 남아 있어도 실제 코드 어디서도 부르지 않는다 (11-14 재검토 ①-1)
-test('변경 기록: 갱신기를 비롯한 어느 코드도 foldLog 를 부르지 않는다 (전부 남기기)', async () => {
-  const walk = async (d) => (await Promise.all((await readdir(d, { withFileTypes: true })).map((e) => (e.isDirectory() ? walk(join(d, e.name)) : e.name.endsWith('.ts') ? [join(d, e.name)] : [])))).flat();
-  const callers = [];
-  for (const f of await walk('src')) {
-    if (f === join('src', 'core', 'people', 'store.ts')) continue;
-    if (/\bfoldLog\b/.test(await readFile(f, 'utf8'))) callers.push(f);
-  }
-  assert.deepEqual(callers, []);
+// 사용자 2026-11-17: 원본처럼 오래된 호감 계기는 숫자 하나로 합친다 (11-14 「전부 남기기」를 대신함). 갱신 저장 때 prune.ts foldCues 가 부른다
+test('변경 기록: 갱신 저장 때 오래된 호감 계기를 합치고 값은 그대로 (foldCues)', async () => {
+  const n = 260;
+  const chat = { message: Array.from({ length: n }, (_, i) => ({ role: i % 2 ? 'char' : 'user', data: `m${i}`, chatId: `k${i}` })) };
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  const cues = ['작은친절', '도움', '큰도움', '헌신', '실망', '무시', '배신'];
+  for (let i = 0; i < 900; i++) store.log.push({ id: `x${i}`, anchor: `k${1 + (i % 25) * 2}`, seq: i, src: 'story', who: i % 3 ? '쟈알디' : '세력:A00', kind: 'cue', cue: cues[i % cues.length], reason: '' });
+  store.log.push({ id: 'late', anchor: `k${n - 1}`, seq: 900, src: 'story', who: '쟈알디', kind: 'cue', cue: '헌신', reason: '' });
+  const o = { speed: 1, speedDown: 1, turnCap: 10 };
+  const temper = { open: 1.5, grudge: 0.5 };
+  const live = S.liveness(chat);
+  const P = await mod('people/prune');
+  const uf = '';
+  const val = () => [A.affinityOf(store.people.쟈알디, S.liveChanges(store, live), store.folded.쟈알디 ?? 0, { ...o, temper }), A.factionOf('A00', B.factionBase('A00', uf), S.liveChanges(store, live), store.folded['세력:A00'] ?? 0, o)];
+  const before = val();
+  P.foldCues(store, chat, o, () => temper);
+  const after = val();
+  assert.ok(Math.abs(before[0] - after[0]) < 0.01 && Math.abs(before[1] - after[1]) < 0.01, `${before} → ${after}`);
+  assert.deepEqual(store.log.map((c) => c.id), ['late']);
+  assert.match(await readFile(join('src', 'host', 'people.ts'), 'utf8'), /foldCues\(s, cur, settings, temperOf\)/);
+});
+
+test('변경 기록: 오래된 음란도 변화는 시작값 줄 하나로 합치고 값은 그대로 (foldOpenness)', async () => {
+  const n = 300;
+  const chat = { message: Array.from({ length: n }, (_, i) => ({ role: i % 2 ? 'char' : 'user', data: `m${i}`, chatId: `k${i}` })) };
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  store.log.push({ id: 'i', anchor: 'k1', seq: 0, src: 'story', who: '쟈알디', kind: 'openness', init: 90, reason: '' });
+  for (let i = 1; i < 150; i++) store.log.push({ id: `d${i}`, anchor: `k${1 + i * 2}`, seq: 0, src: 'story', who: '쟈알디', kind: 'openness', delta: i % 4 ? 3 : -2, reason: '' });
+  const P = await mod('people/prune');
+  const val = () => A.opennessOf(store.people.쟈알디, S.liveChanges(store, S.liveness(chat)));
+  const before = val();
+  const dropped = P.foldOpenness(store, chat);
+  assert.equal(val(), before);
+  // 메시지 100 앞(응답 50개)의 줄이 하나가 된다
+  assert.equal(dropped, 49);
+  assert.equal(store.log.length, 101);
+  assert.equal(P.foldOpenness(store, chat), 0, '다시 불러도 그대로');
 });
 
 // 사용자 2026-11-14 F-1 (나): 다시 굴려 사라진 응답이 만든 변경 줄만 버린다. 살아 있는 응답의 변경은 전부 남긴다 (접지 않는다)
-test('변경 기록: 사라진 응답이 만든 줄만 버리고, 살아 있는 응답의 줄은 상한을 넘어도 전부 남긴다', async () => {
+test('변경 기록: dropGoneChanges 는 사라진 응답이 만든 줄만 버린다', async () => {
   const n = 260;
   const chat = { message: Array.from({ length: n }, (_, i) => ({ role: i % 2 ? 'char' : 'user', data: `m${i}`, chatId: `k${i}` })) };
   const store = T.emptyStore();

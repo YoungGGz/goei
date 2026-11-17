@@ -463,15 +463,17 @@ export function dropGoneChanges(store: PeopleStore, chat: Chat): number {
 // ── 접기 ──
 
 export const LOG_CAP = 800;
-/** 변경 기록 줄이기 (전수검사 11-13, 예전엔 부르는 곳이 없어 끝없이 쌓였다).
- *  ① 지워진 메시지(chatId 기준)에 붙은 변경은 되살아날 수 없으니 버린다 ('#N' 기준은 메시지가 다시 생기면 살아나서 둔다).
+/** 합치지 않고 줄로 남겨 두는 채팅 뒤쪽 메시지 수 (이 안의 응답은 지우거나 다시 굴리면 값이 정확히 되돌아간다) */
+export const FOLD_KEEP_MSGS = 200;
+/** 변경 기록 줄이기. 갱신 저장 때 부른다 (2026-11-17 사용자: 원본처럼 오래된 호감 계기는 숫자 하나로 합친다. 원본은 호감 숫자를 저장하고 이력은 60개만 둔다).
+ *  ① 사라진 응답이 만든 변경은 버린다 (dropGoneChanges).
  *  ② 상한을 넘으면 오래된(최근 200개 메시지 밖) 살아 있는 계기를 사람별 값으로 접는다. refold(그 사람, 접을 계기(순서대로), 지금 접힌 값) → 새 접힌 값, null 이면 그 사람은 접지 않는다.
  *  고정(pin)이 든 사람, 묶음이 경계에 걸친 사람은 값이 달라질 수 있어 접지 않는다. 접은 것은 되돌릴 수 없다 */
 export function foldLog(store: PeopleStore, chat: Chat, refold: (who: string, cues: Change[], folded: number) => number | null): void {
+  dropGoneChanges(store, chat);
   const live = liveness(chat);
-  store.log = store.log.filter((c) => c.anchor.startsWith('#') || live.at.has(c.anchor));
   if (store.log.length <= LOG_CAP) return;
-  const cut = msgs(chat).length - 200;
+  const cut = msgs(chat).length - FOLD_KEEP_MSGS;
   if (cut <= 0) return;
   const key = (c: Change) => c.group ?? c.anchor;
   const pos = (c: Change) => live.at.get(c.anchor) ?? -1;
