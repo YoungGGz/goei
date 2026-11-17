@@ -227,7 +227,7 @@ test('명부 대조 인원 상한: 기본은 전원, 상한을 두면 글에 소
   const row = Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === 'roster_cap');
   assert.ok(row && row.help && row.ctl.opts[0][0] === '0', '정의표: 첫 선택지가 제한 없음');
   for (const k of ['docs_inject', 'axes_obs_inject']) {
-    assert.equal(St.PP_DEFAULTS[k], '0', `${k} 기본 끔`);
+    assert.equal(St.PP_DEFAULTS[k], k === 'docs_inject' ? '1' : '0', `${k} 기본값`);
     assert.deepEqual(Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === k)?.ctl, { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] });
   }
 });
