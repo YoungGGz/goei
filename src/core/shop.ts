@@ -63,7 +63,8 @@ export const OWN_MAX = 40;
 export const SHELF_MAX = 40;
 /** 진열대 물건 수 설정 (2026-11-17 사용자: 코드에 박힌 수를 설정으로). 기본 SHELF_MAX, 10~200. 상점 넷이 같이 쓴다 (SHOP_SHARED_VARS) */
 export const SHOP_SHELF_VAR = '$sh_shelf';
-export const SHOP_SHELF_LO = 10;
+// 하한은 한 번에 받는 물건 수의 최대(SHOP_SIZE_HI 16)보다 커야 한다: 작으면 방금 받은 진열과 끝에 붙는 시그니처 상품이 읽을 때 잘린다
+export const SHOP_SHELF_LO = 20;
 export const SHOP_SHELF_HI = 200;
 export const shelfCap = (vars: Record<string, unknown> | undefined): number => numIn(vars?.[SHOP_SHELF_VAR], SHELF_MAX, SHOP_SHELF_LO, SHOP_SHELF_HI);
 export function capShelf<T extends { sold?: boolean }>(items: T[], cap = SHELF_MAX): T[] {
