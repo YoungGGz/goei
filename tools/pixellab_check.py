@@ -52,6 +52,8 @@ def check(subject, kind, row, body, start, first_row=False):
         errs.append(f"첫 줄 시작 그림이 {start} — 정한 시작은 {s.get('first_row_start')}")
     if not first_row and not (str(start).startswith("pick:") or start in s.get("base_state_directions", [])):
         errs.append(f"시작 그림 {start} — 기본 상태 그림이나 사용자가 고른 장(pick:)에서 시작해야 함")
+    if len(dirs) == 1 and start in allowed and start != dirs[0] and not body.get("custom_start_frame"):
+        errs.append(f"시작 그림은 {start} 인데 보내는 방향은 {dirs[0]} 이고 시작 그림을 따로 넣지 않음 — 서버가 {dirs[0]} 등록 그림에서 시작해 버림")
     for f in s.get("forbid_fields", []):
         if body.get(f):
             errs.append(f"{f} 를 글로 넣지 않기로 함")
