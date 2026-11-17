@@ -84,6 +84,20 @@ export function blockEntries(p: Person, live: Liveness, o: Pick<BlockOpts, 'shee
   return kept;
 }
 
+/** 요청에 싣는 의심 칸 줄 (수치 모드): 사례(대상·종류)마다 묶어, 닫힌 사례(마지막 표식이 [해소])는 마지막 줄 하나만, 열린 사례는 줄 전부.
+ *  저장은 그대로다 (점수는 updater.ts suspicionCases 가 저장된 줄 전부로 센다. 다시 열면 열린 사례가 되어 옛 줄도 다시 실린다).
+ *  닫힌 사례의 [시작]·[단서]·[반응] 줄까지 요청마다 전부 실리던 것 (2026-11-17) */
+export function suspicionShown<T extends { text: string; target?: string; kind?: string }>(list: T[]): T[] {
+  const last = new Map<string, { closed: boolean; at: number }>();
+  const key = (e: T) => `${e.target}|${e.kind}`;
+  list.forEach((e, i) => {
+    const m = /^\[(시작|단서|반응|해소)/.exec(e.text);
+    const cur = last.get(key(e)) ?? { closed: false, at: i };
+    last.set(key(e), { closed: m ? (m[1] === '해소' ? true : m[1] === '시작' ? false : cur.closed) : cur.closed, at: i });
+  });
+  return list.filter((e, i) => { const c = last.get(key(e))!; return !c.closed || c.at === i; });
+}
+
 /** 한 인물의 블록. 비어 있는 절은 빼고, 보통(무관심) 단계면 관계 줄을 짧게 */
 export function personBlock(p: Person, store: PeopleStore, live: Liveness, changes: Change[], o: BlockOpts = {}): string {
   const user = o.user ?? '{{user}}';
@@ -159,7 +173,7 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
   if (be.length) out.push(main('PEOPLE.BLOCK.BEHAVIOR') + '\n' + lines(be));
   const th = slot('threads');
   if (th.length) out.push(main('PEOPLE.BLOCK.THREADS') + '\n' + lines(th));
-  const su = o.qual?.has('suspicion') ? [] : slot('suspicion');
+  const su = o.qual?.has('suspicion') ? [] : suspicionShown(slot('suspicion'));
   if (su.length) out.push(main('PEOPLE.BLOCK.SUSPICION') + '\n' + su.map((e) => `- ${e.target ? main('PEOPLE.BLOCK.SUSPICION_ABOUT', { target: e.target === '@user' ? user : e.target }) : ''}${e.kind ? ` [${e.kind}]` : ''}: ${plain(e.text, 200)}`).join('\n'));
   const hi = slot('history');
   if (hi.length) out.push(main('PEOPLE.BLOCK.HISTORY') + '\n' + lines(hi));

@@ -7,7 +7,7 @@ import { scanAgents } from '../world/tags';
 import { addressOf, affinityView, opennessOf, tasteOf, type AffinityOpts } from './affinity';
 import { SPEECH_ENTRY_CHARS, applySpeechSign, parseSpeechMarker, speechVariety } from './speech';
 import { SEXUAL_FIELDS, SEXUAL_AXIS_OF, explicitOn, isSexualAxis, sexualAnyOn, sexualFieldOn, sexualGlobal, setSexualText } from './sexual';
-import { unknownTo } from './inject';
+import { unknownTo, suspicionShown } from './inject';
 import { seedPerson } from './seed';
 import { temperOf, type RosterRow } from './base';
 import { rhythmClock, rhythmClockLines, rhythmNow, hookActive, parseHookHead, retireHookText, turnAt, type RhythmClock } from './rhythm';
@@ -150,13 +150,14 @@ export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSett
 /** 인물 기록을 자료용으로 (칸별 id·본문, 상한을 넘으면 오래된 history·scene 부터 뺀다) */
 /** 인물의 살아 있는 기록 글자 수 (저장 상한 판정) */
 export function recordChars(p: Person, live: Liveness): number {
-  return SLOTS.reduce((n, s) => n + liveEntries(p.slots[s], live).reduce((m, e) => m + e.text.length, 0), 0);
+  // 의심 칸은 세지 않는다: 정리(merge·정리 호출)로 줄일 수 없는 칸이라, 세면 상한을 넘은 인물이 갱신마다 정리 대상으로 다시 올라간다
+  return SLOTS.filter((s) => s !== 'suspicion').reduce((n, s) => n + liveEntries(p.slots[s], live).reduce((m, e) => m + e.text.length, 0), 0);
 }
 
 export function personPayload(p: Person, live: Liveness, changes: Change[], unknown?: string[], extra: { taste?: boolean; openness?: boolean; axes?: boolean; turnCap?: number; slots?: SlotId[]; qual?: Set<string>; sexual?: PeopleSettings; aff?: AffinityOpts; folded?: number } = {}) {
   const entries: Record<string, { id: string; text: string; target?: string; kind?: string; pin?: true }[]> = {};
   for (const s of extra.slots ?? SLOTS) {
-    const list = liveEntries(p.slots[s], live);
+    const list = s === 'suspicion' ? suspicionShown(liveEntries(p.slots[s], live)) : liveEntries(p.slots[s], live);
     if (!list.length) continue;
     entries[s] = list.map((e) => ({ id: e.id, text: e.text, ...(e.target ? { target: e.target } : {}), ...(e.kind ? { kind: e.kind } : {}), ...(e.pin ? { pin: true as const } : {}) }));
   }

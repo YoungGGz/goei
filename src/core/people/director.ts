@@ -7,7 +7,7 @@ import { listDocs } from '../wiki';
 import { addressOf, affinityView } from './affinity';
 import { axesLinesEn } from './axes';
 import { temperOf } from './base';
-import { personBlock, unknownTo } from './inject';
+import { personBlock, unknownTo, suspicionShown } from './inject';
 import { liveChanges, liveEntries, liveness, plain, hash } from './store';
 import { rhythmClock, rhythmClockLines, rhythmNow } from './rhythm';
 import { speechVarietyBlock } from './speech';
@@ -50,7 +50,8 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
     const slots: Record<string, { text: string; target?: string; kind?: string }[]> = {};
     for (const k of featureSlots) {
       // 기능 전용 칸은 여기(`slots`)에만 싣는다: `record` 에서는 같은 칸을 뺀다 (같은 글이 두 번 나가지 않게). 그래서 최근 몇 개가 아니라 살아 있는 항목 전부
-      const es = liveEntries(p.slots[k as SlotId], live).map((e) => ({ text: e.text, ...(e.target ? { target: e.target } : {}), ...(e.kind ? { kind: e.kind } : {}) }));
+      const all = liveEntries(p.slots[k as SlotId], live);
+      const es = (k === 'suspicion' ? suspicionShown(all) : all).map((e) => ({ text: e.text, ...(e.target ? { target: e.target } : {}), ...(e.kind ? { kind: e.kind } : {}) }));
       if (es.length) slots[k] = es;
     }
     // record 의 글자 몫은 slots 에 실은 글자만큼 줄인다 (record 가 전용 칸을 싣던 때와 같은 총량: personBlock 과 같은 셈으로 항목당 글자 + 3)

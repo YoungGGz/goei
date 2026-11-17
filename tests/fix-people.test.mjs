@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(join(tmpdir(), 'goei-fix-people-'));
 await build({
-  entryPoints: ['src/core/people/rhythm.ts', 'src/core/people/updater.ts', 'src/core/people/director.ts', 'src/core/people/request.ts', 'src/core/people/store.ts', 'src/core/people/types.ts', 'src/core/people/settings.ts', 'src/core/people/affinity.ts', 'src/core/people/base.ts', 'src/core/people/prune.ts'],
+  entryPoints: ['src/core/people/rhythm.ts', 'src/core/people/updater.ts', 'src/core/people/director.ts', 'src/core/people/request.ts', 'src/core/people/store.ts', 'src/core/people/types.ts', 'src/core/people/settings.ts', 'src/core/people/affinity.ts', 'src/core/people/base.ts', 'src/core/people/prune.ts', 'src/core/people/inject.ts'],
   outdir: dir, outbase: 'src', bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' }, logLevel: 'silent',
 });
 const mod = async (n) => import(pathToFileURL(join(dir, `core/people/${n}.mjs`)));
@@ -118,6 +118,14 @@ test('저장 정리: 등록 대기 이름은 근거 응답이 뒤쪽 200 메시�
   assert.deepEqual(Object.keys(a.pending), ['새이름']);
   const b = mk(); S.prunePending(b, c);
   assert.deepEqual(Object.keys(b.pending), ['옛이름', '새이름']);
+});
+
+test('의심 칸: 닫힌 사례는 마지막 줄만, 열린 사례와 다시 연 사례는 줄 전부를 요청에 싣는다 (2026-11-17)', async () => {
+  const Inj = await import(pathToFileURL(join(dir, 'core/people/inject.mjs')));
+  const e = (text, target, kind) => ({ text, target, kind });
+  const list = [e('[시작] a', '@user', '신분'), e('[단서·중] b', '@user', '신분'), e('[해소·해소] c', '@user', '신분'), e('[시작] d', '에일린', '거짓말'), e('[단서·약] f', '에일린', '거짓말')];
+  assert.deepEqual(Inj.suspicionShown(list).map((x) => x.text), ['[해소·해소] c', '[시작] d', '[단서·약] f']);
+  assert.equal(Inj.suspicionShown([...list, e('[시작] 다시', '@user', '신분')]).length, 6);
 });
 
 test('저장 정리: 다음 턴 메모는 최근 응답 20개 것만 남긴다 (2026-11-17)', () => {
