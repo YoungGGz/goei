@@ -464,6 +464,8 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('person_cap', String(s.personCap)),
     ppRow('tidy', s.tidy),
     ...(s.tidy === 'separate' ? [stageModel('tidy', '별도 정리 호출에 쓸 모델이에요. 갱신과 같게 = 위 갱신 모델')] : []),
+    ppRow('keep_msgs', String(s.keepMsgs)),
+    ppRow('keep_scene', String(s.keepScene)),
   ].join('');
   return `<div class="ph-form pp-set">
     <header class="ph-room-head"><button class="ph-tool ph-back" data-action="set-feat-back" aria-label="설정으로">${ICONS.back}</button><div class="ph-room-title"><b>인물 설정</b><small>${canChat ? '이 채팅' : '이 채팅 · 시작 전'}</small></div><span class="ph-act">${defaultsButtons('pp')}</span></header>${defaultsConfirm('pp')}

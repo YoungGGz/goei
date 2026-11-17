@@ -409,11 +409,11 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         dropGoneChanges(s, cur);
         pruneScene(s, cur);
         // 인물 기록·문서의 죽은 줄도 같은 때 치운다 (2026-11-17 사용자: 원본처럼 지난 이력 60개만)
-        pruneEntries(s, cur);
-        pruneNotes(s, cur);
+        pruneEntries(s, cur, settings.keepMsgs);
+        pruneNotes(s, cur, settings.keepScene);
         // 오래된 호감 계기는 숫자로 합친다 (2026-11-17 사용자: 원본처럼. 11-14 「전부 남기기」를 대신함)
-        foldCues(s, cur, settings, temperOf);
-        foldOpenness(s, cur);
+        foldCues(s, cur, settings, temperOf, settings.keepMsgs);
+        foldOpenness(s, cur, settings.keepMsgs);
         let next = cur;
         // 이름을 옮긴 기록이 설정 「항상 포함할 인물」에 옛 호칭으로 적혀 있으면 새 이름으로 고쳐 적는다 (이름으로 적는 채팅 저장값은 인물 기록 밖에 이것뿐)
         const always = renameAlways(cur.scriptstate?.[PP('always')], report.applied.renamed);

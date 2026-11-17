@@ -364,9 +364,9 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
  *  남겨 두면 사라진 응답이 2턴 규칙의 「처음 본 것」으로 세어지고, 그 이름이 갱신기 자료(held_names)로 계속 나간다.
  *  expire: 근거 응답이 채팅 뒤쪽 FOLD_KEEP_MSGS 메시지 밖인 줄도 버린다 (한 번 스치고 다시 안 나온 이름이 끝없이 남아 요청마다 실리지 않게, 2026-11-17).
  *  그 뒤에 다시 나오면 처음 본 것으로 다시 센다. 「확인 뒤 등록」은 사용자가 고를 목록이라 expire 를 주지 않는다 */
-export function prunePending(store: PeopleStore, chat: Chat, expire = false): void {
+export function prunePending(store: PeopleStore, chat: Chat, expire = false, keepMsgs = FOLD_KEEP_MSGS): void {
   const at = anchorPositions(chat);
-  const cut = expire ? msgs(chat).length - FOLD_KEEP_MSGS : -1;
+  const cut = expire ? msgs(chat).length - keepMsgs : -1;
   for (const [name, row] of Object.entries(store.pending)) {
     const pos = at.get(row.anchor);
     if (pos === undefined || (pos >= 0 && pos < cut)) delete store.pending[name];
@@ -385,12 +385,12 @@ export function pruneScene(store: PeopleStore, chat: Chat): void {
  *  마지막 응답들을 지우거나 다시 굴려도 그 앞 응답의 목록이 있도록 채팅 뒤쪽 몇 개만 둔다 */
 export const SCENE_KEEP = 20;
 /** 장면 인물 목록을 채팅 뒤쪽 SCENE_KEEP 개 응답 것만 남긴다. keep = 방금 적은 응답 (지난 응답을 뒤늦게 읽은 것이면 다음 묶음이 쓰도록 남긴다) */
-export function capScene(store: PeopleStore, chat: Chat, keep?: string): void {
+export function capScene(store: PeopleStore, chat: Chat, keep?: string, keepScene = SCENE_KEEP): void {
   if (!store.scene) return;
   const keys = Object.keys(store.scene);
-  if (keys.length <= SCENE_KEEP) return;
+  if (keys.length <= keepScene) return;
   const at = new Map(msgs(chat).map((m, i) => [messageKey(m, i), i]));
-  const recent = new Set(keys.filter((k) => at.has(k)).sort((a, b) => at.get(b)! - at.get(a)!).slice(0, SCENE_KEEP));
+  const recent = new Set(keys.filter((k) => at.has(k)).sort((a, b) => at.get(b)! - at.get(a)!).slice(0, keepScene));
   for (const k of keys) if (!recent.has(k) && k !== keep) delete store.scene[k];
 }
 
@@ -475,11 +475,11 @@ export const FOLD_KEEP_MSGS = 200;
  *  ① 사라진 응답이 만든 변경은 버린다 (dropGoneChanges).
  *  ② 상한을 넘으면 오래된(최근 200개 메시지 밖) 살아 있는 계기를 사람별 값으로 접는다. refold(그 사람, 접을 계기(순서대로), 지금 접힌 값) → 새 접힌 값, null 이면 그 사람은 접지 않는다.
  *  고정(pin)이 든 사람, 묶음이 경계에 걸친 사람은 값이 달라질 수 있어 접지 않는다. 접은 것은 되돌릴 수 없다 */
-export function foldLog(store: PeopleStore, chat: Chat, refold: (who: string, cues: Change[], folded: number) => number | null): void {
+export function foldLog(store: PeopleStore, chat: Chat, refold: (who: string, cues: Change[], folded: number) => number | null, keepMsgs = FOLD_KEEP_MSGS): void {
   dropGoneChanges(store, chat);
   const live = liveness(chat);
   if (store.log.length <= LOG_CAP) return;
-  const cut = msgs(chat).length - FOLD_KEEP_MSGS;
+  const cut = msgs(chat).length - keepMsgs;
   if (cut <= 0) return;
   const key = (c: Change) => c.group ?? c.anchor;
   const pos = (c: Change) => live.at.get(c.anchor) ?? -1;

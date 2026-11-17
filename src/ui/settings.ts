@@ -31,7 +31,7 @@ import { ICON_KIND_LABEL, normIcon } from '../core/iconmatch';
 import { keepOpen } from './panels';
 import { invOn, ITEM_SCOPE_VAR, ITEM_SKIP_MAX, ITEM_SKIP_VAR, itemScope, itemSkip, ITEM_ICON_POOL_VAR, itemIconPoolOn, ITEM_AUTO_VAR, ITEM_DETAIL_VAR, ITEM_LOGTURNS_MAX, ITEM_LOGTURNS_VAR, ITEM_RESUMED_VAR, ITEM_SPENT_VAR, ITEM_START_VAR, ITEM_STATE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, ITEM_USE_VAR, itemDetail, itemLogTurns, itemStartOn, itemStateOn, ITEM_LIMIT_DEFAULT, ITEM_LIMIT_VAR, ITEM_ICON_ALIAS_VAR, ITEM_ON_VAR, ITEM_SLOTS_MAX, ITEM_SLOTS_MIN, ITEM_SLOTS_VAR, itemAutoOn, itemLimit, itemSlots, ITEM_CARRY_MAX, ITEM_CARRY_MIN, ITEM_CARRY_PC_VAR, ITEM_CARRY_VAR, ITEM_EDIT_VAR, itemCarrySetting, itemEditOn, itemWeight } from '../core/items';
 import { SHOP_AMOUNTS, isGiveKey, isGiveShop, isShopAmount, isShopFn, shopAmountNone, shopFnVar, shopGiveVar } from '../core/shopfn';
-import { SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags } from '../core/shop';
+import { SHOP_SHELF_HI, SHOP_SHELF_LO, SHOP_SHELF_VAR, SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags } from '../core/shop';
 import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { updateChat, type ChatContext } from '../host/risu';
 import { barButtons, directoryBar, directoryDone, directoryDoneClear, directorySearch, directoryView } from './directory';
@@ -743,6 +743,7 @@ export async function shopFamSet(ctx: ChatContext, env: SettingsEnv, scope: 'cha
     else if (key === 'thoughts' && ['off', 'inner', 'note'].includes(raw)) patch = { [SHOP_THOUGHTS_VAR]: raw };
     else if (key === 'turns') { const n = int(1, 8); if (n !== null) patch = { [SHOP_TURNS_VAR]: String(n) }; }
     else if (key === 'refs') { const n = int(0, 12); if (n !== null) patch = { [SHOP_REFS_VAR]: String(n) }; }
+    else if (key === 'shelf') { const n = int(SHOP_SHELF_LO, SHOP_SHELF_HI); if (n !== null) patch = { [SHOP_SHELF_VAR]: String(n) }; }
   }
   if (!patch) return env.render(), true;
   const out = patch;
@@ -1026,7 +1027,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       else await save(ctx, env, (chat) => (String(chat.scriptstate?.[SHOP_MIN_VAR] ?? '') === patch[SHOP_MIN_VAR] && String(chat.scriptstate?.[SHOP_MAX_VAR] ?? '') === patch[SHOP_MAX_VAR] ? null : patch));
       return true;
     }
-    const KEY: Record<string, string> = { on: SHOP_ON_VAR, model: SHOP_MODEL_VAR, count: SHOP_COUNT_VAR, ctx: SHOP_CTX_VAR, price: SHOP_PRICE_VAR, diverse: SHOP_DIVERSE_VAR, thoughts: SHOP_THOUGHTS_VAR, prev: SHOP_PREV_VAR, kick: SHOP_KICK_VAR, feature: SHOP_FEATURE_VAR, turns: SHOP_TURNS_VAR, refs: SHOP_REFS_VAR, where: SHOP_WHERE_VAR, judge: SHOP_JUDGE_VAR };
+    const KEY: Record<string, string> = { on: SHOP_ON_VAR, model: SHOP_MODEL_VAR, count: SHOP_COUNT_VAR, ctx: SHOP_CTX_VAR, price: SHOP_PRICE_VAR, diverse: SHOP_DIVERSE_VAR, thoughts: SHOP_THOUGHTS_VAR, prev: SHOP_PREV_VAR, kick: SHOP_KICK_VAR, feature: SHOP_FEATURE_VAR, turns: SHOP_TURNS_VAR, refs: SHOP_REFS_VAR, shelf: SHOP_SHELF_VAR, where: SHOP_WHERE_VAR, judge: SHOP_JUDGE_VAR };
     const k = action.slice(9);
     const key = KEY[k];
     if (!key) return true;
@@ -1039,7 +1040,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       else await save(ctx, env, (chat) => (String(chat.scriptstate?.[key] ?? '') === nv ? null : { [key]: nv }));
       return true;
     }
-    const ok = k === 'price' ? true : k === 'model' ? v === 'main' || v === 'aux' : k === 'count' ? ['0', '1', '2'].includes(v) : k === 'thoughts' ? ['off', 'inner', 'note'].includes(v) : k === 'where' ? v === 'any' || v === 'shop' : k === 'judge' ? ['auto', 'main', 'updater'].includes(v) : k === 'turns' ? /^[1-8]$/.test(v) : k === 'refs' ? /^([0-9]|1[0-2])$/.test(v) : v === '1' || v === '0';
+    const ok = k === 'price' ? true : k === 'model' ? v === 'main' || v === 'aux' : k === 'count' ? ['0', '1', '2'].includes(v) : k === 'thoughts' ? ['off', 'inner', 'note'].includes(v) : k === 'where' ? v === 'any' || v === 'shop' : k === 'judge' ? ['auto', 'main', 'updater'].includes(v) : k === 'turns' ? /^[1-8]$/.test(v) : k === 'refs' ? /^([0-9]|1[0-2])$/.test(v) : k === 'shelf' ? /^\d{2,3}$/.test(v) && Number(v) >= SHOP_SHELF_LO && Number(v) <= SHOP_SHELF_HI : v === '1' || v === '0';
     if (!ok) return true;
     const next = k === 'price' ? v.replace(/\s+/g, ' ').trim().slice(0, 80) : v;
     if (scope === 'defaults') await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), [key]: next } }));

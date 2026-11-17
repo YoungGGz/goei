@@ -84,6 +84,10 @@ export const PP_DEFAULTS: Record<string, string> = {
   person_cap: '10000',
   /** 본편 요청에 넣는 기록 블록 전체 상한 (글자). 리수폿 Director 참고 상한과 같은 16,000 */
   block_cap: '16000',
+  /** 지난 기록 보관 범위: 채팅 뒤쪽 메시지 이 수 안의 죽은 줄·호감 계기·음란도 변화·대기 줄은 그대로 둔다 (store.ts FOLD_KEEP_MSGS. 2026-11-17 사용자: 설정으로) */
+  keep_msgs: '200',
+  /** 장면 메모 보관: 최근 응답 이 수만큼의 Director 메모·장면 인물 목록만 남긴다 (store.ts SCENE_KEEP. 2026-11-17 사용자: 설정으로) */
+  keep_scene: '20',
   /** 사건·장소·세력·물건 문서 가운데 장면과 관련된 것을 메인 요청에 넣는다 (컨텍스트 글자 상한 안에서). 기본 켬 (사용자 2026-11-17) */
   docs_inject: '1',
   /** 승인 전 성격 관찰(후보)도 메인 요청의 인물 기록에 넣는다. 기본 끔 */
@@ -156,6 +160,10 @@ export interface PeopleSettings {
   lang: 'ko' | 'en';
   personCap: number;
   blockCap: number;
+  /** 지난 기록을 그대로 두는 채팅 뒤쪽 메시지 수 (20~2000) */
+  keepMsgs: number;
+  /** 메모·장면 인물 목록을 남기는 최근 응답 수 (2~200) */
+  keepScene: number;
   docsInject: boolean;
   axesObsInject: boolean;
   tidy: 'same' | 'separate';
@@ -236,6 +244,8 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     lang: v('lang') === 'en' ? 'en' : 'ko',
     personCap: num('person_cap', 2000, 40000),
     blockCap: num('block_cap', 4000, 64000),
+    keepMsgs: Math.round(num('keep_msgs', 20, 2000)),
+    keepScene: Math.round(num('keep_scene', 2, 200)),
     docsInject: v('docs_inject') === '1',
     axesObsInject: v('axes_obs_inject') === '1',
     tidy: v('tidy') === 'separate' ? 'separate' : 'same',

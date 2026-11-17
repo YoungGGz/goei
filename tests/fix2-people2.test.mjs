@@ -171,7 +171,7 @@ test('변경 기록: 갱신 저장 때 오래된 호감 계기를 합치고 값�
   const after = val();
   assert.ok(Math.abs(before[0] - after[0]) < 0.01 && Math.abs(before[1] - after[1]) < 0.01, `${before} → ${after}`);
   assert.deepEqual(store.log.map((c) => c.id), ['late']);
-  assert.match(await readFile(join('src', 'host', 'people.ts'), 'utf8'), /foldCues\(s, cur, settings, temperOf\)/);
+  assert.match(await readFile(join('src', 'host', 'people.ts'), 'utf8'), /foldCues\(s, cur, settings, temperOf, settings\.keepMsgs\)/);
 });
 
 test('변경 기록: 오래된 음란도 변화는 시작값 줄 하나로 합치고 값은 그대로 (foldOpenness)', async () => {

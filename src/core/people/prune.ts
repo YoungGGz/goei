@@ -18,10 +18,10 @@ import type { Entry, PeopleStore } from './types';
  *     「밀려난 때」 = 그 줄을 고친(합친) 줄의 응답 위치. 정리 줄처럼 기준이 '#0' 이면 밀려난 줄 자신의 위치.
  *     어떤 줄을 버리면 그 줄이 가리고 있던 줄(replaces·from)도 같이 버린다: 가운데 줄만 없어져 더 옛 줄이 되살아나지 않게.
  *  진행 중인 떡밥의 지난 줄은 남긴다: 심은 턴을 그 사슬에서 읽는다 (rhythm.ts rootPos) */
-export function pruneEntries(store: PeopleStore, chat: Chat): number {
+export function pruneEntries(store: PeopleStore, chat: Chat, keepMsgs = FOLD_KEEP_MSGS): number {
   const at = anchorPositions(chat);
   const live: Liveness = liveness(chat);
-  const cut = (Array.isArray(chat.message) ? chat.message.length : 0) - FOLD_KEEP_MSGS;
+  const cut = (Array.isArray(chat.message) ? chat.message.length : 0) - keepMsgs;
   const lists: { get: () => Entry[]; set: (l: Entry[]) => void; keepAll: boolean }[] = [];
   for (const p of Object.values(store.people)) {
     for (const k of Object.keys(p.slots) as (keyof typeof p.slots)[]) {
@@ -65,11 +65,11 @@ export function pruneEntries(store: PeopleStore, chat: Chat): number {
 /** 다음 턴 메모(변경 기록의 note) 정리. 버린 줄 수.
  *  쓰이는 것은 인물마다 가장 최근의 살아 있는 메모 하나다 (updater.ts latestNote).
  *  마지막 응답들을 지우거나 다시 굴려도 그 앞 응답의 메모가 있도록, 장면 인물 목록과 같이 채팅 뒤쪽 SCENE_KEEP 개 응답의 메모만 남긴다 (2026-11-17 사용자) */
-export function pruneNotes(store: PeopleStore, chat: Chat): number {
+export function pruneNotes(store: PeopleStore, chat: Chat, keepScene = SCENE_KEEP): number {
   const list = Array.isArray(chat.message) ? chat.message : [];
   const bots = list.map((m, i) => (m.role === 'char' ? i : -1)).filter((i) => i >= 0);
-  if (bots.length <= SCENE_KEEP) return 0;
-  const cut = bots[bots.length - SCENE_KEEP];
+  if (bots.length <= keepScene) return 0;
+  const cut = bots[bots.length - keepScene];
   const at = anchorPositions(chat);
   const before = store.log.length;
   store.log = store.log.filter((c) => c.kind !== 'note' || (at.get(c.anchor) ?? cut) >= cut);
@@ -79,7 +79,7 @@ export function pruneNotes(store: PeopleStore, chat: Chat): number {
 /** 오래된 호감·세력 평판 계기를 사람(세력)마다 숫자 하나(store.folded)로 합치고 줄은 버린다 (store.ts foldLog 의 규칙 그대로).
  *  합친 값은 지금 화면·요청이 쓰는 계산과 같게 낸다: 인물은 성격 계수 + 설정 속도·상한, 세력은 설정 속도·상한 (affinity.ts affinityOf·factionOf).
  *  합친 뒤에는 그 구간의 응답을 지워도 값이 되돌아가지 않는다 (원본도 이력 60개 밖은 같다) */
-export function foldCues(store: PeopleStore, chat: Chat, o: { speed: number; speedDown: number; turnCap: number }, temperOf: (name: string) => Temper | undefined): void {
+export function foldCues(store: PeopleStore, chat: Chat, o: { speed: number; speedDown: number; turnCap: number }, temperOf: (name: string) => Temper | undefined, keepMsgs = FOLD_KEEP_MSGS): void {
   const uf = userFactionOf(store, chat);
   foldLog(store, chat, (who, cues, folded) => {
     const code = factionOfWho(who);
@@ -92,13 +92,13 @@ export function foldCues(store: PeopleStore, chat: Chat, o: { speed: number; spe
     if (!p) return null;
     const opts: AffinityOpts = { ...o, temper: temperOf(who) };
     return sumCues(who, p.affinity.base, cues, folded, AFF_MIN, AFF_MAX, opts) - p.affinity.base;
-  });
+  }, keepMsgs);
 }
 
 /** 오래된 음란도 변화 줄을 인물마다 시작값 줄 하나로 합친다 (호감 계기 합치기와 같은 경계: 채팅 뒤쪽 FOLD_KEEP_MSGS 밖).
  *  합친 줄은 기준 '#0'(늘 살아 있음)의 시작값(init)이라 계산(affinity.ts opennessOf)은 그대로다. 버린 줄 수 */
-export function foldOpenness(store: PeopleStore, chat: Chat): number {
-  const cut = (Array.isArray(chat.message) ? chat.message.length : 0) - FOLD_KEEP_MSGS;
+export function foldOpenness(store: PeopleStore, chat: Chat, keepMsgs = FOLD_KEEP_MSGS): number {
+  const cut = (Array.isArray(chat.message) ? chat.message.length : 0) - keepMsgs;
   if (cut <= 0) return 0;
   const live = liveness(chat);
   const pos = (c: { anchor: string }) => live.at.get(c.anchor) ?? -1;

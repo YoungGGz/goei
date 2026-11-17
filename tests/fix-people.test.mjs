@@ -170,3 +170,57 @@ test('갱신기 자료 cues: 계기 이름만 (뜻은 지침 표)', () => {
   const input = U.buildUpdate(c, store, [3], { settings: St.peopleSettings({}), system: 'S', values: {}, names: [{ name: '쟈알디', aliases: [], titles: [] }] });
   assert.deepEqual(input.data.cues, [...T.CUES]);
 });
+
+test('보관 범위 설정: 지난 기록 보관 범위(keep_msgs)·장면 메모 보관(keep_scene)을 바꾸면 정리 경계가 달라진다 (2026-11-17)', () => {
+  // 설정: 기본값은 그대로 200·20, 범위 밖은 끝값으로
+  assert.equal(St.peopleSettings({}).keepMsgs, 200);
+  assert.equal(St.peopleSettings({}).keepScene, 20);
+  const small = St.peopleSettings({ $pp_keep_msgs: '100', $pp_keep_scene: '10' });
+  assert.deepEqual([small.keepMsgs, small.keepScene], [100, 10]);
+  assert.deepEqual([St.peopleSettings({ $pp_keep_msgs: '5' }).keepMsgs, St.peopleSettings({ $pp_keep_msgs: '99999' }).keepMsgs], [20, 2000]);
+  assert.deepEqual([St.peopleSettings({ $pp_keep_scene: '0' }).keepScene, St.peopleSettings({ $pp_keep_scene: '999' }).keepScene], [2, 200]);
+  // 지난 줄: 메시지 300개에서 범위 100 이면 경계 = 위치 200 → e1..e99 버림 (기본 200 이면 e1..e49)
+  const c = chatOf(150);
+  const mk = () => {
+    const s = T.emptyStore();
+    s.people['쟈알디'] = person('쟈알디');
+    const list = (s.people['쟈알디'].slots.state = []);
+    for (let i = 1; i <= 150; i++) list.push(entry(`e${i}`, `상태 ${i}`, `c${i}`, i > 1 ? { replaces: `e${i - 1}` } : {}));
+    return s;
+  };
+  const a = mk();
+  assert.equal(P.pruneEntries(a, c, small.keepMsgs), 99);
+  const ids = a.people['쟈알디'].slots.state.map((e) => e.id);
+  assert.ok(ids.includes('e100') && !ids.includes('e99'));
+  const b = mk();
+  assert.equal(P.pruneEntries(b, c), 49, '안 넘기면 기본 200');
+  // 등록 대기: 범위 100 이면 c90(위치 179)도 밖
+  const pend = () => { const s = T.emptyStore(); s.pending = { 가: { anchor: 'c90', aliases: [] }, 나: { anchor: 'c140', aliases: [] } }; return s; };
+  const p1 = pend(); S.prunePending(p1, c, true, small.keepMsgs);
+  assert.deepEqual(Object.keys(p1.pending), ['나']);
+  const p2 = pend(); S.prunePending(p2, c, true);
+  assert.deepEqual(Object.keys(p2.pending), ['가', '나']);
+  // 음란도 변화 합치기: 범위 100 이면 c60·c80(위치 119·159)이 밖이라 하나로 합쳐진다. 기본 200 이면 그대로
+  const op = () => {
+    const s = T.emptyStore();
+    s.people['쟈알디'] = person('쟈알디');
+    s.log.push({ id: 'o60', anchor: 'c60', seq: 0, src: 'story', who: '쟈알디', kind: 'openness', init: 50, reason: 'r' });
+    for (const k of [80, 140]) s.log.push({ id: `o${k}`, anchor: `c${k}`, seq: 0, src: 'story', who: '쟈알디', kind: 'openness', delta: 1, reason: 'r' });
+    return s;
+  };
+  const o1 = op(); P.foldOpenness(o1, c, small.keepMsgs);
+  const o2 = op(); P.foldOpenness(o2, c);
+  assert.equal(o2.log.length, 3);
+  assert.equal(o1.log.length, 2, '범위를 줄이면 더 일찍 합친다');
+  // 메모: 응답 30개에서 10 이면 20개 버림
+  const c30 = chatOf(30);
+  const notes = () => { const s = T.emptyStore(); for (let k = 1; k <= 30; k++) s.log.push({ id: `n${k}`, anchor: `c${k}`, seq: 0, src: 'story', who: '쟈알디', kind: 'note', now: `memo ${k}`, reason: '다음 턴 메모' }); return s; };
+  const n1 = notes();
+  assert.equal(P.pruneNotes(n1, c30, small.keepScene), 20);
+  assert.deepEqual(n1.log.map((x) => x.id), Array.from({ length: 10 }, (_, i) => `n${i + 21}`));
+  // 장면 인물 목록도 같은 수
+  const sc = T.emptyStore();
+  sc.scene = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`c${i + 1}`, ['쟈알디']]));
+  S.capScene(sc, c30, undefined, small.keepScene);
+  assert.deepEqual(Object.keys(sc.scene).sort(), Array.from({ length: 10 }, (_, i) => `c${i + 21}`).sort());
+});

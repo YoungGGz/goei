@@ -12,9 +12,9 @@ const out = await build({
       export { dropDoubleSync, syncPointsToStatus, readPoints } from './src/core/points';
       export { mergeLate, lateNow, sendsOrders } from './src/ui/malls';
       export { guideSections } from './src/core/guides';
-      export { mallVarsOf, readMall, mallAtKey, mallSeenKey, mallUnseen } from './src/core/malls';
+      export { mallVarsOf, readMall, mallSettings, mallAtKey, mallSeenKey, mallUnseen } from './src/core/malls';
       export { aliveAnchors } from './src/core/wallet';
-      export { markSold, capShelf, readShop, applyShelf, shopSettings, storyStamp, talkPrompt, reviveShop } from './src/core/shop';
+      export { markSold, capShelf, applyTalk, readShop, applyShelf, shopSettings, storyStamp, talkPrompt, reviveShop } from './src/core/shop';
     `,
     resolveDir: process.cwd(), loader: 'ts',
   },
@@ -157,6 +157,34 @@ test('진열대 자르기: 파는 물건과 산 물건을 따로 센다 — 산 
   const st = M.readMall(M.mallVarsOf('cos', base), 'cos');
   assert.equal(st.items.filter((x) => !x.sold).length, 8);
   assert.equal(st.items.filter((x) => x.sold).length, 40);
+});
+
+test('진열대 물건 수 설정($sh_shelf): 기본 40, 10~200, 바꾸면 그 수만큼 남긴다 (2026-11-17)', () => {
+  const it = (id, sold) => ({ id, name: id, price: 1, desc: '', effect: '', ...(sold ? { sold: true, soldKey: 'k' } : {}) });
+  assert.equal(M.shopSettings({}).shelf, 40);
+  assert.equal(M.shopSettings({ $sh_shelf: '10' }).shelf, 10);
+  assert.deepEqual([M.shopSettings({ $sh_shelf: '3' }).shelf, M.shopSettings({ $sh_shelf: '999' }).shelf, M.shopSettings({ $sh_shelf: 'x' }).shelf], [10, 200, 40]);
+  const sold = Array.from({ length: 45 }, (_, i) => it(`s${i}`, true));
+  const open = Array.from({ length: 60 }, (_, i) => it(`n${i}`));
+  const out = M.capShelf([...sold, ...open], 10);
+  assert.deepEqual(out.filter((x) => !x.sold).map((x) => x.id), open.slice(0, 10).map((x) => x.id));
+  assert.deepEqual(out.filter((x) => x.sold).map((x) => x.id), sold.slice(35).map((x) => x.id));
+  const base = { shop: 'S', owner: '', key: '', loaded: true, identity: { sells: '', never: '', prices: '' }, items: [...sold, ...open], talk: [], closed: false, prev: [], sell: null, sales: [] };
+  // 기본 상점: 채팅 변수의 값을 읽는다
+  const shop = M.readShop({ $st_shop: JSON.stringify(base), $sh_shelf: '10' });
+  assert.deepEqual([shop.items.filter((x) => !x.sold).length, shop.items.filter((x) => x.sold).length], [10, 10]);
+  assert.equal(M.readShop({ $st_shop: JSON.stringify(base) }).items.length, 80, '안 정했으면 40씩');
+  // 쇼핑몰: 같은 값을 같이 쓴다 (몰 자리 값은 따로 없다)
+  const mall = M.readMall({ ...M.mallVarsOf('cos', base), $sh_shelf: '10' }, 'cos');
+  assert.deepEqual([mall.items.filter((x) => !x.sold).length, mall.items.filter((x) => x.sold).length], [10, 10]);
+  const big = M.readMall({ ...M.mallVarsOf('cos', base), $sh_shelf: '200' }, 'cos');
+  assert.equal(big.items.length, 105);
+  assert.equal(M.mallSettings({ $sh_shelf: '10', $cos_sh_shelf: '50' }, 'cos').shelf, 10);
+  // 문의 응답으로 물건이 늘 때도 같은 수
+  const st = { ...base, items: open.slice(0, 10) };
+  const talked = M.applyTalk(st, { owner: '네', mode: 'partial', all: [], add: [{ name: 'x1', price: 1, desc: '', effect: '' }, { name: 'x2', price: 1, desc: '', effect: '' }], remove: [], reprice: [], closed: false }, false, true, 10);
+  assert.equal(talked.items.filter((x) => !x.sold).length, 10);
+  assert.equal(M.applyTalk(st, { owner: '네', mode: 'partial', all: [], add: [{ name: 'x1', price: 1, desc: '', effect: '' }, { name: 'x2', price: 1, desc: '', effect: '' }], remove: [], reprice: [], closed: false }, false, true).items.length, 12, '안 넘기면 기본 40');
 });
 
 test('쇼핑몰 문의: 지금까지 산 것을 한 줄씩 (산 때|이름|값|효과), 일반 가게는 이름만 (2026-11-17)', () => {

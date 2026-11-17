@@ -7,7 +7,7 @@ import { CFG, COUNT_RANGE, GN_DEFAULTS, STORAGE_MAX, gnetRetention, gnetSettings
 import { jointOn } from '../core/netjoint';
 import { MALL_NAME, mallSettings } from '../core/malls';
 import { hsName, hsSettings } from '../core/homeshop';
-import { SHOP_SIZE_HI, SHOP_SIZE_LO, shopBlocked, shopSettings, type ShopSettings } from '../core/shop';
+import { SHOP_SHELF_HI, SHOP_SHELF_LO, SHOP_SIZE_HI, SHOP_SIZE_LO, shopBlocked, shopSettings, type ShopSettings } from '../core/shop';
 import { HS_MAIN_SET, hsMainSettings, type HsLogKind } from '../core/hslog';
 import { SHOP_MAIN_ALL, SHOP_MAIN_KINDS, SHOP_MAIN_LABEL, SHOP_MAIN_LINES, SHOP_PLACES, shopMain, shopMainLines, type ShopPlace } from '../core/shopctx';
 import { advChipsCtl, advCtl } from './advanced';
@@ -311,6 +311,7 @@ export function shopTable(vars: State, busy = false): string {
     R('다양성 강화', sw('diverse', s0.diverse), '켜면 싼 것, 비싼 것, 흔한 것, 특이한 것을 섞어 받아요.'),
     R('지난 목록 피하기', sw('prev', s0.avoidPrev), '켜면 지난번에 나온 물건을 다시 내지 않게 해요.'),
     R('문의로 물건 바꾸기', sw('talkstock', s0.talkStock), '끄면 주인이나 운영자가 말로 물건을 더하거나 진열을 새로 짜지 않아요. 문의 요청에서 진열 규칙이 빠져 요청이 짧아져요. 값 흥정은 그대로 돼요.'),
+    R('진열대 물건 수', numCtl('s:shop:shelf', { n: s0.shelf, lo: SHOP_SHELF_LO, hi: SHOP_SHELF_HI, step: 10 }, '진열대 물건 수', '개', busy), '진열대에 남기는 물건 수예요. 파는 물건과 산 물건을 따로 이 수만큼 남겨요.'),
   ].join(''));
   const note = blocked ? `<p class="gx-hint">${blocked === 'both' ? '소지품과 가계부가' : blocked === 'items' ? '소지품이' : '가계부가'} 꺼져 있어 기본 상점과 쇼핑몰 둘을 쓸 수 없어요. 산 물건은 소지품에, 돈은 가계부로 오가서 둘 다 켜져 있어야 해요.</p>` : '';
   /* ── 3. 기본 상점에만 있는 값: 거래 끊음 + (ui/settings.ts 가 잇는) 열리는 조건 ── */

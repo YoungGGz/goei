@@ -61,11 +61,16 @@ export const OWN_MAX = 40;
 /** 진열대 목록 자르기: 파는 물건과 산 물건을 따로 센다 (파는 것 앞에서 SHELF_MAX 개, 산 것 최근 SHELF_MAX 개. 2026-11-17 사용자).
  *  한 목록으로 앞에서 40개를 자르면, 쇼핑몰처럼 산 물건이 계속 남는 곳은 산 것이 40개가 된 뒤 새 물건이 전부 잘려 진열대가 비었다 */
 export const SHELF_MAX = 40;
-export function capShelf<T extends { sold?: boolean }>(items: T[]): T[] {
+/** 진열대 물건 수 설정 (2026-11-17 사용자: 코드에 박힌 수를 설정으로). 기본 SHELF_MAX, 10~200. 상점 넷이 같이 쓴다 (SHOP_SHARED_VARS) */
+export const SHOP_SHELF_VAR = '$sh_shelf';
+export const SHOP_SHELF_LO = 10;
+export const SHOP_SHELF_HI = 200;
+export const shelfCap = (vars: Record<string, unknown> | undefined): number => numIn(vars?.[SHOP_SHELF_VAR], SHELF_MAX, SHOP_SHELF_LO, SHOP_SHELF_HI);
+export function capShelf<T extends { sold?: boolean }>(items: T[], cap = SHELF_MAX): T[] {
   const sold = items.filter((x) => x.sold);
-  const dropSold = new Set(sold.slice(0, Math.max(0, sold.length - SHELF_MAX)));
+  const dropSold = new Set(sold.slice(0, Math.max(0, sold.length - cap)));
   let open = 0;
-  return items.filter((x) => (x.sold ? !dropSold.has(x) : ++open <= SHELF_MAX));
+  return items.filter((x) => (x.sold ? !dropSold.has(x) : ++open <= cap));
 }
 export function ownShops(vars: Vars): OwnShop[] {
   const raw = vars?.[SHOP_OWN_VAR];
@@ -123,7 +128,7 @@ export const SHOP_FEATURE_VAR = '$sh_feature';
 /** 상점 넷(기본 상점·우주 쇼핑몰·포인트몰·망상홈쇼핑)이 값 하나를 같이 쓰는 설정: 기본 상점 자리($sh_*)의 값을 넷이 같이 읽는다 (2026-11-11 사용자: 설정 → 상점) */
 /** 문의로 물건 바꾸기 (기본 켬): 끄면 문의 요청에 진열 규칙을 넣지 않고, 주인·운영자가 말로 물건을 더하거나 진열을 새로 짜지 않는다 (값 흥정·빼기는 그대로) */
 export const SHOP_TALK_STOCK_VAR = '$sh_talk_stock';
-export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR, SHOP_TALK_STOCK_VAR];
+export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR, SHOP_TALK_STOCK_VAR, SHOP_SHELF_VAR];
 export const SHOP_SIZE_LO = 1;
 export const SHOP_SIZE_HI = 16;
 
@@ -155,6 +160,8 @@ export interface ShopSettings {
   refs: number;
   /** 문의로 물건을 더하거나 진열을 새로 짤 수 있음 (끄면 문의 요청에서 진열 규칙이 빠진다) */
   talkStock: boolean;
+  /** 진열대에 남기는 물건 수 (파는 것·산 것 따로, 10~200) */
+  shelf: number;
 }
 
 type Vars = Record<string, unknown> | undefined;
@@ -187,6 +194,7 @@ export function shopSettings(vars: Vars): ShopSettings {
     turns: numIn(vars?.[SHOP_TURNS_VAR], SHOP_TURNS_DEFAULT, 1, 8),
     refs: numIn(vars?.[SHOP_REFS_VAR], SHOP_REFS_DEFAULT, 0, 12),
     talkStock: vars?.[SHOP_TALK_STOCK_VAR] !== '0',
+    shelf: shelfCap(vars),
   };
 }
 function sizeOf(vars: Vars, legacy: ShopCount): [number, number] {
@@ -392,7 +400,8 @@ function readOffer(v: unknown): ShopOffer | null {
   };
 }
 
-export function readShop(vars: Vars): ShopState | null {
+/** shelf: 진열대 물건 수. vars 가 채팅 변수 그대로가 아니면(상태 하나만 담은 것) 부르는 쪽이 채팅의 값(shelfCap)을 넘긴다 */
+export function readShop(vars: Vars, shelf = shelfCap(vars)): ShopState | null {
   const raw = vars?.[SHOP_VAR];
   if (typeof raw !== 'string' || !raw.trim()) return null;
   try {
@@ -413,7 +422,7 @@ export function readShop(vars: Vars): ShopState | null {
       items: capShelf((Array.isArray(o.items) ? o.items.filter(isItem) : []).map((x) => {
         const { use: _u, uses: _n, equip: _e, icon: _i, weight: _w, ...rest } = x;
         return { ...rest, ...traitsOf(x), desc: clean(x.desc, 120), effect: clean(x.effect, 60) };
-      })),
+      }), shelf),
       talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-40),
       closed: !!o.closed,
       prev: Array.isArray(o.prev) ? o.prev.filter((x): x is string => typeof x === 'string').slice(-40) : [],
@@ -527,7 +536,7 @@ export function eventShop(chat: Chat): ShopState | null {
   if (st) return st;
   const last = lastBot(chat);
   if (!last || !shopOn(chat.scriptstate)) return null;
-  const snap = readShop({ [SHOP_VAR]: chat.scriptstate?.[SHOP_LAST_VAR] });
+  const snap = readShop({ [SHOP_VAR]: chat.scriptstate?.[SHOP_LAST_VAR] }, shelfCap(chat.scriptstate));
   return snap && snap.key === last.key ? snap : null;
 }
 
@@ -801,7 +810,7 @@ export function dropItemsNamed(st: ShopState, names: string[]): ShopState {
 
 /** 주인에게 말한 결과를 상태에 (내 말은 부르는 쪽이 먼저 적는다) */
 /** stock: 설정 「문의로 물건 바꾸기」. 꺼져 있으면 응답의 물건 더하기·전체 다시 짜기는 받지 않는다 (값 바꾸기·빼기는 받는다) */
-export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = true): ShopState {
+export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = true, shelf = SHELF_MAX): ShopState {
   const r0: TalkReply = stock ? r1 : { ...r1, all: [], add: [], mode: r1.mode === 'all' ? 'none' : r1.mode };
   // 포인트 상점: 「900p」로 적은 값도 포인트 값으로
   const r = st.identity.points ? { ...r0, all: r0.all.map(pointPrice), add: r0.add.map(pointPrice), reprice: r0.reprice.map(pointPrice) } : r0;
@@ -855,7 +864,7 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
     }
   }
   const closed = st.closed || (kick && r.closed);
-  return { ...st, items: capShelf(items), talk: talk.slice(-40), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
+  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-40), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
 }
 
 /** 견적 수락 표시 (없거나 이미 수락했으면 null) */

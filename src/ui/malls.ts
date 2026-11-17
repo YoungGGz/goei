@@ -190,7 +190,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       next = { ...applied, talk: st0.talk };
     } else {
       const { value } = await generate(talkPrompt(src, s, MALL_GUIDE[site]), s.model, parseTalk, opts);
-      next = stampLastLine(applyTalk(st0, value, false, s.talkStock), lastBot(ctx.chat)?.key ?? '');
+      next = stampLastLine(applyTalk(st0, value, false, s.talkStock, s.shelf), lastBot(ctx.chat)?.key ?? '');
       // 우주몰: 문의로 새로 들어온 물건에 진실 칸이 비었으면 「?」 (시그니처 상품 fixedItem 과 같게 — 광고 문구가 사실이 되지 않게, 전수검사 11-13)
       if (site === 'cos') { const had = new Set(st0.items.map((x) => x.id)); next = { ...next, items: next.items.map((x) => (!x.sold && !had.has(x.id) && !x.truth ? { ...x, truth: '?' } : x)) }; }
       // 말로 판 것: 운영자가 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리

@@ -385,7 +385,7 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
       next = applyShelf(st0, value, s);
     } else {
       const { value } = await generate(talkPrompt(src, s), s.model, parseTalk, opts);
-      next = applyTalk(st0, value, s.kick, s.talkStock);
+      next = applyTalk(st0, value, s.kick, s.talkStock, s.shelf);
       // 말로 판 것: 주인이 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리
       if (value.deal && next.sell && typeof next.sell.price === 'number') deal = next.sell.itemId;
     }

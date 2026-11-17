@@ -735,7 +735,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     return true;
   };
   // 근거 응답이 채팅에서 사라진 대기 줄은 먼저 버린다 (다시 굴린 응답이 2턴 규칙의 「다른 응답」으로 세어지지 않게)
-  prunePending(store, chat, ctx.settings.newPeople !== 'confirm');
+  prunePending(store, chat, ctx.settings.newPeople !== 'confirm', ctx.settings.keepMsgs);
   let newCount = 0;
   for (const n of ctx.only?.length ? [] : r.new_people ?? []) {
     const given = plain(n?.name, 40);
@@ -1653,7 +1653,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     const last = Math.max(...input.indexes);
     if (list[last]) {
       (store.scene ??= {})[messageKey(list[last], last)] = present;
-      capScene(store, chat, messageKey(list[last], last));
+      capScene(store, chat, messageKey(list[last], last), ctx.settings.keepScene);
     }
   }
 
