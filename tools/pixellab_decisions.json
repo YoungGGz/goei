@@ -1,0 +1,39 @@
+{
+  "_설명": "사용자가 정한 PixelLab 동작 규칙. pixellab_check.py 가 보내기 전에 대조하고, 다르면 보내지 않는다. 사용자 결정만 적는다(출처 날짜·말). Claude 판단·베이스 문서 값은 적지 않는다.",
+  "subjects": {
+    "persona": {
+      "character_ids": {
+        "여A": "999a9ba9-9fe4-45a7-ab06-129e849cf1f9",
+        "남A": "9cb911fe-dbcc-4d3c-8398-dfc777391847"
+      },
+      "base_state_directions": ["south-east", "south-west"],
+      "motion_directions": ["east", "west"],
+      "first_row_start": "south-east",
+      "excluded_kinds": ["샤워", "앉기", "화장실"],
+      "weapon": "권총",
+      "excluded_rows": ["고유기술", "필살기"],
+      "forbid_fields": ["initial_pose"],
+      "loop_moves_keep_first": true,
+      "_출처": [
+        "2026-11-16 03:38Z 「남동이나 남서를 기본 상태로 하고 동작 방향은 동 서로 한다」",
+        "2026-11-17 03:41Z 「내가 시작 자세 뭐라고 했지?」 — 동쪽 선 그림에서 시작한 것을 지적",
+        "2026-11-16 09:13Z 「샤워랑 앉아있는거 제외」, 2026-11-17 02:15Z 「그래」(화장실 제외·권총·고유기술·필살기 제외)",
+        "2026-11-12 「시작 자세는 그리고 왜 텍스트로 정해」",
+        "2026-11-16 08:15Z 「첫장 유지를 끄면 달리다 멈추면 어떻게 되는데」"
+      ]
+    },
+    "공장": {
+      "character_ids": {"B_pro": "b7757cd4-2ea6-4807-8ece-03b01a1d3da5"},
+      "base_state_directions": ["south"],
+      "motion_directions": ["south"],
+      "first_row_start": "south",
+      "min_frames": {"걷기": 12, "달리기": 12},
+      "loop_moves_keep_first": true,
+      "_출처": [
+        "2026-11-16 08:05Z 「대기상태 남쪽 <- 모든 동작의 시작」「남쪽 자체가 사실상 남동이라서 그냥 쓰는거야」",
+        "2026-11-16 08:23Z 「왜 한번 말하면 안듣지?」 — 동쪽으로 바꾼 것을 지적",
+        "2026-11-16 08:27Z 「프레임이 부족하다는 생각은 안하냐?」 — 8장 부족"
+      ]
+    }
+  }
+}
