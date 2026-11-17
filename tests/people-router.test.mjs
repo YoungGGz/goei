@@ -71,8 +71,8 @@ test('2026-11-07 설정 L·M·N·P: 항상 포함 인물, 최근 글 범위, 증
   assert.ok(input.people.includes('데쥬레'), '글에 안 나온 always 인물도 갱신 대상');
   assert.deepEqual(input.data.tracking_review.refs.sort(), ['데쥬레', '쟈알디']);
   assert.equal(U.buildUpdate(c, store, [1], { settings: St.peopleSettings({}), system: 'S', values: {}, names }).data.tracking_review, undefined);
-  // M: Router·Director 최근 글 수 (기본 4, 0 이면 없음), 갱신기 직전 쌍 기본 2
-  assert.equal(St.peopleSettings({}).recentMsgs, 4);
+  // M: Router·Director 최근 글 수 (기본 2, 0 이면 없음), 갱신기 직전 쌍 기본 2
+  assert.equal(St.peopleSettings({}).recentMsgs, 2);
   assert.equal(St.peopleSettings({}).prevPairs, 2);
   const long = chat(...Array.from({ length: 6 }, (_, i) => [i % 2 ? 'char' : 'user', `글 ${i}`, `m${i}`]));
   assert.equal(Ro.buildRouter(long, store, names, '입력', { recent: 2 }).data.recent.length, 2);

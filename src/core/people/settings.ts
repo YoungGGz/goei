@@ -31,7 +31,7 @@ export const PP_DEFAULTS: Record<string, string> = {
   router_timeout: '60',
   /** 2026-11-07 (전수검사 4 의 L·M·P, 원본 trackedCharactersByScope·stageContext·Router 지침): 항상 포함할 인물(쉼표·줄바꿈), Router·Director 가 보는 최근 글 수, Router 에 덧붙일 지침 */
   always: '',
-  recent_msgs: '4',
+  recent_msgs: '2',
   router_rules: '',
   /** 리수폿 J-2 단계별 모델: same = 갱신 모델과 같게 */
   model_director: 'same', model_router: 'same', model_tidy: 'same',
