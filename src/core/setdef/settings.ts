@@ -81,6 +81,8 @@ export const SETTINGS_SET: SetPage = {
         { key: 'items-skip', label: '만들지 않을 것', ctl: { t: 'custom' }, help: '여기 적은 것은 물건으로 만들지 않아요. 갱신기에 그대로 넘기는 글이에요. 예: 지급받은 옷, 명함, 영수증' },
         { key: 'items-state', label: '상태 바꾸기', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '켜면 갱신기가 응답을 보고 물건을 손상·고장·파괴로 바꿔요. 끄면 손상·고장은 받지 않고, 부서진 물건은 「없어짐」으로만 빠져요.' },
         { key: 'items-spent', label: '다 쓴 물건', ctl: { t: 'seg', opts: [['remove', '목록에서 빼기'], ['keep', '남겨 두기']] }, help: '남은 횟수가 0이 된 소모품을 어떻게 할지예요. 남겨 두면 「다 씀」으로 칸에 남고 메인 요청에도 used up 으로 넘어가요(빈 병·다 쓴 탄창처럼).' },
+        { key: 'items-away-turns', label: '치운 물건 기억', ctl: { t: 'custom' } },
+        { key: 'items-list-cap', label: '물건 줄 상한', ctl: { t: 'custom' } },
         { key: 'items-logturns', label: '사용·처분 기록 넘기기', ctl: { t: 'custom' } },
         { key: 'items-start', label: '시작 소지품', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '고유 인물로 시작할 때 명부의 「시작 소지품」을 넣고 손에 드는 것은 손 칸, 장비는 장착할지예요. 새 채팅을 시작할 때만 쓰여요.' },
       ],

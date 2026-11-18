@@ -20,7 +20,7 @@ import { boxLanded } from './homeshop';
 import { EQUIP_LABEL, EQUIP_SLOTS, STATE_LABEL, cleanIcon, itemEquip, itemState, itemUses, itemWeight, type ItemEquip, type ItemState } from './itemtraits';
 export * from './itemtraits';
 import type { StartItem } from './startitems';
-import { FORM_EMPTY, kindOfIcon, leftWordIn, nameFilled, offWordIn, traitsFor } from './itemrules';
+import { FORM_EMPTY, itemListCap, kindOfIcon, leftWordIn, nameFilled, offWordIn, traitsFor } from './itemrules';
 import { splitIconWord } from './iconmatch';
 export * from './itemrules';
 
@@ -470,8 +470,7 @@ export function addItemLog(it: Items, l: Omit<ItemLog, 'id' | 'at'> & { id?: str
   return compactLog({ ...it, log: [...it.log, row] }, alive && withAnchor(alive, row.anchor));
 }
 
-/** 줄 수 한도 (넘으면 아래 정리) */
-const ITEM_LIST_CAP = 200;
+/** 줄 수 한도 (넘으면 아래 정리). 물건 줄 한도는 설정 「물건 줄 상한」(core/itemrules.ts itemListCap) */
 const ITEM_LOG_CAP = 400;
 /** 방금 넣은 줄의 응답은 살아 있는 것으로 본다 (정리가 새 줄을 지우지 않게) */
 const withAnchor = (alive: Set<string>, anchor: string): Set<string> => (!anchor || alive.has(anchor) ? alive : new Set([...alive, anchor]));
@@ -479,7 +478,7 @@ const withAnchor = (alive: Set<string>, anchor: string): Set<string> => (!anchor
 /** 물건 줄 정리 (전수검사 11-13: 그냥 앞에서 자르면 시작 장비가 빠졌다). 한도를 넘은 만큼 오래된 것부터
  *  ① 기준 응답이 사라진 줄 → ② 판·파괴된·다 쓴 줄. 살아 있는 줄과 직접 넣은·시작 줄(anchor '')은 빼지 않는다 */
 function compactList(it: Items, alive: Set<string>): Items {
-  let over = it.list.length - ITEM_LIST_CAP;
+  let over = it.list.length - itemListCap();
   if (over <= 0) return it;
   const drop = new Set<Item>();
   const tiers: ((e: Item) => boolean)[] = [
@@ -518,6 +517,46 @@ function compactLog(it: Items, alive?: Set<string>): Items {
     return true;
   });
   return drop.size ? { ...it, list, log: it.log.filter((l) => !drop.has(l)) } : it;
+}
+
+/** 치운 물건 기억 (2026-11-17 사용자: 치운 물건은 치운 뒤 N턴까지만 기억한다. 종류를 나누지 않는다). 0 = 계속 */
+export const ITEM_AWAY_TURNS_VAR = '$it_away_turns';
+export const ITEM_AWAY_TURNS_DEFAULT = 30;
+export const ITEM_AWAY_TURNS_MAX = 300;
+export const ITEM_AWAY_TURNS_STEP = 5;
+export const itemAwayTurns = (vars: Record<string, unknown> | undefined): number => {
+  const raw = vars?.[ITEM_AWAY_TURNS_VAR];
+  if (raw === undefined || raw === null || raw === '') return ITEM_AWAY_TURNS_DEFAULT;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? Math.min(ITEM_AWAY_TURNS_MAX, n) : ITEM_AWAY_TURNS_DEFAULT;
+};
+/** 그 메시지 뒤에 온 봇 응답 수 (턴 세기는 recentItemLog 와 같이 봇 응답 하나 = 1턴). 채팅에 없는 키는 undefined */
+function turnsAfter(chat: Chat): (key: string) => number | undefined {
+  const list = chat.message ?? [];
+  const at = new Map<string, number>();
+  let later = 0;
+  for (let i = list.length - 1; i >= 0; i--) {
+    at.set(messageKey(list[i], i), later);
+    if (list[i].role === 'char') later++;
+  }
+  return (key) => at.get(key);
+}
+/** 치운 물건을 아직 기억하는가: 치운 때(치운 응답, 사용자가 버린 것은 그때의 마지막 메시지)에서 turns 턴 안이면 기억한다.
+ *  치운 때를 모르는 줄(키가 없거나 그 메시지가 사라짐)은 나이를 모르니 기억한다. 저장 정리(forgetAway)와 자료 items_away(itemsAwayOf)가 같이 쓴다 */
+function awayKept(e: Item, after: (key: string) => number | undefined, turns: number): boolean {
+  if (turns <= 0) return true;
+  const key = e.outAt || e.outKey;
+  const n = key ? after(key) : undefined;
+  return n === undefined || n <= turns;
+}
+/** 치운 지 설정 「치운 물건 기억」 턴이 지난 줄을 목록에서 지운다. 기록 줄(log)과 갖고 있는 물건은 건드리지 않는다 */
+export function forgetAway(it: Items, chat: Chat): Items {
+  const turns = itemAwayTurns(chat.scriptstate);
+  if (turns <= 0 || !it.list.some((e) => e.outHow)) return it;
+  const alive = aliveAnchors(chat);
+  const after = turnsAfter(chat);
+  const list = it.list.filter((e) => !isOut(e, alive) || awayKept(e, after, turns));
+  return list.length === it.list.length ? it : { ...it, list };
 }
 
 /** 물건 빼기 → 기록에 한 줄. what: drop(버림)·gone(본문에서 없어짐)·destroy(파괴)·sell(상점에 팖) */
@@ -1223,8 +1262,10 @@ export function itemsNowOf(chat: Chat, pictures?: (name: string, icon?: string) 
 export function itemsAwayOf(chat: Chat): { name: string; place?: string }[] {
   const it = readItems(chat.scriptstate);
   const alive = aliveAnchors(chat);
+  const turns = itemAwayTurns(chat.scriptstate);
+  const after = turnsAfter(chat);
   return outItems(it, alive)
-    .filter((e) => outItemOf(it, alive, e.name) === e)
+    .filter((e) => outItemOf(it, alive, e.name) === e && awayKept(e, after, turns))
     .map((e) => ({ name: e.name, ...(e.place ? { place: e.place } : {}) }));
 }
 

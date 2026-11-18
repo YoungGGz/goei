@@ -28,7 +28,7 @@ import { findStatusTags } from '../core/world/status';
 import { colConfig } from '../core/world/statuscols';
 import { mentionsPoints, pointsOn, pointsVars, readPoints, syncPointsToStatus } from '../core/points';
 import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
-import { applyItemChanges, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
+import { applyItemChanges, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
 import { bmAsked, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
 import { getPrefs } from '../core/settings';
@@ -450,6 +450,12 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           const done = confirmBmPickups(readItems(next.scriptstate), orders, bmAsked(orders, prevKey), report.pickup.names, alive, report.pickup.anchor, itemChanges);
           itemChanges = done.changes;
           if (done.got.length) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(done.it), ...bmOrdersVars(done.orders) } };
+        }
+        // 치운 지 오래된 물건 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway). 이번 요청의 items_away 도 같은 기준으로 걸렀다
+        if (itemsOn) {
+          const it0 = readItems(next.scriptstate);
+          const it1 = forgetAway(it0, next);
+          if (it1 !== it0) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it1) } };
         }
         if (itemChanges.length) {
           // 판정 표·「두고 옴」 말은 이 채팅의 설정으로 (core/itemrules.ts). order = 메시지 차례 (사용자가 버린 물건은 버린 뒤의 메시지가 근거일 때만 되살린다)

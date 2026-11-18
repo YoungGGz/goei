@@ -53,7 +53,18 @@ export function parseItemRules(text: string): { kinds: Map<string, ItemTraits | 
 }
 export const parseWords = (text: string): string[] => [...new Set(String(text ?? '').split(/[,，\n]/).map((w) => w.replace(/\s+/g, ' ').trim()).filter(Boolean))];
 
-interface Rules { traits: ReturnType<typeof parseItemRules>; left: string[]; off: string[]; grades: [string, string][] }
+interface Rules { traits: ReturnType<typeof parseItemRules>; left: string[]; off: string[]; grades: [string, string][]; listCap: number }
+/** 물건 줄 상한 (2026-11-17 사용자: 코드에 박힌 수를 설정으로). 목록($st_items)의 줄이 이 수를 넘으면 사라진 응답의 줄·판·파괴된·다 쓴 줄을 오래된 것부터 뺀다 (core/items.ts compactList) */
+export const ITEM_LIST_CAP_VAR = '$it_list_cap';
+export const ITEM_LIST_CAP_DEFAULT = 200;
+export const ITEM_LIST_CAP_MIN = 50;
+export const ITEM_LIST_CAP_MAX = 1000;
+export const ITEM_LIST_CAP_STEP = 50;
+export const itemListCapOf = (vars: Record<string, unknown> | undefined): number => {
+  const raw = vars?.[ITEM_LIST_CAP_VAR];
+  const n = raw === undefined || raw === null || raw === '' ? NaN : Number(raw);
+  return Number.isInteger(n) ? Math.min(ITEM_LIST_CAP_MAX, Math.max(ITEM_LIST_CAP_MIN, n)) : ITEM_LIST_CAP_DEFAULT;
+};
 /** 등급 이름 표 글 → [이름, 등급 글자] */
 export function parseGradeWords(text: string): [string, string][] {
   const out: [string, string][] = [];
@@ -68,13 +79,15 @@ export function parseGradeWords(text: string): [string, string][] {
 }
 const build = (vars: Record<string, unknown> | undefined): Rules => {
   const txt = (k: string, def: string) => { const s = String(vars?.[k] ?? ''); return s.trim() ? s : def; };
-  return { traits: parseItemRules(txt(ITEM_RULES_VAR, ITEM_RULES_DEFAULT)), left: parseWords(txt(ITEM_LEFT_WORDS_VAR, ITEM_LEFT_WORDS_DEFAULT)), off: parseWords(txt(ITEM_OFF_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT)), grades: parseGradeWords(ITEM_GRADE_WORDS_DEFAULT) };
+  return { traits: parseItemRules(txt(ITEM_RULES_VAR, ITEM_RULES_DEFAULT)), left: parseWords(txt(ITEM_LEFT_WORDS_VAR, ITEM_LEFT_WORDS_DEFAULT)), off: parseWords(txt(ITEM_OFF_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT)), grades: parseGradeWords(ITEM_GRADE_WORDS_DEFAULT), listCap: itemListCapOf(vars) };
 };
 let rules: Rules = build(undefined);
 /** 지금 채팅의 표를 올린다 (host/risu.ts loadContext · 갱신기 적용 직전). 빈 값은 기본 표 */
 export function setItemRules(vars: Record<string, unknown> | undefined | null): void {
   rules = build(vars ?? undefined);
 }
+/** 지금 채팅의 물건 줄 상한 (setItemRules 가 올린 값) */
+export const itemListCap = (): number => rules.listCap;
 
 /** 그림 낱말(종류/물건말/english)의 종류 코드 (모르면 '') */
 export const kindOfIcon = (icon: unknown): string => splitIconWord(typeof icon === 'string' ? icon : '').kind;
