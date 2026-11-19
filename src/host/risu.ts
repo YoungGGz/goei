@@ -111,18 +111,22 @@ async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Cha
   // 응답이 끝나기 전에 다른 채팅을 열었어도 그 채팅 값으로 정리하지 않는다)
   applyChatLimits(latest.scriptstate);
   const key = `${charIndex}:${chatIndex}`;
+  const read = latest.scriptstate;
   let next: Chat | null = null;
   try {
     next = mutate(latest);
   } finally {
-    // 저장이 끝나면 열려 있는 채팅의 값으로 되돌린다. 열려 있는 채팅을 저장했으면 저장한 값이 곧 그 값이다
-    if (shown && shown.key === key) {
-      if (next) shown = { key, state: next.scriptstate };
-      applyChatLimits(shown.state);
-    } else if (shown) applyChatLimits(shown.state);
+    // mutate 가 끝나면 열려 있는 채팅의 값으로 되돌린다. 열려 있는 채팅이면 방금 읽은 값이 그 값이다
+    if (shown && shown.key === key) shown = { key, state: read };
+    if (shown) applyChatLimits(shown.state);
   }
   if (!next) return null;
   await risuai.setChatToIndex(charIndex, chatIndex, next);
+  // 열려 있는 채팅을 저장했으면 쓰기가 된 뒤에 저장한 값을 그 채팅 값으로 삼는다 (쓰기가 실패하면 읽은 값 그대로)
+  if (shown && shown.key === key) {
+    shown = { key, state: next.scriptstate };
+    applyChatLimits(shown.state);
+  }
   return next;
 }
 

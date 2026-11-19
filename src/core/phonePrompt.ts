@@ -346,6 +346,8 @@ export interface RefreshPlan {
 /** 전체 새 메시지 확인 (원본 refreshPrompt): 대화 중인 방 + 공개된 연락처 전부 + 공지 + 단톡 초대 */
 export function refreshPrompt(src: RefSource, st: PState, dir: Directory, names: Record<string, string>, rng: () => number): RefreshPlan {
   const chat = src.chat;
+  // 이 채팅의 고급 설정으로 맞춘다 (선톡·초대 쉬는 턴을 열려 있는 다른 채팅 값으로 보지 않게)
+  applyAdvanced(chat.scriptstate);
   const set = phoneSettings(chat.scriptstate);
   const t = fnRefs(chat.scriptstate, 'ph', 'check');
   const history = fnHistory(chat.scriptstate, 'ph', 'check');
