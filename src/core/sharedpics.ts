@@ -63,8 +63,8 @@ function rank(table: Table, name: string, text: string, seed: string): string[] 
 
 // ── 괴이·사건: 그림 한 장마다 낱말 ──
 interface Pic { n: number; w: string[]; in?: boolean; inc?: string[] }
-/** pics 가 없으면 그림 한 장(이름 = k, 숫자 없음) */
-interface Place { k: string; w?: string[]; pics?: Pic[]; g?: { w: string[]; p: number[] }; near?: string; inc?: string[]; base?: boolean }
+/** pics 가 없으면 그림 한 장(이름 = k, 숫자 없음). old: 같은 장소를 옛 이름으로 이미 뽑은 그림 (k 그림이 없을 때 그다음 후보, 11-19 대조표의 같은 장소·되살림) */
+interface Place { k: string; old?: string[]; w?: string[]; pics?: Pic[]; g?: { w: string[]; p: number[] }; near?: string; inc?: string[]; base?: boolean }
 const PLACES = (pw as { places: Place[] }).places;
 
 /** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고, 같은 글자로 끝나는 다른 낱말은 뺀다 */
@@ -197,7 +197,7 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
 function picsOf(h: Hit, cue: 'in' | 'out' | '', seed: string): string[] {
   const p = h.place;
   if (p.base) return ['@'];
-  if (!p.pics) return [p.k];
+  if (!p.pics) return [p.k, ...(p.old ?? [])];
   const all = p.pics.map((x) => x.n);
   const pool = h.pic ? [h.pic] : (p.g?.p ?? all);
   const start = pick(seed, pool.length);
