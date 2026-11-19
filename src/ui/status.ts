@@ -3,6 +3,7 @@
 import { dayInfo, elapsedLabel, sceneLabel, statusMinute, storyDay, type ColId, type StatusTag, type StatusTimeline } from '../core/world';
 import { formatDelta, formatWon } from '../core/wallet';
 import { formatPoints } from '../core/points';
+import { nameEndsAt } from '../core/lore';
 import type { StatusStyle, Theme } from '../core/settings';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -20,6 +21,7 @@ export interface StatusContext {
 }
 
 const squash = (t: string) => t.replace(/\s+/g, '');
+const LETTER = /[\p{L}\p{N}]/u;
 const escRe = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** 띄어쓰기를 봐주는 이름인가: 한글이 든 세 글자 이상의 이름 (본편 로어북 고르기 core/lore.ts keyRegex 와 같은 기준. 사람 이름은 부르는 쪽이 뺀다) */
 export const looseTerm = (term: string): boolean => /[가-힣]/.test(term) && [...squash(term)].length >= 3;
@@ -34,7 +36,13 @@ export function linkTerms(text: string, terms: StatusContext['terms']): string {
   for (const { term, loose } of terms) {
     if (loose) {
       const re = new RegExp([...squash(term)].map(escRe).join('[ \\t]*'), 'gu');
-      for (const m of text.matchAll(re)) put(m.index ?? 0, (m.index ?? 0) + m[0].length);
+      for (const m of text.matchAll(re)) {
+        const at = m.index ?? 0;
+        const end = at + m[0].length;
+        // 띄어쓰기가 이름과 다르게 걸린 것은 낱말로 떨어질 때만: 「미술 관련」의 「미술 관」, 「지하 드럭스토어」의 「지하 드」는 그 이름이 아니다
+        if (m[0] !== term && (LETTER.test(text[at - 1] ?? '') || !nameEndsAt(text, end))) continue;
+        put(at, end);
+      }
       continue;
     }
     let from = 0;

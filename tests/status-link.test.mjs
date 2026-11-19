@@ -20,6 +20,16 @@ test('띄어 쓴 이름에도 밑줄을 긋는다', () => {
   assert.equal(M.linkTerms('여우 상담실 앞', terms), `${link('여우 상담실')} 앞`);
 });
 
+test('띄어쓰기가 다르게 걸린 것은 낱말로 떨어질 때만', () => {
+  const t = [{ term: '미술관', title: '미술관', loose: true }, { term: '오후역', title: '오후역', loose: true }, { term: '영원마을', title: '영원마을', loose: true }, { term: '지하드', title: '서울중앙성원', loose: true }];
+  for (const line of ['학교 미술 관련 자료실', '시립 미술 관람실', '오후 역할 분담 회의', '영원 마을버스 정류장', '쇼핑몰 지하 드럭스토어', '현대미 술관 앞']) assert.equal(M.linkTerms(line, t), line, line);
+  assert.equal(M.linkTerms('오후 역 앞 집결', t), `${link('오후 역')} 앞 집결`);
+  assert.equal(M.linkTerms('오후 역에서 대기', t), `${link('오후 역')}에서 대기`);
+  assert.equal(M.linkTerms('화요 퀴즈쇼에서 탈출', terms), `${link('화요 퀴즈쇼')}에서 탈출`);
+  // 이름 그대로 쓴 것은 전과 같이 어디서든
+  assert.equal(M.linkTerms('현대미술관람', t), `현대${link('미술관')}람`);
+});
+
 test('사람 이름(loose 아님)은 글자가 똑같을 때만', () => {
   assert.equal(M.linkTerms('이 도형은 뭐지', terms), '이 도형은 뭐지');
   assert.equal(M.linkTerms('이도형 요원', terms), `${link('이도형')} 요원`);

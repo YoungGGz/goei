@@ -65,6 +65,9 @@ export function refreshReportCards(chat: Chat): void {
   cards = collectCards(chat);
 }
 
+/** 인물 문서: 여는 태그의 doc_type */
+const PERSON_DOC = /^\s*<lightboard-namuwiki[^>]*\bdoc_type="person"/;
+
 /** 이 채팅의 상태창 시각 목록과 위키 이름을 다시 모은다 */
 export async function refreshStatusContext(charIndex: number, chatIndex: number, known?: { chat: Chat; char: { globalLore?: LoreEntry[] } | null }): Promise<void> {
   if (charIndex < 0 || chatIndex < 0) return;
@@ -74,10 +77,13 @@ export async function refreshStatusContext(charIndex: number, chatIndex: number,
   if (!chat) return;
   const texts = (chat.message ?? []).filter((m) => m.role === 'char' && typeof m.data === 'string').map((m) => m.data);
   await prepareBaseDocs(char?.globalLore).catch(() => undefined);
-  // 띄어쓰기 봐주기(loose): 사람 이름은 뺀다 (「이 도형」이 이도형으로 걸리지 않게. core/lore.ts 와 같은 규칙)
+  // 띄어쓰기 봐주기(loose): 사람 이름은 뺀다 (「이 도형」이 이도형으로 걸리지 않게. core/lore.ts 와 같은 규칙).
+  // 사람 이름 = 명부 요원의 이름·별칭(거점 별칭으로 먼저 올라온 것도), 인물 문서의 제목
+  const reg = buildRegistry(char?.globalLore).entries;
+  const people = new Set(reg.filter((e) => e.key.startsWith('Agent roster/')).flatMap((e) => e.terms));
   const titles = new Map<string, { title: string; loose: boolean }>();
-  for (const e of buildRegistry(char?.globalLore).entries) for (const t of e.terms) if (t.length >= 2 && !titles.has(t)) titles.set(t, { title: e.name, loose: !e.key.startsWith('Agent roster/') && looseTerm(t) });
-  for (const d of listDocs(chat, char?.globalLore)) if (d.title.length >= 2 && !titles.has(d.title)) titles.set(d.title, { title: d.title, loose: looseTerm(d.title) });
+  for (const e of reg) for (const t of e.terms) if (t.length >= 2 && !titles.has(t)) titles.set(t, { title: e.name, loose: !people.has(t) && looseTerm(t) });
+  for (const d of listDocs(chat, char?.globalLore)) if (d.title.length >= 2 && !titles.has(d.title)) titles.set(d.title, { title: d.title, loose: !PERSON_DOC.test(d.body) && looseTerm(d.title) });
   const terms = [...titles].map(([term, v]) => ({ term, title: v.title, ...(v.loose ? { loose: true } : {}) })).sort((a, b) => b.term.length - a.term.length);
   // 칸 구성: 파서에 알리고(칸 수로 모양 찾기), 상자에서 숨길 칸을 정한다
   setStatusColumns(chat.scriptstate);
