@@ -320,8 +320,10 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const pointBal = pointsUse ? walletBalance(readPoints(fresh.chat.scriptstate), aliveAnchors(fresh.chat)) : null;
       const batchKeys = batches[b].map((i) => (fresh.chat.message[i] ? messageKey(fresh.chat.message[i], i) : '')).filter(Boolean);
       // 치운 물건 기억의 턴을 세는 기준: 이번에 읽는 응답 가운데 가장 뒤의 것 (core/items.ts turnsAfter)
-      const asOfAt = Math.max(...batches[b]);
-      const asOfKey = fresh.chat.message[asOfAt] ? messageKey(fresh.chat.message[asOfAt], asOfAt) : undefined;
+      // 지울 때는 가장 뒤의 응답에서, 자료 items_away 는 가장 앞의 응답에서 센다 (한 묶음에 여러 응답: 앞 응답에서 되찾은 물건의 이름이 빠지지 않게)
+      const keyAt = (i: number) => (fresh.chat.message[i] ? messageKey(fresh.chat.message[i], i) : undefined);
+      const asOfKey = keyAt(Math.max(...batches[b]));
+      const awayAsOf = keyAt(Math.min(...batches[b]));
       // 소지품 (core/items.ts): 설정 「보조 모델이 읽기」가 켜져 있으면 지금 목록을 자료에 넣고 소지품 절을 켠다
       const itemsOn = itemAutoOn(fresh.chat.scriptstate);
       const itemsNow = itemsOn ? itemsNowOf(fresh.chat, itemPictures) : null;
@@ -337,7 +339,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const prevChar = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' && i < lastChar ? i : a), -1);
       const prevKey = prevChar >= 0 ? messageKey(fresh.chat.message[prevChar], prevChar) : '';
       const pickNames = !o.scope?.only && lastChar >= 0 && batches[b].includes(lastChar) && bmPickupConfirm(fresh.chat.scriptstate) ? bmAsked(liveBmOrders(fresh.chat.scriptstate, aliveAnchors(fresh.chat)), prevKey).map((x) => x.item.name) : [];
-      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat, asOfKey) : [] });
+      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat, awayAsOf) : [] });
       // 지침은 자료를 본 뒤 조립한다 (저장 상한을 넘긴 인물이 있으면 정리 절을 켠다)
       const sections = enabledSections(settings);
       if (input.tidy.length) sections.add('tidy');

@@ -12,7 +12,7 @@ import { itemIconStatus, itemIconUrl, itemPictures } from '../host/itemicons';
 import { aliveAnchors } from '../core/wallet';
 import {
   addItem, addUse, canMerge, canUse, invOn, dropUse, EQUIP_LABEL, EQUIP_SLOTS, equipItem, equippedOf, gridItems, isEquipped, ITEM_SPENT_VAR, ITEM_USE_AT_VAR, ITEMS_VAR, itemCarry, itemEditOn, itemLeft, itemSlots, itemUseVars, itemWeight, itemsVars, lastBotKey, liveItems, mergeItems, mergeUse, queueUseVars, usesToSend, seatLost, useNeedsSeat,
-  forgetAway, purgeItem, readItemUse, readItems, removeItem, searchItems, setItemLeft, slotKind, STATE_LABEL, lineWeight, totalWeight, unequipItem, updateItem, weightText,
+  forgetAway, itemAutoOn, purgeItem, readItemUse, readItems, removeItem, searchItems, setItemLeft, slotKind, STATE_LABEL, lineWeight, totalWeight, unequipItem, updateItem, weightText,
   type Item, type ItemEquip, type ItemLog, type Items, type ItemUse,
 } from '../core/items';
 import { findStatusTags } from '../core/world/status';
@@ -437,8 +437,10 @@ export interface ItemsEnv {
 export async function itemsAction(action: string, value: string | undefined, ctx: ChatContext, env: ItemsEnv, formEl?: HTMLElement | null): Promise<boolean> {
   const write = (fn: (it: Items, alive: Set<string>) => Items) => updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
     const cur = readItems(chat.scriptstate);
-    // 저장할 때마다 치운 지 오래된 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway)
-    const next = forgetAway(fn(cur, aliveAnchors(chat)), chat);
+    // 갱신기가 물건을 읽지 않는 채팅은 여기서 치운 지 오래된 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway).
+    // 갱신기가 읽는 채팅은 갱신기가 읽은 응답 기준으로 지운다 (host/people.ts): 밀린 응답이 있을 때 채팅 끝에서 세어 먼저 지우지 않게
+    const done = fn(cur, aliveAnchors(chat));
+    const next = itemAutoOn(chat.scriptstate) ? done : forgetAway(done, chat);
     if (next === cur) return null;
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(next) } };
   });
