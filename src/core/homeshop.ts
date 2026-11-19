@@ -671,8 +671,6 @@ export function nextDrop(left: number, end: number, rest: { ms: number; planned:
 
 export const HS_ORDERS_VAR = '$hs_orders';
 export const HS_AUD_VAR = '$hs_aud';
-/** 남겨 두는 주문 수의 기본값 (설정 「주문 기록 수」) */
-export const HS_ORDERS_MAX = 40;
 export interface HsOrder {
   id: string;
   /** 상품 (상자를 열면 소지품에 들어갈 것) */
@@ -703,20 +701,20 @@ export function readOrders(vars: Vars): HsOrder[] {
     return [];
   }
 }
-/** 넘치면 상자를 연 주문과 죽은 주문(주문한 응답이 지워진 것)부터 오래된 순으로 버린다. 안 연 상자가 걸린 주문은 버리지 않는다 — 버리면 그 상자를 못 열어 값을 치른 물건을 못 받는다.
- *  alive: 살아 있는 응답 키. 안 주면 연 주문만 버린다 */
-export function pruneOrders(list: HsOrder[], max = HS_ORDERS_MAX, alive?: Set<string>): HsOrder[] {
+/** 새 주문을 넣을 때만 부른다. 넘치면 죽은 주문(주문한 응답이 지워진 것)과 다 끝난 연 주문부터 오래된 순으로 버린다. 남길 것만 남으면 수를 넘겨도 둔다.
+ *  남기는 주문: 안 연 상자가 걸린 것(버리면 그 상자를 못 연다) · 시연 호출이 남은 것 · 연 응답이 마지막 응답인 것(다시 굴리면 상자가 미개봉으로 돌아온다).
+ *  now: 살아 있는 응답 키 · 지금 턴 · 마지막 응답 키 */
+export function pruneOrders(list: HsOrder[], max: number, now: { alive: Set<string>; turn: number; last: string }): HsOrder[] {
   const out = [...list];
-  const gone = (o: HsOrder): boolean => (alive ? (!!o.anchor && !alive.has(o.anchor)) || orderOpened(o, alive) : o.openKey !== undefined);
+  const keep = (o: HsOrder): boolean => (!o.anchor || now.alive.has(o.anchor)) && (!orderOpened(o, now.alive) || o.dues.some((d) => d >= now.turn) || (!!o.openKey && o.openKey === now.last));
   while (out.length > Math.max(1, max)) {
-    const i = out.findIndex(gone);
+    const i = out.findIndex((o) => !keep(o));
     if (i < 0) break;
     out.splice(i, 1);
   }
   return out;
 }
-/** max: 둘 수 (설정 「주문 기록 수」). 안 주면 기본 */
-export const ordersVars = (list: HsOrder[], max = HS_ORDERS_MAX, alive?: Set<string>): Record<string, string> => ({ [HS_ORDERS_VAR]: list.length ? JSON.stringify(pruneOrders(list, max, alive)) : '' });
+export const ordersVars = (list: HsOrder[]): Record<string, string> => ({ [HS_ORDERS_VAR]: list.length ? JSON.stringify(list) : '' });
 /** 살아 있는 주문 (주문한 응답이 남아 있는 것) */
 export const liveOrders = (vars: Vars, alive: Set<string>): HsOrder[] => readOrders(vars).filter((o) => !o.anchor || alive.has(o.anchor));
 /** 이 응답 뒤에 주문해 상자가 들어온 주문이 있나 (그 턴의 메인 요청에 받는 법 ARRIVE 를 한 번 붙인다. 같은 턴에 열어 버렸어도 들어온 것은 들어온 것) */
