@@ -83,6 +83,18 @@ export const clip = (s: string, max = TRACE_TEXT): string => {
   return `${s.slice(0, head)}\n…(${s.length - max}자 생략)…\n${s.slice(-tail)}`;
 };
 
+/** 저장소의 goei-trace:<id> 가운데 목록에 없는 것을 지운다. 못 지워도 진행 */
+async function sweepOrphans(keep: Set<string>): Promise<void> {
+  try {
+    const keys: unknown = await risuai.pluginStorage.keys();
+    for (const k of Array.isArray(keys) ? keys : []) {
+      if (typeof k === 'string' && k.startsWith(`${KEY}:`) && !keep.has(k.slice(KEY.length + 1))) await risuai.pluginStorage.removeItem(k).catch(() => {});
+    }
+  } catch {
+    /* 무시 */
+  }
+}
+
 async function load(): Promise<TraceTurn[]> {
   if (turns) return turns;
   if (!loading) {
@@ -110,6 +122,9 @@ async function load(): Promise<TraceTurn[]> {
           for (const t of turns) dirty.add(t.id);
           savedIds = null;
         }
+        // 목록에 없는 턴 기록을 지운다: 저장하다 앱이 닫히거나 지우기가 실패하면 그 턴 기록(몇 MB)이 저장소에 남아 다시는 안 지워졌다.
+        // 첫 저장보다 먼저 끝난다 (save 가 load 를 기다린다)
+        await sweepOrphans(new Set(savedIds ?? []));
       } catch {
         turns = [];
       }

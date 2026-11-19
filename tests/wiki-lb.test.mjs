@@ -51,6 +51,11 @@ test('위키: 자동 작성 제목 고르기 요청과 응답 읽기', () => {
   assert.match(m[0].content, /Return exactly \{"title"/);
   assert.match(m[1].content, /- 오후역/);
   assert.match(m[1].content, /이미 쓴 문서/);
+  // 이미 쓴 문서는 후보에 있는 제목만 넘긴다 (직접 제목을 쳐서 만든 문서는 후보가 아니라 빠진다). 하나도 없으면 머리말도 없다
+  const m2 = wikiTitlePrompt(src(), ['오후역', '어둠의 정원'], ['어둠의 정원', '3층 자판기'], {});
+  assert.match(m2[1].content, /이미 쓴 문서\]\n- 어둠의 정원/);
+  assert.doesNotMatch(m2[1].content, /3층 자판기/);
+  assert.doesNotMatch(wikiTitlePrompt(src(), ['오후역'], ['3층 자판기'], {})[1].content, /이미 쓴 문서/);
   assert.equal(acceptTitle('<think>x</think>{"title":"오후역"}', ['오후역', '어둠의 정원']), '오후역');
   assert.equal(acceptTitle('어둠의 정원', ['오후역', '어둠의 정원']), '어둠의 정원');
   assert.throws(() => acceptTitle('{"title":"관리국"}', ['오후역']), /후보에 없는/);

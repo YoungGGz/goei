@@ -610,7 +610,10 @@ export function wikiTitlePrompt(src: RefSource, candidates: string[], written: s
   // 머리말·목록 줄 꼴은 지침 「괴이위키」 NW.TITLE_* 절
   const item = (t: string) => guideTxt('Wiki', 'NW.TITLE_ITEM', { title: t });
   let user = `${guideTxt('Wiki', 'NW.TITLE_HEAD_CANDIDATES')}\n${candidates.map(item).join('\n')}`;
-  if (written.length) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_WRITTEN')}\n${written.map(item).join('\n')}`;
+  // 이미 쓴 문서는 후보에 있는 제목만 넘긴다: 모델은 후보 안에서만 고르니 그 밖의 제목은 쓸 데가 없고, 문서를 쓸수록 목록만 길어진다
+  const cand = new Set(candidates);
+  const done = written.filter((t) => cand.has(t));
+  if (done.length) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_WRITTEN')}\n${done.map(item).join('\n')}`;
   if (story) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_STORY')}\n${story}`;
   return [
     { role: 'system', content: factionCodesToNames(rule, names) },
