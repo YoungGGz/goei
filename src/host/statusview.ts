@@ -6,7 +6,7 @@ import { buildRegistry, colConfig, findStatusTags, hiddenCols, setStatusColumns,
 import { journalSettings, readReports, type Report } from '../core/journal';
 import { listDocs, prepareBaseDocs } from '../core/wiki';
 import type { Chat, LoreEntry } from '../core/types';
-import { statusHtml, type StatusContext } from '../ui/status';
+import { looseTerm, sameTerm, statusHtml, type StatusContext } from '../ui/status';
 import { reportCardHtml } from '../ui/reportcard';
 import { cardPalette, currentTheme } from '../ui/theme';
 import { armChatClick, elements, hit, onChatClick } from './chatclicks';
@@ -74,10 +74,11 @@ export async function refreshStatusContext(charIndex: number, chatIndex: number,
   if (!chat) return;
   const texts = (chat.message ?? []).filter((m) => m.role === 'char' && typeof m.data === 'string').map((m) => m.data);
   await prepareBaseDocs(char?.globalLore).catch(() => undefined);
-  const titles = new Map<string, string>();
-  for (const e of buildRegistry(char?.globalLore).entries) for (const t of e.terms) if (t.length >= 2 && !titles.has(t)) titles.set(t, e.name);
-  for (const d of listDocs(chat, char?.globalLore)) if (d.title.length >= 2 && !titles.has(d.title)) titles.set(d.title, d.title);
-  const terms = [...titles].map(([term, title]) => ({ term, title })).sort((a, b) => b.term.length - a.term.length);
+  // 띄어쓰기 봐주기(loose): 사람 이름은 뺀다 (「이 도형」이 이도형으로 걸리지 않게. core/lore.ts 와 같은 규칙)
+  const titles = new Map<string, { title: string; loose: boolean }>();
+  for (const e of buildRegistry(char?.globalLore).entries) for (const t of e.terms) if (t.length >= 2 && !titles.has(t)) titles.set(t, { title: e.name, loose: !e.key.startsWith('Agent roster/') && looseTerm(t) });
+  for (const d of listDocs(chat, char?.globalLore)) if (d.title.length >= 2 && !titles.has(d.title)) titles.set(d.title, { title: d.title, loose: looseTerm(d.title) });
+  const terms = [...titles].map(([term, v]) => ({ term, title: v.title, ...(v.loose ? { loose: true } : {}) })).sort((a, b) => b.term.length - a.term.length);
   // 칸 구성: 파서에 알리고(칸 수로 모양 찾기), 상자에서 숨길 칸을 정한다
   setStatusColumns(chat.scriptstate);
   ctx = { timeline: statusTimeline(texts), terms, hide: hiddenCols(colConfig(chat.scriptstate)) };
@@ -135,7 +136,7 @@ onChatClick('status', async (doc, x, y) => {
   for (const el of await elements(doc, '[data-goei-wiki]')) {
     if (!(await hit(el, x, y))) continue;
     const name = ((await el.textContent().catch(() => '')) ?? '').trim();
-    const title = ctx.terms.find((t) => t.term === name)?.title;
+    const title = (ctx.terms.find((t) => t.term === name) ?? ctx.terms.find((t) => sameTerm(t, name)))?.title;
     if (title && openWiki) openWiki(title);
     return true;
   }
