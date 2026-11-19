@@ -3,7 +3,7 @@
 // 시작 포인트는 0 (등급별 지급은 본문에 적힌 대로 갱신기가 거래로 적는다).
 import type { Chat } from './types';
 import { findStatusTags } from './world/status';
-import { addWalletEntry, aliveAnchors, liveWallet, removeWalletEntry, walletBalance, walletCapOf, WALLET_MAX, type Wallet } from './wallet';
+import { addWalletEntry, aliveAnchors, liveWallet, removeWalletEntry, walletBalance, WALLET_MAX, type Wallet } from './wallet';
 import { messageKey } from './people/store';
 import { colConfig, isPointsOrg, POINTS_ON_VAR } from './world/statuscols';
 import { guideTxt } from './guides';
@@ -11,6 +11,7 @@ export { isPointsOrg, pointsOrg } from './world/statuscols';
 
 export const POINTS_VAR = '$st_points';
 
+/** 포인트 장부 읽기. 여기서 자르지 않는다 (잘리면 잔액이 바뀐다): 줄 수 상한은 거래를 더할 때의 정리(core/wallet.ts compactWallet)가 지킨다 */
 export function readPoints(vars: Record<string, unknown> | undefined): Wallet {
   const raw = vars?.[POINTS_VAR];
   const empty: Wallet = { start: 0, log: [] };
@@ -18,7 +19,7 @@ export function readPoints(vars: Record<string, unknown> | undefined): Wallet {
   try {
     const o = JSON.parse(raw) as Partial<Wallet>;
     if (!o || typeof o !== 'object') return empty;
-    return { start: Number.isSafeInteger(o.start) ? (o.start as number) : 0, log: Array.isArray(o.log) ? o.log.filter((e) => !!e && typeof e === 'object' && typeof e.id === 'string' && typeof e.anchor === 'string' && Number.isSafeInteger(e.amount) && typeof e.memo === 'string').slice(-walletCapOf(vars)) : [] };
+    return { start: Number.isSafeInteger(o.start) ? (o.start as number) : 0, log: Array.isArray(o.log) ? o.log.filter((e) => !!e && typeof e === 'object' && typeof e.id === 'string' && typeof e.anchor === 'string' && Number.isSafeInteger(e.amount) && typeof e.memo === 'string') : [] };
   } catch {
     return empty;
   }

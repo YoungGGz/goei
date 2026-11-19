@@ -495,15 +495,16 @@ function compactList(it: Items, alive: Set<string>): Items {
 
 /** 기록 정리 (전수검사 11-13: 사용 기록이 잘리면 다 쓴 소모품이 되살았다). 한도를 넘은 만큼 오래된 것부터
  *  ① 기준 응답이 사라진 줄(alive 를 알 때) → ② 남은 횟수와 무관한 줄 → ③ 살아 있는 사용 기록: 그 횟수를 물건의 처음 횟수에서 먼저 빼 둬 남은 횟수가 그대로.
- *  처음 횟수가 1 아래로 내려가야 하면 그 줄은 남긴다 */
+ *  처음 횟수가 1 아래로 내려가야 하면 그 줄은 남긴다. 방금 넣은 마지막 줄은 빼지 않는다 */
 function compactLog(it: Items, alive?: Set<string>): Items {
   let over = it.log.length - itemLogCap();
   if (over <= 0) return it;
   const drop = new Set<ItemLog>();
   let list = it.list;
   const counted = (l: ItemLog) => l.what === 'use' && list.find((x) => x.id === l.item)?.uses !== undefined;
+  const old = it.log.slice(0, -1);
   const take = (ok: (l: ItemLog) => boolean) => {
-    for (const l of it.log) {
+    for (const l of old) {
       if (over <= 0) return;
       if (!drop.has(l) && ok(l)) { drop.add(l); over--; }
     }

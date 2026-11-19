@@ -27,7 +27,7 @@ import { messageText } from '../core/refs';
 import { findStatusTags } from '../core/world/status';
 import { colConfig } from '../core/world/statuscols';
 import { mentionsPoints, pointsOn, pointsVars, readPoints, syncPointsToStatus } from '../core/points';
-import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, setWalletCap, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
+import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { applyItemChanges, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
 import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
@@ -423,8 +423,6 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         // 이름을 옮긴 기록이 설정 「항상 포함할 인물」에 옛 호칭으로 적혀 있으면 새 이름으로 고쳐 적는다 (이름으로 적는 채팅 저장값은 인물 기록 밖에 이것뿐)
         const always = renameAlways(cur.scriptstate?.[PP('always')], report.applied.renamed);
         if (always !== null) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), [PP('always')]: always } };
-        // 거래 줄 상한은 이 채팅의 설정으로 (core/wallet.ts)
-        setWalletCap(cur.scriptstate);
         if (report.wallet.length) {
           let w = readWallet(cur.scriptstate, walletStart);
           const alive = aliveAnchors(cur); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)

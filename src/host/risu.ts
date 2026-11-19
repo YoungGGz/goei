@@ -102,6 +102,9 @@ async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Cha
   latest.message ??= [];
   // 저장 직전에 이 채팅의 고급 설정으로 맞춘다 (길이 제한·보관 수를 다른 채팅 값으로 쓰지 않게)
   applyAdvanced(latest.scriptstate);
+  // 거래 줄 상한·소지품 표와 줄 상한도 이 채팅의 값으로 (응답이 끝나기 전에 다른 채팅을 열었어도 그 채팅 값으로 정리하지 않게)
+  setWalletCap(latest.scriptstate);
+  setItemRules(latest.scriptstate);
   const next = mutate(latest);
   if (!next) return null;
   await risuai.setChatToIndex(charIndex, chatIndex, next);

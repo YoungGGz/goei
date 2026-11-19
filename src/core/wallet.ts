@@ -130,7 +130,7 @@ export const walletCapOf = (vars: Record<string, unknown> | undefined | null): n
   return Number.isInteger(n) && n >= WALLET_CAP_MIN ? Math.min(WALLET_CAP_MAX, n) : WALLET_CAP_DEFAULT;
 };
 let walletCap = WALLET_CAP_DEFAULT;
-/** 지금 채팅의 거래 줄 상한을 올린다 (host/risu.ts loadContext · 갱신기 적용 직전). 빈 값은 기본값 */
+/** 지금 채팅의 거래 줄 상한을 올린다 (host/risu.ts loadContext · 채팅 저장 직전 saveChat). 빈 값은 기본값 */
 export function setWalletCap(vars: Record<string, unknown> | undefined | null): void {
   walletCap = walletCapOf(vars);
 }

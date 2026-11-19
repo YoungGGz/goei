@@ -41,13 +41,21 @@ test('거래 줄 상한: 설정대로 가계부를 정리하고 잔고는 그대
   setWalletCap(undefined);
 });
 
-test('거래 줄 상한: 포인트 장부를 읽을 때도 같은 값', () => {
-  const log = Array.from({ length: 700 }, (_, i) => ({ id: `p${i}`, anchor: 'a1', amount: 1, memo: 'p', at: '' }));
+test('거래 줄 상한: 포인트 장부는 읽을 때 자르지 않는다 (상한을 낮춰도 잔액이 그대로, 정리는 거래를 더할 때)', () => {
+  const log = Array.from({ length: 250 }, (_, i) => ({ id: `p${i}`, anchor: 'a1', amount: 10, memo: 'p', src: 'story', at: '' }));
   const raw = JSON.stringify({ start: 0, log });
-  assert.equal(readPoints({ [POINTS_VAR]: raw }).log.length, 400);
-  assert.equal(readPoints({ [POINTS_VAR]: raw, [WALLET_CAP_VAR]: '200' }).log.length, 200);
-  assert.equal(readPoints({ [POINTS_VAR]: raw, [WALLET_CAP_VAR]: '600' }).log.at(0).id, 'p100');
-  assert.equal(readPoints({ [POINTS_VAR]: raw, [WALLET_CAP_VAR]: 'x' }).log.length, 400);
+  for (const cap of [undefined, '100', '2000', 'x']) {
+    const p = readPoints({ [POINTS_VAR]: raw, ...(cap ? { [WALLET_CAP_VAR]: cap } : {}) });
+    assert.equal(p.log.length, 250, String(cap));
+    assert.equal(walletBalance(p, alive), 2500, String(cap));
+  }
+  // 상한을 100으로 낮춘 뒤 거래 한 줄: 100줄로 줄고 잔액은 그대로
+  setWalletCap({ [WALLET_CAP_VAR]: '100' });
+  const p = addWalletEntry(readPoints({ [POINTS_VAR]: raw, [WALLET_CAP_VAR]: '100' }), { anchor: 'a1', amount: 10, memo: 'new', src: 'story', id: 'new' }, alive);
+  assert.equal(p.log.length, 100);
+  assert.equal(p.log.at(-1).id, 'new');
+  assert.equal(walletBalance(p, alive), 2510);
+  setWalletCap(undefined);
 });
 
 test('기록 줄 상한: 기본값은 400, 틀린 값은 기본값', () => {
@@ -80,5 +88,26 @@ test('기록 줄 상한: 설정대로 기록을 정리하고 남은 횟수는 �
   assert.equal(fill(650).log.length, 600);
   setItemRules({ [ITEM_LOG_CAP_VAR]: '엉뚱' });
   assert.equal(fill(450).log.length, 400);
+  setItemRules(undefined);
+});
+
+test('기록 줄 상한: 상한을 낮춘 뒤에도 방금 넣은 줄은 남는다', () => {
+  setItemRules(undefined);
+  let it = addItem({ list: [], log: [] }, alive, { name: '붕대', uses: 1000, from: 'manual', anchor: '' });
+  const id = it.list[0].id;
+  for (let i = 0; i < 60; i++) it = addItemLog(it, { name: `잡동사니${i}`, what: 'drop', by: 'manual', anchor: 'a1' }, alive);
+  for (let i = 0; i < 240; i++) it = addItemLog(it, { name: '붕대', item: id, what: 'use', by: 'use', anchor: 'a1' }, alive);
+  const before = itemLeft(it, it.list[0], alive);
+  // 기본 상한에서는 그대로 한 줄 늘어난다
+  assert.equal(addItemLog(it, { name: '라디오', what: 'sell', by: 'manual', anchor: 'a1', id: 'sold' }).log.at(-1).id, 'sold');
+  setItemRules({ [ITEM_LOG_CAP_VAR]: '100' });
+  // alive 를 모르고 넣는 길(팔기·버리기)
+  let out = addItemLog(it, { name: '라디오', what: 'sell', by: 'manual', anchor: 'a1', id: 'sold' });
+  assert.equal(out.log.at(-1).id, 'sold');
+  // alive 를 아는 길: 100줄로 줄고 새 줄이 남고 남은 횟수는 그대로
+  out = addItemLog(it, { name: '라디오', what: 'sell', by: 'manual', anchor: 'a1', id: 'sold' }, alive);
+  assert.equal(out.log.length, 100);
+  assert.equal(out.log.at(-1).id, 'sold');
+  assert.equal(itemLeft(out, out.list[0], alive), before);
   setItemRules(undefined);
 });

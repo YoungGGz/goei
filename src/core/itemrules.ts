@@ -94,7 +94,7 @@ const build = (vars: Record<string, unknown> | undefined): Rules => {
   return { traits: parseItemRules(txt(ITEM_RULES_VAR, ITEM_RULES_DEFAULT)), left: parseWords(txt(ITEM_LEFT_WORDS_VAR, ITEM_LEFT_WORDS_DEFAULT)), off: parseWords(txt(ITEM_OFF_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT)), grades: parseGradeWords(ITEM_GRADE_WORDS_DEFAULT), listCap: itemListCapOf(vars), logCap: itemLogCapOf(vars) };
 };
 let rules: Rules = build(undefined);
-/** 지금 채팅의 표를 올린다 (host/risu.ts loadContext · 갱신기 적용 직전). 빈 값은 기본 표 */
+/** 지금 채팅의 표를 올린다 (host/risu.ts loadContext · 채팅 저장 직전 saveChat · 갱신기 적용 직전). 빈 값은 기본 표 */
 export function setItemRules(vars: Record<string, unknown> | undefined | null): void {
   rules = build(vars ?? undefined);
 }
