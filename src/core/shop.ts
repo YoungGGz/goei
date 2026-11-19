@@ -129,7 +129,19 @@ export const SHOP_FEATURE_VAR = '$sh_feature';
 /** 상점 넷(기본 상점·우주 쇼핑몰·포인트몰·망상홈쇼핑)이 값 하나를 같이 쓰는 설정: 기본 상점 자리($sh_*)의 값을 넷이 같이 읽는다 (2026-11-11 사용자: 설정 → 상점) */
 /** 문의로 물건 바꾸기 (기본 켬): 끄면 문의 요청에 진열 규칙을 넣지 않고, 주인·운영자가 말로 물건을 더하거나 진열을 새로 짜지 않는다 (값 흥정·빼기는 그대로) */
 export const SHOP_TALK_STOCK_VAR = '$sh_talk_stock';
-export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR, SHOP_TALK_STOCK_VAR, SHOP_SHELF_VAR];
+/** 보관하는 양·참고 글 길이 (상점 넷이 같이 쓴다). 기본값은 설정이 생기기 전에 코드에 적혀 있던 수 그대로.
+ *  prev 지난 진열대 이름 · sales 판 것 기록 · notes 견적과 정보 쪽지(각각) · talk 문의 대화 줄 · wiki 가게 위키 문서 글자 · report 진행 중 괴이·사건 보고 글자 */
+export const SHOP_LIMITS = {
+  prev: { key: '$sh_keep_prev', def: 40, min: 5, max: 200, step: 5, unit: '개' },
+  sales: { key: '$sh_keep_sales', def: 40, min: 5, max: 200, step: 5, unit: '건' },
+  notes: { key: '$sh_keep_notes', def: 20, min: 5, max: 100, step: 5, unit: '건' },
+  talk: { key: '$sh_keep_talk', def: 40, min: 10, max: 200, step: 10, unit: '줄' },
+  wiki: { key: '$sh_wiki_chars', def: 3000, min: 500, max: 20000, step: 500, unit: '자' },
+  report: { key: '$sh_report_chars', def: 1500, min: 500, max: 10000, step: 500, unit: '자' },
+} as const;
+export type ShopLimit = keyof typeof SHOP_LIMITS;
+export const isShopLimit = (k: string): k is ShopLimit => Object.prototype.hasOwnProperty.call(SHOP_LIMITS, k);
+export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR, SHOP_TALK_STOCK_VAR, SHOP_SHELF_VAR, ...Object.values(SHOP_LIMITS).map((l) => l.key)];
 export const SHOP_SIZE_LO = 1;
 export const SHOP_SIZE_HI = 16;
 
@@ -209,6 +221,17 @@ function numIn(v: unknown, def: number, lo: number, hi: number): number {
   return v === undefined || v === '' || !Number.isFinite(n) ? def : Math.max(lo, Math.min(hi, Math.round(n)));
 }
 export const shopOn = (vars: Vars): boolean => shopSettings(vars).on;
+/** 보관하는 양·참고 글 길이의 지금 값 (빈 값·수가 아닌 값은 기본값, 범위 밖은 범위 끝) */
+export function shopLimits(vars: Vars): Record<ShopLimit, number> {
+  const out = {} as Record<ShopLimit, number>;
+  for (const k of Object.keys(SHOP_LIMITS) as ShopLimit[]) { const l = SHOP_LIMITS[k]; out[k] = numIn(vars?.[l.key], l.def, l.min, l.max); }
+  return out;
+}
+let keep: Record<ShopLimit, number> = shopLimits(undefined);
+/** 지금 채팅의 보관하는 양을 올린다 (host/risu.ts loadContext). 상태를 읽고 고치는 함수들(readShop·applyShelf·applyTalk·closeSale·sayToOwner)이 본다 */
+export function setShopKeep(vars: Record<string, unknown> | undefined | null): void {
+  keep = shopLimits(vars ?? undefined);
+}
 
 // ── 표식 `[shop: 가게|주인]` ──
 
@@ -424,13 +447,13 @@ export function readShop(vars: Vars, shelf = shelfCap(vars)): ShopState | null {
         const { use: _u, uses: _n, equip: _e, icon: _i, weight: _w, ...rest } = x;
         return { ...rest, ...traitsOf(x), desc: clean(x.desc, 120), effect: clean(x.effect, 60) };
       }), shelf),
-      talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-40),
+      talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-keep.talk),
       closed: !!o.closed,
-      prev: Array.isArray(o.prev) ? o.prev.filter((x): x is string => typeof x === 'string').slice(-40) : [],
+      prev: Array.isArray(o.prev) ? o.prev.filter((x): x is string => typeof x === 'string').slice(-keep.prev) : [],
       sell: readOffer(o.sell),
-      sales: (Array.isArray(o.sales) ? o.sales : []).filter((x): x is ShopSale => !!x && typeof x === 'object' && typeof (x as ShopSale).name === 'string' && Number.isSafeInteger((x as ShopSale).price)).slice(-40),
-      ...(Array.isArray(o.quotes) && o.quotes.length ? { quotes: o.quotes.filter((q): q is ShopQuote => !!q && typeof q === 'object' && typeof q.id === 'string' && Number.isSafeInteger(q.price) && Number.isFinite(q.hours) && !!q.item && typeof q.item.name === 'string').slice(-20) } : {}),
-      ...(Array.isArray(o.notes) && o.notes.length ? { notes: o.notes.filter((n): n is ShopNote => !!n && typeof n === 'object' && typeof n.id === 'string' && typeof n.title === 'string' && Number.isSafeInteger(n.price) && typeof n.body === 'string').slice(-20) } : {}),
+      sales: (Array.isArray(o.sales) ? o.sales : []).filter((x): x is ShopSale => !!x && typeof x === 'object' && typeof (x as ShopSale).name === 'string' && Number.isSafeInteger((x as ShopSale).price)).slice(-keep.sales),
+      ...(Array.isArray(o.quotes) && o.quotes.length ? { quotes: o.quotes.filter((q): q is ShopQuote => !!q && typeof q === 'object' && typeof q.id === 'string' && Number.isSafeInteger(q.price) && Number.isFinite(q.hours) && !!q.item && typeof q.item.name === 'string').slice(-keep.notes) } : {}),
+      ...(Array.isArray(o.notes) && o.notes.length ? { notes: o.notes.filter((n): n is ShopNote => !!n && typeof n === 'object' && typeof n.id === 'string' && typeof n.title === 'string' && Number.isSafeInteger(n.price) && typeof n.body === 'string').slice(-keep.notes) } : {}),
     };
   } catch {
     return null;
@@ -793,9 +816,9 @@ export function applyShelf(st: ShopState, r: ShelfReply, s: ShopSettings): ShopS
   const base: ShopState = { ...st, identity: st.loaded ? st.identity : r.identity, loaded: true };
   const items = withIds(base, r.items).slice(0, 40);
   if (!items.length) throw new ShopError('받은 물건 줄이 모두 겹쳐서 버렸어요. 다시 받아 보세요.');
-  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-40);
+  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-keep.prev);
   const talk = r.owner ? [...st.talk, { who: 'owner' as const, text: r.owner, ...keyOf(st) }] : st.talk;
-  return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-40), prev, closed: false };
+  return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-keep.talk), prev, closed: false };
 }
 
 /** 코드가 넣는 물건 (쇼핑몰 시그니처 상품): 이미 진열돼 있거나 팔린 것과 같은 이름은 건너뛴다. 지난 목록(prev)에는 넣지 않는다 */
@@ -836,14 +859,14 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
   let noteId = '';
   if (r.info && !notes.some((n) => n.title === r.info!.title)) {
     noteId = `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    notes = [...notes, { id: noteId, ...r.info }].slice(-20);
+    notes = [...notes, { id: noteId, ...r.info }].slice(-keep.notes);
   }
   // 맞춤 주문 견적: 대사에 붙여 두고, 선납하면 주문으로 (같은 이름의 견적이 열려 있으면 바꿔치기)
   let quotes = st.quotes ?? [];
   let quoteId = '';
   if (r.quote) {
     quoteId = `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    quotes = [...quotes.filter((q) => q.accepted || !sameShopName(q.item.name, r.quote!.item.name)), { id: quoteId, ...r.quote }].slice(-20);
+    quotes = [...quotes.filter((q) => q.accepted || !sameShopName(q.item.name, r.quote!.item.name)), { id: quoteId, ...r.quote }].slice(-keep.notes);
   }
   const talk: ShopLine[] = [...st.talk, { who: 'owner', text: r.owner, ...(noteId ? { note: noteId } : {}), ...(quoteId ? { quote: quoteId } : {}), ...keyOf(st) }];
   let sell = st.sell ?? null;
@@ -865,7 +888,7 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
     }
   }
   const closed = st.closed || (kick && r.closed);
-  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-40), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
+  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-keep.talk), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
 }
 
 /** 견적 수락 표시 (없거나 이미 수락했으면 null) */
@@ -903,12 +926,12 @@ export const cancelSell = (st: ShopState): ShopState => ({ ...st, sell: null });
 export function closeSale(st: ShopState, key = ''): ShopState | null {
   const o = st.sell;
   if (!o || typeof o.price !== 'number') return null;
-  return { ...st, sell: null, sales: [...st.sales, { name: o.name, price: o.price, ...(key ? { k: key } : keyOf(st)) }].slice(-40) };
+  return { ...st, sell: null, sales: [...st.sales, { name: o.name, price: o.price, ...(key ? { k: key } : keyOf(st)) }].slice(-keep.sales) };
 }
 
 export function sayToOwner(st: ShopState, text: string): ShopState {
   const talk: ShopLine[] = [...st.talk, { who: 'me', text: clean(text, 300), ...keyOf(st) }];
-  return { ...st, talk: talk.slice(-40) };
+  return { ...st, talk: talk.slice(-keep.talk) };
 }
 
 /** 지금 작중 날짜·시각: 마지막 상태창의 날짜·시각 글 그대로. 상태창이 없으면 빈 글 */

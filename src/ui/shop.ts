@@ -28,7 +28,7 @@ import { addItem, dropUse, EQUIP_LABEL, gridItems, ITEM_USE_AT_VAR, itemLeft, it
 import { getPrefs } from '../core/settings';
 import { guideTxt } from '../core/guides';
 import {
-  applyShelf, applyTalk, cancelSell, closeSale, currentShop, markSold, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
+  applyShelf, applyTalk, cancelSell, closeSale, currentShop, markSold, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
   type ShopItem, type ShopSource, type ShopState,
 } from '../core/shop';
 import { ICONS } from './icons';
@@ -309,10 +309,12 @@ const chatKey = (ctx: ChatContext) => `${ctx.charIndex}:${ctx.chatIndex}`;
 export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ctx.chat.scriptstate), give?: ShopGive): ShopSource {
   const src = playerSource({ char: ctx.char as RefSource['char'], chat: ctx.chat, persona: personaText() } as RefSource);
   const vars = ctx.chat.scriptstate ?? {};
+  // 위키 문서·사건 보고를 몇 자까지 넘길지 (설정 → 상점, 상점 넷이 같이 쓰는 값)
+  const limits = shopLimits(vars);
   // 최근 챗로그는 맥락 반영이 꺼져 있어도 관련 로어북을 고를 때는 읽는다
   const story = storyText(recentTurns(ctx.chat, give ? give.turns : sh.turns, genSettings(vars).userMessages));
   const doc = findDoc(ctx.chat, st.shop, ctx.char.globalLore);
-  const extra = doc ? [{ source: guideTxt('Shop', 'REFS_WIKI_SOURCE', { shop: st.shop }), content: innerBody(doc.body).slice(0, 3000) }] : [];
+  const extra = doc ? [{ source: guideTxt('Shop', 'REFS_WIKI_SOURCE', { shop: st.shop }), content: innerBody(doc.body).slice(0, limits.wiki) }] : [];
   const text = `${st.shop}\n${st.owner}\n${story}`;
   let rows: RefRow[];
   if (give) {
@@ -334,7 +336,7 @@ export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ct
   }
   // 잔고는 상점 모델에 넘기지 않는다 (설정 「넘기는 것·남는 것」): 상태창 줄에서 잔고 칸을 빼고 다시 만든다 (11-08 전수점검: 잔고 칸이 그대로 갔다)
   if (status) status = rebuildStatusLine(status, usedCols(colConfig(vars)).filter((c) => c !== 'wallet' && c !== 'points'));
-  const situation = ['$an_report', '$in_report'].map((k) => String(vars[k] ?? '').trim()).filter(Boolean).join('\n').slice(0, 1500);
+  const situation = ['$an_report', '$in_report'].map((k) => String(vars[k] ?? '').trim()).filter(Boolean).join('\n').slice(0, limits.report);
   const identity = peopleSettings(vars).on ? identityText(peopleStore(ctx.chat).identity) : '';
   // 가게 표와 기능 표 가운데 하나라도 맥락 반영이 꺼져 있으면 신분·상태창·괴이·챗로그를 넘기지 않는다
   // 양 표 「지난 대화」: 진열·문의 요청에 같이 넘기는 지난 문의 대화의 줄 수 (give 가 없으면 전부)

@@ -8,11 +8,12 @@ import type { CraftMessage } from './craft';
 type Vars = Record<string, unknown> | undefined;
 
 export const DESK_VAR = '$bm_desk';
-export const DESK_KEY = { on: '$bm_desk_on', axes: '$bm_desk_axes', again: '$bm_desk_again', avoid: '$bm_desk_avoid' } as const;
+export const DESK_KEY = { on: '$bm_desk_on', axes: '$bm_desk_axes', again: '$bm_desk_again', avoid: '$bm_desk_avoid', keep: '$bm_desk_keep' } as const;
 export const DESK_AVOID_RANGE: [number, number] = [0, 12];
 export const DESK_AVOID_DEFAULT = 6;
-/** 저장해 두는 지난 상담사 수 (다시 만나기·겹치지 않기용) */
-const PAST_KEEP = 20;
+/** 저장해 두는 지난 상담사 수 (다시 만나기·겹치지 않기용). 겹치지 않게 넘길 수(최대 12)보다 적으면 그만큼 못 넘기니 12부터 */
+export const DESK_KEEP_RANGE: [number, number] = [12, 100];
+export const DESK_KEEP_DEFAULT = 20;
 
 /** 주사위 칸 기본 (설정에서 통째로 고친다. 한 줄에 「칸 이름: 값, 값, …」 — 같은 값을 여러 번 적으면 그만큼 잘 뽑힌다).
  *  글은 지침 「포인트몰 1:1 상담」의 DICE_DEFAULT 절 (2026-11-14 사용자: 모델에 가는 글은 지침에). 직급은 위키 백일몽 문서의 직급표(사원~차장) 안에서. 나머지는 사람 됨됨이 축이지 소재가 아니다 */
@@ -40,17 +41,21 @@ export interface DeskSettings {
   again: boolean;
   /** 겹치지 말라고 넘길 최근 상담사 수 */
   avoid: number;
+  /** 기억해 둘 지난 상담사 수 */
+  keep: number;
 }
 export function deskSettings(vars: Vars): DeskSettings {
   const axesText = String(vars?.[DESK_KEY.axes] ?? '');
   const parsed = parseAxes(axesText);
   const n = Math.floor(Number(vars?.[DESK_KEY.avoid] ?? ''));
+  const k = Math.floor(Number(vars?.[DESK_KEY.keep] ?? ''));
   return {
     on: String(vars?.[DESK_KEY.on] ?? '') !== '0',
     axesText,
     axes: parsed.length ? parsed : parseAxes(deskAxesDefault()),
     again: String(vars?.[DESK_KEY.again] ?? '') === '1',
     avoid: String(vars?.[DESK_KEY.avoid] ?? '') !== '' && Number.isFinite(n) ? Math.max(DESK_AVOID_RANGE[0], Math.min(DESK_AVOID_RANGE[1], n)) : DESK_AVOID_DEFAULT,
+    keep: String(vars?.[DESK_KEY.keep] ?? '') !== '' && Number.isFinite(k) ? Math.max(DESK_KEEP_RANGE[0], Math.min(DESK_KEEP_RANGE[1], k)) : DESK_KEEP_DEFAULT,
   };
 }
 
@@ -89,10 +94,10 @@ export function readDesk(vars: Vars): DeskState {
 }
 export const deskVars = (st: DeskState): Record<string, string> => ({ [DESK_VAR]: JSON.stringify(st) });
 
-/** 상담을 끝낸다: 상담사를 지난 목록에 넣고 대화를 비운다 */
-export function endDesk(st: DeskState): DeskState {
+/** 상담을 끝낸다: 상담사를 지난 목록에 넣고 대화를 비운다. keep: 기억해 둘 지난 상담사 수 (deskSettings().keep) */
+export function endDesk(st: DeskState, keep = DESK_KEEP_DEFAULT): DeskState {
   if (!st.agent) return { ...st, talk: [] };
-  const past = [st.agent, ...st.past.filter((p) => p.id !== st.agent!.id)].slice(0, PAST_KEEP);
+  const past = [st.agent, ...st.past.filter((p) => p.id !== st.agent!.id)].slice(0, keep);
   return { agent: null, talk: [], anchor: '', past };
 }
 

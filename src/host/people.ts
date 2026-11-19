@@ -29,7 +29,7 @@ import { colConfig } from '../core/world/statuscols';
 import { mentionsPoints, pointsOn, pointsVars, readPoints, syncPointsToStatus } from '../core/points';
 import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { applyItemChanges, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
-import { bmAsked, bmOrdersVars, liveBmOrders } from '../core/orders';
+import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
 import { getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
@@ -454,14 +454,14 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           const orders = liveBmOrders(next.scriptstate, alive);
           const done = confirmBmPickups(readItems(next.scriptstate), orders, bmAsked(orders, prevKey), report.pickup.names, alive, report.pickup.anchor, itemChanges);
           itemChanges = done.changes;
-          if (done.got.length) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(done.it), ...bmOrdersVars(done.orders) } };
+          if (done.got.length) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(done.it), ...bmOrdersVars(done.orders, bmOrdersKeep(next.scriptstate)) } };
         }
         if (itemChanges.length) {
           // 판정 표·「두고 옴」 말은 이 채팅의 설정으로 (core/itemrules.ts). order = 메시지 차례 (사용자가 버린 물건은 버린 뒤의 메시지가 근거일 때만 되살린다)
           setItemRules(next.scriptstate);
           // 포인트몰 수령 대기 중인 물건을 본문이 먼저 받았으면 새로 만들지 않고 그 대기 줄을 받은 것으로 (core/items.ts settleBmPickups)
           const bm = settleBmPickups(readItems(next.scriptstate), liveBmOrders(next.scriptstate, aliveAnchors(next)), aliveAnchors(next), itemChanges);
-          if (bm.settled) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...bmOrdersVars(bm.orders) } };
+          if (bm.settled) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...bmOrdersVars(bm.orders, bmOrdersKeep(next.scriptstate)) } };
           const it = applyItemChanges(bm.it, aliveAnchors(next), bm.changes, { state: itemStateOn(next.scriptstate), skipKinds: ITEM_SCOPE_SKIP[itemScope(next.scriptstate)], order: (next.message ?? []).map((m, i) => messageKey(m, i)) });
           next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it) } };
         }

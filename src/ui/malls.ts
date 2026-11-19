@@ -14,12 +14,12 @@ import { pointsOn, pointsVars, readPoints } from '../core/points';
 import { addItem, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
-import { bmGoing, bmOrdersVars, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
+import { bmGoing, bmOrdersKeep, bmOrdersVars, cosOrdersKeep, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
 import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, storyStamp, parseShelf, parseTalk, pointPrice, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
-import { DESK_AVOID_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
+import { DESK_AVOID_RANGE, DESK_KEEP_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
 import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallSeenKey, mallUnseen, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
 import { SHOP_SIZE_HI, SHOP_SIZE_LO } from '../core/shop';
 import { onOffSwitch } from './controls';
@@ -319,7 +319,7 @@ async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<Sho
       st = markSold(st, it.id, anchor, storyStamp(chat));
     }
     got = list;
-    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? { ...pointsVars(w), ...bmOrdersVars([...liveBmOrders(chat.scriptstate, alive), ...waiting]) } : { ...walletVars(w), ...itemsVars(items) }), ...mallVarsOf(site, st) } };
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? { ...pointsVars(w), ...bmOrdersVars([...liveBmOrders(chat.scriptstate, alive), ...waiting], bmOrdersKeep(chat.scriptstate)) } : { ...walletVars(w), ...itemsVars(items) }), ...mallVarsOf(site, st) } };
   });
   return got;
 }
@@ -473,7 +473,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         const item = rest.truth ? rest : { ...rest, truth: '?' };
         const order: CosOrder = { id: q.id, anchor, price: q.price, hours: q.hours, orderedAt: worldMinute(chat), orderedKey: anchor, walletId, item };
         ok = true;
-        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...ordersVars([...liveOrders(chat.scriptstate, aliveAnchors(chat)), order]), ...mallVarsOf(site, nextShop) } };
+        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...ordersVars([...liveOrders(chat.scriptstate, aliveAnchors(chat)), order], cosOrdersKeep(chat.scriptstate)), ...mallVarsOf(site, nextShop) } };
       });
       v.info = ok ? `「${q.item.name}」 주문이 접수 되었다. 선납 완료. 완성되면 「주문 조회」에서 받아라.` : short ? '잔고가 모자란다. 입금이 필요하다.' : '주문할 수 없는 상태다.';
       await env.refresh();
@@ -492,7 +492,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         const it = cur.item;
         const items = addItem(readItems(chat.scriptstate), aliveAnchors(chat), { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site === 'cos' ? 'cos-order' : site, anchor, price: cur.price, walletId: cur.walletId ?? `${site}_ord_${cur.id}`, paidWith: guideTxt('Main', 'MALL.PAID.ORDER', { mall: MALL_NAME[site] }) });
         ok = true;
-        const next = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(list.map((x) => (x.id === o.id ? { ...x, taken: true, takenKey: anchor } : x))) } };
+        const next = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(list.map((x) => (x.id === o.id ? { ...x, taken: true, takenKey: anchor } : x)), cosOrdersKeep(chat.scriptstate)) } };
         // 받았으니 채팅의 완성 알림 카드(표식)를 지운다
         const message = settleReady(next, cosReadyMode(next.scriptstate) !== 'off');
         return message ? { ...next, message } : next;
@@ -521,7 +521,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
           went = true;
           n = r.got.length;
           first = r.got[0].item.name;
-          return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...bmOrdersVars(r.list) } };
+          return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...bmOrdersVars(r.list, bmOrdersKeep(chat.scriptstate)) } };
         }
         const { list, got } = takeBmOrders(liveBmOrders(chat.scriptstate, alive), anchor, ids);
         if (!got.length) return null;
@@ -532,7 +532,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         }
         n = got.length;
         first = got[0].item.name;
-        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...bmOrdersVars(list) } };
+        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...bmOrdersVars(list, bmOrdersKeep(chat.scriptstate)) } };
       });
       if (went) v.info = n > 1 ? `상품 ${n}건을 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.` : `「${first}」을(를) 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.`;
       else v.info = n > 1 ? `상품 ${n}건을 수령했습니다. 소지품에 들어갔습니다.` : n ? `「${first}」을(를) 수령했습니다. 소지품에 들어갔습니다.` : '수령할 수 없는 상태입니다.';
@@ -577,16 +577,16 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
     case 'mall-desk-end':
       // 상담 종료: 상담사를 지난 목록에 넣고 창을 닫는다 (다음에 열면 새 상담사)
       if (site !== 'bm' || v.dl) return true;
-      await saveDesk(ctx, endDesk(readDesk(ctx.chat.scriptstate)));
+      await saveDesk(ctx, endDesk(readDesk(ctx.chat.scriptstate), deskSettings(ctx.chat.scriptstate).keep));
       v.ask = false;
       v.input = '';
       await env.refresh();
       return true;
     case 'mall-desk-next': {
       if (site !== 'bm' || v.dl) return true;
-      const saved = await saveDesk(ctx, endDesk(readDesk(ctx.chat.scriptstate)));
+      const saved = await saveDesk(ctx, endDesk(readDesk(ctx.chat.scriptstate), deskSettings(ctx.chat.scriptstate).keep));
       v.input = '';
-      if (saved) await deskRun({ ...ctx, chat: saved }, env, 'make', endDesk(readDesk(saved.scriptstate)));
+      if (saved) await deskRun({ ...ctx, chat: saved }, env, 'make', endDesk(readDesk(saved.scriptstate), deskSettings(saved.scriptstate).keep));
       return true;
     }
     case 'mall-say': {
@@ -706,7 +706,7 @@ async function deskOpen(ctx: ChatContext, env: MallEnv): Promise<boolean> {
   let st = readDesk(ctx.chat.scriptstate);
   const key = lastBot(ctx.chat)?.key ?? '';
   if (st.agent && st.anchor === key) return env.render(), true;
-  if (st.agent) st = endDesk(st);
+  if (st.agent) st = endDesk(st, ds.keep);
   const again = pickAgain(st, ds);
   if (again) {
     st = { ...st, agent: again, anchor: key, past: st.past.filter((p) => p.id !== again.id), talk: [{ who: 'sys', text: deskHello(again, true) }] };
@@ -1094,6 +1094,7 @@ function deskGroup(ctx: ChatContext): string {
     row('상담사 주사위 칸', axisTable(ctx.chat.scriptstate), '칸마다 값을 하나씩 뽑아요. 값은 쉼표로 나눠요. 같은 값을 여러 번 적으면 그만큼 잘 뽑혀요. 다 지우면 기본 칸으로 돌아가요.', `ms-wide ${aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? 'ps-changed' : ''}`),
     row('지난 상담사 다시 만나기', mseg('bm', 'desk_again', d.again ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '켜면 가끔(4번에 1번꼴) 전에 만났던 상담사가 다시 연결돼요.'),
     row('겹치지 않게 넘길 수', `<div class="st-step${stepSizeText(`${DESK_AVOID_RANGE[1]}명`)}"><button class="gx-step" data-action="ms-desk-step" data-value="-" ${d.avoid > DESK_AVOID_RANGE[0] ? '' : 'disabled'} aria-label="줄이기">−</button><b>${d.avoid}명</b><button class="gx-step" data-action="ms-desk-step" data-value="+" ${d.avoid < DESK_AVOID_RANGE[1] ? '' : 'disabled'} aria-label="늘리기">+</button></div>`, '새 상담사를 만들 때 최근 상담사 몇 명의 요약을 같이 넘겨 「이들과 겹치지 마라」고 해요(0~12).'),
+    row('지난 상담사 보관 수', `<div class="st-step${stepSizeText(`${DESK_KEEP_RANGE[1]}명`)}"><button class="gx-step" data-action="ms-desk-keep" data-value="-" ${d.keep > DESK_KEEP_RANGE[0] ? '' : 'disabled'} aria-label="줄이기">−</button><b>${d.keep}명</b><button class="gx-step" data-action="ms-desk-keep" data-value="+" ${d.keep < DESK_KEEP_RANGE[1] ? '' : 'disabled'} aria-label="늘리기">+</button></div>`, `지난 상담사를 몇 명까지 남겨 둘지예요(${DESK_KEEP_RANGE[0]}~${DESK_KEEP_RANGE[1]}). 넘으면 오래된 상담사부터 지워요. 「다시 만나기」는 남아 있는 상담사 가운데서 골라요.`),
   ].join('') + reset);
 }
 
@@ -1202,6 +1203,12 @@ async function deskSettingsAction(action: string, value: string | undefined, ctx
     const d = deskSettings(ctx.chat.scriptstate);
     const n = Math.max(DESK_AVOID_RANGE[0], Math.min(DESK_AVOID_RANGE[1], d.avoid + (value === '+' ? 1 : -1)));
     return set({ [DESK_KEY.avoid]: String(n) });
+  }
+  if (action === 'ms-desk-keep') {
+    const d = deskSettings(ctx.chat.scriptstate);
+    // 한 번에 4명씩 (12~100)
+    const n = Math.max(DESK_KEEP_RANGE[0], Math.min(DESK_KEEP_RANGE[1], d.keep + (value === '+' ? 4 : -4)));
+    return set({ [DESK_KEY.keep]: String(n) });
   }
   if (action === 'ms-desk-reset') return set({ [DESK_KEY.axes]: '' });
   return false;
