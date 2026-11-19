@@ -1,5 +1,6 @@
 // 공용 그림 고르기. 모델을 부르지 않고 이름·상황 글의 낱말로 고른다. 후보 이름을 좋은 순서로 돌려주고, 카드에 있는 첫 그림을 쓰는 건 부르는 쪽이 한다.
 // 괴이·사건의 장소 낱말은 src/data/picwords.json (그림 한 장마다 낱말, 2026-11-19 사용자: 엉뚱한 그림이 붙지 않게).
+// 그림 이름: 처음 31곳은 「Situation Anomaly <장소> <n>」(pics), 그 뒤 새 그림은 숫자 없이 「Situation Anomaly <내용>」 한 장에 항목 하나 (pics 없음, 11-19 사용자).
 import pw from '../data/picwords.json';
 import { SIDO_NAME, SIGUN } from './world/geo';
 
@@ -62,14 +63,15 @@ function rank(table: Table, name: string, text: string, seed: string): string[] 
 
 // ── 괴이·사건: 그림 한 장마다 낱말 ──
 interface Pic { n: number; w: string[]; in?: boolean; inc?: string[] }
+/** pics 가 없으면 그림 한 장(이름 = k, 숫자 없음) */
 interface Place { k: string; w?: string[]; pics?: Pic[]; g?: { w: string[]; p: number[] }; near?: string; inc?: string[]; base?: boolean }
 const PLACES = (pw as { places: Place[] }).places;
 
 /** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고, 같은 글자로 끝나는 다른 낱말은 뺀다 */
 const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
   호: { to: 'Lake', n: 1, not: ['번호', '신호', '보호', '간호', '구호', '암호', '경호', '수호', '변호', '상호', '기호', '부호', '애호', '옹호', '양호', '괄호', '점호', '전호', '엄호', '원호', '칭호', '존호', '방호', '참호', '산호', '미호', '호호', '선호', '환호', '연호', '국호', '시호', '묘호', '당호', '아호', '별호', '작호', '군호', '문호', '가호', '비호', '맹호', '백호', '흑호', '념호', '집호'] },
-  천: { to: 'Riverside', not: ['온천', '수천', '추천', '원천', '실천', '황천'] },
-  강: { to: 'Riverside', not: ['건강', '보강', '증강', '철강', '제강', '하강', '특강', '휴강', '개강'] },
+  천: { to: 'RiversidePark', not: ['온천', '수천', '추천', '원천', '실천', '황천'] },
+  강: { to: 'RiversidePark', not: ['건강', '보강', '증강', '철강', '제강', '하강', '특강', '휴강', '개강'] },
   산: { to: 'Forest', not: ['부동산', '낙하산', '화산', '수산', '재산', '유산', '생산', '계산', '출산', '예산', '파산', '해산', '하산', '우산', '자산', '축산', '농산', '임산', '광산', '물산', '정산', '전산', '분산', '확산', '무산', '양산'] },
   봉: { to: 'Forest', not: ['개봉', '밀봉', '면봉', '철봉', '경찰봉', '야광봉', '응원봉', '지휘봉', '곤봉', '연봉', '상봉'] },
   령: { to: 'Forest', not: ['대통령', '유령', '명령', '사령', '법령', '연령', '수령', '망령', '혼령', '악령', '심령', '점령', '발령'] },
@@ -77,7 +79,7 @@ const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
   포: { to: 'Sea', n: 2, not: ['폭포', '공포', '체포', '세포', '대포', '발포', '배포', '살포', '유포', '분포', '점포', '전당포', '소포', '선포', '수배포'] },
   굴: { to: 'Cave', not: ['얼굴', '발굴', '채굴', '시굴', '도굴'] },
   역: { to: 'Subway', not: ['지역', '구역', '영역', '전역', '번역', '통역', '면역', '무역', '징역', '용역', '현역', '병역', '주역', '악역', '배역', '광역', '권역', '수역', '해역', '방역', '부역', '노역', '교역'] },
-  섬: { to: 'Island', not: [] },
+  섬: { to: 'IslandVillage', not: [] },
   숲: { to: 'Forest', not: [] },
   댐: { to: 'Lake', n: 1, not: [] },
 };
@@ -180,7 +182,7 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
       if (last === '호') {
         // 「~호」는 호수·배·열차·사람 이름·보통 낱말이 다 같은 꼴이다: 이름 → 상황 글 순으로 단서가 있을 때만 받는다 (이름난 호수는 표의 낱말)
         const kind = HO_SHIP.test(stem) ? 'ship' : hoKind(text) || hoKind(ctx);
-        if (kind === 'ship') put('Ship', end);
+        if (kind === 'ship') put('Ferry', end);
         else if (kind === 'train') put('Subway', end, 2);
         else if (kind === 'lake') put('Lake', end, 1);
         continue;
@@ -195,10 +197,7 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
 function picsOf(h: Hit, cue: 'in' | 'out' | '', seed: string): string[] {
   const p = h.place;
   if (p.base) return ['@'];
-  if (!p.pics) {
-    const first = pick(seed, 2) + 1;
-    return [first, 3 - first, 3].map((n) => `${p.k} ${n}`);
-  }
+  if (!p.pics) return [p.k];
   const all = p.pics.map((x) => x.n);
   const pool = h.pic ? [h.pic] : (p.g?.p ?? all);
   const start = pick(seed, pool.length);
@@ -219,7 +218,9 @@ function broad(name: string, text: string, loc: string): string {
   if (/[시구](\s|$)/.test(loc) || /행인|시민|차량|도심|시내/.test(all)) return 'City';
   return 'Night';
 }
-const BROAD_IN: Record<string, string[]> = { Indoor: ['Street'], Water: ['River'], Mountain: ['Mountain'], Country: ['Farm', 'Mountain'], City: ['Street'], Night: ['Street'] };
+/** 넓은 갈래마다 한 장 (숫자 없음) */
+const BROAD_AN: Record<string, string> = { Indoor: 'Generic Indoor EmptyHall', Water: 'Generic Waterside', Mountain: 'Generic Mountain Ridge', Country: 'Generic Country Lane', City: 'Generic City Skyline', Night: 'Generic EmptyLot' };
+const BROAD_IN: Record<string, string[]> = { Indoor: ['Street'], Water: ['River'], Mountain: ['Mountain'], Country: ['CountryFarmland', 'Mountain'], City: ['Street'], Night: ['Street'] };
 
 const SIT: Record<string, string> = { an: 'Anomaly', in: 'Incident', ms: 'Mystic' };
 
@@ -244,8 +245,7 @@ export function situationShared(kind: string, name: string, text = '', loc = '')
     const cue = IN_CUE.test(name) ? 'in' : OUT_CUE.test(name) ? 'out' : '';
     for (const h of places) out.push(...picsOf(h, cue, name));
     for (const h of places) if (h.place.near) out.push(h.place.near);
-    const start = pick(name, 3);
-    out.push(...[0, 1, 2].map((i) => `Generic ${group} ${((start + i) % 3) + 1}`));
+    out.push(BROAD_AN[group]);
   } else {
     for (const h of places) out.push(...(h.place.pics?.find((x) => x.n === h.pic)?.inc ?? []), ...(h.place.inc ?? []));
     out.push(...BROAD_IN[group]);

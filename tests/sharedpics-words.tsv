@@ -21,13 +21,13 @@
 다락방	Home	
 부엌	Home	
 주방	Home	
-자취방	Home	
-원룸	Home	
-투룸	Home	
-반지하	Home	
-옥탑방	Home	
-하숙집	Home	
-셋방	Home	
+자취방	StudioFlat	
+원룸	StudioFlat	
+투룸	StudioFlat	
+반지하	StudioFlat	
+옥탑방	StudioFlat	
+하숙집	StudioFlat	
+셋방	StudioFlat	
 침실	Home	
 욕실	Home	
 골목	Alley	
@@ -48,12 +48,12 @@
 전원주택	House	
 별장	House	
 저택	House	
-고택	House	
-한옥	House	
-한옥마을	House	
-초가집	House	
-기와집	House	
-종갓집	House	
+고택	Hanok	
+한옥	Hanok	
+한옥마을	Hanok	
+초가집	Hanok	
+기와집	Hanok	
+종갓집	Hanok	
 사택	House	
 관사	House	
 시골집	Village	1
@@ -103,25 +103,25 @@
 미끄럼틀	Forest	2
 벤치	Forest	2
 소공원	Forest	2
-산책로	Park	
-호수공원	Park	
-체육공원	Park	
-한강공원	Park	
-수변공원	Park	
-생태공원	Park	
-잔디밭	Park	
-산책길	Park	
-자전거도로	Park	
-조깅코스	Park	
-유원지	Park	
-재개발구역	Demolition	
-철거촌	Demolition	
-철거현장	Demolition	
-재건축	Demolition	
-재개발	Demolition	
-빈집촌	Demolition	
-폐건물	Demolition	
-공가	Demolition	
+산책로	UrbanPark	
+호수공원	UrbanPark	
+체육공원	UrbanPark	
+한강공원	RiversidePark	
+수변공원	UrbanPark	
+생태공원	UrbanPark	
+잔디밭	UrbanPark	
+산책길	UrbanPark	
+자전거도로	UrbanPark	
+조깅코스	UrbanPark	
+유원지	UrbanPark	
+재개발구역	Redevelopment	
+철거촌	Redevelopment	
+철거현장	Redevelopment	
+재건축	Redevelopment	
+재개발	Redevelopment	
+빈집촌	Redevelopment	
+폐건물	Redevelopment	
+공가	Redevelopment	
 폐공장	Ruin	
 폐허	Ruin	
 폐창고	Ruin	1
@@ -136,18 +136,18 @@
 폐상가	Ruin	2
 폐빌딩	Ruin	2
 폐연구소	Ruin	2
-번화가	Downtown	
-유흥가	Downtown	
-먹자골목	Downtown	
-술집거리	Downtown	
-클럽거리	Downtown	
-모텔촌	Downtown	
-홍등가	Downtown	
-네온사인	Downtown	
-상점가	Downtown	
-로데오거리	Downtown	
-대학가	Downtown	
-학원가	Downtown	
+번화가	NightlifeStreet	
+유흥가	NightlifeStreet	
+먹자골목	NightlifeStreet	
+술집거리	NightlifeStreet	
+클럽거리	NightlifeStreet	
+모텔촌	NightlifeStreet	
+홍등가	NightlifeStreet	
+네온사인	NightlifeStreet	
+상점가	NightlifeStreet	
+로데오거리	NightlifeStreet	
+대학가	NightlifeStreet	
+학원가	NightlifeStreet	
 횡단보도	Road	2
 사거리	Road	2
 교차로	Road	2
@@ -158,8 +158,8 @@
 대로	Road	2
 차도	Road	2
 신호등	Road	2
-국도	Road	
-지방도	Road	
+국도	ProvincialRoad	
+지방도	ProvincialRoad	
 산길	Road	1
 고갯길	Road	1
 커브길	Road	1
@@ -170,27 +170,27 @@
 도로	Road	
 고개	Road	1
 재	Road	1
-고속도로	Highway	
-고가도로	Highway	
-톨게이트	Highway	
-요금소	Highway	
-나들목	Highway	
-분기점	Highway	
-고가차도	Highway	
-자동차전용도로	Highway	
-순환도로	Highway	
+고속도로	Expressway	
+고가도로	ElevatedRoad	
+톨게이트	Expressway	
+요금소	Expressway	
+나들목	Expressway	
+분기점	Expressway	
+고가차도	ElevatedRoad	
+자동차전용도로	Expressway	
+순환도로	Expressway	
 휴게소	RestArea	
 졸음쉼터	RestArea	
 간이휴게소	RestArea	
 화물차휴게소	RestArea	
 주차쉼터	RestArea	
-고가밑	Underpass	
-교각아래	Underpass	
-굴다리	Underpass	
-다리밑	Underpass	
-철교밑	Underpass	
-토끼굴	Underpass	
-암거	Underpass	
+고가밑	ElevatedRoad	
+교각아래	ElevatedRoad	
+굴다리	RailUnderpass	
+다리밑	ElevatedRoad	
+철교밑	RailUnderpass	
+토끼굴	RailUnderpass	
+암거	RailUnderpass	
 터널	Tunnel	1
 폐터널	Tunnel	1
 지하차도	Tunnel	1
@@ -203,25 +203,25 @@
 동굴	Cave	
 석회동굴	Cave	
 용암동굴	Cave	
-해식동굴	Cave	
+해식동굴	SeaCave	
 굴	Cave	
 토굴	Cave	
 방공굴	Cave	
 땅굴	Cave	
-광장	Plaza	
-분수대	Plaza	
-시계탑	Plaza	
-동상	Plaza	
-역전광장	Plaza	
-시민광장	Plaza	
-야외무대	Plaza	
-전망대	Tower	
-타워	Tower	
-전망탑	Tower	
-스카이라운지	Tower	
-케이블카	Tower	
-곤돌라	Tower	
-관람차	Tower	
+광장	CityPlaza	
+분수대	CityPlaza	
+시계탑	CityPlaza	
+동상	CityPlaza	
+역전광장	StationPlaza	
+시민광장	CityPlaza	
+야외무대	CityPlaza	
+전망대	ObservationTower	
+타워	ObservationTower	
+전망탑	ObservationTower	
+스카이라운지	ObservationTower	
+케이블카	ObservationTower	
+곤돌라	ObservationTower	
+관람차	ObservationTower	
 놀이공원	Amusement	1
 놀이동산	Amusement	1
 테마파크	Amusement	1
@@ -243,31 +243,31 @@
 조류원	Zoo	
 맹수사	Zoo	
 동물사	Zoo	
-수족관	Zoo	
-아쿠아리움	Zoo	
-수조	Zoo	
-식물원	Garden	
-온실	Garden	
-수목원	Garden	
-화원	Garden	
-정원	Garden	
-꽃밭	Garden	
-장미원	Garden	
-유리온실	Garden	
-미로정원	Garden	
-시장	Market	
-재래시장	Market	
-전통시장	Market	
-수산시장	Market	
-어시장	Market	
-야시장	Market	
-오일장	Market	
-장터	Market	
-벼룩시장	Market	
-청과시장	Market	
-도매시장	Market	
-좌판	Market	
-노점	Market	
+수족관	Aquarium	
+아쿠아리움	Aquarium	
+수조	Aquarium	
+식물원	BotanicalGlasshouse	
+온실	BotanicalGlasshouse	
+수목원	FormalGarden	
+화원	FormalGarden	
+정원	FormalGarden	
+꽃밭	FormalGarden	
+장미원	FormalGarden	
+유리온실	BotanicalGlasshouse	
+미로정원	FormalGarden	
+시장	TraditionalMarket	
+재래시장	TraditionalMarket	
+전통시장	TraditionalMarket	
+수산시장	FishMarket	
+어시장	FishMarket	
+야시장	TraditionalMarket	
+오일장	TraditionalMarket	
+장터	TraditionalMarket	
+벼룩시장	TraditionalMarket	
+청과시장	TraditionalMarket	
+도매시장	TraditionalMarket	
+좌판	TraditionalMarket	
+노점	TraditionalMarket	
 백화점	Mall	1
 쇼핑몰	Mall	1
 아울렛	Mall	1
@@ -295,17 +295,17 @@
 편의점내부	Store	2
 진열대	Store	2
 무인편의점	Store	2
-빨래방	Unmanned	
-코인빨래방	Unmanned	
-무인점포	Unmanned	
-무인가게	Unmanned	
-무인카페	Unmanned	
-셀프빨래방	Unmanned	
-인형뽑기방	Unmanned	
-무인사진관	Unmanned	
-코인세탁소	Unmanned	
-자판기	Unmanned	
-공중전화	Unmanned	
+빨래방	Laundromat	
+코인빨래방	Laundromat	
+무인점포	VendingCorner	
+무인가게	VendingCorner	
+무인카페	VendingCorner	
+셀프빨래방	Laundromat	
+인형뽑기방	VendingCorner	
+무인사진관	VendingCorner	
+코인세탁소	Laundromat	
+자판기	VendingCorner	
+공중전화	VendingCorner	
 카페	Cafe	
 커피숍	Cafe	
 찻집	Cafe	
@@ -314,9 +314,9 @@
 북카페	Cafe	
 키즈카페	Cafe	
 만화카페	Cafe	
-방탈출카페	Cafe	
-보드게임카페	Cafe	
-스터디카페	Cafe	
+방탈출카페	EscapeRoom	
+보드게임카페	EscapeRoom	
+스터디카페	StudyHall	
 포장마차	Restaurant	1
 먹자골목포차	Restaurant	1
 노점식당	Restaurant	1
@@ -336,18 +336,18 @@
 급식실	Restaurant	2
 뷔페	Restaurant	2
 푸드코트	Restaurant	2
-술집	Bar	
-주점	Bar	
-호프집	Bar	
-바	Bar	
-선술집	Bar	
-이자카야	Bar	
-단란주점	Bar	
-유흥주점	Bar	
-룸살롱	Bar	
-클럽	Bar	
-나이트클럽	Bar	
-라운지	Bar	
+술집	BasementBar	
+주점	BasementBar	
+호프집	BasementBar	
+바	BasementBar	
+선술집	BasementBar	
+이자카야	BasementBar	
+단란주점	BasementBar	
+유흥주점	BasementBar	
+룸살롱	BasementBar	
+클럽	Nightclub	
+나이트클럽	Nightclub	
+라운지	Nightclub	
 노래방건물	Arcade	1
 피시방건물	Arcade	1
 오락실	Arcade	1
@@ -357,16 +357,16 @@
 노래연습장	Arcade	2
 코인노래방	Arcade	2
 가라오케	Arcade	2
-PC방	PCroom	
-피시방	PCroom	
-게임방	PCroom	
-만화방	PCroom	
-당구장	PCroom	
-볼링장	PCroom	
-탁구장	PCroom	
-스크린골프	PCroom	
-실내야구장	PCroom	
-사격게임장	PCroom	
+PC방	PCBang	
+피시방	PCBang	
+게임방	PCBang	
+만화방	PCBang	
+당구장	BilliardHall	
+볼링장	BilliardHall	
+탁구장	BilliardHall	
+스크린골프	BilliardHall	
+실내야구장	BilliardHall	
+사격게임장	BilliardHall	
 은행	Bank	
 금고	Bank	
 금고실	Bank	
@@ -377,42 +377,42 @@ ATM	Bank
 신협	Bank	
 증권사	Bank	
 환전소	Bank	
-미용실	Salon	
-이발소	Salon	
-이용원	Salon	
-네일샵	Salon	
-피부관리실	Salon	
-마사지샵	Salon	
-사진관	Salon	
-의상실	Salon	
-세탁소	Salon	
-수선집	Salon	
-안경점	Salon	
-전당포	Pawn	
-고물상	Pawn	
-골동품점	Pawn	
-중고가게	Pawn	
-폐지수집소	Pawn	
-만물상	Pawn	
-철물점	Pawn	
-헌책방	Pawn	
-잡화점	Pawn	
+미용실	HairSalon	
+이발소	HairSalon	
+이용원	HairSalon	
+네일샵	HairSalon	
+피부관리실	HairSalon	
+마사지샵	HairSalon	
+사진관	PhotoStudio	
+의상실	HairSalon	
+세탁소	Laundromat	
+수선집	HairSalon	
+안경점	HairSalon	
+전당포	Pawnshop	
+고물상	Scrapyard	
+골동품점	Pawnshop	
+중고가게	Pawnshop	
+폐지수집소	Scrapyard	
+만물상	Pawnshop	
+철물점	Pawnshop	
+헌책방	Pawnshop	
+잡화점	Pawnshop	
 주유소	GasStation	
-세차장	GasStation	
+세차장	CarWash	
 충전소	GasStation	
-정비소	GasStation	
-카센터	GasStation	
-폐차장	GasStation	
-공업사	GasStation	
-타이어가게	GasStation	
-예식장	Wedding	
-웨딩홀	Wedding	
-연회장	Wedding	
-컨벤션홀	Wedding	
-연회실	Wedding	
-피로연장	Wedding	
-돌잔치홀	Wedding	
-호텔연회장	Wedding	
+정비소	CarWash	
+카센터	CarWash	
+폐차장	Scrapyard	
+공업사	CarWash	
+타이어가게	CarWash	
+예식장	WeddingHall	
+웨딩홀	WeddingHall	
+연회장	WeddingHall	
+컨벤션홀	WeddingHall	
+연회실	WeddingHall	
+피로연장	WeddingHall	
+돌잔치홀	WeddingHall	
+호텔연회장	WeddingHall	
 모텔	Lodging	
 여관	Lodging	
 여인숙	Lodging	1
@@ -445,25 +445,25 @@ ATM	Bank
 한증막	Bathhouse	2
 탈의실	Bathhouse	2
 냉탕	Bathhouse	2
-수영장	Pool	
-실내수영장	Pool	
-워터파크	Pool	
-풀장	Pool	
-물놀이장	Pool	
-다이빙풀	Pool	
-유수풀	Pool	
-헬스장	Gym	
-체육관	Gym	
-강당	Gym	
-체육시설	Gym	
-도장	Gym	
-무도장	Gym	
-태권도장	Gym	
-검도장	Gym	
-필라테스	Gym	
-요가원	Gym	
-연습실	Gym	
-무용실	Gym	
+수영장	IndoorPool	
+실내수영장	IndoorPool	
+워터파크	WaterPark	
+풀장	IndoorPool	
+물놀이장	WaterPark	
+다이빙풀	IndoorPool	
+유수풀	WaterPark	
+헬스장	FitnessGym	
+체육관	SchoolGymnasium	
+강당	SchoolGymnasium	
+체육시설	FitnessGym	
+도장	FitnessGym	
+무도장	FitnessGym	
+태권도장	FitnessGym	
+검도장	FitnessGym	
+필라테스	FitnessGym	
+요가원	FitnessGym	
+연습실	FitnessGym	
+무용실	FitnessGym	
 경기장	Stadium	
 야구장	Stadium	
 축구장	Stadium	
@@ -502,14 +502,14 @@ ATM	Bank
 서점	Library	2
 책방	Library	2
 자료실	Library	2
-전시장	Gallery	
-전시실	Gallery	
-갤러리	Gallery	
-박람회장	Gallery	
-컨벤션센터	Gallery	
-화랑	Gallery	
-수장고	Gallery	
-밀랍인형관	Gallery	
+전시장	ArtGallery	
+전시실	ArtGallery	
+갤러리	ArtGallery	
+박람회장	ArtGallery	
+컨벤션센터	ArtGallery	
+화랑	ArtGallery	
+수장고	Museum	
+밀랍인형관	Museum	
 학교	School	
 초등학교	School	
 중학교	School	
@@ -531,36 +531,36 @@ ATM	Bank
 보건실	School	2
 도서실	School	2
 시청각실	School	2
-대학	Campus	
-대학교	Campus	
-캠퍼스	Campus	
-강의실	Campus	
-강의동	Campus	
-학생회관	Campus	
-동아리방	Campus	
-대학원	Campus	
-기숙사	Dorm	
-합숙소	Dorm	
-생활관	Dorm	
-고시원형기숙사	Dorm	
-연수원	Dorm	
-수련원	Dorm	
-수련회장	Dorm	
-유스호스텔	Dorm	
-학원	Academy	
-독서실	Academy	
-교습소	Academy	
-입시학원	Academy	
-기숙학원	Academy	
-공부방	Academy	
-과외방	Academy	
-유치원	Kinder	
-어린이집	Kinder	
-보육원	Kinder	
-고아원	Kinder	
-놀이방	Kinder	
-아동센터	Kinder	
-지역아동센터	Kinder	
+대학	College	
+대학교	College	
+캠퍼스	College	
+강의실	College	
+강의동	College	
+학생회관	College	
+동아리방	College	
+대학원	College	
+기숙사	Dormitory	
+합숙소	Dormitory	
+생활관	Dormitory	
+고시원형기숙사	Dormitory	
+연수원	Dormitory	
+수련원	RetreatCenter	
+수련회장	RetreatCenter	
+유스호스텔	Dormitory	
+학원	CramSchool	
+독서실	StudyHall	
+교습소	CramSchool	
+입시학원	CramSchool	
+기숙학원	CramSchool	
+공부방	CramSchool	
+과외방	CramSchool	
+유치원	Kindergarten	
+어린이집	Kindergarten	
+보육원	Orphanage	
+고아원	Orphanage	
+놀이방	Kindergarten	
+아동센터	Orphanage	
+지역아동센터	Orphanage	
 병원	Hospital	
 대학병원	Hospital	
 종합병원	Hospital	
@@ -580,22 +580,22 @@ ATM	Bank
 보건소	Clinic	
 치과	Clinic	
 한의원	Clinic	
-약국	Clinic	
+약국	Pharmacy	
 산부인과	Clinic	
 소아과	Clinic	
 진료소	Clinic	
 접종실	Clinic	
 조리원	Clinic	
 동물병원	Clinic	
-수술실	Surgery	
-영안실	Surgery	
-시체안치소	Surgery	
-부검실	Surgery	
-해부실	Surgery	
-분만실	Surgery	
-검사실	Surgery	
-엑스레이실	Surgery	
-냉동고	Surgery	
+수술실	OperatingRoom	
+영안실	Morgue	
+시체안치소	Morgue	
+부검실	Morgue	
+해부실	Morgue	
+분만실	OperatingRoom	
+검사실	OperatingRoom	
+엑스레이실	OperatingRoom	
+냉동고	ColdStorage	
 요양원	NursingHome	
 양로원	NursingHome	
 실버타운	NursingHome	
@@ -603,14 +603,14 @@ ATM	Bank
 복지관	NursingHome	
 재활원	NursingHome	
 호스피스	NursingHome	
-장례식장	Funeral	
-빈소	Funeral	
-화장터	Funeral	
-화장장	Funeral	
-납골당	Funeral	
-봉안당	Funeral	
-추모공원	Funeral	
-장의사	Funeral	
+장례식장	FuneralHall	
+빈소	FuneralHall	
+화장터	Columbarium	
+화장장	Columbarium	
+납골당	Columbarium	
+봉안당	Columbarium	
+추모공원	Columbarium	
+장의사	FuneralHall	
 무덤	Shrine	1
 묘지	Shrine	1
 공동묘지	Shrine	1
@@ -667,51 +667,51 @@ ATM	Bank
 콜센터	Office	2
 사무소	Office	2
 작업실	Office	2
-연구소	Lab	
-실험실	Lab	
-연구실	Lab	
-연구동	Lab	
-시험장	Lab	
-무균실	Lab	
-격리실	Lab	
-연구단지	Lab	
-서버실	Server	
-전산실	Server	
-데이터센터	Server	
-통신실	Server	
-관제실	Server	
-상황실	Server	
-CCTV실	Server	
-방재실	Server	
-경비실	Server	
-관리실	Server	
-관리사무소	Server	
-숙직실	Server	
-방송국	Broadcast	
-스튜디오	Broadcast	
-촬영장	Broadcast	
-세트장	Broadcast	
-녹음실	Broadcast	
-편집실	Broadcast	
-라디오부스	Broadcast	
-공개홀	Broadcast	
-신문사	Broadcast	
-구청	CityHall	
-시청	CityHall	
-군청	CityHall	
-도청	CityHall	
-주민센터	CityHall	
-동사무소	CityHall	
-면사무소	CityHall	
-읍사무소	CityHall	
-관공서	CityHall	
-청사	CityHall	
-민원실	CityHall	
-세무서	CityHall	
-등기소	CityHall	
-법원	CityHall	
-검찰청	CityHall	
-국회	CityHall	
+연구소	Laboratory	
+실험실	Laboratory	
+연구실	Laboratory	
+연구동	Laboratory	
+시험장	Laboratory	
+무균실	Laboratory	
+격리실	Laboratory	
+연구단지	Laboratory	
+서버실	ServerRoom	
+전산실	ServerRoom	
+데이터센터	ServerRoom	
+통신실	ServerRoom	
+관제실	SecurityRoom	
+상황실	SecurityRoom	
+CCTV실	SecurityRoom	
+방재실	SecurityRoom	
+경비실	SecurityRoom	
+관리실	SecurityRoom	
+관리사무소	SecurityRoom	
+숙직실	SecurityRoom	
+방송국	TVStudio	
+스튜디오	TVStudio	
+촬영장	TVStudio	
+세트장	TVStudio	
+녹음실	RadioStudio	
+편집실	TVStudio	
+라디오부스	RadioStudio	
+공개홀	TVStudio	
+신문사	TVStudio	
+구청	DistrictOffice	
+시청	DistrictOffice	
+군청	DistrictOffice	
+도청	DistrictOffice	
+주민센터	DistrictOffice	
+동사무소	DistrictOffice	
+면사무소	DistrictOffice	
+읍사무소	DistrictOffice	
+관공서	DistrictOffice	
+청사	DistrictOffice	
+민원실	DistrictOffice	
+세무서	DistrictOffice	
+등기소	DistrictOffice	
+법원	Courthouse	
+검찰청	Courthouse	
+국회	Courthouse	
 우체국	PostOffice	
 우편집중국	PostOffice	
 택배영업소	PostOffice	
@@ -779,21 +779,21 @@ GOP	Military	2
 옥상출입구	Rooftop	2
 루프탑	Rooftop	2
 헬기장	Rooftop	2
-복도	Corridor	
-통로	Corridor	
-회랑	Corridor	
-긴복도	Corridor	
-연결복도	Corridor	
-창고	Storage	
-자재실	Storage	
-비품실	Storage	
-물품보관소	Storage	
-사물함	Storage	
-보관함	Storage	
-컨테이너창고	Storage	
-광	Storage	
-헛간	Storage	
-곳간	Storage	
+복도	Hallway	
+통로	Hallway	
+회랑	Hallway	
+긴복도	Hallway	
+연결복도	Hallway	
+창고	Stockroom	
+자재실	Stockroom	
+비품실	Stockroom	
+물품보관소	Stockroom	
+사물함	SelfStorage	
+보관함	SelfStorage	
+컨테이너창고	SelfStorage	
+광	Stockroom	
+헛간	Stockroom	
+곳간	Stockroom	
 공중화장실	Restroom	1
 공원화장실	Restroom	1
 간이화장실	Restroom	1
@@ -825,14 +825,14 @@ GOP	Military	2
 막차	Subway	2
 기차안	Subway	2
 KTX	Subway	2
-기차역	Station	
-간이역	Station	
-대합실	Station	
-역광장	Station	
-철도역	Station	
-정거장	Station	
-역무실	Station	
-승차장	Station	
+기차역	RuralStation	
+간이역	RuralStation	
+대합실	TrainStation	
+역광장	StationPlaza	
+철도역	TrainStation	
+정거장	RuralStation	
+역무실	TrainStation	
+승차장	TrainStation	
 철길	Anomaly	0
 건널목	Anomaly	0
 철로	Anomaly	0
@@ -853,20 +853,20 @@ KTX	Subway	2
 고속버스	Bus	2
 시외버스	Bus	2
 통학버스	Bus	2
-터미널	Terminal	
-버스터미널	Terminal	
-고속터미널	Terminal	
-시외버스터미널	Terminal	
-차고지	Terminal	
-여객터미널	Terminal	
-환승센터	Terminal	
-택시	Car	
-차안	Car	
-운전석	Car	
-뒷좌석	Car	
-블랙박스	Car	
-조수석	Car	
-차량내부	Car	
+터미널	BusTerminal	
+버스터미널	BusTerminal	
+고속터미널	BusTerminal	
+시외버스터미널	BusTerminal	
+차고지	BusTerminal	
+여객터미널	Ferry	
+환승센터	BusTerminal	
+택시	Taxi	
+차안	Taxi	
+운전석	Taxi	
+뒷좌석	Taxi	
+블랙박스	Taxi	
+조수석	Taxi	
+차량내부	Taxi	
 공항	Airport	
 활주로	Airport	
 격납고	Airport	
@@ -906,43 +906,43 @@ KTX	Subway	2
 사구	Beach	
 해송숲	Beach	
 야영해변	Beach	
-갯벌	Tidal	
-염전	Tidal	
-양식장	Tidal	
-간척지	Tidal	
-개펄	Tidal	
-새만금	Tidal	
-소금창고	Tidal	
-김양식장	Tidal	
-섬	Island	
-무인도	Island	
-외딴섬	Island	
-암초	Island	
-섬마을	Island	
-낙도	Island	
-여객선	Ship	
-유람선	Ship	
-배	Ship	
-선박	Ship	
-화물선	Ship	
-크루즈	Ship	
-갑판	Ship	
-선실	Ship	
-폐선박	Ship	
-잠수함	Ship	
-요트	Ship	
-낚싯배	Ship	
-항만	Port	
-컨테이너부두	Port	
-야적장	Port	
-하역장	Port	
-컨테이너	Port	
-크레인	Port	
-물류항	Port	
-컨테이너터미널	Port	
-국제여객터미널	Port	
-연안여객터미널	Port	
-연안부두	Port	
+갯벌	Mudflat	
+염전	SaltPan	
+양식장	Mudflat	
+간척지	Mudflat	
+개펄	Mudflat	
+새만금	Mudflat	
+소금창고	SaltPan	
+김양식장	Mudflat	
+섬	IslandVillage	
+무인도	IslandVillage	
+외딴섬	IslandVillage	
+암초	IslandVillage	
+섬마을	IslandVillage	
+낙도	IslandVillage	
+여객선	Ferry	
+유람선	Ferry	
+배	Ferry	
+선박	Ferry	
+화물선	Ferry	
+크루즈	Ferry	
+갑판	Ferry	
+선실	Ferry	
+폐선박	Ferry	
+잠수함	Ferry	
+요트	Ferry	
+낚싯배	Ferry	
+항만	ContainerPort	
+컨테이너부두	ContainerPort	
+야적장	ContainerPort	
+하역장	ContainerPort	
+컨테이너	ContainerPort	
+크레인	ContainerPort	
+물류항	ContainerPort	
+컨테이너터미널	ContainerPort	
+국제여객터미널	Ferry	
+연안여객터미널	Ferry	
+연안부두	ContainerPort	
 다리	Bridge	1
 대교	Bridge	1
 교량	Bridge	1
@@ -974,32 +974,32 @@ KTX	Subway	2
 샘터	Lake	2
 두레박	Lake	2
 펌프	Lake	2
-하천	Riverside	
-개천	Riverside	
-강	Riverside	
-강변	Riverside	
-천변	Riverside	
-둔치	Riverside	
-수변	Riverside	
-제방	Riverside	
-둑	Riverside	
-둑길	Riverside	
-강둑	Riverside	
-개울	Riverside	
-시내	Riverside	
-도랑	Riverside	
-보	Riverside	
-수문	Riverside	
-하구	Riverside	
-수로	Riverside	
-천	Riverside	
-계곡	Valley	
-폭포	Valley	
-소	Valley	
-계류	Valley	
-물놀이계곡	Valley	
-협곡	Valley	
-골짜기	Valley	
+하천	RiversidePark	
+개천	RiversidePark	
+강	RiversidePark	
+강변	RiversidePark	
+천변	RiversidePark	
+둔치	RiversidePark	
+수변	RiversidePark	
+제방	RiversidePark	
+둑	RiversidePark	
+둑길	RiversidePark	
+강둑	RiversidePark	
+개울	RiversidePark	
+시내	RiversidePark	
+도랑	RiversidePark	
+보	RiversidePark	
+수문	RiversidePark	
+하구	RiversidePark	
+수로	RiversidePark	
+천	RiversidePark	
+계곡	MountainValley	
+폭포	MountainValley	
+소	MountainValley	
+계류	MountainValley	
+물놀이계곡	MountainValley	
+협곡	MountainValley	
+골짜기	MountainValley	
 산	Forest	
 숲	Forest	
 둘레길	Forest	1
@@ -1017,29 +1017,29 @@ KTX	Subway	2
 휴양림	Forest	1
 자연휴양림	Forest	1
 약수터길	Forest	1
-대나무숲	Bamboo	
-대밭	Bamboo	
-자작나무숲	Bamboo	
-삼나무숲	Bamboo	
-갈대밭	Bamboo	
-억새밭	Bamboo	
-갈대숲	Bamboo	
-메밀밭	Bamboo	
-캠핑장	Camp	
-야영장	Camp	
-글램핑장	Camp	
-오토캠핑장	Camp	
-수련원야영장	Camp	
-캠프장	Camp	
-텐트	Camp	
-설산	Snow	
-스키장	Snow	
-눈밭	Snow	
-눈썰매장	Snow	
-설원	Snow	
-빙판	Snow	
-얼음낚시터	Snow	
-얼어붙은호수	Snow	
+대나무숲	BambooGrove	
+대밭	BambooGrove	
+자작나무숲	BambooGrove	
+삼나무숲	BambooGrove	
+갈대밭	SilverGrassField	
+억새밭	SilverGrassField	
+갈대숲	SilverGrassField	
+메밀밭	SilverGrassField	
+캠핑장	Campsite	
+야영장	Campsite	
+글램핑장	Campsite	
+오토캠핑장	Campsite	
+수련원야영장	Campsite	
+캠프장	Campsite	
+텐트	Campsite	
+설산	SkiResort	
+스키장	SkiResort	
+눈밭	SkiResort	
+눈썰매장	SkiResort	
+설원	SkiResort	
+빙판	FrozenReservoir	
+얼음낚시터	FrozenReservoir	
+얼어붙은호수	FrozenReservoir	
 폐광	Mine	
 광산	Mine	
 탄광	Mine	
@@ -1048,86 +1048,86 @@ KTX	Subway	2
 채석장	Mine	
 석산	Mine	
 폐갱도	Mine	
-논	Field	
-밭	Field	
-논밭	Field	
-들판	Field	
-평야	Field	
-논두렁	Field	
-밭두렁	Field	
-농로	Field	
-들	Field	
-허수아비	Field	
-초원	Field	
-목초지	Field	
-풀밭	Field	
-비닐하우스	Greenhouse	
-과수원	Greenhouse	
-온상	Greenhouse	
-하우스단지	Greenhouse	
-포도밭	Greenhouse	
-인삼밭	Greenhouse	
-묘목장	Greenhouse	
-농원	Greenhouse	
-축사	Farm	
-농장	Farm	
-목장	Farm	
-양계장	Farm	
-돈사	Farm	
-우사	Farm	
-도축장	Farm	
-도계장	Farm	
-양돈장	Farm	
-개사육장	Farm	
-마구간	Farm	
-외양간	Farm	
-사육장	Farm	
-공사장	Construction	
-공사현장	Construction	
-건설현장	Construction	
-신축현장	Construction	
-타워크레인	Construction	
-공사판	Construction	
-모델하우스	Construction	
-분양사무소	Construction	
-가설울타리	Construction	
-비계	Construction	
-공장	Factory	
-제철소	Factory	
-정유공장	Factory	
-화학공장	Factory	
-조립공장	Factory	
-봉제공장	Factory	
-인쇄소	Factory	
-제재소	Factory	
-양조장	Factory	
-공단	Factory	
-산업단지	Factory	
-작업장	Factory	
-공방	Factory	
-물류센터	Warehouse	
-물류창고	Warehouse	
-택배센터	Warehouse	
-분류장	Warehouse	
-냉동창고	Warehouse	
-저온창고	Warehouse	
-컨테이너야드	Warehouse	
-보세창고	Warehouse	
-하치장	Warehouse	
-발전소	Power	
-변전소	Power	
-송전탑	Power	
-원전	Power	
-원자력발전소	Power	
-화력발전소	Power	
-풍력발전기	Power	
-태양광단지	Power	
-철탑	Power	
-기지국	Power	
-급수탑	Power	
-정수장	Power	
-배수지	Power	
-취수장	Power	
+논	RiceFields	
+밭	RiceFields	
+논밭	RiceFields	
+들판	RiceFields	
+평야	RiceFields	
+논두렁	RiceFields	
+밭두렁	RiceFields	
+농로	RiceFields	
+들	RiceFields	
+허수아비	RiceFields	
+초원	Pasture	
+목초지	Pasture	
+풀밭	Pasture	
+비닐하우스	VinylGreenhouses	
+과수원	Orchard	
+온상	VinylGreenhouses	
+하우스단지	VinylGreenhouses	
+포도밭	Orchard	
+인삼밭	VinylGreenhouses	
+묘목장	VinylGreenhouses	
+농원	VinylGreenhouses	
+축사	CattleBarn	
+농장	CattleBarn	
+목장	Pasture	
+양계장	CattleBarn	
+돈사	CattleBarn	
+우사	CattleBarn	
+도축장	CattleBarn	
+도계장	CattleBarn	
+양돈장	CattleBarn	
+개사육장	CattleBarn	
+마구간	CattleBarn	
+외양간	CattleBarn	
+사육장	CattleBarn	
+공사장	ConstructionSite	
+공사현장	ConstructionSite	
+건설현장	ConstructionSite	
+신축현장	ConstructionSite	
+타워크레인	ConstructionSite	
+공사판	ConstructionSite	
+모델하우스	ConstructionSite	
+분양사무소	ConstructionSite	
+가설울타리	ConstructionSite	
+비계	ConstructionSite	
+공장	FactoryFloor	
+제철소	IndustrialComplex	
+정유공장	IndustrialComplex	
+화학공장	FactoryFloor	
+조립공장	FactoryFloor	
+봉제공장	FactoryFloor	
+인쇄소	FactoryFloor	
+제재소	FactoryFloor	
+양조장	FactoryFloor	
+공단	IndustrialComplex	
+산업단지	IndustrialComplex	
+작업장	FactoryFloor	
+공방	FactoryFloor	
+물류센터	LogisticsCenter	
+물류창고	LogisticsCenter	
+택배센터	LogisticsCenter	
+분류장	LogisticsCenter	
+냉동창고	ColdStorage	
+저온창고	ColdStorage	
+컨테이너야드	ContainerPort	
+보세창고	LogisticsCenter	
+하치장	LogisticsCenter	
+발전소	Substation	
+변전소	Substation	
+송전탑	PowerLines	
+원전	Substation	
+원자력발전소	Substation	
+화력발전소	Substation	
+풍력발전기	PowerLines	
+태양광단지	PowerLines	
+철탑	PowerLines	
+기지국	PowerLines	
+급수탑	PowerLines	
+정수장	Substation	
+배수지	Substation	
+취수장	Substation	
 하수도	Sewer	
 맨홀	Sewer	
 배수로	Sewer	
@@ -1137,14 +1137,14 @@ KTX	Subway	2
 복개천	Sewer	
 우수관	Sewer	
 배수펌프장	Sewer	
-매립지	Dump	
-소각장	Dump	
-쓰레기장	Dump	
-분리수거장	Dump	
-재활용센터	Dump	
-쓰레기매립장	Dump	
-폐기물처리장	Dump	
-적환장	Dump	
+매립지	Landfill	
+소각장	Landfill	
+쓰레기장	Landfill	
+분리수거장	Landfill	
+재활용센터	Landfill	
+쓰레기매립장	Landfill	
+폐기물처리장	Landfill	
+적환장	Landfill	
 소양호	Lake	1
 충주호	Lake	1
 청풍호	Lake	1
@@ -1228,14 +1228,14 @@ KTX	Subway	2
 송전호	Lake	1
 낙동강호	Lake	1
 서호호	Lake	1
-세월호	Ship	
-타이타닉호	Ship	
-서해훼리호	Ship	
-유령선	Ship	
-난파선	Ship	
-침몰선	Ship	
-페리호	Ship	
-훼리호	Ship	
+세월호	Ferry	
+타이타닉호	Ferry	
+서해훼리호	Ferry	
+유령선	Ferry	
+난파선	Ferry	
+침몰선	Ferry	
+페리호	Ferry	
+훼리호	Ferry	
 무궁화호	Subway	2
 새마을호	Subway	2
 통일호	Subway	2
@@ -1250,3 +1250,371 @@ KTX	Subway	2
 본가	Home	
 친정집	Home	
 시댁	Home	
+아파트집	Home	
+단칸방	StudioFlat	
+원룸텔	StudioFlat	
+자취집	StudioFlat	
+계단길	Alley	
+산동네	Alley	
+언덕동네	Alley	
+양옥집	House	
+이층집	House	
+2층집	House	
+종가	Hanok	
+한옥집	Hanok	
+고가옥	Hanok	
+시민공원	UrbanPark	
+도시공원	UrbanPark	
+중앙공원	UrbanPark	
+재개발지구	Redevelopment	
+재건축단지	Redevelopment	
+환락가	NightlifeStreet	
+유흥거리	NightlifeStreet	
+밤거리	NightlifeStreet	
+농어촌도로	ProvincialRoad	
+들판길	ProvincialRoad	
+직선도로	ProvincialRoad	
+국도변	ProvincialRoad	
+시골도로	ProvincialRoad	
+고속국도	Expressway	
+도시고속도로	Expressway	
+고속도로휴게소	RestArea	
+고가아래	ElevatedRoad	
+고가하부	ElevatedRoad	
+교각밑	ElevatedRoad	
+철둑	RailUnderpass	
+철둑길	RailUnderpass	
+철길굴다리	RailUnderpass	
+종유굴	Cave	
+석굴	Cave	
+해안동굴	SeaCave	
+바닷가동굴	SeaCave	
+해식굴	SeaCave	
+중앙광장	CityPlaza	
+분수광장	CityPlaza	
+역앞광장	StationPlaza	
+역전앞	StationPlaza	
+역앞	StationPlaza	
+동물원우리	Zoo	
+해양관	Aquarium	
+열대식물원	BotanicalGlasshouse	
+온실정원	BotanicalGlasshouse	
+산울타리	FormalGarden	
+정원수	FormalGarden	
+5일장	TraditionalMarket	
+골목시장	TraditionalMarket	
+수산물시장	FishMarket	
+활어시장	FishMarket	
+회센터	FishMarket	
+수산센터	FishMarket	
+수산물도매시장	FishMarket	
+무인세탁소	Laundromat	
+세탁방	Laundromat	
+자판기코너	VendingCorner	
+무인판매대	VendingCorner	
+커피전문점	Cafe	
+브런치카페	Cafe	
+방탈출	EscapeRoom	
+테마방	EscapeRoom	
+지하술집	BasementBar	
+칵테일바	BasementBar	
+와인바	BasementBar	
+댄스클럽	Nightclub	
+피씨방	PCBang	
+PC카페	PCBang	
+플스방	PCBang	
+포켓볼	BilliardHall	
+은행지점	Bank	
+저축은행	Bank	
+헤어샵	HairSalon	
+미장원	HairSalon	
+바버샵	HairSalon	
+사진스튜디오	PhotoStudio	
+증명사진	PhotoStudio	
+사진원	PhotoStudio	
+금은방	Pawnshop	
+중고상	Pawnshop	
+고철상	Scrapyard	
+재활용상	Scrapyard	
+셀프주유소	GasStation	
+LPG충전소	GasStation	
+전기차충전소	GasStation	
+수소충전소	GasStation	
+자동세차	CarWash	
+셀프세차	CarWash	
+손세차	CarWash	
+세차소	CarWash	
+결혼식장	WeddingHall	
+웨딩컨벤션	WeddingHall	
+수영센터	IndoorPool	
+야외수영장	WaterPark	
+물놀이공원	WaterPark	
+파도풀	WaterPark	
+실내체육관	SchoolGymnasium	
+학교체육관	SchoolGymnasium	
+대강당	SchoolGymnasium	
+피트니스	FitnessGym	
+헬스클럽	FitnessGym	
+복싱장	FitnessGym	
+합기도장	FitnessGym	
+시립미술관	ArtGallery	
+현대미술관	ArtGallery	
+역사관	Museum	
+민속관	Museum	
+유물관	Museum	
+역사박물관	Museum	
+민속박물관	Museum	
+국립박물관	Museum	
+시립박물관	Museum	
+단과대학	College	
+학생기숙사	Dormitory	
+보습학원	CramSchool	
+학원건물	CramSchool	
+스터디룸	StudyHall	
+공부카페	StudyHall	
+병설유치원	Kindergarten	
+아동복지시설	Orphanage	
+아동양육시설	Orphanage	
+그룹홈	Orphanage	
+내과	Clinic	
+정형외과	Clinic	
+이비인후과	Clinic	
+피부과	Clinic	
+동네병원	Clinic	
+보건지소	Clinic	
+약방	Pharmacy	
+한약방	Pharmacy	
+드럭스토어	Pharmacy	
+회복실	OperatingRoom	
+처치실	OperatingRoom	
+수술방	OperatingRoom	
+안치실	Morgue	
+시신안치실	Morgue	
+노인요양원	NursingHome	
+주간보호센터	NursingHome	
+상갓집	FuneralHall	
+영결식장	FuneralHall	
+조문객	FuneralHall	
+추모관	Columbarium	
+납골묘	Columbarium	
+승화원	Columbarium	
+절간	Temple	
+템플스테이	Temple	
+서버룸	ServerRoom	
+IDC	ServerRoom	
+경비초소	SecurityRoom	
+수위실	SecurityRoom	
+통제실	SecurityRoom	
+보안실	SecurityRoom	
+방송사	TVStudio	
+방송센터	TVStudio	
+라디오방송국	RadioStudio	
+라디오스튜디오	RadioStudio	
+녹음부스	RadioStudio	
+행정복지센터	DistrictOffice	
+지방법원	Courthouse	
+대법원	Courthouse	
+가정법원	Courthouse	
+헌법재판소	Courthouse	
+법정	Courthouse	
+재판정	Courthouse	
+우편물분류실	PostOffice	
+아파트로비	ApartmentLobby	
+아파트현관	ApartmentLobby	
+공동현관	ApartmentLobby	
+우편함	ApartmentLobby	
+소방본부	FireStation	
+119구조대	FireStation	
+소방센터	FireStation	
+건물복도	Hallway	
+창고방	Stockroom	
+재고실	Stockroom	
+개인창고	SelfStorage	
+셀프스토리지	SelfStorage	
+짐보관소	SelfStorage	
+미니창고	SelfStorage	
+시골역	RuralStation	
+무인역	RuralStation	
+기차역대합실	TrainStation	
+KTX역	TrainStation	
+고속철도역	TrainStation	
+중앙역	TrainStation	
+고속버스터미널	BusTerminal	
+종합터미널	BusTerminal	
+택시안	Taxi	
+승용차	Taxi	
+자가용	Taxi	
+콜택시	Taxi	
+국제공항	Airport	
+공항터미널	Airport	
+갯골	Mudflat	
+천일염전	SaltPan	
+소금밭	SaltPan	
+섬분교	IslandVillage	
+카페리	Ferry	
+무역항	ContainerPort	
+신항	ContainerPort	
+강변공원	RiversidePark	
+고수부지	RiversidePark	
+둔치공원	RiversidePark	
+계곡물	MountainValley	
+산골짜기	MountainValley	
+대숲	BambooGrove	
+죽림	BambooGrove	
+억새군락	SilverGrassField	
+갈대습지	SilverGrassField	
+청소년수련원	RetreatCenter	
+수련관	RetreatCenter	
+청소년수련관	RetreatCenter	
+수련시설	RetreatCenter	
+스키리조트	SkiResort	
+슬로프	SkiResort	
+얼음낚시	FrozenReservoir	
+빙어낚시	FrozenReservoir	
+얼어붙은저수지	FrozenReservoir	
+갱구	Mine	
+탄광촌	Mine	
+논길	RiceFields	
+다랭이논	RiceFields	
+딸기하우스	VinylGreenhouses	
+사과밭	Orchard	
+배밭	Orchard	
+감나무밭	Orchard	
+귤밭	Orchard	
+복숭아밭	Orchard	
+한우농장	CattleBarn	
+방목장	Pasture	
+양떼목장	Pasture	
+건축현장	ConstructionSite	
+신축공사장	ConstructionSite	
+생산라인	FactoryFloor	
+공장내부	FactoryFloor	
+국가산업단지	IndustrialComplex	
+공업단지	IndustrialComplex	
+농공단지	IndustrialComplex	
+석유화학단지	IndustrialComplex	
+화학단지	IndustrialComplex	
+택배터미널	LogisticsCenter	
+냉장창고	ColdStorage	
+냉동실	ColdStorage	
+고압선	PowerLines	
+송전선	PowerLines	
+배전소	Substation	
+빗물저류조	Sewer	
+지하배수로	Sewer	
+매립장	Landfill	
+공터	Generic EmptyLot	
+빈터	Generic EmptyLot	
+나대지	Generic EmptyLot	
+빈땅	Generic EmptyLot	
+한빛빌라 3층 집 거실	Home	
+은하동 반지하 자취방	StudioFlat	
+새솔동 언덕 골목길	Alley	
+목련 단독주택	House	
+북촌 한옥마을 고택	Hanok	
+가람아파트 비상계단	Stairwell	
+한별빌딩 지하 보일러실	Basement	
+누리 호수공원 산책로	UrbanPark	
+은행동 재개발구역	Redevelopment	
+신촌 유흥가 뒷길	NightlifeStreet	
+경부고속도로 하행선	Expressway	
+망향 휴게소	RestArea	
+내부순환 고가도로 아래	ElevatedRoad	
+경인선 굴다리	RailUnderpass	
+고수 석회동굴	Cave	
+용머리 해식동굴	SeaCave	
+시민광장 분수대	CityPlaza	
+서울역 역전광장	StationPlaza	
+남산 전망대	ObservationTower	
+어린이대공원 동물원	Zoo	
+코엑스 아쿠아리움	Aquarium	
+열대 식물원 온실	BotanicalGlasshouse	
+가든 미로정원	FormalGarden	
+망원 전통시장	TraditionalMarket	
+노량진 수산시장	FishMarket	
+은하 코인빨래방	Laundromat	
+골목 끝 자판기	VendingCorner	
+모퉁이 카페	Cafe	
+미궁 방탈출카페	EscapeRoom	
+지하 선술집	BasementBar	
+홍대 클럽	Nightclub	
+레벨업 PC방	PCBang	
+큐 당구장	BilliardHall	
+새마을금고 본점	Bank	
+행운 이발소	HairSalon	
+추억 사진관	PhotoStudio	
+대박 전당포	Pawnshop	
+동네 고물상	Scrapyard	
+국도변 셀프주유소	GasStation	
+한빛동 셀프세차장	CarWash	
+라온 웨딩홀	WeddingHall	
+시립 실내수영장	IndoorPool	
+캐리비안 워터파크	WaterPark	
+은하중학교 체육관	SchoolGymnasium	
+바디 헬스장	FitnessGym	
+잠실 야구장	Stadium	
+가온 갤러리	ArtGallery	
+향토 역사박물관	Museum	
+한국대학교 캠퍼스	College	
+한빛대 기숙사	Dormitory	
+청소년수련원	RetreatCenter	
+대치동 입시학원	CramSchool	
+24시 독서실	StudyHall	
+해님 유치원	Kindergarten	
+소망 보육원	Orphanage	
+연세 내과의원	Clinic	
+온누리 약국	Pharmacy	
+대학병원 수술실	OperatingRoom	
+병원 영안실	Morgue	
+행복 요양원	NursingHome	
+한빛 장례식장	FuneralHall	
+하늘 봉안당	Columbarium	
+운문사 대웅전	Temple	
+생명과학 연구소	Laboratory	
+데이터센터 서버실	ServerRoom	
+건물 경비실	SecurityRoom	
+한빛 방송국 스튜디오	TVStudio	
+라디오 녹음실	RadioStudio	
+마포구청 민원실	DistrictOffice	
+서울중앙지방법원	Courthouse	
+은하 우체국	PostOffice	
+푸른아파트 공동현관	ApartmentLobby	
+중부 소방서	FireStation	
+건물 긴복도	Hallway	
+가게 뒤 창고	Stockroom	
+셀프스토리지	SelfStorage	
+간이역	RuralStation	
+중앙역 대합실	TrainStation	
+동서울 버스터미널	BusTerminal	
+심야 택시 뒷좌석	Taxi	
+들판 국도	ProvincialRoad	
+김포공항 출국장	Airport	
+해운대 해수욕장	Beach	
+순천만 갯벌	Mudflat	
+증도 염전	SaltPan	
+외딴섬 섬마을	IslandVillage	
+연안 여객선 갑판	Ferry	
+부산항 컨테이너부두	ContainerPort	
+한강공원 둔치	RiversidePark	
+백운 계곡	MountainValley	
+십리 대나무숲	BambooGrove	
+민둥산 억새밭	SilverGrassField	
+솔숲 오토캠핑장	Campsite	
+문 닫은 스키장	SkiResort	
+빙어 얼음낚시터	FrozenReservoir	
+폐광	Mine	
+황금 들판 논두렁	RiceFields	
+딸기 비닐하우스	VinylGreenhouses	
+사과 과수원	Orchard	
+한우 축사	CattleBarn	
+대관령 양떼목장	Pasture	
+신축 공사현장	ConstructionSite	
+봉제공장	FactoryFloor	
+반월 공단	IndustrialComplex	
+택배 물류센터	LogisticsCenter	
+수산 냉동창고	ColdStorage	
+고압 송전탑	PowerLines	
+변전소	Substation	
+지하 하수도	Sewer	
+쓰레기 매립지	Landfill	
+골목 공터	Generic EmptyLot	

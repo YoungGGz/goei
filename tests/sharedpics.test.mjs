@@ -37,7 +37,7 @@ test('이름에서 뒤에 나온 낱말(더 좁은 자리)을 따르고, 안·�
   assert.equal(top('강서대학병원 지하 주차장'), 'Parking 1');
   assert.equal(top('성북초등학교 3층 화장실'), 'Restroom 2');
   assert.match(top('세광병원 옥상'), /^Rooftop/);
-  assert.equal(top('신축 아파트 공사 현장').replace(/ \d$/, ''), 'Construction');
+  assert.equal(top('신축 아파트 공사 현장').replace(/ \d$/, ''), 'ConstructionSite');
   assert.equal(top('모텔 3층'), 'Lodging 2');
   assert.equal(top('목욕탕 앞'), 'Bathhouse 1');
   // 복도 그림이 아직 없으면 그 건물의 안쪽 그림
@@ -48,7 +48,7 @@ test('이름에서 뒤에 나온 낱말(더 좁은 자리)을 따르고, 안·�
 test('끝말: 세 글자 이상인 낱말 끝에서만, 같은 글자로 끝나는 다른 낱말과 행정구역은 뺀다', () => {
   // 2026-11-19 사용자 스샷: 옥정호 수변 산책로에 상가 복도 그림. 새 그림이 오기 전에도 저수지 그림
   assert.equal(now('옥정호 수변 산책로 안개 구역', '안개 속에서 낚시객 두 명이 같은 자리를 맴돎', '전북특별자치도 임실군'), 'Lake 1');
-  assert.equal(top('중랑천변 자전거 보관소').replace(/ \d$/, ''), 'Riverside');
+  assert.equal(top('중랑천변 자전거 보관소').replace(/ \d$/, ''), 'RiversidePark');
   assert.match(top('북한산 둘레길'), /^Forest/);
   assert.equal(top('구룡포항'), 'Sea 2');
   assert.equal(top('유성온천').replace(/ \d$/, ''), 'Bathhouse');
@@ -72,12 +72,12 @@ test('「~교」는 다리, 종교 이름은 교회, 학교·계급은 아님 (2
 
 test('「~호」는 호수·배·열차·사람 이름을 가른다 (2026-11-19 사용자: 세월호)', () => {
   const top = (n, t = '') => situationShared('an', n, t)[0].replace('Situation Anomaly ', '');
-  for (const n of ['세월호', '제3금성호', '금성호 침몰 해역', '대성호 갑판', '한일카페리호', '서해훼리호']) assert.match(top(n), /^Ship/, n);
-  assert.match(top('대성호', '조업 중이던 어선이 표류'), /^Ship/);
+  for (const n of ['세월호', '제3금성호', '금성호 침몰 해역', '대성호 갑판', '한일카페리호', '서해훼리호']) assert.match(top(n), /^Ferry/, n);
+  assert.match(top('대성호', '조업 중이던 어선이 표류'), /^Ferry/);
   for (const n of ['무궁화호', '새마을호 객차', '은하호 열차']) assert.equal(top(n), 'Subway 2', n);
   for (const n of ['옥정호', '소양호', '충주호 유람선 선착장 앞 물가', '유계호 얼음 구멍', '은월호 수몰 지구']) assert.match(top(n), /^Lake 1|^Sea 2/, n);
   assert.equal(top('유계호', '물안개 속에서 낚시객이 사라짐'), 'Lake 1');
-  for (const n of ['김민호 씨', '이준호', '구미호', '백호', '창간호', '교통호', '3번 참호', '누리호 발사대']) assert.ok(!/^(Lake|Ship)/.test(top(n)), n);
+  for (const n of ['김민호 씨', '이준호', '구미호', '백호', '창간호', '교통호', '3번 참호', '누리호 발사대']) assert.ok(!/^(Lake|Ferry)/.test(top(n)), n);
   // 배 이름으로 정해졌으면 호수 그림이 뒤 후보로도 끼지 않는다
   assert.ok(!situationShared('an', '세월호').some((k) => /Lake/.test(k)));
   assert.match(top('김민호 씨 자택'), /^Home/);
@@ -94,6 +94,25 @@ test('상황 글은 이름에서 못 고를 때만, 다른 곳을 가리키는 �
   const inc = situationShared('in', '강남대로 사거리', '다중 추돌', '서울특별시 강남구');
   assert.equal(inc[0], 'Situation Incident Street');
   assert.ok(inc.every((n) => n.startsWith('Situation Incident')));
+});
+
+test('새 그림은 숫자 없는 이름 한 장, 그림이 아직 없으면 가까운 기존 그림 (2026-11-19 사용자)', () => {
+  assert.equal(situationShared('an', '한빛동 셀프세차장')[0], 'Situation Anomaly CarWash');
+  assert.equal(situationShared('an', '국도변 주유소')[0], 'Situation Anomaly GasStation');
+  assert.ok(!situationShared('an', '한빛동 셀프세차장').some((n) => /GasStation/.test(n)));
+  assert.equal(now('한빛동 셀프세차장'), have.has('Situation Anomaly CarWash') ? 'CarWash' : 'Store 1');
+  assert.ok(situationShared('an', '이름 모를 곳', '', '서울특별시 강남구').includes('Situation Anomaly Generic City Skyline'));
+  assert.ok(situationShared('an', '이름 모를 곳', '실내에서 소리가 남').includes('Situation Anomaly Generic Indoor EmptyHall'));
+  assert.equal(situationShared('in', '시청 앞 광장', '집회 중 압사')[0], 'Situation Incident CityHallPlaza');
+  assert.equal(situationShared('in', '울산 석유화학단지', '폭발')[0], 'Situation Incident PetrochemicalComplex');
+  // 숫자 있는 기존 그림은 그대로
+  assert.equal(top('모텔 3층'), 'Lodging 2');
+  // 그림 한 장 항목의 「가까운 그림」은 지금 있는 그림이어야 한다
+  const places = JSON.parse(readFileSync('src/data/picwords.json', 'utf8')).places;
+  const bad = places.filter((p) => p.near && !have.has(`Situation Anomaly ${p.near}`)).map((p) => `${p.k} → ${p.near}`);
+  assert.deepEqual(bad, []);
+  // 새 그림 이름에 숫자가 붙지 않는다
+  assert.deepEqual(places.filter((p) => !p.pics && /\d$/.test(p.k)).map((p) => p.k), []);
 });
 
 test('bases and orgs pick by name words', () => {
