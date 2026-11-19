@@ -84,10 +84,10 @@ run('npm', ['run', 'build'], '② 빌드');
 // ④ dist → release (시작기·본체 조각·자료 팩·토크나이저 조각)
 {
   const dist = resolve(ROOT, 'dist');
-  const mine = /^(goei-plugin\.js|goei-body\.(json|\d+\.txt)|goei-data-(world|install|items|looks|homeshop)\.(json|\d+\.txt)|tok-o200k\.(json|\d+\.txt))$/;
+  const mine = /^(goei-plugin\.js|goei-body\.(json|\d+\.txt)|goei-data-(world|install|items|looks|homeshop)\.(json|\d+\.txt)|goei-look-\d+\.\d+\.\d+\.txt|tok-o200k\.(json|\d+\.txt))$/;
   // 지난 빌드의 조각이 남지 않게 (--no-card 로 release/ 를 비우지 않았을 때 조각 수가 줄면 옛 조각이 남는다)
   if (!opt.dry) for (const f of readdirSync(resolve(ROOT, 'release'))) if (mine.test(f)) unlinkSync(resolve(ROOT, 'release', f));
-  const files = readdirSync(dist).filter((f) => /^(goei-plugin\.js|goei-body\.(json|\d+\.txt)|goei-data-(world|install|items|looks|homeshop)\.(json|\d+\.txt)|tok-o200k\.(json|\d+\.txt))$/.test(f));
+  const files = readdirSync(dist).filter((f) => /^(goei-plugin\.js|goei-body\.(json|\d+\.txt)|goei-data-(world|install|items|looks|homeshop)\.(json|\d+\.txt)|goei-look-\d+\.\d+\.\d+\.txt|tok-o200k\.(json|\d+\.txt))$/.test(f));
   log(`④ dist → release 복사 ${files.length}개`);
   if (!opt.dry) for (const f of files) copyFileSync(resolve(dist, f), resolve(ROOT, 'release', f));
 }

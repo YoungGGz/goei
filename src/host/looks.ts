@@ -1,9 +1,11 @@
 // 내 모습 그림 (2026-11-07 사용자): 필드 인물 126명의 대기 동작 팩(goei-data-looks, 약 1.5MB 글)을 처음 그릴 때 한 번 받아 저장소에 둔다.
 // 받기·저장은 소지품 그림 팩(host/itemicons.ts)과 같다. 그림은 blob: 주소 하나씩 만들어 다시 그려도 같은 주소를 쓴다(화면 글이 가볍게).
 import { packMatches } from '../core/datapack';
-import { lookFor, LOOKS_PACK, parseLooksPack, type LookRow } from '../core/looks';
+import { fetchParts } from '../core/fetchparts';
+import { lookActsParts, lookFor, LOOKS_PACK, parseLookActs, parseLooksPack, type LookAct, type LookRow } from '../core/looks';
 import { playerAgent } from '../core/player';
-import { DataPackError, fetchPack } from './datapack';
+import { textHash } from '../core/texthash';
+import { DataPackError, fetchPack, getText } from './datapack';
 import type { ChatContext } from './risu';
 
 export const LOOKS_KEY = 'goei:data-looks';
@@ -88,6 +90,8 @@ export function lookUrl(r: LookRow): string {
 /** 정면 대기 동작 한 벌: 시트 주소 + 장 수·장 크기·장 길이. 그리는 쪽은 1배(픽셀 그대로), steps(frames) 로 돌린다 */
 export interface IdleLook {
   id: string;
+  /** 대기 사이에 끼울 동작이 있는 모습인가 (lookActs 로 받는다) */
+  acts: boolean;
   /** 시트 blob: 주소 (가로로 frames 장) */
   url: string;
   frames: number;
@@ -102,6 +106,7 @@ export interface IdleLook {
 
 export const idleOf = (r: LookRow): IdleLook => ({
   id: r.id,
+  acts: !!r.acts,
   url: lookUrl(r),
   frames: r.n,
   w: r.cw,
@@ -121,4 +126,76 @@ export function idleLook(ctx: Pick<ChatContext, 'char' | 'chat'>): IdleLook | nu
   const pa = playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
   const r = lookFor(all, ctx.chat.scriptstate, pa?.name);
   return r ? idleOf(r) : null;
+}
+
+// ── 대기 사이에 끼우는 동작 (2026-11-19 사용자) ──
+// 인물마다 따로 받는 파일(goei-look-<번호>.N.txt, 한 사람 평균 150KB)이라 126명 것을 한꺼번에 받지 않는다.
+// 지금 쓰는 모습 하나만 받아 저장소(goei:look-acts)에 둔다 (모습을 바꾸면 그 자리를 새 것으로 바꾼다).
+export const LOOK_ACTS_KEY = 'goei:look-acts';
+
+/** 동작 하나: 시트 주소와 재생·겹치기 값 */
+export interface ActLook {
+  k: string;
+  url: string;
+  frames: number;
+  w: number;
+  h: number;
+  dx: number;
+  dy: number;
+  sec: number;
+}
+
+const actsOf = new Map<string, ActLook[]>();
+const actsBusy = new Set<string>();
+const actsFail = new Map<string, number>();
+
+function actUrl(a: LookAct): string {
+  const bin = atob(a.img);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return URL.createObjectURL(new Blob([bytes], { type: 'image/webp' }));
+}
+
+async function loadActs(r: LookRow): Promise<void> {
+  const want = r.acts!;
+  const good = (t: string) => t.length === want.length && textHash(t) === want.hash;
+  const head = `${r.id}\n`;
+  let text = '';
+  try {
+    const saved = await risuai.pluginStorage.getItem(LOOK_ACTS_KEY);
+    if (typeof saved === 'string' && saved.startsWith(head) && good(saved.slice(head.length))) text = saved.slice(head.length);
+  } catch {
+    // 아래에서 받는다
+  }
+  if (!text) {
+    text = await fetchParts(lookActsParts(r.id, want.parts), getText);
+    if (!good(text)) throw new Error('받은 아바타 동작이 이 판의 것과 달라요.');
+    try {
+      await risuai.pluginStorage.setItem(LOOK_ACTS_KEY, head + text);
+    } catch {
+      // 저장이 안 되면 이번엔 메모리로
+    }
+  }
+  actsOf.set(r.id, parseLookActs(text, r.id).map((a) => ({ k: a.k, url: actUrl(a), frames: a.n, w: a.cw, h: a.ch, dx: a.dx, dy: a.dy, sec: a.sec })));
+}
+
+/**
+ * 이 모습의 동작들. 아직 없으면 받기 시작하고 null (다음에 물을 때 있다). 동작이 없는 모습은 빈 목록.
+ * 받지 못하면 조용히 대기 동작만 돈다 (5분 뒤 다시 시도)
+ */
+export function lookActs(id: string): ActLook[] | null {
+  const got = actsOf.get(id);
+  if (got) return got;
+  const r = rows?.find((x) => x.id === id);
+  if (!r) return null;
+  if (!r.acts) return [];
+  if (actsBusy.has(id) || Date.now() - (actsFail.get(id) ?? 0) < 300_000) return null;
+  actsBusy.add(id);
+  loadActs(r)
+    .catch((error) => {
+      actsFail.set(id, Date.now());
+      console.log(`[goei] 아바타 동작(${id}): ${error instanceof Error ? error.message : String(error)}`);
+    })
+    .finally(() => actsBusy.delete(id));
+  return null;
 }

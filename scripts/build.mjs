@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { HOMESHOP_PACK_NAME, INSTALL_PACK_NAME, ITEMS_PACK_NAME, LOOKS_PACK_NAME, WORLD_PACK_NAME, homeshopPackText, installPackText, itemsPackText, looksPackText, packOf, worldPackText } from './data-pack.mjs';
+import { HOMESHOP_PACK_NAME, INSTALL_PACK_NAME, ITEMS_PACK_NAME, LOOKS_PACK_NAME, WORLD_PACK_NAME, homeshopPackText, installPackText, itemsPackText, lookActsFiles, looksPackText, packOf, worldPackText } from './data-pack.mjs';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url)));
 if (process.env.GOEI_BUILD_VERSION) pkg.version = process.env.GOEI_BUILD_VERSION;
@@ -28,6 +28,9 @@ for (const p of dataPacks) {
   writeFileSync(`dist/${p.name}.json`, JSON.stringify(p.index) + '\n');
 }
 const [worldPack, installPack, itemsPack, looksPack, homeshopPack] = dataPacks;
+// 아바타 동작 (2026-11-19 사용자): 인물마다 따로 받는 파일 (goei-look-<번호>.N.txt). 지문은 내 모습 팩의 그 인물 줄에 있다 (scripts/data-pack.mjs lookActsFiles)
+for (const f of readdirSync('dist')) if (/^goei-look-\d+\.\d+\.\d+\.txt$/.test(f)) unlinkSync(`dist/${f}`);
+for (const f of lookActsFiles()) writeFileSync(`dist/${f.name}`, f.text);
 // 세계 자료를 한 파일로도 (goei-data-world.txt): 릴리스 zip 에 넣어, 네트워크가 막힌 환경에서 본체(goei-body.js)와 함께 받기 창에 파일로 넣는다 (host/datapanel.ts)
 writeFileSync(`dist/${worldPack.name}.txt`, worldPack.text);
 

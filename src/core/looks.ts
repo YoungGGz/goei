@@ -37,8 +37,67 @@ export interface LookRow {
   oy: number;
   /** 장 하나 길이 (초) */
   sec: number;
+  /** 대기 사이에 끼우는 동작 파일(goei-look-<id>.N.txt)의 조각 수·길이·지문. 동작이 없는 모습은 없음 */
+  acts?: { parts: number; length: number; hash: string };
   /** 정면 대기 줄 시트 base64 webp (가로로 n장, 장마다 cw×ch) */
   img: string;
+}
+
+/** 대기 사이에 한 번씩 끼우는 동작 하나 (2026-11-19 사용자: 이미 뽑아 둔 서서 정면 동작 중 고른 것) */
+export interface LookAct {
+  /** 동작 줄 번호 ('143') */
+  k: string;
+  name: string;
+  /** 장 수 · 장 크기 */
+  n: number;
+  cw: number;
+  ch: number;
+  /** 이 장 안에서 대기 칸의 왼쪽 위 자리: 대기 그림 위에 발밑을 맞춰 겹친다 */
+  dx: number;
+  dy: number;
+  /** 장 하나 길이 (초) */
+  sec: number;
+  /** 시트 base64 webp (가로로 n장) */
+  img: string;
+}
+
+/** 아바타 동작 간격 설정 (2026-11-19 사용자: 간격을 코드에 박지 않는다). 한 동작이 끝나고 다음 동작까지 대기로 서 있는 초. 0이면 동작 없이 대기만 */
+export const LOOK_ACT_GAP_VAR = '$it_act_gap';
+export const LOOK_ACT_GAP_DEFAULT = 20;
+export const LOOK_ACT_GAP_MAX = 120;
+export const LOOK_ACT_GAP_STEP = 5;
+export const lookActGap = (vars: Record<string, unknown> | undefined): number => {
+  const raw = vars?.[LOOK_ACT_GAP_VAR];
+  const n = raw === undefined || raw === null || raw === '' ? NaN : Number(raw);
+  return Number.isInteger(n) ? Math.min(LOOK_ACT_GAP_MAX, Math.max(0, n)) : LOOK_ACT_GAP_DEFAULT;
+};
+
+/** 인물별 동작 파일 이름 */
+export const lookActsParts = (id: string, parts: number): string[] => Array.from({ length: parts }, (_, i) => `goei-look-${id}.${i + 1}.txt`);
+
+/** 인물별 동작 글을 푼다. 형식이 다르면 던진다 */
+export function parseLookActs(text: string, id: string): LookAct[] {
+  let j: unknown;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    throw new Error('아바타 동작이 JSON 이 아니에요.');
+  }
+  if (!obj(j) || j.schema !== 1 || j.kind !== 'look-acts' || j.id !== id || !Array.isArray(j.acts)) throw new Error('아바타 동작 형식이 달라요.');
+  const out: LookAct[] = [];
+  for (const r of j.acts as unknown[]) {
+    if (!obj(r) || typeof r.k !== 'string' || typeof r.img !== 'string' || !r.img) continue;
+    const n = num(r.n), cw = num(r.cw), ch = num(r.ch), sec = num(r.sec);
+    if (!(n >= 1 && cw > 0 && ch > 0 && sec > 0)) continue;
+    out.push({ k: r.k, name: String(r.name ?? ''), n, cw, ch, dx: num(r.dx) || 0, dy: num(r.dy) || 0, sec, img: r.img });
+  }
+  return out;
+}
+
+/** 다음에 보일 동작: 바로 앞 것만 피해 아무거나 (rnd = 0~1) */
+export function pickLookAct<T extends { k: string }>(acts: T[], last: string, rnd: number): T | undefined {
+  const pool = acts.length > 1 ? acts.filter((a) => a.k !== last) : acts;
+  return pool[Math.min(pool.length - 1, Math.floor(rnd * pool.length))];
 }
 
 const obj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -59,7 +118,8 @@ export function parseLooksPack(text: string): LookRow[] {
     const n = num(r.n), cw = num(r.cw), ch = num(r.ch);
     if (!(n >= 1 && cw > 0 && ch > 0)) continue;
     const g = r.g === '남' || r.g === '여' ? r.g : '';
-    out.push({ id: r.id, name: String(r.name ?? ''), g, unique: r.unique === true, n, w: num(r.w) || 128, h: num(r.h) || 256, cw, ch, ox: num(r.ox) || 0, oy: num(r.oy) || 0, sec: num(r.sec) > 0 ? num(r.sec) : LOOK_FRAME_SEC, img: r.img });
+    const a = obj(r.acts) && num(r.acts.parts) >= 1 && num(r.acts.length) > 0 && typeof r.acts.hash === 'string' ? { parts: num(r.acts.parts), length: num(r.acts.length), hash: r.acts.hash } : undefined;
+    out.push({ id: r.id, name: String(r.name ?? ''), g, unique: r.unique === true, n, w: num(r.w) || 128, h: num(r.h) || 256, cw, ch, ox: num(r.ox) || 0, oy: num(r.oy) || 0, sec: num(r.sec) > 0 ? num(r.sec) : LOOK_FRAME_SEC, ...(a ? { acts: a } : {}), img: r.img });
   }
   return out;
 }

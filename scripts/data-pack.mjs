@@ -84,7 +84,7 @@ export function itemsPackText() {
   return JSON.stringify({ schema: 1, kind: 'items', table, rep, same: src.up_same ?? {}, cats: src.up_cats ?? [], icons });
 }
 
-/** 내 모습 팩 글: { schema, kind:'looks', looks:[{id, name, g, unique, n, w, h, cw, ch, ox, oy, sec?, img}] }.
+/** 내 모습 팩 글: { schema, kind:'looks', looks:[{id, name, g, unique, n, w, h, cw, ch, ox, oy, sec?, acts?, img}] }.
  *  id = 인물 팩 번호(char-6.54 → '6.54'). 고유 인물(char-1~5)은 명부 이름(cfg.name)으로 찾는다.
  *  맨 앞에는 페르소나 전용 아바타(그림/모습/페르소나/<이름>/look.json + 시트, 사용자가 PixelLab에서 만든 것, id 7.N).
  *  성별 g: 일반 NPC(char-6)만 필드 신상표(src/data/mobProfiles.json sex). 고유 인물은 고르는 창이 안 열려 성별이 필요 없다('').
@@ -105,7 +105,7 @@ export function looksPackText() {
     .map((d) => ({ d, j: readJson(`그림/모습/페르소나/${d}/look.json`) }))
     .sort((a, b) => Number(a.j.id.split('.')[1]) - Number(b.j.id.split('.')[1]));
   for (const { d, j } of persona) {
-    looks.push({ id: j.id, name: j.name, g: j.g, unique: false, n: j.n, w: j.w, h: j.h, cw: j.cw, ch: j.ch, ox: j.ox, oy: j.oy, sec: j.sec, img: readFileSync(new URL(`그림/모습/페르소나/${d}/${j.file}`, ROOT)).toString('base64') });
+    looks.push({ id: j.id, name: j.name, g: j.g, unique: false, n: j.n, w: j.w, h: j.h, cw: j.cw, ch: j.ch, ox: j.ox, oy: j.oy, sec: j.sec, ...actsIndex(lookActsText(`그림/모습/페르소나/${d}`, j.id, j.acts)), img: readFileSync(new URL(`그림/모습/페르소나/${d}/${j.file}`, ROOT)).toString('base64') });
   }
   for (const d of ids) {
     const j = readJson(`그림/모습/인물/${d}/char.json`);
@@ -116,9 +116,44 @@ export function looksPackText() {
     const unique = !id.startsWith('6.');
     const sex = unique ? '' : profiles[name]?.sex;
     const g = sex === '남' || sex === '여' ? sex : '';
-    looks.push({ id, name, g, unique, n: m.n, w: m.w, h: m.h, cw: m.cw, ch: m.ch, ox: m.ox, oy: m.oy, img: readFileSync(new URL(`그림/모습/인물/${d}/${m.file}`, ROOT)).toString('base64') });
+    // 대기 사이에 끼우는 동작(아래 lookActsFiles)이 있으면 그 파일의 조각 수·길이·지문만 싣는다. 그림은 그 인물을 쓸 때 따로 받는다
+    looks.push({ id, name, g, unique, n: m.n, w: m.w, h: m.h, cw: m.cw, ch: m.ch, ox: m.ox, oy: m.oy, ...actsIndex(lookActsText(`그림/모습/인물/${d}`, id, j.acts)), img: readFileSync(new URL(`그림/모습/인물/${d}/${m.file}`, ROOT)).toString('base64') });
   }
   return JSON.stringify({ schema: 1, kind: 'looks', looks });
+}
+
+/** 인물별 동작 파일 이름 줄기 (goei-look-6.54 → goei-look-6.54.N.txt). 목록 파일은 없다: 조각 수·길이·지문은 내 모습 팩의 그 인물 줄(acts)에 있다 */
+export const LOOK_ACTS_PREFIX = 'goei-look-';
+
+/** 한 인물의 동작 글: { schema, kind:'look-acts', id, acts:[{k:줄 번호, name, n, cw, ch, dx, dy, sec, img}] }. 동작이 없으면 ''.
+ *  동작 = 사용자가 고른 것(그림/모습/동작_고른것.json)을 tools/look_acts.py 가 char.json 의 acts 와 act_<줄>.webp 로 넣어 둔 것.
+ *  장은 대기 칸과 동작이 닿는 범위를 다 덮게 잘려 있고, dx·dy = 그 장 안에서 대기 칸의 왼쪽 위 (발밑이 안 움직이게 겹친다). src/core/looks.ts parseLookActs 가 읽는 모양 */
+function lookActsText(dir, id, src) {
+  if (!src || typeof src !== 'object') return '';
+  const acts = Object.keys(src)
+    .sort((a, b) => parseFloat(a) - parseFloat(b) || a.localeCompare(b))
+    .map((k) => {
+      const a = src[k];
+      return { k, name: a.name, n: a.n, cw: a.cw, ch: a.ch, dx: a.dx, dy: a.dy, sec: a.sec, img: readFileSync(new URL(`${dir}/${a.file}`, ROOT)).toString('base64') };
+    });
+  return acts.length ? JSON.stringify({ schema: 1, kind: 'look-acts', id, acts }) : '';
+}
+const actsIndex = (text) => (text ? { acts: { parts: splitText(text).length, length: text.length, hash: textHash(text) } } : {});
+
+/** 인물별 동작 파일 전부: [{ name: 조각 파일 이름, text }] (빌드가 dist 에 쓴다). 페르소나 아바타(look.json acts)도 같은 모양 */
+export function lookActsFiles() {
+  const out = [];
+  const add = (id, text) => splitText(text).forEach((part, i) => out.push({ name: `${LOOK_ACTS_PREFIX}${id}.${i + 1}.txt`, text: part }));
+  for (const d of readdirSync(new URL('그림/모습/페르소나/', ROOT)).sort()) {
+    const j = readJson(`그림/모습/페르소나/${d}/look.json`);
+    const text = lookActsText(`그림/모습/페르소나/${d}`, j.id, j.acts);
+    if (text) add(j.id, text);
+  }
+  for (const d of readdirSync(new URL('그림/모습/인물/', ROOT)).filter((x) => /^char-\d+\.\d+$/.test(x)).sort()) {
+    const text = lookActsText(`그림/모습/인물/${d}`, d.slice(5), readJson(`그림/모습/인물/${d}/char.json`).acts);
+    if (text) add(d.slice(5), text);
+  }
+  return out;
 }
 
 /** 망상홈쇼핑 방송 그림 팩 글: { schema, kind:'homeshop', meta:{w,h,box,cuts:{A,B}}, files:{이름: base64 webp} }.

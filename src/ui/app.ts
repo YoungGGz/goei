@@ -16,11 +16,11 @@ import { loadContext, updateChat, type ChatContext } from '../host/risu';
 import { prepareBaseDocs } from '../core/wiki';
 import { facePic, loadModuleAssets, mainPic } from '../host/assets';
 import { playableAgents, playerAgent } from '../core/player';
-import { defaultLook, LOOK_KEY, lookId } from '../core/looks';
+import { defaultLook, LOOK_KEY, lookActGap, lookId } from '../core/looks';
 import { idleLook, lookRows, looksStatus, onLooksReady } from '../host/looks';
 import { bindNeedFill } from './needfill';
 import { moreAction, moreBegin, moreEnd, resetMore } from './more';
-import { chatLookPopup, flashPick, LOOK_CSS, lookAction, lookCommon, lookPopup, lookSprite, lookStep, lookUi, setLookRender } from './looks';
+import { chatLookPopup, flashPick, avatarSprite, LOOK_CSS, lookAction, lookCommon, lookPopup, lookStep, lookUi, setLookRender, startLookActs } from './looks';
 import { savePrefs } from '../host/prefs';
 import { editorOnSettings, editorOpen, isFeatPage, openEditor, render as editorRender, type EditorNode } from './editor/index';
 import { consultAllowed } from './editor/catalog';
@@ -242,7 +242,7 @@ function ensureRoot(): HTMLElement {
   setAvatarHtml((ctx) => {
     const look = idleLook(ctx);
     const unique = !!playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
-    const inner = look ? lookSprite(look, 'it-look') : `<span class="it-avnone">${looksStatus().loading ? '아바타 받는 중…' : unique ? '' : '아바타<br>고르기'}</span>`;
+    const inner = look ? avatarSprite(look, lookActGap(ctx.chat.scriptstate)) : `<span class="it-avnone">${looksStatus().loading ? '아바타 받는 중…' : unique ? '' : '아바타<br>고르기'}</span>`;
     if (unique) return `<span class="it-avbtn">${inner}</span>`;
     return `<button class="it-avbtn" data-action="look-open" aria-label="아바타 바꾸기" title="아바타 바꾸기">${inner}</button>`;
   });
@@ -251,6 +251,7 @@ function ensureRoot(): HTMLElement {
     // 연어 마켓 매물 그림도 같은 팩 (릴리스 점검 11-09: 팩이 받힌 뒤에도 가방 아이콘 그대로였다)
     if (view.kind !== 'picker' && (tab === 'items' || shopUi.open || (inBrowser() && curTab().site === 'sm'))) render();
   });
+  startLookActs();
   const style = document.createElement('style');
   style.textContent = css + LOOK_CSS;
   document.head.appendChild(style);
