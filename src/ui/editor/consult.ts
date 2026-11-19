@@ -12,9 +12,9 @@ import { generate, type ModelChoice } from '../../host/llm';
 import { savePrefs } from '../../host/prefs';
 import { loadTrace } from '../../host/trace';
 import { getPrefs } from '../../core/settings';
-import { advNum, consultLimits, genSettings } from '../../core/advanced';
+import { advNum, consultTalk, genSettings } from '../../core/advanced';
 import { tokens } from '../../core/gnet';
-import { checkConsult, consultCan, consultLabel, consultPrompt, itemLine, parseConsult, type ConsultChange, type ConsultReply, type ConsultSource, type ConsultTalk } from '../../core/consult';
+import { checkConsult, consultCan, trimConsult, consultLabel, consultPrompt, itemLine, parseConsult, type ConsultChange, type ConsultReply, type ConsultSource, type ConsultTalk } from '../../core/consult';
 import { GHOST_ICON, ICONS } from '../icons';
 import { catalogAll, catalogCurrent, catalogOthers, catalogPage, sendsFor, type CatMenu, type CatRow } from './catalog';
 import { flowView } from './flowpage';
@@ -23,7 +23,7 @@ import { guideTxt } from '../../core/guides';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const KEY = 'goei:consult';
-// 채팅마다 남기는 줄 수 · 기억하는 채팅 수 · 모델에 넘기는 지난 대화 줄 수는 생성 공통 설정 (core/advanced.ts consultLimits, 기본 80 · 30 · 24)
+// 채팅마다 남기는 줄 수 · 기억하는 채팅 수는 이 기기 설정 (core/consult.ts consultKeep, 기본 80 · 30), 모델에 넘기는 지난 대화 줄 수는 생성 공통 설정 (core/advanced.ts consultTalk, 기본 24)
 
 interface CardRow { id: string; page: string; title: string; from: string; to: string; fromLabel: string; toLabel: string; go: [string, string] | null; scope?: string }
 type Line = { who: 'me' | 'op' | 'sys' | 'err'; text: string; go?: [string, string] } | { who: 'card'; rows: CardRow[]; undone?: boolean };
@@ -58,12 +58,9 @@ function ensureLoaded(render: () => void): void {
     render();
   })();
 }
-async function persist(d: ConsultDeps, ctx: ChatContext): Promise<void> {
+async function persist(): Promise<void> {
   if (!store) return;
-  const keep = consultLimits(flowView(d.ctx() ?? ctx, d.started()).scope);
-  const keys = Object.keys(store).sort((a, b) => (store![b].at ?? 0) - (store![a].at ?? 0));
-  for (const k of keys.slice(keep.chats)) delete store[k];
-  for (const k of Object.keys(store)) store[k].lines = store[k].lines.slice(-keep.lines);
+  trimConsult(store);
   try {
     await risuai.pluginStorage.setItem(KEY, JSON.stringify(store));
   } catch (error) {
@@ -278,7 +275,7 @@ async function ask(d: ConsultDeps, ctx: ChatContext): Promise<void> {
     const menus = catalogAll();
     const all = rowsOf(menus);
     const pending = me.pending.filter((p) => all.some((i) => i.id === p.id));
-    const talk: ConsultTalk[] = me.lines.filter((l): l is { who: 'me' | 'op'; text: string } => l.who === 'me' || l.who === 'op').slice(-consultLimits(flowView(ctx, started).scope).talk).map((l) => ({ who: l.who, text: l.text }));
+    const talk: ConsultTalk[] = me.lines.filter((l): l is { who: 'me' | 'op'; text: string } => l.who === 'me' || l.who === 'op').slice(-consultTalk(flowView(ctx, started).scope)).map((l) => ({ who: l.who, text: l.text }));
     const scope = flowView(ctx, started).scope;
     const gen = genSettings(scope);
     const budget = advNum(scope, 'gen', 'budget');
@@ -351,7 +348,7 @@ async function ask(d: ConsultDeps, ctx: ChatContext): Promise<void> {
   }
   me.at = Date.now();
   consultUi.busy = false;
-  await persist(d, ctx);
+  await persist();
   d.render();
 }
 
@@ -385,7 +382,7 @@ export async function consultAction(action: string, value: string | undefined, d
     me.lines = [];
     me.pending = [];
     me.at = Date.now();
-    await persist(d, ctx);
+    await persist();
     return d.render();
   }
   consultUi.confirm = false;
@@ -425,7 +422,7 @@ export async function consultAction(action: string, value: string | undefined, d
     else card.undone = true;
     me.at = Date.now();
     consultUi.busy = false;
-    await persist(d, ctx);
+    await persist();
     return d.render();
   }
 }

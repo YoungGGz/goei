@@ -1,6 +1,6 @@
 // 「설정」 탭: 원본 설정 창의 동작·요원창·캐릭터 이미지 항목. 값은 이 채팅의 $st_* 변수에 두고,
 // 범위: 이 채팅($st_*·$wg_*) / 새 채팅 기본값(플러그인 저장소) / 카드 명부(directory.ts, 카드 로어북).
-import { ckWide, defRow, helpBox, numCtl, numSet, setGroup, setRow, stepSizeText, type CkActs, type CkBand, type CkNum, type RowScope } from './setrow';
+import { ckWide, defRow, helpBox, numCtl, numSet, setGroup, setRow, stepBox, stepSizeText, type CkActs, type CkBand, type CkNum, type RowScope } from './setrow';
 import { SETTINGS_SET } from '../core/setdef/settings';
 import { findDef } from '../core/setdef/types';
 import { mallSettingsPane } from './malls';
@@ -11,10 +11,12 @@ import { GUIDE_NAMES, guideTxt, setGuideOverride } from '../core/guides';
 import { onOffSwitch, switchHtml } from './controls';
 import { repaintTheme } from './theme';
 import {
-  AGENT_MAX, basicDefaults, DIM_DEFAULT, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
+  AGENT_MAX, basicDefaults, CONSULT_CHATS_RANGE, CONSULT_LINES_RANGE, DIM_DEFAULT, TRACE_KEEP_RANGE, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
 } from '../core/settings';
 import type { WorldSettings } from '../core/world/engine';
 import { savePrefs, saveVarDefaults, varDefaultsToLoad } from '../host/prefs';
+import { keepTurns } from '../host/trace';
+import { consultKeep } from '../core/consult';
 import { activeBooksRow, advSections } from './advanced';
 import { ASSET_NOTE } from '../core/asset';
 import { IMG_FOLD, IMG_RECENT, IMG_SIZE, imgFold, imgRecent, imgSize, setImgHidden } from '../core/imgtag';
@@ -425,9 +427,13 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       D('dim', '', { ctl: dimSlider(getPrefs().dim ?? DIM_DEFAULT, busy) }),
       // 호출 진행 창 (11-09 사용자): 채팅을 보내면 라우터→디렉터→메인→갱신기→인터넷이 어디까지 돌았는지 (host/progwin.ts)
       D('progress', getPrefs().progress === false ? '0' : '1'),
+      // 호출 기록·AI 상담 대화는 기기에 하나뿐인 저장소라 보관하는 양도 이 기기에 하나 (core/settings.ts)
+      D('trace-keep', '', { ctl: stepBox('set-trace-keep', 'n', keepTurns(), ...TRACE_KEEP_RANGE, '턴', '호출 기록 보관', busy) }),
       // 창 둘레 기기 틀 (2026-10-29 사용자, ui/frame.ts). 좁아서 숨긴 상태는 app.ts 가 .gx 에 data-frame-hidden 으로 적는다
       D('frame', getPrefs().frame ?? 'tablet', { help: `PC에서 상황판 창 둘레에 그리는 기기 틀로, 폰에서는 그리지 않고 창 폭이 모자라면 자동으로 숨겨요.${document.querySelector<HTMLElement>('.gx')?.dataset.frameHidden === '1' ? '<br><span class="st-frame-note">지금 창 폭이 좁아 프레임을 숨겼어요</span>' : ''}` }),
       D('editor-width', String(getPrefs().editorWidth ?? 90)),
+      D('consult-lines', '', { ctl: stepBox('set-consult-lines', 'n', consultKeep().lines, ...CONSULT_LINES_RANGE, '줄', 'AI 상담 대화 보관', busy) }),
+      D('consult-chats', '', { ctl: stepBox('set-consult-chats', 'n', consultKeep().chats, ...CONSULT_CHATS_RANGE, '개', 'AI 상담 보관 채팅', busy) }),
     ].join(''))}`,
     image: `${group('', [
       D('asset', s.assetOn ? '1' : '0'),
@@ -972,6 +978,14 @@ export async function handleSettings(action: string, value: string | undefined, 
   }
   if (action === 'set-progress') {
     if (v === '1' || v === '0') await saveDefaults(env, (p) => ({ ...p, progress: v === '0' ? false : undefined }));
+    return true;
+  }
+  if (action === 'set-trace-keep' || action === 'set-consult-lines' || action === 'set-consult-chats') {
+    // 값은 「n=수」. 범위를 벗어난 수는 범위 끝으로 맞추고, 수가 아니면 그대로 둔다
+    const [key, [lo, hi]] = action === 'set-trace-keep' ? ['traceKeep', TRACE_KEEP_RANGE] as const : action === 'set-consult-lines' ? ['consultLines', CONSULT_LINES_RANGE] as const : ['consultChats', CONSULT_CHATS_RANGE] as const;
+    const raw = v.slice(v.indexOf('=') + 1).trim();
+    const n = Number(raw);
+    if (/^-?\d+$/.test(raw)) await saveDefaults(env, (p) => ({ ...p, [key]: Math.max(lo, Math.min(hi, n)) }));
     return true;
   }
   if (action === 'set-frame') {

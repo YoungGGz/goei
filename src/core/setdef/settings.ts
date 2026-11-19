@@ -16,8 +16,11 @@ export const SETTINGS_SET: SetPage = {
         { key: 'agents', label: '요원 칸', ctl: { t: 'seg', opts: [['wall', '모니터'], ['list', '목록']] }, help: '상황판 요원 칸 모양이에요.', scope: 'device' },
         { key: 'dim', label: '창 바깥 불투명도', ctl: { t: 'custom' }, help: '창 뒤 채팅 화면을 가리는 정도예요. 0%면 그대로 보이고 100%면 다 가려요.', scope: 'device' },
         { key: 'progress', label: '호출 진행 창', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '채팅을 보내면 채팅 화면 오른쪽 위에 지금 도는 단계(라우터·디렉터·메인·갱신기·인터넷)와 모델·토큰·경과 시간을 보여 줘요. PC는 카드로 펼쳐졌다 끝나면 단추로 접히고, 폰은 점 다섯 개짜리 막대예요. 눌러서 지난 턴을 다시 볼 수 있어요.', scope: 'device' },
+        { key: 'trace-keep', label: '호출 기록 보관', ctl: { t: 'custom' }, help: '호출 기록에 남겨 두는 최근 턴 수예요. 모든 채팅의 기록을 한곳에 모아 두어서 모든 채팅에 같이 적용돼요. 늘리면 저장 공간을 더 써요.', scope: 'device' },
         { key: 'frame', label: '외부 프레임', ctl: { t: 'seg', opts: [['none', '없음'], ['tablet', '일반 태블릿'], ['tactical', '전술 태블릿']] }, scope: 'device' },
         { key: 'editor-width', label: '설정 창 폭', ctl: { t: 'seg', opts: [['60', '60%'], ['70', '70%'], ['80', '80%'], ['90', '90%'], ['100', '100%']] }, help: '이 설정 창이 화면 가로의 몇 %를 쓸지예요. 높이는 늘 화면의 90%. 폰에서는 늘 전체 화면이에요.', scope: 'device' },
+        { key: 'consult-lines', label: 'AI 상담 대화 보관', ctl: { t: 'custom' }, help: 'AI 상담 창에 채팅마다 남겨 두는 대화 줄 수예요. 모든 채팅의 대화를 한곳에 모아 두어서 모든 채팅에 같이 적용돼요. 넘으면 오래된 줄부터 지워요.', scope: 'device' },
+        { key: 'consult-chats', label: 'AI 상담 보관 채팅', ctl: { t: 'custom' }, help: 'AI 상담 대화를 남겨 두는 채팅 수예요. 모든 채팅에 같이 적용돼요. 넘으면 상담한 지 오래된 채팅의 대화부터 지워요.', scope: 'device' },
       ],
     },
     {

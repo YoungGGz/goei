@@ -71,7 +71,7 @@ export async function loadContext(): Promise<ChatContext | null> {
   setIconPool(itemIconPoolOn(chat.scriptstate));
   // 소지품 판정 표·「두고 옴」 말·「벗음」 말 (core/itemrules.ts)
   setItemRules(chat.scriptstate);
-  // 요청당 사진 수·호출 기록 보관 턴 수 (core/advanced.ts)
+  // 요청당 사진 수 (core/advanced.ts)
   applyGenLimits(chat.scriptstate);
   // 거래 줄 상한 (core/wallet.ts)
   setWalletCap(chat.scriptstate);
