@@ -99,7 +99,7 @@ const retryOf = (ctx: ChatContext) => { const n = Number(ctx.chat.scriptstate?.[
 
 /** 방송 요청에 넘기는 자료 묶음 (참고 자료·본편은 상점과 같은 길로 모은다) */
 function showSource(ctx: ChatContext, show: HsShow, s: HsSettings, fn: ShopFn = 'shelf') {
-  const st: ShopState = { ...emptyShop({ raw: '', shop: hsName(), owner: hsHost() }, ''), loaded: true, identity: { sells: hsName(), never: '', prices: guideTxt('Hs', 'IDENTITY_PRICES') }, prev: show.prev.concat(show.parts.map((p) => p.item.name)).slice(-24) };
+  const st: ShopState = { ...emptyShop({ raw: '', shop: hsName(), owner: hsHost() }, ''), loaded: true, identity: { sells: hsName(), never: '', prices: guideTxt('Hs', 'IDENTITY_PRICES') }, prev: show.prev.concat(show.parts.map((p) => p.item.name)).slice(-s.keep.prev) };
   return shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: hsVars(ctx.chat.scriptstate) as typeof ctx.chat.scriptstate } }, st, s.shop, shopGive(ctx.chat.scriptstate, 'hs', fn));
 }
 /** 지침에 채우는 낱말 (컷·표정·화면 사건) */
@@ -152,7 +152,7 @@ async function ask(ctx: ChatContext, env: HsEnv): Promise<void> {
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
     const key = lastBot(cur.chat)?.key ?? '';
-    await updateChat(cur.charIndex, cur.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...applyShow(readShow(chat.scriptstate), value, key), tk: turnKey(chat) }), [HS_AT_VAR]: turnKey(chat) } }));
+    await updateChat(cur.charIndex, cur.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...applyShow(readShow(chat.scriptstate), value, key, hsSettings(chat.scriptstate).keep.prev), tk: turnKey(chat) }), [HS_AT_VAR]: turnKey(chat) } }));
     ui.retried = 0;
   } catch (error) {
     failed = true;
@@ -446,7 +446,7 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
     // 그사이 상품이 바뀌었으면 버린다
     if (ui.call !== call) return;
     call.lines.push({ who: 'op', text: value.line });
-    if (call.lines.length > 40) call.lines.splice(0, call.lines.length - 40);
+    if (call.lines.length > s.keep.talk) call.lines.splice(0, call.lines.length - s.keep.talk);
     call.terms = value.terms && !walletOn(ctx) ? (value.terms.money > 0 ? null : value.terms) : value.terms;
     const buyer = userInfo().name || guideTxt('Hs', 'SAY_ME_NICK');
     saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: buyer, text: meLine, me: 1 }, { k: 'aside', p: show.at, who: hsLogOperator(), text: value.line }], show);
@@ -515,7 +515,7 @@ async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
     // 상담원의 확정 말도 같이 적는다 (맞교환·흥정의 통화 말은 조건을 내미는 말이라 확정 말이 아니다)
     const opSaid = show.ops?.done ?? '';
     const bought = appendLog(chat.scriptstate, show, [{ k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how: o.how }), ref: o.id }, ...(opSaid ? [{ k: 'aside' as const, p: show.at, who: hsLogOperator(), text: opSaid }] : [])], turnKey(chat));
-    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...wallet, ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o]), ...bought } };
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...wallet, ...itemsVars(items), ...ordersVars([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o], hsSettings(chat.scriptstate).keep.orders), ...bought } };
   });
   if (ok) {
     const ops = readShow(ctx.chat.scriptstate).ops;
@@ -545,7 +545,7 @@ async function openBox(ctx: ChatContext, env: HsEnv, boxId: string): Promise<voi
     items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: 'hs', anchor, paidWith: orderPaid(o, true) || box.paidWith || hsName(), ...(box.price !== undefined ? { price: box.price } : {}), ...(box.walletId ? { walletId: box.walletId } : {}) });
     const s = hsSettings(chat.scriptstate);
     const orders = readOrders(chat.scriptstate).map((x) => (x.id === o.id ? openOrder(chat, x, s, anchor) : x));
-    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(orders) } };
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(orders, s.keep.orders) } };
   });
   await env.refresh();
 }
@@ -582,9 +582,9 @@ async function say(ctx: ChatContext, env: HsEnv, text: string): Promise<void> {
     const system = [fillGuide(g.COMMON ?? '', {}), fillGuide(g.KNOWS ?? '', {}), fillGuide(g.SAY ?? '', { say_cue: range(s.sayCue), say_chat: range(s.sayChat), cuts: w.cuts, moods: w.moods_all, events: w.say_events }), fillGuide(g.HOST ?? '', {}), fillGuide(g.VIEWERS ?? '', {}), genSettings(ctx.chat.scriptstate).language ?? ''].filter(Boolean).join('\n\n'); // 생성 언어 줄 (방송 편성과 같게, 전수검사 11-13)
     const st = playerState();
     // 요청 글은 지침 「망상홈쇼핑」의 SAY_* 절
-    const recent = part.cues.slice(Math.max(0, (st?.cue ?? 0) - 3), (st?.cue ?? 0) + 1).map((c) => guideTxt('Hs', 'SAY_HOST_LINE', { text: c.text })).join('\n');
+    const recent = part.cues.slice(Math.max(0, (st?.cue ?? 0) - (s.sayHost - 1)), (st?.cue ?? 0) + 1).map((c) => guideTxt('Hs', 'SAY_HOST_LINE', { text: c.text })).join('\n');
     // 방금까지 흐른 채팅 (내 줄은 playerSay 로 이미 맨 끝에 있다): 같은 닉네임·말투를 잇게
-    const flowed = playerRecentChat(24).slice(0, -1).map((c) => guideTxt('Hs', 'SAY_CHAT_LINE', { nick: c.nick, text: c.text })).join('\n');
+    const flowed = playerRecentChat(s.sayFlow).slice(0, -1).map((c) => guideTxt('Hs', 'SAY_CHAT_LINE', { nick: c.nick, text: c.text })).join('\n');
     const now = { title: show.title, part: show.at + 1, item: part.item.name, pay: hsPayText(part), desc: part.item.desc };
     const user = guideTxt('Hs', 'SAY_USER', {
       material: broadcastMaterial(showSource(ctx, show, s, 'say'), s.shop),
