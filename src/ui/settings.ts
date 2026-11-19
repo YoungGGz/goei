@@ -243,6 +243,7 @@ function stepper(action: string, key: string, shown: string, canDown: boolean, c
 function worldStep(key: WorldField['key']): number {
   if (key.endsWith('_p') || key === 'landmark_share') return 10;
   if (key.endsWith('_ttl')) return 6;
+  if (key === 'cleared_cap') return 50;
   return 1;
 }
 
@@ -274,6 +275,7 @@ function worldGrid(w: WorldSettings, busy: boolean): string {
     ${group('', [
       field('사건의 거점 비율', n('landmark_share', '사건의 거점 비율', '%'), '사건이 생길 때 등록된 거점(본부·지사 같은 장소)에서 생길 비율이에요. 나머지는 지도의 아무 곳에서 생겨요.'),
       field('추가 발생 여유분', numSet([['괴이', n('extra_cap', '괴이 여유분', '개')], ['사건', n('extra_in_cap', '사건 여유분', '개')], ['특수', n('extra_ms_cap', '특수 여유분', '개')]]), '직접 고르거나 RP 중에 새로 등장한 것을 동시 최대와 따로 기록할 수 있는 수예요.'),
+      field('클리어 기록 상한', n('cleared_cap', '클리어 기록 상한', '개'), '클리어한 괴이 이름을 몇 개까지 기억할지예요. 넘으면 오래된 이름부터 잊어요. 기억하는 괴이는 위키 문서의 스포일러 문단이 처음부터 펼쳐져요. 0이면 모두 기억해요.'),
     ].join(''))}`;
 }
 

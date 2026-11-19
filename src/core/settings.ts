@@ -4,6 +4,7 @@ import { GUIDE_NAMES, isGuideName, setGuideOverride, RULE_TARGETS, setUserRules,
 import type { LoreEntry, ScriptState } from './types';
 import { DEFAULT_SETTINGS, type WorldSettings } from './world/engine';
 import { imgFold, imgRecent, imgSize } from './imgtag';
+import { journalSettings } from './journal/settings';
 
 export type AssetModel = 'main' | 'aux';
 
@@ -39,7 +40,7 @@ export const BASIC_DEFAULTS: BasicSettings = { anomalyOn: true, assetOn: true, a
 
 /** 괴이 생성 수치. label은 옛 Settings 로어북 「괴이생성」의 항목 이름 (원본 WG.spec) */
 export interface WorldField {
-  key: Exclude<keyof WorldSettings, 'agent_limit'>;
+  key: Exclude<keyof WorldSettings, 'agent_limit' | 'trail_cap'>;
   label: string;
   max: number | null;
   fraction: boolean;
@@ -66,6 +67,7 @@ export const WORLD_SPEC: WorldField[] = (
     ['인시던트 RP 유지 시간', 'incident_ttl', 8760, true],
     ['미스틱 사이트 RP 유지 시간', 'mystic_ttl', 8760, true],
     ['인시던트 중 거점 비율', 'landmark_share', 100, false],
+    ['클리어 기록 상한', 'cleared_cap', 1000, false],
   ] as [string, WorldField['key'], number | null, boolean][]
 ).map(([label, key, max, fraction]) => ({ key, label, max, fraction }));
 
@@ -344,6 +346,7 @@ export function worldDefaults(lore: LoreEntry[] | undefined): WorldSettings {
   }
   Object.assign(out, prefs.world);
   out.agent_limit = basicDefaults(lore).agentLimit;
+  out.trail_cap = journalSettings(prefs.vars).trailMax;
   return out;
 }
 
@@ -356,6 +359,8 @@ export function worldSettings(lore: LoreEntry[] | undefined, ss?: ScriptState): 
     if (n !== null) out[f.key] = n;
   }
   out.agent_limit = basicSettings(lore, ss).agentLimit;
+  // 경과 줄 수는 설정 「일지」의 값 (보고서 경과와 같은 수)
+  out.trail_cap = journalSettings(ss).trailMax;
   return out;
 }
 

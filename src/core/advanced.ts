@@ -188,7 +188,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
     {
       title: '참조',
       chips: [chip('desc', '봇 설명', 1), chip('authors', '작가 노트', 1), chip('persona', '페르소나', 1), chip('active', '상시 로어북', 1), chip('related', '관련 로어북', 1), chip('secondary', '2차 참조', 1)],
-      items: [turns(8), num('ref_count', '관련·2차 참조 최대', 20, 1, 200, '개'), { ...budget, hint: '넘으면 이전 문서, 2차 참조, 관련 로어북, 오래된 챗로그 순으로 줄여요' }],
+      items: [turns(8), num('ref_count', '관련·2차 참조 최대', 20, 1, 200, '개'), num('image_count', '그림 후보 최대', 30, 1, 200, '장', { hint: '문서를 쓸 때 본문에 넣을 수 있는 그림으로 알려 주는 수예요. 참고 자료나 제목에 나온 그림만 넣어요.' }), { ...budget, hint: '넘으면 이전 문서, 2차 참조, 관련 로어북, 오래된 챗로그 순으로 줄여요' }],
     },
     {
       title: '컨텍스트 포함',

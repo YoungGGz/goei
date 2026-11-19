@@ -12,10 +12,10 @@ import type { Catalog } from '../world/catalog';
 import { codesToNames, type AnEntry, type ClosedEvent, type InEntry, type MsEntry, type WorldState } from '../world/engine';
 import { findStatusTags } from '../world/status';
 import { isMine, periodOf } from './mine';
-import type { JournalSettings } from './settings';
+import { journalSettings, type JournalSettings } from './settings';
 import { journalHash, readJournal, readReports, reportVars, trimJournal, trimReports } from './store';
 import {
-  PEOPLE_MAX, RESULT_REPORT_MAX, RESULT_ROW_MAX, TRADES_MAX, TRAIL_MAX,
+  RESULT_REPORT_MAX, RESULT_ROW_MAX,
   type JournalAgent, type JournalRow, type JournalStore, type Report, type ReportPerson, type ReportStore, type ReportTrade, type TrailStep,
 } from './types';
 
@@ -93,7 +93,7 @@ function peopleDelta(chat: Chat, from: number, to: number): ReportPerson[] {
     const stage = person ? stageOf(affinityOf(person, all.filter((c) => pos(c) <= to), store.folded[who] ?? 0, o)).label : undefined;
     out.push({ who, delta, ...(top?.cue ? { cue: top.cue } : {}), ...(top?.quote || top?.reason ? { quote: cut(top.quote || top.reason, 60) } : {}), ...(stage ? { stage } : {}) });
   }
-  return out.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, PEOPLE_MAX);
+  return out.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)).slice(0, journalSettings(chat.scriptstate).peopleMax);
 }
 
 function walletSpan(chat: Chat, from: number, to: number, start?: number): { trades: ReportTrade[]; balance: number } {
@@ -102,7 +102,7 @@ function walletSpan(chat: Chat, from: number, to: number, start?: number): { tra
   const at = anchorPositions(chat);
   const pos = (anchor: string) => at.get(anchor) ?? -1;
   // 수동 조정(anchor '')은 거래 목록에서 빼고 잔고에만 반영한다
-  const trades = live.filter((e) => e.anchor && pos(e.anchor) >= from && pos(e.anchor) <= to).slice(-TRADES_MAX)
+  const trades = live.filter((e) => e.anchor && pos(e.anchor) >= from && pos(e.anchor) <= to).slice(-journalSettings(chat.scriptstate).tradesMax)
     .map((e) => ({ memo: e.memo, amount: e.amount, ...(e.quote ? { quote: cut(e.quote, 60) } : {}) }));
   const balance = live.filter((e) => !e.anchor || pos(e.anchor) <= to).reduce((n, e) => n + e.amount, w.start);
   return { trades, balance };
@@ -124,7 +124,7 @@ function snapshot(input: BuildInput, ev: ClosedEvent, anchor: string, now: strin
   const name = (an ? an.presetName || an.name : e.name) || '이름 미확인';
   const deploy = ev.kind === 'ms' ? (e as MsEntry).visitors : ((e as AnEntry | InEntry).deploy ?? '');
   const agents = parseAgents(deploy, world, catalog, faction);
-  const trail: TrailStep[] = (e.trail?.length ? e.trail : e.situation ? [{ m: e.since, e: ev.epoch, text: cut(e.situation, 160) }] : []).slice(-TRAIL_MAX);
+  const trail: TrailStep[] = (e.trail?.length ? e.trail : e.situation ? [{ m: e.since, e: ev.epoch, text: cut(e.situation, 160) }] : []).slice(-input.settings.trailMax);
   const lastText = trail.length ? trail[trail.length - 1].text : '';
   const prefix = ev.cleared ? '클리어 · ' : '';
   const result = prefix + (lastText || '처리 완료');

@@ -124,8 +124,5 @@ export interface ReportStore {
   items: Report[];
 }
 
-export const TRAIL_MAX = 24;
 export const RESULT_ROW_MAX = 120;
 export const RESULT_REPORT_MAX = 400;
-export const PEOPLE_MAX = 12;
-export const TRADES_MAX = 12;

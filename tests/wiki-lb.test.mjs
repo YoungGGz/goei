@@ -31,6 +31,16 @@ test('위키: 본문 그림은 제목·참고·챗로그에 나온 것만, 표�
   assert.doesNotMatch(none, /BODY IMAGES|portrait_mood/);
 });
 
+test('위키: 그림 후보 최대 — 기본 30장, 설정대로, 틀린 값은 기본값', () => {
+  const images = Array.from({ length: 40 }, (_, i) => ({ name: `Pic ${i}`, label: '오후역', subject: true }));
+  const count = (vars) => (wikiPrompt(src(vars), req({ images }), wikiSettings(vars), {}).messages[0].content.match(/- Pic \d+ = /g) ?? []).length;
+  assert.equal(count({}), 30);
+  assert.equal(count({ '$nw_adv_image_count': '5' }), 5);
+  assert.equal(count({ '$nw_adv_image_count': '40' }), 40);
+  assert.equal(count({ '$nw_adv_image_count': '0' }), 30);
+  assert.equal(count({ '$nw_adv_image_count': 'abc' }), 30);
+});
+
 test('위키: 그림 블록·표정·주석 펼치기 렌더', () => {
   const body = '<lightboard-namuwiki doc_title="오후역" doc_type="other" portrait_mood="Smile">\n[Paragraph]조용한 역이다.📌늘 그렇다.📌\n[Image]Name:Afternoon Station|Caption:승강장\n[Image]Name:없는그림|Caption:x\n</lightboard-namuwiki>';
   assert.equal(portraitMood(body), 'smile');

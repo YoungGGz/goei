@@ -171,6 +171,22 @@ test('terminal states end the entry and block it for the next draw', () => {
   assert.deepEqual(world.cleared, ['소라 랜드'], '클리어한 괴이는 위키 정답을 펼치려고 기억');
 });
 
+test('클리어 기록 상한: 기본 200, 설정한 수만 남기고, 0이면 모두 기억', () => {
+  assert.equal(DEFAULT_SETTINGS.cleared_cap, 200);
+  const clear = (n, set) => {
+    const w0 = applyOutput(started(), catalog, noSpawn, 'A00', '[AN|부산 기장군|소라 랜드|활성|A|없음]', always).world;
+    w0.cleared = Array.from({ length: n }, (_, i) => `옛 괴이 ${i}`);
+    return applyOutput(w0, catalog, { ...S, ...set }, 'A00', '[AN|부산 기장군|소라 랜드|클리어|A|없음]', always).world.cleared;
+  };
+  const def = clear(250, {});
+  assert.equal(def.length, 200);
+  assert.equal(def.at(-1), '소라 랜드');
+  const few = clear(250, { cleared_cap: 50 });
+  assert.equal(few.length, 50);
+  assert.equal(few.at(-1), '소라 랜드');
+  assert.equal(clear(250, { cleared_cap: 0 }).length, 251);
+});
+
 test('model-invented anomalies use the extra pool and need an unambiguous free region', () => {
   const w = emptyWorld();
   const a = applyOutput(w, catalog, noSpawn, 'A00', '[AN|강원특별자치도 춘천시|호수의 목소리|활성|C|없음]', always).world;
