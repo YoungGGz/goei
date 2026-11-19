@@ -117,14 +117,26 @@ test('망상홈쇼핑 설정: 남겨 두는 수·같이 넘기는 줄 수 — �
   const out = hsSettings({ $hs_say_host: '0', $hs_say_flow: '999', $hs_prev_keep: '-3', $hs_talk_keep: '1', $hs_order_keep: '0', $hs_log_keep: '99999' });
   assert.deepEqual([out.sayHost, out.sayFlow, out.keep], [1, 60, { prev: 1, talk: 4, orders: 10, log: 2000 }], '범위 밖은 끝 값');
 
-  // 주문: 기본 40건, 설정을 넘기면 그 수만 남긴다 (가장 새 것부터)
-  const order = (i) => ({ id: `o${i}`, item: { name: `물건${i}` }, n: 0, how: '', pay: 'won', anchor: '', turn: 0, dues: [], boxId: '' });
+  // 주문: 기본 40건, 설정을 넘기면 그 수만 남긴다 (가장 새 것부터). 버리는 것은 상자를 연 주문
+  const order = (i) => ({ id: `o${i}`, item: { name: `물건${i}` }, n: 0, how: '', pay: 'won', anchor: '', turn: 0, dues: [], boxId: '', openKey: '' });
   const many = Array.from({ length: 60 }, (_, i) => order(i));
   const ids = (vars) => homeshop.readOrders(vars).map((o) => o.id);
   assert.equal(ids(homeshop.ordersVars(many)).length, 40);
   assert.equal(ids(homeshop.ordersVars(many))[0], 'o20');
   assert.deepEqual(ids(homeshop.ordersVars(many, s.keep.orders)), many.slice(-15).map((o) => o.id));
   assert.equal(ids(homeshop.ordersVars(many, 200)).length, 60);
+
+  // 안 연 상자가 걸린 주문은 넘쳐도 버리지 않는다 (버리면 그 상자를 못 연다). 연 주문·죽은 주문(주문한 응답이 지워진 것)부터 오래된 순으로
+  const alive = new Set(['a', 'r']);
+  const sealed = (i) => ({ ...order(i), anchor: 'a', boxId: `box${i}`, openKey: undefined });
+  const eleven = Array.from({ length: 11 }, (_, i) => sealed(i));
+  const kept = homeshop.ordersVars(eleven, 10, alive);
+  assert.equal(ids(kept).length, 11, '전부 안 연 상자면 수를 넘겨도 남긴다');
+  assert.equal(homeshop.boxOrder(kept, 'box0', alive)?.id, 'o0', '가장 오래된 상자도 열 수 있다');
+  assert.equal(ids(homeshop.ordersVars(eleven, 10)).length, 11);
+  const mixed = [sealed(0), { ...sealed(1), anchor: 'gone' }, { ...sealed(2), openKey: 'r' }, { ...sealed(3), openKey: 'gone' }, { ...sealed(4), openKey: 'r' }, ...Array.from({ length: 8 }, (_, i) => sealed(5 + i))];
+  assert.deepEqual(ids(homeshop.ordersVars(mixed, 10, alive)), ['o0', 'o3', ...Array.from({ length: 8 }, (_, i) => `o${5 + i}`)], '죽은 주문·연 주문만 빠지고, 연 응답이 지워져 다시 미개봉이 된 상자는 남는다');
+  assert.deepEqual(ids(homeshop.ordersVars(mixed, 12, alive)), mixed.filter((o) => o.id !== 'o1').map((o) => o.id), '넘친 만큼만, 오래된 것부터');
 
   // 지난 상품 이름: 기본 24개, 설정을 넘기면 그 수만
   const reply = (k) => ({ title: '', items: Array.from({ length: 5 }, (_, i) => ({ name: `${k}-${i}`, price: 0 })), cues: Array.from({ length: 5 }, () => []), chat: [] });
