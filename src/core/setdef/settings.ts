@@ -88,6 +88,7 @@ export const SETTINGS_SET: SetPage = {
         { key: 'items-away-turns', label: '치운 물건 기억', ctl: { t: 'custom' } },
         { key: 'items-list-cap', label: '물건 줄 상한', ctl: { t: 'custom' } },
         { key: 'items-logcap', label: '기록 줄 상한', ctl: { t: 'custom' } },
+        { key: 'items-act-gap', label: '아바타 동작 간격', ctl: { t: 'custom' } },
         { key: 'items-logturns', label: '사용·처분 기록 넘기기', ctl: { t: 'custom' } },
         { key: 'items-start', label: '시작 소지품', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '고유 인물로 시작할 때 명부의 「시작 소지품」을 넣고 손에 드는 것은 손 칸, 장비는 장착할지예요. 새 채팅을 시작할 때만 쓰여요.' },
       ],

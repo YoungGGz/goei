@@ -16,7 +16,7 @@ import { loadContext, updateChat, type ChatContext } from '../host/risu';
 import { prepareBaseDocs } from '../core/wiki';
 import { facePic, loadModuleAssets, mainPic } from '../host/assets';
 import { playableAgents, playerAgent } from '../core/player';
-import { defaultLook, LOOK_KEY, lookId } from '../core/looks';
+import { defaultLook, LOOK_KEY, lookActGap, lookId } from '../core/looks';
 import { idleLook, lookRows, looksStatus, onLooksReady } from '../host/looks';
 import { bindNeedFill } from './needfill';
 import { moreAction, moreBegin, moreEnd, resetMore } from './more';
@@ -242,7 +242,7 @@ function ensureRoot(): HTMLElement {
   setAvatarHtml((ctx) => {
     const look = idleLook(ctx);
     const unique = !!playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
-    const inner = look ? avatarSprite(look) : `<span class="it-avnone">${looksStatus().loading ? '아바타 받는 중…' : unique ? '' : '아바타<br>고르기'}</span>`;
+    const inner = look ? avatarSprite(look, lookActGap(ctx.chat.scriptstate)) : `<span class="it-avnone">${looksStatus().loading ? '아바타 받는 중…' : unique ? '' : '아바타<br>고르기'}</span>`;
     if (unique) return `<span class="it-avbtn">${inner}</span>`;
     return `<button class="it-avbtn" data-action="look-open" aria-label="아바타 바꾸기" title="아바타 바꾸기">${inner}</button>`;
   });

@@ -61,8 +61,16 @@ export interface LookAct {
   img: string;
 }
 
-/** 동작 사이 쉬는 시간 (초): 한 동작이 끝나면 이 사이의 아무 때나 지난 뒤 다음 동작 */
-export const LOOK_ACT_GAP_SEC: [number, number] = [12, 24];
+/** 아바타 동작 간격 설정 (2026-11-19 사용자: 간격을 코드에 박지 않는다). 한 동작이 끝나고 다음 동작까지 대기로 서 있는 초. 0이면 동작 없이 대기만 */
+export const LOOK_ACT_GAP_VAR = '$it_act_gap';
+export const LOOK_ACT_GAP_DEFAULT = 20;
+export const LOOK_ACT_GAP_MAX = 120;
+export const LOOK_ACT_GAP_STEP = 5;
+export const lookActGap = (vars: Record<string, unknown> | undefined): number => {
+  const raw = vars?.[LOOK_ACT_GAP_VAR];
+  const n = raw === undefined || raw === null || raw === '' ? NaN : Number(raw);
+  return Number.isInteger(n) ? Math.min(LOOK_ACT_GAP_MAX, Math.max(0, n)) : LOOK_ACT_GAP_DEFAULT;
+};
 
 /** 인물별 동작 파일 이름 */
 export const lookActsParts = (id: string, parts: number): string[] => Array.from({ length: parts }, (_, i) => `goei-look-${id}.${i + 1}.txt`);

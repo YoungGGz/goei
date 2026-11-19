@@ -1,7 +1,7 @@
 // 아바타 고르기 (2026-11-07~08 사용자): 시작 패널(내 페르소나)과 시작한 뒤가 같은 팝업을 쓴다.
 // 남·여를 고르면 그 성별 일반 NPC 프리셋 전부가 정면 대기 동작으로 움직이는 격자에서 하나를 꼭 고른다.
 // 대기 동작은 1배(픽셀 그대로)로 CSS steps 로 돌린다. 고른 것은 이 채팅 변수 $st_look 에 둔다 (core/looks.ts).
-import { LOOK_ACT_GAP_SEC, LOOK_GENDERS, LOOK_KEY, lookId, looksOf, pickLookAct, type LookGender, type LookRow } from '../core/looks';
+import { LOOK_GENDERS, LOOK_KEY, lookId, looksOf, pickLookAct, type LookGender, type LookRow } from '../core/looks';
 import { playerAgent } from '../core/player';
 import { idleOf, lookActs, looksStatus, lookRows, ensureLooks, type ActLook, type IdleLook } from '../host/looks';
 import { savePrefs } from '../host/prefs';
@@ -42,18 +42,21 @@ export function lookSprite(look: IdleLook, cls = ''): string {
 // 대기 한 바퀴가 끝나는 순간에 동작 시트로 바꾸고(첫 장이 대기 자세에서 이어지게), 동작이 끝나면 대기 시트로 되돌린다.
 // 동작 장은 대기 칸보다 넓어서, 대기 칸이 있던 자리에 그대로 겹치도록 바깥 여백을 음수로 준다 (자리·발밑이 안 움직인다).
 
-/** 내 아바타 칸: 동작을 끼울 수 있게 모습 번호를 달아 둔다 */
-export function avatarSprite(look: IdleLook): string {
+/** 내 아바타 칸: 동작을 끼울 수 있게 모습 번호와 동작 간격(초, 설정 「아바타 동작 간격」)을 달아 둔다. 간격 0이면 대기만 */
+export function avatarSprite(look: IdleLook, gapSec: number): string {
   const html = lookSprite(look, 'it-look');
+  if (!look.acts || !(gapSec > 0)) return html;
   // 동작 그림을 미리 받아 둔다 (첫 차례에 바로 나오게)
-  if (look.acts) void lookActs(look.id);
-  return look.acts ? html.replace('<span ', `<span data-look="${esc(look.id)}" `) : html;
+  void lookActs(look.id);
+  return html.replace('<span ', `<span data-look="${esc(look.id)}" data-gap="${gapSec}" `);
 }
 
-let actTimer: ReturnType<typeof setTimeout> | undefined;
+let actTimer: ReturnType<typeof setInterval> | undefined;
 let lastAct = '';
+/** 마지막 동작이 끝난 때 (아바타가 처음 보인 때부터 센다) */
+let restFrom = 0;
+let arming = false;
 
-const actGapMs = () => (LOOK_ACT_GAP_SEC[0] + Math.random() * (LOOK_ACT_GAP_SEC[1] - LOOK_ACT_GAP_SEC[0])) * 1000;
 const stillMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function playAct(el: HTMLElement, a: ActLook): void {
@@ -64,6 +67,7 @@ function playAct(el: HTMLElement, a: ActLook): void {
     el.removeEventListener('animationend', back);
     el.classList.remove('act');
     el.setAttribute('style', idle);
+    restFrom = Date.now();
   };
   el.style.setProperty('--lw', `${a.w}px`);
   el.style.setProperty('--lh', `${a.h}px`);
@@ -80,10 +84,12 @@ const avatarEl = () => document.querySelector<HTMLElement>('.gx-look.it-look[dat
 /** 대기 한 바퀴가 끝날 때 동작으로 바꾼다. 그 사이 화면이 다시 그려져 칸이 바뀌었으면 새 칸에서 다시 기다린다 (tries 번까지) */
 function armAct(id: string, a: ActLook, tries: number): void {
   const el = avatarEl();
-  if (!el || el.dataset.look !== id) return;
+  if (!el || el.dataset.look !== id) return void (arming = false);
   let done = false;
   const go = () => {
     done = true;
+    arming = false;
+    restFrom = Date.now();
     if (el.isConnected && !el.classList.contains('act')) playAct(el, a);
   };
   el.addEventListener('animationiteration', go, { once: true });
@@ -92,29 +98,35 @@ function armAct(id: string, a: ActLook, tries: number): void {
     if (done) return;
     el.removeEventListener('animationiteration', go);
     if (tries > 0) armAct(id, a, tries - 1);
+    else arming = false;
   }, wait);
 }
 
+/** 1초마다: 아바타가 보이고, 마지막 동작 뒤로 설정한 간격이 지났으면 다음 동작을 건다 */
 function actTick(): void {
-  actTimer = setTimeout(actTick, actGapMs());
-  if (stillMotion() || document.hidden) return;
+  if (arming || stillMotion() || document.hidden) return;
   const el = avatarEl();
-  if (!el || !el.getClientRects().length) return;
+  if (!el || !el.getClientRects().length) return void (restFrom = 0);
+  if (!restFrom) restFrom = Date.now();
+  const gap = Number(el.dataset.gap);
+  if (!(gap > 0) || Date.now() - restFrom < gap * 1000) return;
   const id = el.dataset.look ?? '';
   const acts = lookActs(id);
   const a = acts && pickLookAct(acts, lastAct, Math.random());
   if (!a) return;
   lastAct = a.k;
+  arming = true;
   // 그림을 먼저 읽어 둔다 (안 읽힌 채 바꾸면 빈 장이 보인다)
   const img = new Image();
   img.onload = () => armAct(id, a, 2);
+  img.onerror = () => (arming = false);
   img.src = a.url;
 }
 
 /** 동작 끼우기를 켠다 (ui/app.ts 가 한 번 부른다). 아바타가 화면에 없으면 아무 일도 없다 */
 export function startLookActs(): void {
   if (actTimer) return;
-  actTimer = setTimeout(actTick, actGapMs());
+  actTimer = setInterval(actTick, 1000);
 }
 
 const genderOf = (rows: LookRow[] | null, id: string): LookGender | '' => rows?.find((r) => r.id === id)?.g ?? '';
