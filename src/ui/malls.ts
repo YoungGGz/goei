@@ -21,7 +21,7 @@ import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
 import { DESK_AVOID_RANGE, DESK_KEEP_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
 import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallSeenKey, mallUnseen, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
-import { SHOP_SIZE_HI, SHOP_SIZE_LO } from '../core/shop';
+import { SHOP_SIZE_HI, SHOP_SIZE_LO, shopLimits } from '../core/shop';
 import { onOffSwitch } from './controls';
 import { shopSource } from './shop';
 import { shopGive } from '../core/shopfn';
@@ -118,7 +118,7 @@ function saleDone<C extends ChatContext['chat']>(chat: C, site: MallSite, itemId
   const w0 = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
   const w = addWalletEntry(w0, { id: freshWalletId(w0, `${site}_sl_${itemId}_${now.sales.length}`, anchor), anchor, amount: o.price, memo: guideTxt('Main', 'MALL.MEMO.SELL', { item: o.name, mall: MALL_NAME[site] }), src: 'store' }, aliveAnchors(chat)); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
   const items = sellItem(it0, itemId, anchor, `${MALL_NAME[site]}에 팖`);
-  const nextShop = closeSale(now, anchor); // 판 응답 키 — 다시 굴리면 판 것 목록에서도 빠진다 (전수검사 11-13)
+  const nextShop = closeSale(now, anchor, shopLimits(chat.scriptstate)); // 판 응답 키 — 다시 굴리면 판 것 목록에서도 빠진다 (전수검사 11-13)
   if (!nextShop) return null;
   // 답을 기다리는 중·정리 중에는 「사용」 자리를 건드리지 않는다 (요청에 실린 사용이 기록 없이 빠지지 않게, host/usebox.ts useLocked)
   const q = chat.scriptstate?.[ITEM_USE_AT_VAR] || useLocked() ? null : readItemUse(chat.scriptstate);
@@ -190,7 +190,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       next = { ...applied, talk: st0.talk };
     } else {
       const { value } = await generate(talkPrompt(src, s, MALL_GUIDE[site]), s.model, parseTalk, opts);
-      next = stampLastLine(applyTalk(st0, value, false, s.talkStock, s.shelf), lastBot(ctx.chat)?.key ?? '');
+      next = stampLastLine(applyTalk(st0, value, false, s.talkStock, s.shelf, s.keep), lastBot(ctx.chat)?.key ?? '');
       // 우주몰: 문의로 새로 들어온 물건에 진실 칸이 비었으면 「?」 (시그니처 상품 fixedItem 과 같게 — 광고 문구가 사실이 되지 않게, 전수검사 11-13)
       if (site === 'cos') { const had = new Set(st0.items.map((x) => x.id)); next = { ...next, items: next.items.map((x) => (!x.sold && !had.has(x.id) && !x.truth ? { ...x, truth: '?' } : x)) }; }
       // 말로 판 것: 운영자가 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리
@@ -604,7 +604,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       }
       if (site !== 'cos' || !said || v.loading || !st.loaded) return true;
       const chip = st.items.find((x) => x.id === v.chip && !x.sold);
-      const next = stampLastLine(sayToOwner(st, chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said), lastBot(ctx.chat)?.key ?? '');
+      const next = stampLastLine(sayToOwner(st, chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said, shopLimits(ctx.chat.scriptstate)), lastBot(ctx.chat)?.key ?? '');
       v.input = '';
       v.chip = '';
       v.picking = false;

@@ -175,6 +175,8 @@ export interface ShopSettings {
   talkStock: boolean;
   /** 진열대에 남기는 물건 수 (파는 것·산 것 따로, 10~200) */
   shelf: number;
+  /** 기록을 몇 개까지 둘지·참고 글 길이 (shopLimits) */
+  keep: ShopKeep;
 }
 
 type Vars = Record<string, unknown> | undefined;
@@ -208,6 +210,7 @@ export function shopSettings(vars: Vars): ShopSettings {
     refs: numIn(vars?.[SHOP_REFS_VAR], SHOP_REFS_DEFAULT, 0, 12),
     talkStock: vars?.[SHOP_TALK_STOCK_VAR] !== '0',
     shelf: shelfCap(vars),
+    keep: shopLimits(vars),
   };
 }
 function sizeOf(vars: Vars, legacy: ShopCount): [number, number] {
@@ -222,16 +225,14 @@ function numIn(v: unknown, def: number, lo: number, hi: number): number {
 }
 export const shopOn = (vars: Vars): boolean => shopSettings(vars).on;
 /** 보관하는 양·참고 글 길이의 지금 값 (빈 값·수가 아닌 값은 기본값, 범위 밖은 범위 끝) */
-export function shopLimits(vars: Vars): Record<ShopLimit, number> {
-  const out = {} as Record<ShopLimit, number>;
+export type ShopKeep = Record<ShopLimit, number>;
+export function shopLimits(vars: Vars): ShopKeep {
+  const out = {} as ShopKeep;
   for (const k of Object.keys(SHOP_LIMITS) as ShopLimit[]) { const l = SHOP_LIMITS[k]; out[k] = numIn(vars?.[l.key], l.def, l.min, l.max); }
   return out;
 }
-let keep: Record<ShopLimit, number> = shopLimits(undefined);
-/** 지금 채팅의 보관하는 양을 올린다 (host/risu.ts loadContext). 상태를 읽고 고치는 함수들(readShop·applyShelf·applyTalk·closeSale·sayToOwner)이 본다 */
-export function setShopKeep(vars: Record<string, unknown> | undefined | null): void {
-  keep = shopLimits(vars ?? undefined);
-}
+/** 설정을 건드리지 않은 채팅의 보관하는 양. 상태를 읽고 고치는 함수들(readShop·applyShelf·applyTalk·closeSale·sayToOwner)은 그 채팅의 값(shopLimits)을 받아 쓴다 — 다른 채팅의 값이 섞이지 않게 모듈에 두지 않는다 */
+const KEEP_DEFAULT: ShopKeep = shopLimits(undefined);
 
 // ── 표식 `[shop: 가게|주인]` ──
 
@@ -424,8 +425,8 @@ function readOffer(v: unknown): ShopOffer | null {
   };
 }
 
-/** shelf: 진열대 물건 수. vars 가 채팅 변수 그대로가 아니면(상태 하나만 담은 것) 부르는 쪽이 채팅의 값(shelfCap)을 넘긴다 */
-export function readShop(vars: Vars, shelf = shelfCap(vars)): ShopState | null {
+/** shelf: 진열대 물건 수, keep: 보관하는 양. vars 가 채팅 변수 그대로가 아니면(상태 하나만 담은 것) 부르는 쪽이 채팅의 값(shelfCap·shopLimits)을 넘긴다 */
+export function readShop(vars: Vars, shelf = shelfCap(vars), keep = shopLimits(vars)): ShopState | null {
   const raw = vars?.[SHOP_VAR];
   if (typeof raw !== 'string' || !raw.trim()) return null;
   try {
@@ -560,7 +561,7 @@ export function eventShop(chat: Chat): ShopState | null {
   if (st) return st;
   const last = lastBot(chat);
   if (!last || !shopOn(chat.scriptstate)) return null;
-  const snap = readShop({ [SHOP_VAR]: chat.scriptstate?.[SHOP_LAST_VAR] }, shelfCap(chat.scriptstate));
+  const snap = readShop({ [SHOP_VAR]: chat.scriptstate?.[SHOP_LAST_VAR] }, shelfCap(chat.scriptstate), shopLimits(chat.scriptstate));
   return snap && snap.key === last.key ? snap : null;
 }
 
@@ -816,9 +817,9 @@ export function applyShelf(st: ShopState, r: ShelfReply, s: ShopSettings): ShopS
   const base: ShopState = { ...st, identity: st.loaded ? st.identity : r.identity, loaded: true };
   const items = withIds(base, r.items).slice(0, 40);
   if (!items.length) throw new ShopError('받은 물건 줄이 모두 겹쳐서 버렸어요. 다시 받아 보세요.');
-  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-keep.prev);
+  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-s.keep.prev);
   const talk = r.owner ? [...st.talk, { who: 'owner' as const, text: r.owner, ...keyOf(st) }] : st.talk;
-  return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-keep.talk), prev, closed: false };
+  return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-s.keep.talk), prev, closed: false };
 }
 
 /** 코드가 넣는 물건 (쇼핑몰 시그니처 상품): 이미 진열돼 있거나 팔린 것과 같은 이름은 건너뛴다. 지난 목록(prev)에는 넣지 않는다 */
@@ -834,7 +835,7 @@ export function dropItemsNamed(st: ShopState, names: string[]): ShopState {
 
 /** 주인에게 말한 결과를 상태에 (내 말은 부르는 쪽이 먼저 적는다) */
 /** stock: 설정 「문의로 물건 바꾸기」. 꺼져 있으면 응답의 물건 더하기·전체 다시 짜기는 받지 않는다 (값 바꾸기·빼기는 받는다) */
-export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = true, shelf = SHELF_MAX): ShopState {
+export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = true, shelf = SHELF_MAX, keep = KEEP_DEFAULT): ShopState {
   const r0: TalkReply = stock ? r1 : { ...r1, all: [], add: [], mode: r1.mode === 'all' ? 'none' : r1.mode };
   // 포인트 상점: 「900p」로 적은 값도 포인트 값으로
   const r = st.identity.points ? { ...r0, all: r0.all.map(pointPrice), add: r0.add.map(pointPrice), reprice: r0.reprice.map(pointPrice) } : r0;
@@ -923,13 +924,13 @@ export const cancelSell = (st: ShopState): ShopState => ({ ...st, sell: null });
 
 /** 팔기 확정: 부른 값이 있을 때만. 판 것 목록에 남고 팔기 상태는 비운다 */
 /** key: 판 응답 키 (쇼핑몰은 상태 key 가 비어 따로 넘긴다 — 다시 굴리면 판 것 목록에서도 빠지게, 전수검사 11-13) */
-export function closeSale(st: ShopState, key = ''): ShopState | null {
+export function closeSale(st: ShopState, key = '', keep = KEEP_DEFAULT): ShopState | null {
   const o = st.sell;
   if (!o || typeof o.price !== 'number') return null;
   return { ...st, sell: null, sales: [...st.sales, { name: o.name, price: o.price, ...(key ? { k: key } : keyOf(st)) }].slice(-keep.sales) };
 }
 
-export function sayToOwner(st: ShopState, text: string): ShopState {
+export function sayToOwner(st: ShopState, text: string, keep = KEEP_DEFAULT): ShopState {
   const talk: ShopLine[] = [...st.talk, { who: 'me', text: clean(text, 300), ...keyOf(st) }];
   return { ...st, talk: talk.slice(-keep.talk) };
 }

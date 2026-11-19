@@ -358,7 +358,7 @@ function saleDone<C extends ChatContext['chat']>(chat: C, shop: string, itemId: 
   const w = addWalletEntry(l0, { id: freshWalletId(l0, `sl_${itemId}_${now.sales.length}`, now.key), anchor: now.key, amount: o.price, memo: o.name, src: 'store' }, aliveAnchors(chat));
   // 판 물건은 판 돈과 같은 응답에 묶여 숨는다(응답을 다시 굴리면 같이 돌아옴, core/items.ts sellItem). 장착 칸에서도 빠지고, 「사용」 자리에 놓여 있었으면 거기서도 뺀다
   const items = sellItem(it0, itemId, now.key, `${now.shop}에 팖`);
-  const nextShop = closeSale(now, now.key);
+  const nextShop = closeSale(now, now.key, shopLimits(chat.scriptstate));
   if (!nextShop) return null;
   // 답을 기다리는 중·정리 중에는 「사용」 자리를 건드리지 않는다 (요청에 실린 사용이 기록 없이 빠지지 않게, host/usebox.ts useLocked)
   const q = chat.scriptstate?.[ITEM_USE_AT_VAR] || useLocked() ? null : readItemUse(chat.scriptstate);
@@ -387,7 +387,7 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
       next = applyShelf(st0, value, s);
     } else {
       const { value } = await generate(talkPrompt(src, s), s.model, parseTalk, opts);
-      next = applyTalk(st0, value, s.kick, s.talkStock, s.shelf);
+      next = applyTalk(st0, value, s.kick, s.talkStock, s.shelf, s.keep);
       // 말로 판 것: 주인이 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리
       if (value.deal && next.sell && typeof next.sell.price === 'number') deal = next.sell.itemId;
     }
@@ -585,7 +585,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       shopUi.chip = '';
       shopUi.chipKind = '';
       shopUi.pick = false;
-      const next = sayToOwner(st, text);
+      const next = sayToOwner(st, text, shopLimits(ctx.chat.scriptstate));
       const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
         const now = readShop(chat.scriptstate);
         if (!now || now.shop !== st.shop) return null;

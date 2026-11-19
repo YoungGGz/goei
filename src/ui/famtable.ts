@@ -323,7 +323,7 @@ export function shopTable(vars: State, busy = false): string {
   const limBox = (k: ShopLimit, label: string): [string, string] => { const l = SHOP_LIMITS[k]; return [label, numCtl(`s:shop:limit_${k}`, { n: lim[k], lo: l.min, hi: l.max, step: l.step }, label, l.unit, busy)]; };
   const ordBox = (id: 'cos' | 'bm', n: number): [string, string] => { const name = rows.find((r) => r.id === id)!.name; return [name, numCtl(`s:${id}:keep_orders`, { n, lo: ORDERS_KEEP_RANGE.min, hi: ORDERS_KEEP_RANGE.max, step: ORDERS_KEEP_RANGE.step }, `${name} 주문 기록`, '건', busy)]; };
   const keepPart = setGroup('보관하는 양', [
-    R('기록', numSet([limBox('prev', '지난 목록'), limBox('sales', '판매 기록'), limBox('notes', '견적·정보'), limBox('talk', '문의 대화')]), '상점마다 남겨 두는 기록의 수예요. 넘으면 오래된 것부터 지워요.', [
+    R('기록', numSet([limBox('prev', '지난 목록'), limBox('sales', '판매 기록'), limBox('notes', '견적·정보'), limBox('talk', '문의 대화')]), `기본 상점과 쇼핑몰 둘이 상점마다 남겨 두는 기록의 수예요. 넘으면 오래된 것부터 지워요. ${hsN}에는 닿지 않아요. 거기는 ${hsN} 설정의 「기억하는 지난 상품 수」·「통화 기록 줄 수」를 따로 써요.`, [
       ['지난 목록', '「지난 목록 피하기」에 쓰는 지난 물건 이름의 수예요.'],
       ['판매 기록', '내가 가게에 판 물건의 기록이에요.'],
       ['견적·정보', '맞춤 주문 견적과 산 정보를 각각 이만큼 남겨요.'],

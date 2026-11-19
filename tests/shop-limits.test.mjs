@@ -15,11 +15,10 @@ const full = () => ({
   notes: Array.from({ length: 300 }, (_, i) => ({ id: `n${i}`, title: `정보${i}`, price: 100, body: '내용' })),
 });
 const sizes = (st) => [st.talk.length, st.prev.length, st.sales.length, st.quotes.length, st.notes.length];
-const read = () => M.readShop(M.shopVars(full()));
+const read = (vars = {}) => M.readShop({ ...vars, ...M.shopVars(full()) });
 
 test('기본값은 예전 수 그대로: 대화 40 · 지난 목록 40 · 판매 40 · 견적 20 · 정보 20 · 위키 3000자 · 보고 1500자', () => {
   assert.deepEqual(M.shopLimits(undefined), { prev: 40, sales: 40, notes: 20, talk: 40, wiki: 3000, report: 1500 });
-  M.setShopKeep(undefined);
   assert.deepEqual(sizes(read()), [40, 40, 40, 20, 20]);
   assert.equal(read().talk[39].text, '말299', '최근 것을 남긴다');
   assert.equal(M.sayToOwner(read(), '하나 더').talk.length, 40);
@@ -28,16 +27,18 @@ test('기본값은 예전 수 그대로: 대화 40 · 지난 목록 40 · 판매
 });
 
 test('설정을 바꾸면 그 수만큼 남긴다', () => {
-  M.setShopKeep({ $sh_keep_talk: '100', $sh_keep_prev: '10', $sh_keep_sales: '60', $sh_keep_notes: '5' });
-  try {
-    assert.deepEqual(sizes(read()), [100, 10, 60, 5, 5]);
-    assert.equal(M.sayToOwner(read(), '하나 더').talk.length, 100);
-    assert.equal(M.closeSale({ ...read(), sell: { id: 'x', name: '시계', price: 500 } }).sales.length, 60);
-    const st = M.applyShelf({ ...read(), items: [{ id: 'a', name: '새 이름', desc: '', use: false, effect: '', price: 1 }] }, { identity: base().identity, owner: '어서 오쇼', items: [{ name: '손전등', desc: '', use: true, effect: '', price: 1000 }] }, M.shopSettings({}));
-    assert.equal(st.prev.length, 10);
-    assert.equal(st.prev[9], '새 이름', '방금 내린 물건이 지난 목록의 끝');
-    assert.equal(st.talk.length, 100);
-  } finally { M.setShopKeep(undefined); }
+  const vars = { $sh_keep_talk: '100', $sh_keep_prev: '10', $sh_keep_sales: '60', $sh_keep_notes: '5' };
+  const keep = M.shopLimits(vars);
+  assert.deepEqual(sizes(read(vars)), [100, 10, 60, 5, 5]);
+  assert.equal(M.sayToOwner(read(vars), '하나 더', keep).talk.length, 100);
+  assert.equal(M.closeSale({ ...read(vars), sell: { id: 'x', name: '시계', price: 500 } }, '', keep).sales.length, 60);
+  const st = M.applyShelf({ ...read(vars), items: [{ id: 'a', name: '새 이름', desc: '', use: false, effect: '', price: 1 }] }, { identity: base().identity, owner: '어서 오쇼', items: [{ name: '손전등', desc: '', use: true, effect: '', price: 1000 }] }, M.shopSettings(vars));
+  assert.equal(st.prev.length, 10);
+  assert.equal(st.prev[9], '새 이름', '방금 내린 물건이 지난 목록의 끝');
+  assert.equal(st.talk.length, 100);
+  const info = { owner: '알려 주지', mode: 'none', all: [], add: [], remove: [], reprice: [], closed: false, info: { title: '새 정보', price: 100, body: '내용' } };
+  assert.equal(M.applyTalk(read(vars), info, true, true, 40, keep).notes.length, 5);
+  assert.equal(M.applyTalk(read(vars), info, true, true, 40, keep).talk.length, 100);
   assert.deepEqual(M.shopLimits({ $sh_wiki_chars: '6000', $sh_report_chars: '500' }), { prev: 40, sales: 40, notes: 20, talk: 40, wiki: 6000, report: 500 });
 });
 
@@ -45,9 +46,24 @@ test('이상한 값은 기본값, 범위 밖은 범위 끝', () => {
   assert.deepEqual(M.shopLimits({ $sh_keep_talk: 'abc', $sh_keep_prev: '', $sh_wiki_chars: 'x' }), M.shopLimits(undefined));
   const l = M.shopLimits({ $sh_keep_talk: '0', $sh_keep_prev: '99999', $sh_keep_notes: '-3', $sh_wiki_chars: '1', $sh_report_chars: '999999' });
   assert.deepEqual(l, { prev: 200, sales: 40, notes: 5, talk: 10, wiki: 500, report: 10000 });
-  M.setShopKeep({ $sh_keep_talk: '엉뚱' });
-  assert.equal(read().talk.length, 40);
-  M.setShopKeep(undefined);
+  assert.equal(read({ $sh_keep_talk: '엉뚱' }).talk.length, 40);
+});
+
+// 응답이 붙는 길(settleShop)은 그 채팅의 값으로 자른다: 그사이 화면이 다른 채팅을 읽었어도 섞이지 않는다
+test('상점 정리는 정리하는 그 채팅의 보관하는 양을 쓴다 (다른 채팅을 읽은 뒤에도)', () => {
+  const msg = [{ role: 'user', data: '가자' }, { role: 'char', data: '도착.\n[shop: 철물점|주인]', chatId: 'c1' }, { role: 'user', data: '더 보자' }, { role: 'char', data: '둘러본다.\n[shop: 철물점|주인]', chatId: 'c2' }];
+  const chatA = { message: msg, scriptstate: { $sh_keep_talk: '200', $sh_keep_sales: '60', $sh_keep_notes: '40', ...M.shopVars(full()) } };
+  const chatB = { message: msg, scriptstate: { ...M.shopVars(full()) } };
+  // 다른 채팅(설정 안 건드림)을 먼저 읽고 정리한다
+  assert.deepEqual(sizes(M.readShop(M.settleShop(chatB, 3).vars)), [40, 40, 40, 20, 20]);
+  const a = M.settleShop(chatA, 3);
+  const saved = M.readShop({ ...chatA.scriptstate, ...a.vars });
+  assert.equal(saved.key, 'c2');
+  assert.deepEqual(sizes(saved), [200, 40, 60, 40, 40]);
+  assert.equal(JSON.parse(a.vars[M.SHOP_VAR]).talk.length, 200, '저장되는 글이 잘리지 않았다');
+  // 마지막 응답 사본(다시 굴린 때)도 그 채팅의 값으로 읽는다
+  const rolled = { message: msg.slice(0, 2), scriptstate: { ...chatA.scriptstate, [M.SHOP_VAR]: '', [M.SHOP_LAST_VAR]: M.shopVars({ ...full(), key: 'c1' })[M.SHOP_VAR] } };
+  assert.equal(M.eventShop(rolled).talk.length, 200);
 });
 
 const cos = (i, taken) => ({ id: `o${i}`, anchor: 'c1', price: 1, hours: 1, orderedAt: null, orderedKey: 'c1', item: { name: `주문${i}` }, ...(taken ? { taken: true, takenKey: 'c1' } : {}) });

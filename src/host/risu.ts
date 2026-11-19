@@ -3,7 +3,6 @@ import { makeAssetCopy, splitAssetCopy } from '../core/world/assetcopy';
 import { setStatusColumns } from '../core/world/statuscols';
 import { setIconAliases, setIconPool } from '../core/iconmatch';
 import { ITEM_ICON_ALIAS_VAR, itemIconPoolOn, setItemRules } from '../core/items';
-import { setShopKeep } from '../core/shop';
 import { setWalletCap } from '../core/wallet';
 import type { Chat, LoreEntry } from '../core/types';
 import { applyAdvanced, applyGenLimits } from '../core/advanced';
@@ -74,8 +73,6 @@ export async function loadContext(): Promise<ChatContext | null> {
   setItemRules(chat.scriptstate);
   // 요청당 사진 수·호출 기록 보관 턴 수 (core/advanced.ts)
   applyGenLimits(chat.scriptstate);
-  // 상점 기록을 몇 개까지 둘지 (core/shop.ts)
-  setShopKeep(chat.scriptstate);
   // 거래 줄 상한 (core/wallet.ts)
   setWalletCap(chat.scriptstate);
   return { charIndex, chatIndex, char, chat };
