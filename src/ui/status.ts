@@ -3,7 +3,7 @@
 import { dayInfo, elapsedLabel, sceneLabel, statusMinute, storyDay, type ColId, type StatusTag, type StatusTimeline } from '../core/world';
 import { formatDelta, formatWon } from '../core/wallet';
 import { formatPoints } from '../core/points';
-import { nameEndsAt } from '../core/lore';
+import { JOSA } from '../core/lore';
 import type { StatusStyle, Theme } from '../core/settings';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -28,23 +28,24 @@ export const looseTerm = (term: string): boolean => /[가-힣]/.test(term) && [.
 /** 상태창에 찍힌 글이 그 이름인가 (누른 밑줄 글 → 문서 찾기) */
 export const sameTerm = (t: StatusContext['terms'][number], name: string): boolean => t.term === name || (!!t.loose && squash(t.term) === squash(name));
 
+/** 띄어쓰기가 이름과 다르게 걸린 자리가 그 이름인가: 낱말로 떨어질 때만.
+ *  앞에 글자가 붙어 있으면 아니고, 뒤에는 조사 하나까지만 (화요 퀴즈쇼에서). 띄어 쓴 끝 조각이 한 글자면 조사도 안 된다:
+ *  「관리 국가 기관」의 「관리 국」+가, 「미술 관련」의 「미술 관」, 「지하 드럭스토어」의 「지하 드」는 그 이름이 아니다 */
+function respacedOk(text: string, at: number, end: number, hit: string): boolean {
+  if (LETTER.test(text[at - 1] ?? '')) return false;
+  const run = /^[\p{L}\p{N}]*/u.exec(text.slice(end))?.[0] ?? '';
+  if (!run) return true;
+  const last = hit.split(/[ \t]+/).pop() ?? '';
+  return [...last].length > 1 && JOSA.includes(run);
+}
+
 /** 글 속에서 위키 이름만 점선 밑줄로 (겹치면 긴 이름). loose 이름은 글자 사이 띄어쓰기가 있든 없든 찾는다 */
 export function linkTerms(text: string, terms: StatusContext['terms']): string {
   if (!terms.length || !text) return esc(text);
   const hits: { at: number; end: number }[] = [];
   const put = (at: number, end: number) => { if (!hits.some((h) => at < h.end && end > h.at)) hits.push({ at, end }); };
   for (const { term, loose } of terms) {
-    if (loose) {
-      const re = new RegExp([...squash(term)].map(escRe).join('[ \\t]*'), 'gu');
-      for (const m of text.matchAll(re)) {
-        const at = m.index ?? 0;
-        const end = at + m[0].length;
-        // 띄어쓰기가 이름과 다르게 걸린 것은 낱말로 떨어질 때만: 「미술 관련」의 「미술 관」, 「지하 드럭스토어」의 「지하 드」는 그 이름이 아니다
-        if (m[0] !== term && (LETTER.test(text[at - 1] ?? '') || !nameEndsAt(text, end))) continue;
-        put(at, end);
-      }
-      continue;
-    }
+    // 이름 그대로 쓴 것은 어디서든 (전과 같다)
     let from = 0;
     for (;;) {
       const at = text.indexOf(term, from);
@@ -52,6 +53,14 @@ export function linkTerms(text: string, terms: StatusContext['terms']): string {
       const end = at + term.length;
       put(at, end);
       from = end;
+    }
+    if (!loose) continue;
+    const re = new RegExp([...squash(term)].map(escRe).join('[ \\t]*'), 'gu');
+    for (let m = re.exec(text); m; m = re.exec(text)) {
+      const at = m.index;
+      const end = at + m[0].length;
+      if (m[0] !== term && respacedOk(text, at, end, m[0])) put(at, end);
+      else re.lastIndex = at + 1;
     }
   }
   if (!hits.length) return esc(text);
