@@ -2,6 +2,7 @@
 // 기능마다 접힌 칸 하나에 모은다. 손대지 않아도 원본 기본값으로 돌아간다. 값은 이 채팅의 변수에 두고,
 // 각 설정 화면의 「덮어쓰기」로 새 채팅 기본값에 같이 담긴다.
 import { CONTEXT as GN_CONTEXT, HISTORY as GN_HISTORY, LIMITS as GN_LIMITS } from './gnet';
+import { ATTACH_LIMITS } from './attach';
 import { guideTxt } from './guides';
 import { COOLDOWN as PH_COOLDOWN, HISTORY as PH_HISTORY, LIMITS as PH_LIMITS } from './phone';
 
@@ -65,6 +66,12 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('reiterate', '다시 보기', 0, 0, 2, '회', { zero: '안 함', hint: '첫 응답을 받은 뒤 「지침과 형식을 빠짐없이 지켰나 다시 읽고, 괜찮으면 그대로, 아니면 고쳐서」를 이만큼 더 물어요. 형식·규칙을 더 잘 지키지만 한 번마다 호출이 하나 늘어요. 기능마다 따로 정할 수도 있어요' }),
         { key: 'user_msgs', label: '유저 메시지', type: 'pick', def: '1', opts: [['1', '포함'], ['0', '빼기']], hint: '괴담넷·괴담톡·위키·상점 요청에 넣는 최근 대화에 내가 쓴 메시지를 넣을지예요. 빼면 내가 쓴 지시문이 게시판·톡·위키로 새지 않지만, 내 행동은 응답 문장으로만 짐작해요' },
         num('concurrent', '동시 요청', 0, 0, 5, '개', { zero: '제한 없음', hint: '괴담넷·괴담톡·위키·상점·쇼핑몰·망상홈쇼핑 요청을 한 번에 몇 개까지 보낼지예요. 넘으면 앞 요청이 끝날 때까지 기다려요. 느린 모델이나 요청 한도가 낮을 때 줄이세요. 인물 기록 요청은 세지 않아요' }),
+        // 기본값 = 전에 코드에 고정돼 있던 값 (사진 8장 · 호출 기록 5턴 · AI 상담 80줄·30개·24줄)
+        num('image_max', '요청당 사진', 8, 1, 20, '장', { hint: '요청 하나에 실제 사진을 몇 장까지 붙일지예요. 넘으면 최근 사진만 붙이고 앞의 사진은 설명 글만 보내요. 늘리면 요청이 커져요' }),
+        num('trace_keep', '호출 기록 보관', 5, 1, 20, '턴', { hint: '호출 기록에 남겨 두는 최근 턴 수예요. 늘리면 저장 공간을 더 써요' }),
+        num('consult_lines', 'AI 상담 대화 보관', 80, 20, 500, '줄', { hint: 'AI 상담 창에 채팅마다 남겨 두는 대화 줄 수예요. 넘으면 오래된 줄부터 지워요' }),
+        num('consult_chats', 'AI 상담 보관 채팅', 30, 1, 100, '개', { hint: 'AI 상담 대화를 남겨 두는 채팅 수예요. 넘으면 상담한 지 오래된 채팅의 대화부터 지워요' }),
+        num('consult_talk', 'AI 상담 지난 대화 참조', 24, 2, 200, '줄', { hint: 'AI 상담 요청에 넣는 지난 대화 줄 수예요. 늘리면 앞의 대화를 더 기억하지만 토큰을 더 써요' }),
       ],
     },
     {
@@ -288,12 +295,27 @@ export const loreLimits = (state: State): { depth: number; budget: number } => (
 /** 본편 요청에 늘 붙는 지침 가운데 세력 요약·요원 명단을 넣을지 (🏷️Tag 는 늘 넣는다) */
 export const alwaysBookOn = (state: State, kind: 'tag' | 'faction' | 'roster'): boolean => kind === 'tag' || advValue(state, 'gen', kind === 'faction' ? 'lore_faction' : 'lore_roster') !== '0';
 
+/** 호출 기록에 남기는 턴 수 (host/trace.ts 가 읽는다). applyGenLimits 가 지금 채팅 값으로 맞춘다 */
+export const TRACE_LIMITS = { keep: 5 };
+
+/** 요청당 사진 수·호출 기록 보관 턴 수를 지금 채팅 값으로 (applyAdvanced · host/risu.ts loadContext) */
+export function applyGenLimits(state: State): void {
+  ATTACH_LIMITS.images = advNum(state, 'gen', 'image_max');
+  TRACE_LIMITS.keep = advNum(state, 'gen', 'trace_keep');
+}
+
+/** AI 상담: 채팅마다 남기는 줄 수 · 대화를 남기는 채팅 수 · 모델에 넘기는 지난 대화 줄 수 */
+export const consultLimits = (state: State): { lines: number; chats: number; talk: number } => ({
+  lines: advNum(state, 'gen', 'consult_lines'), chats: advNum(state, 'gen', 'consult_chats'), talk: advNum(state, 'gen', 'consult_talk'),
+});
+
 // 깊은 곳(응답 검사, 저장 정리)에서 쓰는 상수 묶음은 지금 채팅 값으로 맞춰 둔다.
 // 창을 열거나 고칠 때, 채팅 요청 전, 자동 새로고침 전에 부른다 (모두 한 번에 한 채팅만 다룬다).
 const GN_LIMIT_KEYS = Object.keys(GN_LIMITS) as (keyof typeof GN_LIMITS)[];
 const PH_LIMIT_KEYS = Object.keys(PH_LIMITS) as (keyof typeof PH_LIMITS)[];
 
 export function applyAdvanced(state: State): void {
+  applyGenLimits(state);
   const g = (k: string) => advNum(state, 'gn', k);
   const p = (k: string) => advNum(state, 'ph', k);
   for (const k of GN_LIMIT_KEYS) GN_LIMITS[k] = g(k);

@@ -1,8 +1,9 @@
 // 호출 흐름 기록 (11-07 사용자: 「가장 최근 요청과 마지막 응답 결과를 프로세스 형태로」). 한 턴 = 본편 요청 조립 → 보조 호출들 → 본편 응답 → 응답 뒤 보조 호출들.
 // 플러그인이 부르는 보조 호출은 전부 host/llm.ts runModel 을 거치므로 거기서 한 건씩 적고, 본편 요청·응답은 body.ts 가 적는다.
-// 저장: 플러그인 저장소 goei-trace 에 최근 TRACE_KEEP 턴의 id 목록, 턴마다 goei-trace:<id> (바뀐 턴만 다시 쓴다. 전수검사 11-13). 요청·응답 원문은 한 건당 TRACE_TEXT 자까지(앞 2/3 + 뒤 1/3). 화면은 ui/editor/trace.ts.
+// 저장: 플러그인 저장소 goei-trace 에 최근 「호출 기록 보관」 턴(기본 TRACE_KEEP)의 id 목록, 턴마다 goei-trace:<id> (바뀐 턴만 다시 쓴다. 전수검사 11-13). 요청·응답 원문은 한 건당 TRACE_TEXT 자까지(앞 2/3 + 뒤 1/3). 화면은 ui/editor/trace.ts.
 import type { LlmMessage } from './llm';
 import { tokens } from '../core/gnet';
+import { TRACE_LIMITS } from '../core/advanced';
 import { PROGRESS_WATCHDOG, progressBegin, progressMain, progressMainTokens, progressReply, progressTurn } from '../core/progress';
 
 export interface TraceCall {
@@ -51,7 +52,9 @@ export interface TraceTurn {
   calls: TraceCall[];
 }
 
+/** 남기는 턴 수의 기본값. 지금 값은 생성 공통 「호출 기록 보관」 (core/advanced.ts TRACE_LIMITS) */
 export const TRACE_KEEP = 5;
+const keepTurns = () => Math.max(1, TRACE_LIMITS.keep);
 /** 요청·응답 글 하나의 보관 한도. 사실상 생략 없이 전부 남긴다 (2026-11-13 사용자: 「대부분 생략이 되어있는데 꼭 생략해야 하나」). 전에는 6000자·본편 40000자 */
 export const TRACE_TEXT = 400000;
 /** 본편 요청 메시지 하나의 보관 한도 */
@@ -163,7 +166,7 @@ function save(id?: string): void {
     saveTimer = null;
     void (async () => {
       try {
-        const keep = (await load()).slice(-TRACE_KEEP);
+        const keep = (await load()).slice(-keepTurns());
         const ids = keep.map((t) => t.id);
         const write = keep.filter((t) => dirty.has(t.id));
         dirty.clear();
@@ -206,7 +209,7 @@ export async function clearTrace(): Promise<void> {
 async function push(t: TraceTurn): Promise<void> {
   const list = await load();
   list.push(t);
-  while (list.length > TRACE_KEEP) list.shift();
+  while (list.length > keepTurns()) list.shift();
   save(t.id);
 }
 
