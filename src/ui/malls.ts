@@ -3,7 +3,8 @@
 //   운영자에게 질문: 넷스케이프 팝업. 상품 화면에서 열면 그 물건이 붙고, 다른 곳은 [물건을 붙인다]. 운영자 답에 물건 이름이 있으면 링크로.
 // 백일몽 포인트몰: 사내 쇼핑몰, 운영자 없음(문의·흥정 X), 로그인해야 씀, 정가로 포인트 구매.
 // 진열·문의 요청문은 상점(core/shop.ts)과 같고, 지침·설정만 사이트 것(core/malls.ts).
-import { setGroup, setRow, stepSizeText } from './setrow';
+import { stepNext } from '../core/stepval';
+import { setGroup, setRow, stepIn } from './setrow';
 import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
@@ -995,7 +996,6 @@ const tierBad = (x: TierRaw): string => {
   if (!x.hi || b < a) return '상한이 하한보다 작아 이 줄은 안 뽑혀요.';
   return '';
 };
-const stepBox = (action: string, key: string, text: string, down: boolean, up: boolean) => `<div class="st-step"><button class="gx-step" data-action="${action}" data-value="${key}:-" ${down ? '' : 'disabled'} aria-label="줄이기">−</button><b>${text}</b><button class="gx-step" data-action="${action}" data-value="${key}:+" ${up ? '' : 'disabled'} aria-label="늘리기">+</button></div>`;
 /** 값 등급 표: PC 는 제목 줄 + 등급마다 한 줄, 폰은 제목 두 줄 + 등급마다 두 줄 (같은 DOM, 배치만 CSS). 설명은 길어서 줄이 바뀌는 칸(.ms-list) — 잘리지 않게 (2026-11-12 전수점검 D1·D2) */
 function tierTable(vars: Record<string, unknown> | undefined, site: MallSite): string {
   const unit = site === 'bm' ? 'p' : '원';
@@ -1011,7 +1011,7 @@ function tierTable(vars: Record<string, unknown> | undefined, site: MallSite): s
       ${cell('d', '설명(영어)', `<textarea class="gx-search ms-list" rows="1" data-change="ms-tier" data-key="${k}:desc" maxlength="120" aria-label="설명(영어)">${esc(x.desc)}</textarea>`)}
       ${cell('lo', '하한', num('lo', '하한'))}
       ${cell('hi', '상한', num('hi', '상한'))}
-      <div class="ms-tb-c w"><span>가중치</span>${stepBox('ms-tier-w', k, String(w), w > 0, w < 99)}</div>
+      <div class="ms-tb-c w"><span>가중치</span>${stepIn('ms-tier-w', k, w, 0, 99, '', '가중치')}</div>
       <button class="gx-mini danger ms-tb-x" data-action="ms-tier-del" data-value="${k}" aria-label="지우기">×</button>
       ${bad ? `<p class="ms-tb-err">${bad}</p>` : ''}
     </div>`;
@@ -1093,8 +1093,8 @@ function deskGroup(ctx: ChatContext): string {
     row('사용', mseg('bm', 'desk_on', d.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 왼쪽 메뉴에 「1:1 상담」이 안 보여요.'),
     row('상담사 주사위 칸', axisTable(ctx.chat.scriptstate), '칸마다 값을 하나씩 뽑아요. 값은 쉼표로 나눠요. 같은 값을 여러 번 적으면 그만큼 잘 뽑혀요. 다 지우면 기본 칸으로 돌아가요.', `ms-wide ${aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? 'ps-changed' : ''}`),
     row('지난 상담사 다시 만나기', mseg('bm', 'desk_again', d.again ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '켜면 가끔(4번에 1번꼴) 전에 만났던 상담사가 다시 연결돼요.'),
-    row('겹치지 않게 넘길 수', `<div class="st-step${stepSizeText(`${DESK_AVOID_RANGE[1]}명`)}"><button class="gx-step" data-action="ms-desk-step" data-value="-" ${d.avoid > DESK_AVOID_RANGE[0] ? '' : 'disabled'} aria-label="줄이기">−</button><b>${d.avoid}명</b><button class="gx-step" data-action="ms-desk-step" data-value="+" ${d.avoid < DESK_AVOID_RANGE[1] ? '' : 'disabled'} aria-label="늘리기">+</button></div>`, '새 상담사를 만들 때 최근 상담사 몇 명의 요약을 같이 넘겨 「이들과 겹치지 마라」고 해요(0~12).'),
-    row('지난 상담사 보관 수', `<div class="st-step${stepSizeText(`${DESK_KEEP_RANGE[1]}명`)}"><button class="gx-step" data-action="ms-desk-keep" data-value="-" ${d.keep > DESK_KEEP_RANGE[0] ? '' : 'disabled'} aria-label="줄이기">−</button><b>${d.keep}명</b><button class="gx-step" data-action="ms-desk-keep" data-value="+" ${d.keep < DESK_KEEP_RANGE[1] ? '' : 'disabled'} aria-label="늘리기">+</button></div>`, `지난 상담사를 몇 명까지 남겨 둘지예요(${DESK_KEEP_RANGE[0]}~${DESK_KEEP_RANGE[1]}). 넘으면 오래된 상담사부터 지워요. 「다시 만나기」는 남아 있는 상담사 가운데서 골라요.`),
+    row('겹치지 않게 넘길 수', stepIn('ms-desk-step', '', d.avoid, DESK_AVOID_RANGE[0], DESK_AVOID_RANGE[1], '명', '겹치지 않게 넘길 수'), '새 상담사를 만들 때 최근 상담사 몇 명의 요약을 같이 넘겨 「이들과 겹치지 마라」고 해요(0~12).'),
+    row('지난 상담사 보관 수', stepIn('ms-desk-keep', '', d.keep, DESK_KEEP_RANGE[0], DESK_KEEP_RANGE[1], '명', '지난 상담사 보관 수'), `지난 상담사를 몇 명까지 남겨 둘지예요(${DESK_KEEP_RANGE[0]}~${DESK_KEEP_RANGE[1]}). 넘으면 오래된 상담사부터 지워요. 「다시 만나기」는 남아 있는 상담사 가운데서 골라요.`),
   ].join('') + reset);
 }
 
@@ -1201,14 +1201,13 @@ async function deskSettingsAction(action: string, value: string | undefined, ctx
   }
   if (action === 'ms-desk-step') {
     const d = deskSettings(ctx.chat.scriptstate);
-    const n = Math.max(DESK_AVOID_RANGE[0], Math.min(DESK_AVOID_RANGE[1], d.avoid + (value === '+' ? 1 : -1)));
-    return set({ [DESK_KEY.avoid]: String(n) });
+    const n = stepNext(value, d.avoid, DESK_AVOID_RANGE[0], DESK_AVOID_RANGE[1]);
+    return n === null ? true : set({ [DESK_KEY.avoid]: String(n) });
   }
   if (action === 'ms-desk-keep') {
     const d = deskSettings(ctx.chat.scriptstate);
-    // 한 번에 4명씩 (12~100)
-    const n = Math.max(DESK_KEEP_RANGE[0], Math.min(DESK_KEEP_RANGE[1], d.keep + (value === '+' ? 4 : -4)));
-    return set({ [DESK_KEY.keep]: String(n) });
+    const n = stepNext(value, d.keep, DESK_KEEP_RANGE[0], DESK_KEEP_RANGE[1]);
+    return n === null ? true : set({ [DESK_KEY.keep]: String(n) });
   }
   if (action === 'ms-desk-reset') return set({ [DESK_KEY.axes]: '' });
   return false;
@@ -1296,7 +1295,7 @@ async function cosExtraAction(action: string, value: string | undefined, ctx: Ch
       const site = m[1] as MallSite; const f = m[3] as 'name' | 'desc' | 'lo' | 'hi';
       return saveT(site, tierRows(vars, site).map((x, i) => (i === Number(m[2]) ? { ...x, [f]: f === 'name' ? clean(m[4], 20) : f === 'desc' ? clean(m[4], 120) : m[4].replace(/[^\d]/g, '').slice(0, 13) } : x)));
     }
-    if (action === 'ms-tier-w') { const m = /^(cos|bm):(\d+):([+-])$/.exec(value ?? ''); if (!m) return true; const site = m[1] as MallSite; return saveT(site, tierRows(vars, site).map((x, i) => { if (i !== Number(m[2])) return x; const w = x.w === '' || !Number.isFinite(Number(x.w)) ? 1 : Math.trunc(Number(x.w)); return { ...x, w: String(Math.max(0, Math.min(99, w + (m[3] === '+' ? 1 : -1)))) }; })); }
+    if (action === 'ms-tier-w') { const m = /^(cos|bm):(\d+)(:[+-]|=-?\d+)$/.exec(value ?? ''); if (!m) return true; const site = m[1] as MallSite; return saveT(site, tierRows(vars, site).map((x, i) => { if (i !== Number(m[2])) return x; const w = x.w === '' || !Number.isFinite(Number(x.w)) ? 1 : Math.trunc(Number(x.w)); return { ...x, w: String(stepNext(m[3], w, 0, 99) ?? w) }; })); }
     if (action === 'ms-tier-del') { const m = /^(cos|bm):(\d+)$/.exec(value ?? ''); if (!m) return true; const site = m[1] as MallSite; return saveT(site, tierRows(vars, site).filter((_, i) => i !== Number(m[2]))); }
     if (action === 'ms-tier-add') { const site = (value === 'bm' ? 'bm' : 'cos') as MallSite; return saveT(site, [...tierRows(vars, site), { name: '', desc: '', lo: '', hi: '', w: '1' }]); }
   }

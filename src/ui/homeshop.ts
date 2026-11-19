@@ -2,6 +2,7 @@
 // 모양은 11-10 도트 시안(site_mock_dot: 도트 글꼴·2px 테두리·판 색)을 그대로. 방송 칸은 재생기(ui/hsplayer.ts)가 그린다.
 // 편성 호출은 상점 요청문(core/shop.ts shelfPrompt)에 방송 절(지침 「망상홈쇼핑」 BROADCAST)을 붙여 한 번에: 상품·상품마다 큐시트·채팅.
 // 설정은 우주몰·포인트몰과 같은 틀(설정 → 인터넷 → 망상홈쇼핑). 재생 규칙·효과·속도 모두 설정에서 고친다.
+import { stepNext } from '../core/stepval';
 import { needAttr } from './needfill';
 import { shopGive, type ShopFn } from '../core/shopfn';
 import { defGroups, type Wire } from './setrow';
@@ -910,8 +911,8 @@ async function homeshopSettingsAction(action: string, value: string | undefined,
     return true;
   };
   if (action === 'hs-retry') {
-    const n = retryOf(ctx) + (String(value).endsWith('+') ? 1 : -1);
-    return set({ [HS_RETRY_KEY]: String(Math.max(0, Math.min(3, n))) });
+    const n = stepNext(value, retryOf(ctx), 0, 3);
+    return n === null ? true : set({ [HS_RETRY_KEY]: String(n) });
   }
   const m = /^([\w:]+)=([\s\S]*)$/.exec(value ?? '');
   if (!m) return true;

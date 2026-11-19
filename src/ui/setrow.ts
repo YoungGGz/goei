@@ -1,5 +1,6 @@
 // 설정 줄 그리기 (2026-11-11 설정 개편 2단계). 설정 줄·묶음의 모양은 여기 한 곳에서만 만든다.
 // 페이지는 정의표(core/setdef)와 「선」(Wire: 지금 값 읽기·버튼 이름)을 주고, 줄 HTML 을 직접 쓰지 않는다.
+import { stepOf } from '../core/stepval';
 import { onOffSwitch } from './controls';
 import type { SetDef, SetGroup, SetPage } from '../core/setdef/types';
 import { defChanged, defShown } from '../core/deftext';
@@ -78,10 +79,10 @@ const act = (page: SetPage, kind: 'cfg' | 'text' | 'count' | 'num' | 'shnum' | '
 
 /** 수 한 칸 */
 const sk = (w: Wire, key: string) => (w.scope ? `${w.scope}:${key}` : key);
-const numBox = (page: SetPage, key: string, cur: string | number, lo: number, hi: number, unit: string, aria: string, kind: 'num' | 'shnum' | 'count' = 'num', busy = false, step?: number) =>
-  stepBox(act(page, kind), key, cur, lo, hi, unit, aria, busy, step);
+const numBox = (page: SetPage, key: string, cur: string | number, lo: number, hi: number, unit: string, aria: string, kind: 'num' | 'shnum' | 'count' = 'num', busy = false) =>
+  stepBox(act(page, kind), key, cur, lo, hi, unit, aria, busy);
 /** 수 조작의 공통 규격: 한 상자 「− 값 +」. 가운데 값은 직접 쳐도 된다. − + 와 입력은 같은 처리기에 「열쇠=값」을 보낸다.
- *  한 번에 움직이는 폭: 범위가 1만 이상이면 500, 1천 이상이면 50, 200 이상이면 10, 그 밖은 1 */
+ *  한 번에 움직이는 폭: 1. 상한이 1만 이상인 큰 수만 100 (core/stepval.ts stepOf, 2026-11-19 사용자) */
 /** 수 칸 폭: 그 값이 가질 수 있는 가장 긴 수(최대값)의 자릿수에 맞춘다 */
 /** 수 상자 「− 값 +」는 앱 전체에 두 크기뿐 (2026-11-12 사용자: 큰 것·작은 것. 자릿수로 폭이 바뀌지 않는다, src/ui/editor/style.css --step-sm·--step-lg).
  * 작은 것 = 가장 빽빽한 격자(인터넷 「양」, 한 줄 8개)에 들어가는 폭. 그 줄이 가질 수 있는 값(가장 큰 수·0일 때의 말)에 단위를 붙인 글이
@@ -97,10 +98,16 @@ export const stepSizeText = (...texts: string[]): '' | ' lg' => (Math.max(...tex
 /** 한 묶음(같은 줄·같은 격자)의 수 상자는 같은 크기: 하나라도 큰 것이면 모두 큰 것 */
 export function sameStep(html: string): string { return sameStep0(html); }
 const sameStep0 = (html: string): string => (/class="st-step[^"]* lg"/.test(html) ? html.replace(/class="st-step( adv-step)?"/g, 'class="st-step$1 lg"') : html);
-export const stepBox = (action: string, key: string, cur: string | number, lo: number, hi: number, unit: string, aria: string, busy = false, step?: number): string => {
+/** 「− 값 +」 가운데를 직접 적는 수 상자, − + 가 「열쇠:-」「열쇠:+」를 보내는 처리기용 (직접 입력은 「열쇠=수」, core/stepval.ts stepNext 가 읽는다).
+ *  zero = 0일 때 수 대신 보이는 말 */
+export const stepIn = (action: string, key: string, n: number, lo: number, hi: number, unit: string, aria: string, busy = false, zero = ''): string => {
+  const b = (dir: '-' | '+', on: boolean, name: string) => `<button class="gx-step" data-action="${action}" data-value="${esc(key ? `${key}:${dir}` : dir)}" ${on && !busy ? '' : 'disabled'} aria-label="${esc(aria)} ${name}">${dir === '-' ? '−' : '+'}</button>`;
+  return `<div class="st-step adv-step${stepSize(hi, unit, zero)}">${b('-', n > lo, '줄이기')}<input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="${action}"${key ? ` data-key="${esc(key)}"` : ''} value="${zero && n === 0 ? '' : n}"${zero ? ` placeholder="${esc(zero)}"` : ''} aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit ? `<span>${esc(unit)}</span>` : ''}${b('+', n < hi, '늘리기')}</div>`;
+};
+export const stepBox = (action: string, key: string, cur: string | number, lo: number, hi: number, unit: string, aria: string, busy = false): string => {
   const raw = String(cur ?? '').trim();
   const n = Math.max(lo, Math.min(hi, Number(raw) || 0));
-  const st = step ?? (hi - lo >= 10000 ? 500 : hi - lo >= 1000 ? 50 : hi - lo >= 200 ? 10 : 1);
+  const st = stepOf(hi);
   const b = (to: number, on: boolean, sign: string, name: string) => `<button class="gx-step" data-action="${action}" data-value="${esc(key)}=${to}" ${on && !busy ? '' : 'disabled'} aria-label="${esc(aria)} ${name}">${sign}</button>`;
   return `<div class="st-step adv-step${stepSize(hi, unit)}">${b(Math.max(lo, n - st), n > lo, '−', '줄이기')}<input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="${st}" data-change="${action}" data-key="${esc(key)}" value="${raw === '' ? '' : n}" aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit ? `<span>${esc(unit)}</span>` : ''}${b(Math.min(hi, n + st), n < hi, '+', '늘리기')}</div>`;
 };
@@ -114,7 +121,7 @@ function control(page: SetPage, d: SetDef, w: Wire): { ctl: string; cur: string 
     const i = d.inline;
     if (!i) return { ctl: seg, cur };
     const on = c.opts.find(([, l]) => l === 'ON')?.[0];
-    return { ctl: `<span class="ph-inline">${seg}${!i.whenOn || cur === on ? `<span class="ph-inline">${numBox(page, i.key, w.cur(i.key), i.lo, i.hi, i.unit, i.aria ?? d.label, 'num', false, i.step)}</span>` : ''}</span>`, cur };
+    return { ctl: `<span class="ph-inline">${seg}${!i.whenOn || cur === on ? `<span class="ph-inline">${numBox(page, i.key, w.cur(i.key), i.lo, i.hi, i.unit, i.aria ?? d.label, 'num', false)}</span>` : ''}</span>`, cur };
   }
   if (c.t === 'num') {
     const v = w.cur(d.key);
@@ -136,8 +143,7 @@ function control(page: SetPage, d: SetDef, w: Wire): { ctl: string; cur: string 
   }
   if (c.t === 'step') {
     const n = Number(w.cur(d.key));
-    const b = (dir: '-' | '+', on: boolean, name: string) => `<button class="gx-step" data-action="${c.action ?? act(page, 'step')}" data-value="${sk(w, c.vkey ?? d.key)}:${dir}" ${on ? '' : 'disabled'} aria-label="${esc(d.label)} ${name}">${dir === '-' ? '−' : '+'}</button>`;
-    return { ctl: `<div class="st-step${stepSizeText(`${c.hi}${c.unit}`, `${c.lo}${c.unit}`)}">${b('-', n > c.lo, '줄이기')}<b>${esc(`${n}${c.unit}`)}</b>${b('+', n < c.hi, '늘리기')}</div>`, cur: String(n) };
+    return { ctl: stepIn(c.action ?? act(page, 'step'), sk(w, c.vkey ?? d.key), n, c.lo, c.hi, c.unit, d.label, w.busy), cur: String(n) };
   }
   return { ctl: '', cur: '' };
 }
@@ -215,7 +221,7 @@ export const helpList = (t: string): string => {
 export interface CkGroup { name: string; opts: string[]; kind: 'one' | 'check' | 'num'; band?: boolean }
 /** 수 칸: 지금 값과 범위. step = − + 한 번에 움직이는 폭 */
 /** lg = 큰 상자 (그 칸의 가장 큰 수가 작은 상자에 안 들어가는 격자: 기능별 「넘길 양」. 그 격자의 수 칸은 모두 큰 것으로 맞춘다 sameStep) */
-export interface CkNum { n: number; lo: number; hi: number; step?: number; lg?: boolean }
+export interface CkNum { n: number; lo: number; hi: number; lg?: boolean }
 /** 칸 하나: true·false(체크) · 수 · null(그 메뉴에 없는 값) */
 export type CkMark = boolean | CkNum | null;
 /** acts: 칸마다 누르면 보낼 값. 체크 칸은 「갈래:메뉴:열쇠=값」 그대로(fam-set), 수 칸은 「갈래:메뉴:열쇠」(fam-num 이 「=값」을 붙인다) */
@@ -235,7 +241,7 @@ const ckCtl = (m: CkMark | undefined, act: string | null | undefined, aria: stri
   if (m === null || m === undefined || !act) return '<span class="ck-x" aria-label="없음">–</span>';
   const off = busy ? ' disabled' : '';
   if (typeof m === 'boolean') return `<button class="ck-m ${round ? 'round' : 'box'}${m ? ' on' : ''}" data-action="${ckActs.set}" data-value="${esc(act)}" aria-pressed="${m}" aria-label="${aria}"${off}></button>`;
-  const st = m.step ?? 1;
+  const st = stepOf(m.hi);
   const b = (to: number, on: boolean, sign: string, name: string) => `<button class="gx-step" data-action="${ckActs.num}" data-value="${esc(act)}${ckActs.rel ? `:${sign === '+' ? '+' : '-'}` : `=${to}`}" ${on && !busy ? '' : 'disabled'} aria-label="${aria} ${name}">${sign}</button>`;
   return `<div class="st-step adv-step${inGrid ? (m.lg ? ' lg' : '') : stepSize(m.hi, ckUnit)}">${b(Math.max(m.lo, m.n - st), m.n > m.lo, '−', '줄이기')}<input class="adv-val" type="number" inputmode="numeric" min="${m.lo}" max="${m.hi}" step="${st}" data-change="${ckActs.num}" data-key="${esc(act)}" value="${m.n}" aria-label="${aria}"${off}>${b(Math.min(m.hi, m.n + st), m.n < m.hi, '+', '늘리기')}</div>`;
 };

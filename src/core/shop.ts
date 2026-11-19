@@ -132,12 +132,12 @@ export const SHOP_TALK_STOCK_VAR = '$sh_talk_stock';
 /** 보관하는 양·참고 글 길이 (상점 넷이 같이 쓴다). 기본값은 설정이 생기기 전에 코드에 적혀 있던 수 그대로.
  *  prev 지난 진열대 이름 · sales 판 것 기록 · notes 견적과 정보 쪽지(각각) · talk 문의 대화 줄 · wiki 가게 위키 문서 글자 · report 진행 중 괴이·사건 보고 글자 */
 export const SHOP_LIMITS = {
-  prev: { key: '$sh_keep_prev', def: 40, min: 5, max: 200, step: 5, unit: '개' },
-  sales: { key: '$sh_keep_sales', def: 40, min: 5, max: 200, step: 5, unit: '건' },
-  notes: { key: '$sh_keep_notes', def: 20, min: 5, max: 100, step: 5, unit: '건' },
-  talk: { key: '$sh_keep_talk', def: 40, min: 10, max: 200, step: 10, unit: '줄' },
-  wiki: { key: '$sh_wiki_chars', def: 3000, min: 500, max: 20000, step: 500, unit: '자' },
-  report: { key: '$sh_report_chars', def: 1500, min: 500, max: 10000, step: 500, unit: '자' },
+  prev: { key: '$sh_keep_prev', def: 40, min: 5, max: 200, unit: '개' },
+  sales: { key: '$sh_keep_sales', def: 40, min: 5, max: 200, unit: '건' },
+  notes: { key: '$sh_keep_notes', def: 20, min: 5, max: 100, unit: '건' },
+  talk: { key: '$sh_keep_talk', def: 40, min: 10, max: 200, unit: '줄' },
+  wiki: { key: '$sh_wiki_chars', def: 3000, min: 500, max: 20000, unit: '자' },
+  report: { key: '$sh_report_chars', def: 1500, min: 500, max: 10000, unit: '자' },
 } as const;
 export type ShopLimit = keyof typeof SHOP_LIMITS;
 export const isShopLimit = (k: string): k is ShopLimit => Object.prototype.hasOwnProperty.call(SHOP_LIMITS, k);

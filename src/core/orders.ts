@@ -12,7 +12,7 @@ type Vars = Record<string, unknown> | undefined;
 export const COS_ORDERS_KEY = '$cos_orders';
 export const COS_ORDERS_MAX = 12;
 /** 주문 기록을 몇 건까지 둘지 (설정 → 상점). 기본은 COS_ORDERS_MAX·BM_ORDERS_MAX */
-export const ORDERS_KEEP_RANGE = { min: 5, max: 200, step: 5 } as const;
+export const ORDERS_KEEP_RANGE = { min: 5, max: 200 } as const;
 export const COS_ORDERS_KEEP_VAR = '$cos_sh_keep_orders';
 const keepOf = (v: unknown, def: number): number => { const n = Number(v); return v === undefined || v === null || v === '' || !Number.isFinite(n) ? def : Math.max(ORDERS_KEEP_RANGE.min, Math.min(ORDERS_KEEP_RANGE.max, Math.round(n))); };
 export const cosOrdersKeep = (vars: Vars): number => keepOf(vars?.[COS_ORDERS_KEEP_VAR], COS_ORDERS_MAX);

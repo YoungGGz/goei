@@ -28,7 +28,7 @@ test('cutGroups: 앞에서부터 자르고, 잘린 묶음도 rows(그날 전체)
 
 test('설정 $jr_list_page: 기본 30, 10~100, 「기본값으로 저장」 범위', () => {
   assert.equal(JR_DEFAULTS.list_page, '30');
-  assert.deepEqual({ ...JR_LIST_PAGE }, { min: 10, max: 100, step: 10 });
+  assert.deepEqual({ ...JR_LIST_PAGE }, { min: 10, max: 100 });
   assert.equal(journalSettings(undefined).listPage, 30);
   assert.equal(journalSettings({ [JR('list_page')]: '50' }).listPage, 50);
   assert.equal(journalSettings({ [JR('list_page')]: '3' }).listPage, 10);

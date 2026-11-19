@@ -7,7 +7,7 @@ import { ckWide, sameStep, type CkActs, type CkBand, type CkNum } from './setrow
 type State = Record<string, unknown> | undefined;
 const ADV_ACTS: CkActs = { set: 'adv-set', num: 'adv-set' };
 /** 세부 값 줄과 같은 폭으로 움직인다: 토큰 상한처럼 큰 수는 500, 나머지는 1 */
-const num = (n: number, lo: number, hi: number): CkNum => ({ n, lo, hi, step: hi >= 10000 ? 500 : 1, lg: true });
+const num = (n: number, lo: number, hi: number): CkNum => ({ n, lo, hi, lg: true });
 
 /** 칩 이름 (세부 값 표 「참조」 칩의 이름 그대로: 괴담톡의 다섯째는 「인물 로어북」) */
 export const refChipLabels = (f: FnFeature): string[] => REF_CHIP_KEYS.map((k) => advItem(f, k)?.label ?? k);
