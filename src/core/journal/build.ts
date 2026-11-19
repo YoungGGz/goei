@@ -140,11 +140,11 @@ function snapshot(input: BuildInput, ev: ClosedEvent, anchor: string, now: strin
   const grade = an?.grade || undefined;
   const row: JournalRow = {
     id: `j${id}`, kind: ev.kind, name, loc: e.loc, ...(grade ? { grade } : {}), at, since: e.since, born: e.born, idx: index, anchor, mine, cause: ev.cause,
-    agents: agents.map(({ id: aid, name: an2, st }) => ({ id: aid, name: an2, st })), result: cut(result, RESULT_ROW_MAX), rpt: `r${id}`, ...(ev.cleared ? { cleared: true } : {}),
+    agents: agents.map(({ id: aid, name: an2, st }) => ({ id: aid, name: an2, st })), result: cut(result, RESULT_ROW_MAX), rpt: `r${id}`, ...(ev.cleared ? { cleared: true } : {}), ...(e.art ? { art: e.art.pics } : {}),
   };
   const report: Report = {
     id: `r${id}`, no: '', full: mine, mine, kind: ev.kind, cause: ev.cause,
-    head: { name, ...(grade ? { grade } : {}), loc: e.loc, ...(last?.place ? { place: cut(last.place, 60) } : {}), born: e.born, since: e.since, at, duration: at !== null && e.since !== null ? Math.max(0, at - e.since) : null, ...(ev.cleared ? { cleared: true } : {}) },
+    head: { name, ...(grade ? { grade } : {}), loc: e.loc, ...(last?.place ? { place: cut(last.place, 60) } : {}), born: e.born, since: e.since, at, duration: at !== null && e.since !== null ? Math.max(0, at - e.since) : null, ...(ev.cleared ? { cleared: true } : {}), ...(e.art ? { art: e.art.pics } : {}) },
     trail, agents, result: cut(result, RESULT_REPORT_MAX),
     idx: index, anchor, ...(last ? { statusKey: last.raw.trim() } : {}), savedAt: now,
   };

@@ -143,3 +143,19 @@ test('world#7: 한 응답에 제 이름 줄이 있으면 같은 구의 다른 �
   const w = W.applyOutput(mk(), catalog, S, 'A00', '[AN|서울특별시 종로구|종로3가 폐역|활성|C|P001|진행]', always).world;
   assert.equal(w.an[0].name, '종로3가 폐역');
 });
+
+test('공용 그림은 진행이 시작될 때 한 번 정해지고, 상황 글이 바뀌거나 끝나도 그대로다', () => {
+  const tag = (state, sit) => `[AN|부산광역시 중구|구룡포 방파제|${state}|E|없음|${sit}]`;
+  const w1 = W.applyOutput(W.emptyWorld(), catalog, S, 'A00', tag('활성', '새벽 조업을 나간 어선이 텅 빈 채 돌아옴'), always).world;
+  const e1 = w1.an.find((e) => e.name === '구룡포 방파제');
+  assert.match(e1.art.pics[0], /^Situation Anomaly Sea [12]$/);
+  assert.equal(e1.art.pics.at(-1), 'Situation Anomaly');
+  assert.equal(W.activeEvents(w1).find((e) => e.name === '구룡포 방파제').art, e1.art.pics);
+  // 상황 글이 다른 장소를 말해도 그림은 그대로
+  const w2 = W.applyOutput(w1, catalog, S, 'A00', tag('활성', '목격자가 인근 병원 응급실로 이송됨'), always).world;
+  assert.deepEqual(w2.an.find((e) => e.name === '구룡포 방파제').art.pics, e1.art.pics);
+  // 끝나면 종료 줄과 닫힌 스냅숏(일지·보고서 재료)이 같은 그림을 들고 간다
+  const w3 = W.applyOutput(w2, catalog, S, 'A00', tag('소멸', '안개가 걷힘'), always).world;
+  assert.deepEqual(w3.ended.find((e) => e.name === '구룡포 방파제').art, e1.art.pics);
+  assert.deepEqual(w3.closed[0].entry.art.pics, e1.art.pics);
+});

@@ -180,8 +180,8 @@ const camNo = (loc: string) => String((Array.from(loc).reduce((h, ch) => (h * 31
 const region = (loc: string) => (locName(loc) || loc).split(/\s+/)[0] || '';
 
 /** CCTV 화면 조각: 그 괴이·사건의 그림(없으면 어두운 화면) + 카메라 번호·종료 시각 */
-function shot(ctx: ChatContext, name: string, kind: JournalKind, loc: string, at: number | null, cls = 'gx-shot'): string {
-  const art = kind === 'fd' ? null : evArt(ctx, name, kind).pic;
+function shot(ctx: ChatContext, name: string, kind: JournalKind, loc: string, at: number | null, pic: string[] = [], cls = 'gx-shot'): string {
+  const art = kind === 'fd' ? null : evArt(ctx, name, kind, pic).pic;
   return `<span class="${cls}">${art ? `<img src="${esc(art)}" alt="" loading="lazy">` : ''}<span class="gx-shot-t">CAM-${camNo(loc)}${region(loc) ? ` · ${esc(region(loc))}` : ''}</span><span class="gx-shot-end">END ${esc(hhmm(at))}</span></span>`;
 }
 
@@ -267,7 +267,7 @@ function journalRow(ctx: ChatContext, r: JournalRow, reps: Map<string, Report>):
   // 보고서 탭을 뺀 뒤(2026-11-05) 호감·지출 요약과 고정 표시만 일지 줄에. 「보고서 ›」「간이 보고서」 같은 단추 글자는 없음 (줄 어디를 눌러도 보고서가 뜬다)
   const rep = r.rpt ? reps.get(r.rpt) : undefined;
   const sum = rep ? `${peopleSum(rep)}${walletSum(rep)}` : '';
-  const inner = `${shot(ctx, r.name, r.kind, r.loc, r.at)}
+  const inner = `${shot(ctx, r.name, r.kind, r.loc, r.at, r.art)}
     <span class="gx-jr-main"><span class="gx-jr-l1">${gmark(r.kind, r.grade)}<b>${esc(r.name)}</b>${r.mine ? '<span class="gx-badge live">내 사건</span>' : ''}${rep?.pin ? `<i class="gx-jr-pin" title="고정">${ICONS.pin}</i>` : ''}</span>
       <small>${[JOURNAL_KIND_LABEL[r.kind], locName(r.loc), dur ? `소요 ${dur}` : ''].filter(Boolean).map(esc).join(' · ')}</small>
       <span class="gx-jr-who">${faces(ctx, names)}${esc(whoText(r) || '투입 없음')}${r.result ? ` <em>— ${esc(r.result)}</em>` : ''}</span>

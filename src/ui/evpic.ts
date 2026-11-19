@@ -58,7 +58,7 @@ let descSrc: { chat: unknown; lore: unknown } | null = null;
 
 /** 그림이 없는 상황의 종류별 공용 그림 (카드 에셋, assets/wiki/Situations) */
 // 괴이·사건은 장소, 특수는 종류로 고른 여러 장 중 카드에 있는 첫 그림 (core/sharedpics). 거점은 공용 거점 그림이 없으면 사건 그림
-const sharedFor = (kind: string, name: string, text: string) => (kind === 'lm' ? ['Situation Incident'] : situationShared(kind, name, text));
+const sharedFor = (kind: string, name: string) => (kind === 'lm' ? ['Situation Incident'] : situationShared(kind, name));
 
 /** 거점 사진 이름: 영문명 → 연결 조직 사진 → '' (공용 그림은 evArt가) */
 export const basePic = (ctx: ChatContext, name: string): string => rows(ctx).get(name)?.pic ?? '';
@@ -69,10 +69,10 @@ export function baseLink(ctx: ChatContext, name: string): { doc: string; org: st
   return { doc: r?.title ?? name, org: r?.org ?? '' };
 }
 
-/** text: 발생 지점·상황 글 (공용 그림을 장소에 맞게 고를 때) */
-export function evArt(ctx: ChatContext, name: string, kind?: string, text = ''): { pic: string | null; desc: string } {
+/** art: 그 항목에 정해 둔 공용 그림 후보 (진행·종료·기록이 같은 그림을 쓴다). 없거나 카드에 없는 그림이면 이름만으로 고른다 */
+export function evArt(ctx: ChatContext, name: string, kind?: string, art: string[] = []): { pic: string | null; desc: string } {
   const r = rows(ctx).get(name);
-  const shared = (!r?.pic && kind && sharedFor(kind, name, text).find((n) => hasAsset(ctx.char, n))) || '';
+  const shared = (!r?.pic && kind && [...art, ...sharedFor(kind, name)].find((n) => hasAsset(ctx.char, n))) || '';
   const pic = imageUrl(ctx.char, r?.pic || shared);
   const title = r?.title ?? name;
   const src = ctx.chat.localLore ?? ctx.chat;
