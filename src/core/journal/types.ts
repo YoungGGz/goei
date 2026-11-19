@@ -49,8 +49,8 @@ export interface JournalRow {
   rpt?: string;
   /** 괴이 「클리어」 태그로 끝남 */
   cleared?: boolean;
-  /** 진행 중에 쓰던 공용 그림 */
-  art?: string;
+  /** 진행 중에 쓰던 공용 그림 후보 */
+  art?: string[];
 }
 
 export interface ReportHead {
@@ -65,8 +65,8 @@ export interface ReportHead {
   /** 분 (since·at 둘 다 알 때) */
   duration: number | null;
   cleared?: boolean;
-  /** 진행 중에 쓰던 공용 그림 */
-  art?: string;
+  /** 진행 중에 쓰던 공용 그림 후보 */
+  art?: string[];
 }
 
 /** 그 기간에 호감이 움직인 사람 하나 */

@@ -39,8 +39,8 @@ interface Tracked {
   touched?: boolean;
   /** 활성이 된 응답의 메시지 열쇠 (output.ts 가 적는다. 엔진은 메시지 번호를 모른다) */
   startKey?: string;
-  /** 공용 그림: 진행이 시작될 때 이름·지역·첫 상황 글로 한 번 고르고 끝까지 쓴다 (for = 고를 때의 이름, 이름이 바뀌면 다시 고른다) */
-  art?: { for: string; pic: string };
+  /** 공용 그림 후보: 진행이 시작될 때 이름·지역·첫 상황 글로 한 번 고르고 끝까지 쓴다 (for = 고를 때의 이름, 이름이 바뀌면 다시 고른다). 화면은 이 중 카드에 있는 첫 그림을 쓴다 */
+  art?: { for: string; pics: string[] };
 }
 
 export interface AnEntry extends Tracked {
@@ -142,8 +142,8 @@ export interface EndedEntry {
   name: string;
   loc: string;
   grade?: string;
-  /** 진행 중에 쓰던 공용 그림 */
-  art?: string;
+  /** 진행 중에 쓰던 공용 그림 후보 */
+  art?: string[];
   /** 이 회차까지 보인다 (blocks 값과 같음) */
   until: number;
 }
@@ -266,17 +266,20 @@ function blocked(w: WorldState, group: string, name: string): boolean {
   return (w.blocks[`${group}:${name}`] ?? -1) >= w.epoch;
 }
 
-function remember(w: WorldState, kind: EndedEntry['kind'], e: { name: string; loc: string; state: string; art?: { pic: string } }, grade?: string) {
+function remember(w: WorldState, kind: EndedEntry['kind'], e: { name: string; loc: string; state: string; art?: { pics: string[] } }, grade?: string) {
   // 발생 예정이던 것은 시작도 안 했으니 남기지 않는다
   if (e.state === '발생대기') return;
-  w.ended = [...(w.ended ?? []).filter((x) => !(x.kind === kind && x.name === e.name && x.loc === e.loc)), { kind, name: e.name, loc: e.loc, ...(grade ? { grade } : {}), ...(e.art ? { art: e.art.pic } : {}), until: w.epoch + 1 }];
+  w.ended = [...(w.ended ?? []).filter((x) => !(x.kind === kind && x.name === e.name && x.loc === e.loc)), { kind, name: e.name, loc: e.loc, ...(grade ? { grade } : {}), ...(e.art ? { art: e.art.pics } : {}), until: w.epoch + 1 }];
 }
+/** 항목에 적어 두는 그림 후보 수 (새 장소 그림이 카드에 아직 없을 때 다음 후보로 넘어가는 여유) */
+const ART_KEEP = 10;
 /** 진행 중인 항목의 공용 그림을 한 번 정한다. 상황 글이 바뀌거나 끝나도 같은 그림이 되게 항목에 적어 둔다 */
 function fixArt(w: WorldState) {
   const fix = (kind: 'an' | 'in' | 'ms', e: (AnEntry | InEntry | MsEntry) & { situation?: string }) => {
     if (e.state === '발생대기' || !validName(e.name) || e.art?.for === e.name) return;
-    const pic = situationShared(kind, e.name, `${locName(e.loc)} ${e.situation ?? ''}`)[0];
-    if (pic) e.art = { for: e.name, pic };
+    const pics = situationShared(kind, e.name, e.situation ?? '', locName(e.loc));
+    // 끝은 늘 종류별 기본 그림. 앞쪽 후보만 남긴다
+    if (pics.length) e.art = { for: e.name, pics: [...pics.slice(0, ART_KEEP), pics[pics.length - 1]] };
   };
   for (const e of w.an) fix('an', e);
   for (const e of w.inc) fix('in', e);
@@ -841,8 +844,8 @@ export interface WorldEvent {
   grade: string;
   people: string;
   report: string;
-  /** 정해 둔 공용 그림 */
-  art?: string;
+  /** 정해 둔 공용 그림 후보 */
+  art?: string[];
 }
 
 /** 지도에 표시하는 진행 중 상황 (발생 예정은 제외, 원본 M.records와 같음) */
@@ -850,13 +853,13 @@ export function activeEvents(w: WorldState): WorldEvent[] {
   const out: WorldEvent[] = [];
   const key = (kind: string, e: { loc: string; name: string; born: number | null }) => `${kind}|${e.loc}|${e.name}|${e.born ?? ''}`;
   w.an.forEach((e, index) => {
-    if (e.state === '활성') out.push({ kind: 'an', index, loc: e.loc, name: e.name || '이름 미확인', key: key('an', e), grade: e.grade, people: e.deploy, report: e.situation ?? '', art: e.art?.pic });
+    if (e.state === '활성') out.push({ kind: 'an', index, loc: e.loc, name: e.name || '이름 미확인', key: key('an', e), grade: e.grade, people: e.deploy, report: e.situation ?? '', art: e.art?.pics });
   });
   w.inc.forEach((e, index) => {
-    if (e.state === '진행') out.push({ kind: 'in', index, loc: e.loc, name: e.name || '이름 미확인', key: key('in', e), grade: '', people: e.deploy ?? '', report: e.situation, art: e.art?.pic });
+    if (e.state === '진행') out.push({ kind: 'in', index, loc: e.loc, name: e.name || '이름 미확인', key: key('in', e), grade: '', people: e.deploy ?? '', report: e.situation, art: e.art?.pics });
   });
   w.ms.forEach((e, index) => {
-    if (e.state === '출현') out.push({ kind: 'ms', index, loc: e.loc, name: e.name, key: key('ms', e), grade: '', people: e.visitors, report: e.situation ?? '', art: e.art?.pic });
+    if (e.state === '출현') out.push({ kind: 'ms', index, loc: e.loc, name: e.name, key: key('ms', e), grade: '', people: e.visitors, report: e.situation ?? '', art: e.art?.pics });
   });
   return out.sort((a, b) => a.loc.localeCompare(b.loc) || a.kind.localeCompare(b.kind));
 }

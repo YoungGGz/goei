@@ -69,10 +69,10 @@ export function baseLink(ctx: ChatContext, name: string): { doc: string; org: st
   return { doc: r?.title ?? name, org: r?.org ?? '' };
 }
 
-/** art: 그 항목에 정해 둔 공용 그림 (진행·종료·기록이 같은 그림을 쓴다). 없거나 카드에 없는 그림이면 이름만으로 고른다 */
-export function evArt(ctx: ChatContext, name: string, kind?: string, art = ''): { pic: string | null; desc: string } {
+/** art: 그 항목에 정해 둔 공용 그림 후보 (진행·종료·기록이 같은 그림을 쓴다). 없거나 카드에 없는 그림이면 이름만으로 고른다 */
+export function evArt(ctx: ChatContext, name: string, kind?: string, art: string[] = []): { pic: string | null; desc: string } {
   const r = rows(ctx).get(name);
-  const shared = (!r?.pic && kind && [...(art ? [art] : []), ...sharedFor(kind, name)].find((n) => hasAsset(ctx.char, n))) || '';
+  const shared = (!r?.pic && kind && [...art, ...sharedFor(kind, name)].find((n) => hasAsset(ctx.char, n))) || '';
   const pic = imageUrl(ctx.char, r?.pic || shared);
   const title = r?.title ?? name;
   const src = ctx.chat.localLore ?? ctx.chat;

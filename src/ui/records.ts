@@ -180,7 +180,7 @@ const camNo = (loc: string) => String((Array.from(loc).reduce((h, ch) => (h * 31
 const region = (loc: string) => (locName(loc) || loc).split(/\s+/)[0] || '';
 
 /** CCTV 화면 조각: 그 괴이·사건의 그림(없으면 어두운 화면) + 카메라 번호·종료 시각 */
-function shot(ctx: ChatContext, name: string, kind: JournalKind, loc: string, at: number | null, pic = '', cls = 'gx-shot'): string {
+function shot(ctx: ChatContext, name: string, kind: JournalKind, loc: string, at: number | null, pic: string[] = [], cls = 'gx-shot'): string {
   const art = kind === 'fd' ? null : evArt(ctx, name, kind, pic).pic;
   return `<span class="${cls}">${art ? `<img src="${esc(art)}" alt="" loading="lazy">` : ''}<span class="gx-shot-t">CAM-${camNo(loc)}${region(loc) ? ` · ${esc(region(loc))}` : ''}</span><span class="gx-shot-end">END ${esc(hhmm(at))}</span></span>`;
 }
