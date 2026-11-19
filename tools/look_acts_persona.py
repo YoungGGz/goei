@@ -4,13 +4,14 @@
 PixelLab 서버의 그 캐릭터(look.json pixellab_id)에서 이미 뽑아 둔 동작의 장을 받아 오기만 한다 (새로 뽑지 않는다).
 「그림/모습/동작_고른것.json」이 쓰기로 둔 줄만(이름 앞의 「v3 <줄>」로 찾음) 그림/모습/페르소나/<이름>/act_<줄>.webp 로 넣고
 look.json 의 acts 에 측정값을 적는다. 같은 줄을 두 번 뽑아 둔 것은 둘 다 넣는다 (act_<줄>.webp, act_<줄>_2.webp).
-자르기는 tools/look_acts.py 와 같다 (대기 칸과 동작 모든 장을 함께 덮는 상자, dx·dy = 그 안의 대기 칸 자리).
+받은 장은 윤곽선 밖 회색 찌꺼기를 지운다 (tools/look_speck.py). 자르기는 tools/look_acts.py 와 같다 (대기 칸과 동작 모든 장을 함께 덮는 상자, dx·dy = 그 안의 대기 칸 자리).
 
   python3 tools/look_acts_persona.py
 """
 import io, json, os, re, glob, urllib.request
 import numpy as np
 from PIL import Image
+from look_speck import clean_sheet
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASE = os.path.join(ROOT, '그림', '모습', '페르소나')
@@ -56,6 +57,7 @@ def main():
             sheet = Image.new('RGBA', (w * len(fr), h), (0, 0, 0, 0))
             for i, f in enumerate(fr):
                 sheet.paste(f.crop((x0, y0, x1, y1)), (i * w, 0))
+            sheet, _ = clean_sheet(sheet, w, len(fr))      # 윤곽선 밖 회색 찌꺼기 지우기
             name = f'act_{key}.webp'
             sheet.save(os.path.join(d, name), lossless=True, method=6)
             acts[key] = {'name': p['이름'], 'file': name, 'n': len(fr), 'cw': w, 'ch': h, 'dx': ix - x0, 'dy': iy - y0, 'sec': round(1 / p['초당장'], 3), 'pixellab_group': a['animation_group_id']}
