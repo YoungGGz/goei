@@ -2226,7 +2226,7 @@ function board(ctx: ChatContext): string {
   const add = (kind: EvKind, i: number, locCode: string, c: Omit<EvCard, 'kind' | 'key'>) => {
     const key = keys.get(`${kind}${i}`);
     if (!key) return;
-    cards.push({ ...c, kind, key, id: key, locCode, open: 'board-map', confirmEnd: field.confirmEnd === key, selected: field.target?.type === 'event' && field.target.key === key, art: evArt(ctx, c.name, kind, `${locName(locCode)} ${String(c.extra ?? '').replace(/<[^>]*>/g, ' ')}`) });
+    cards.push({ ...c, kind, key, id: key, locCode, open: 'board-map', confirmEnd: field.confirmEnd === key, selected: field.target?.type === 'event' && field.target.key === key, art: evArt(ctx, c.name, kind, (kind === 'an' ? w.an : kind === 'in' ? w.inc : w.ms)[i]?.art?.pic) });
   };
   const since = (m: number | null) => elapsedText(w.minute, m);
   // 상황 글: 바깥 띠엔 상황 글(없으면 위키 요약), 상세 창·CCTV엔 상황 글과 위키 요약을 함께 (2026-10-21 사용자)
@@ -2240,7 +2240,7 @@ function board(ctx: ChatContext): string {
     const name = e.name || '이름 미확인';
     // 종료 줄 → 보고서 지름길 (기록 메뉴, 2026-10-29): 같은 종류·이름·장소의 일지 줄이 가리키는 보고서
     const rp = endedReport(ctx.chat, e.kind, e.name, e.loc);
-    cards.push({ kind: e.kind, name, grade: e.grade, loc: esc(locName(e.loc)), badge: '<span class="gx-badge end">종료</span>', ended: true, id: `end:${e.kind}:${e.name}:${e.loc}`, locCode: e.loc, art: evArt(ctx, name, e.kind), ...(rp?.rpt ? { rpt: rp.rpt } : {}), ...(rp?.mine ? { mine: true } : {}) });
+    cards.push({ kind: e.kind, name, grade: e.grade, loc: esc(locName(e.loc)), badge: '<span class="gx-badge end">종료</span>', ended: true, id: `end:${e.kind}:${e.name}:${e.loc}`, locCode: e.loc, art: evArt(ctx, name, e.kind, e.art), ...(rp?.rpt ? { rpt: rp.rpt } : {}), ...(rp?.mine ? { mine: true } : {}) });
   }
   // 요원 칸 (2026-10-20 사용자): 모니터 벽 또는 근무 현황 목록. 편성 기준으로 밝기를 나눈다
   // 괴이와 사건(2026-10-21 배치 칸 추가)에서 찾는다

@@ -6,6 +6,7 @@ import { BUILTIN } from '../factions';
 import { guideTxt } from '../guides';
 import type { FactionCode } from '../types';
 import { type Catalog, factionNames, presetCanon } from './catalog';
+import { situationShared } from '../sharedpics';
 import { landmarkLoc, locName, POOL, regionMatch, SEALED_LOC, uniqueRegion } from './geo';
 import {
   type AgState,
@@ -38,6 +39,8 @@ interface Tracked {
   touched?: boolean;
   /** 활성이 된 응답의 메시지 열쇠 (output.ts 가 적는다. 엔진은 메시지 번호를 모른다) */
   startKey?: string;
+  /** 공용 그림: 진행이 시작될 때 이름·지역·첫 상황 글로 한 번 고르고 끝까지 쓴다 (for = 고를 때의 이름, 이름이 바뀌면 다시 고른다) */
+  art?: { for: string; pic: string };
 }
 
 export interface AnEntry extends Tracked {
@@ -139,6 +142,8 @@ export interface EndedEntry {
   name: string;
   loc: string;
   grade?: string;
+  /** 진행 중에 쓰던 공용 그림 */
+  art?: string;
   /** 이 회차까지 보인다 (blocks 값과 같음) */
   until: number;
 }
@@ -261,10 +266,21 @@ function blocked(w: WorldState, group: string, name: string): boolean {
   return (w.blocks[`${group}:${name}`] ?? -1) >= w.epoch;
 }
 
-function remember(w: WorldState, kind: EndedEntry['kind'], e: { name: string; loc: string; state: string }, grade?: string) {
+function remember(w: WorldState, kind: EndedEntry['kind'], e: { name: string; loc: string; state: string; art?: { pic: string } }, grade?: string) {
   // 발생 예정이던 것은 시작도 안 했으니 남기지 않는다
   if (e.state === '발생대기') return;
-  w.ended = [...(w.ended ?? []).filter((x) => !(x.kind === kind && x.name === e.name && x.loc === e.loc)), { kind, name: e.name, loc: e.loc, ...(grade ? { grade } : {}), until: w.epoch + 1 }];
+  w.ended = [...(w.ended ?? []).filter((x) => !(x.kind === kind && x.name === e.name && x.loc === e.loc)), { kind, name: e.name, loc: e.loc, ...(grade ? { grade } : {}), ...(e.art ? { art: e.art.pic } : {}), until: w.epoch + 1 }];
+}
+/** 진행 중인 항목의 공용 그림을 한 번 정한다. 상황 글이 바뀌거나 끝나도 같은 그림이 되게 항목에 적어 둔다 */
+function fixArt(w: WorldState) {
+  const fix = (kind: 'an' | 'in' | 'ms', e: (AnEntry | InEntry | MsEntry) & { situation?: string }) => {
+    if (e.state === '발생대기' || !validName(e.name) || e.art?.for === e.name) return;
+    const pic = situationShared(kind, e.name, `${locName(e.loc)} ${e.situation ?? ''}`)[0];
+    if (pic) e.art = { for: e.name, pic };
+  };
+  for (const e of w.an) fix('an', e);
+  for (const e of w.inc) fix('in', e);
+  for (const e of w.ms) fix('ms', e);
 }
 /** 끝난 항목을 이번 응답의 closed 에 적는다 (remember 와 같은 규칙: 발생대기는 시작도 안 했으니 빼고). 일지·보고서 조립은 엔진 밖 */
 function close(w: WorldState, kind: ClosedEvent['kind'], e: AnEntry | InEntry | MsEntry, cause: CloseCause, cleared?: boolean, minute: number | null = w.minute) {
@@ -698,6 +714,7 @@ export function applyOutput(prev: WorldState, c: Catalog, s: WorldSettings, fact
   applyMysticSites(w, c, s, now, text);
   applyExploration(w, status.target);
   tick(w, c, s, rng);
+  fixArt(w);
 
   if (!newFaction) applyAgents(w, c, s, now, text);
   refillAgents(w, c, s, now);
@@ -824,6 +841,8 @@ export interface WorldEvent {
   grade: string;
   people: string;
   report: string;
+  /** 정해 둔 공용 그림 */
+  art?: string;
 }
 
 /** 지도에 표시하는 진행 중 상황 (발생 예정은 제외, 원본 M.records와 같음) */
@@ -831,13 +850,13 @@ export function activeEvents(w: WorldState): WorldEvent[] {
   const out: WorldEvent[] = [];
   const key = (kind: string, e: { loc: string; name: string; born: number | null }) => `${kind}|${e.loc}|${e.name}|${e.born ?? ''}`;
   w.an.forEach((e, index) => {
-    if (e.state === '활성') out.push({ kind: 'an', index, loc: e.loc, name: e.name || '이름 미확인', key: key('an', e), grade: e.grade, people: e.deploy, report: e.situation ?? '' });
+    if (e.state === '활성') out.push({ kind: 'an', index, loc: e.loc, name: e.name || '이름 미확인', key: key('an', e), grade: e.grade, people: e.deploy, report: e.situation ?? '', art: e.art?.pic });
   });
   w.inc.forEach((e, index) => {
-    if (e.state === '진행') out.push({ kind: 'in', index, loc: e.loc, name: e.name || '이름 미확인', key: key('in', e), grade: '', people: e.deploy ?? '', report: e.situation });
+    if (e.state === '진행') out.push({ kind: 'in', index, loc: e.loc, name: e.name || '이름 미확인', key: key('in', e), grade: '', people: e.deploy ?? '', report: e.situation, art: e.art?.pic });
   });
   w.ms.forEach((e, index) => {
-    if (e.state === '출현') out.push({ kind: 'ms', index, loc: e.loc, name: e.name, key: key('ms', e), grade: '', people: e.visitors, report: e.situation ?? '' });
+    if (e.state === '출현') out.push({ kind: 'ms', index, loc: e.loc, name: e.name, key: key('ms', e), grade: '', people: e.visitors, report: e.situation ?? '', art: e.art?.pic });
   });
   return out.sort((a, b) => a.loc.localeCompare(b.loc) || a.kind.localeCompare(b.kind));
 }
