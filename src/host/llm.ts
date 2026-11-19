@@ -3,7 +3,8 @@ import { prepareAttachments } from '../core/attach';
 import { clip, requestText, traceCall } from './trace';
 import { tokens } from '../core/gnet';
 import { photoData } from './photo';
-import { advNum, applyAdvanced } from '../core/advanced';
+import { advNum, applyAdvanced, applyGenLimits } from '../core/advanced';
+import { setItemRules } from '../core/itemrules';
 import { retryAnalyze } from '../core/craft';
 import { guideTxt } from '../core/guides';
 import { imageMissingLine } from '../core/attach';
@@ -243,12 +244,14 @@ export async function generate<T>(messages: LlmMessage[], model: ModelChoice, pa
   let earlier: unknown = null;
   const transientMax = o.transientRetries ?? (o.state ? advNum(o.state, 'gen', 'transient') : TRANSIENT_RETRIES);
   let transientLeft = transientMax;
+  // 요청을 보낼 때마다 이 채팅의 요청당 사진 수로 맞춘다 (기다리는 사이 다른 채팅 값으로 바뀌었을 수 있다)
+  const send = (m: LlmMessage[], label?: string) => { if (o.state) applyGenLimits(o.state); return runModel(m, use, o.staticModel, label); };
   for (let attempt = 0; ; attempt++) {
     let raw = '';
     try {
       try {
         // 통합 요청(first = Joint.ask)은 동시 요청 칸 밖에서: 칸이 1이면 한쪽이 칸을 잡고 다른 쪽을 기다려 둘 다 멈췄다 (11-09 점검)
-        raw = attempt === 0 && o.first ? await o.first(ask) : await limited(o.concurrent, () => runModel(ask, use, o.staticModel, attempt ? `${o.label ?? '기타'} 다시 묻기 ${attempt}` : o.label));
+        raw = attempt === 0 && o.first ? await o.first(ask) : await limited(o.concurrent, () => send(ask, attempt ? `${o.label ?? '기타'} 다시 묻기 ${attempt}` : o.label));
       } catch (error) {
         // 모델 쪽 일시 오류면 형식 재시도 횟수와 무관하게 같은 요청을 다시 (설정 「모델 오류 재시도」, 기본 2회)
         if (!transient(error) || transientLeft <= 0) throw error;
@@ -262,13 +265,14 @@ export async function generate<T>(messages: LlmMessage[], model: ModelChoice, pa
       for (let i = 1; attempt === 0 && i <= (o.reiterate ?? 0); i++) {
         const again: LlmMessage[] = [...ask, { role: 'assistant', content: raw }, { role: 'user', content: reiterationText(i, o.reiterate ?? 0) }];
         try {
-          const next = await limited(o.concurrent, () => runModel(again, use, o.staticModel, `${o.label ?? '기타'} 다시 보기 ${i}`));
+          const next = await limited(o.concurrent, () => send(again, `${o.label ?? '기타'} 다시 보기 ${i}`));
           if (next.trim()) raw = next;
         } catch {
           break;
         }
       }
-      if (o.state) applyAdvanced(o.state);
+      // 응답을 읽기 직전에 이 채팅의 값으로: 길이 제한과 소지품 판정 표 (상점·쇼핑몰 진열 줄의 쓰임을 다른 채팅 표로 읽지 않게)
+      if (o.state) { applyAdvanced(o.state); setItemRules(o.state); }
       return { raw, value: parse(raw) };
     } catch (error) {
       // 다시 물었는데 연결이 실패하면 처음 형식 오류(원문 포함)를 보여 준다

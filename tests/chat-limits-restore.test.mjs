@@ -131,6 +131,22 @@ test('(c) 저장할 채팅이 없어 실패해도 B 값은 그대로', async () 
   assert.deepEqual(now(M), B);
 });
 
+test('(c) 열려 있는 채팅의 쓰기가 실패하면 새 값을 올리지 않고 읽은 값(B) 그대로', async () => {
+  const M = await fresh();
+  await openB(M);
+  const C = { list: 800, log: 1500, wallet: 1900, images: 5 };
+  const write = globalThis.risuai.setChatToIndex;
+  globalThis.risuai.setChatToIndex = async () => { throw new Error('write failed'); };
+  try {
+    await assert.rejects(M.updateChat(0, 1, (cur) => ({ ...cur, scriptstate: { ...cur.scriptstate, ...stateOf(M, C) } })), /write failed/);
+  } finally {
+    globalThis.risuai.setChatToIndex = write;
+  }
+  assert.deepEqual(now(M), B);
+  await M.updateChat(0, 0, (cur) => cur);
+  assert.deepEqual(now(M), B, '다른 채팅을 저장한 뒤에도 B 값');
+});
+
 test('(d) 아직 채팅을 읽은 적이 없으면 저장한 채팅 값이 남는다 (옛 동작)', async () => {
   const M = await fresh();
   chats.clear();
