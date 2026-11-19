@@ -9,7 +9,7 @@ import { messageText } from '../core/refs';
 import { tokens } from '../core/gnet';
 import { factionList } from '../core/factions';
 import { updateChat, type ChatContext } from '../host/risu';
-import { backfillPeople, chatId, clearDiag, consolidatePerson, loadDiag, rereadPerson, onPeopleStatus, peopleStatus, requestPeopleUpdate, rosterOf, sheetOf, type DiagRun } from '../host/people';
+import { backfillPeople, chatId, clearDiag, consolidatePerson, diagKeep, loadDiag, rereadPerson, onPeopleStatus, peopleStatus, requestPeopleUpdate, rosterOf, sheetOf, type DiagRun } from '../host/people';
 import { anchorOf, changeId, entryId, entryStates, isAlive, liveChanges, liveEntries, liveness, messageKey, peopleStore, plain, putChange, putEntry, splitUnread, withPeople, type EntryState, type Liveness } from '../core/people/store';
 import { addressOf, affinityView, opennessOf, tasteOf } from '../core/people/affinity';
 import { factionNow, knownFactionCodes, stageMid as factionStageMid, userFactionOf } from '../core/people/faction';
@@ -25,6 +25,7 @@ import { approveCandidate, axesView, candidateStats, liveEvidence, rejectCandida
 import { ICONS } from './icons';
 import { keepOpen } from './panels';
 import { toast } from './toast';
+import { savePrefs } from '../host/prefs';
 import { defaultsAction, defaultsButtons, defaultsConfirm } from './defaults';
 
 export interface PeopleEnv {
@@ -279,7 +280,7 @@ function diagTable(ctx: ChatContext, keepRaw: boolean): { toggle: string; body: 
     return { toggle: '', body: '<p class="ps-note">진단을 읽는 중…</p>' };
   }
   const here = chatId(ctx);
-  const mine = (peopleUi.diagAll ? list : list.filter((r) => r.chat === here)).slice(-(ppNum(ctx.chat.scriptstate, 'diag_keep') + ppNum(ctx.chat.scriptstate, 'diag_fail_keep'))).reverse();
+  const mine = (peopleUi.diagAll ? list : list.filter((r) => r.chat === here)).slice().reverse();
   const toggle = `<label class="pp-check"><input type="checkbox" data-change="pp-diag-all" ${peopleUi.diagAll ? 'checked' : ''}> 전부 ${list.length}건 중 이 채팅 ${list.filter((r) => r.chat === here).length}건</label>`;
   if (!mine.length) return { toggle, body: `<p class="ps-note">${peopleUi.diagAll ? '아직 갱신 기록이 없어요.' : '이 채팅의 갱신 기록이 아직 없어요.'}</p>` };
   const rows = mine.map((r) => {
@@ -442,8 +443,8 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     `<div class="pp-rules one">${ruleBox('pp-rules', '갱신에 덧붙일 지침', v('rules'), '응답 뒤 기록을 쓸 때 판정 규칙을 더해요. 출력 형식은 바꿀 수 없어요.', 4000, '예: 관리국 요원은 서로를 직급으로 부른다', 'pp-rules-save')}</div>`,
     ppRow('parallel', v('parallel') === '1' ? '1' : '0'),
     ppRow('keep_raw', v('keep_raw') === '1' ? '1' : '0'),
-    ppRow('diag_keep', String(s.diagKeep)),
-    ppRow('diag_fail_keep', String(s.diagFailKeep)),
+    ppRow('diag_keep', String(diagKeep().ok)),
+    ppRow('diag_fail_keep', String(diagKeep().fail)),
   ].join('');
   const router = [
     ppRow('router', s.router),
@@ -505,7 +506,7 @@ export function peopleDiagPane(ctx: ChatContext, canChat = true): string {
   return group('진단', [
     ppRow('update_now', '', { ctl: updateBar(ctx, canChat) }),
     dg.toggle ? ppRow('diag_all', '', { ctl: dg.toggle }) : '',
-    `<div class="ps-row wide"><div class="ps-label"><b>갱신 기록</b><small>${esc(`최근 갱신의 입력 크기·결과·실패 이유예요. 이 기기 플러그인 저장소에 성공 ${s.diagKeep}건·실패 ${s.diagFailKeep}건까지 두고 오래된 것부터 지워요. 토큰은 한글 1자=1, 그 외 0.3으로 어림했어요.`)}</small></div><div class="ps-ctl">${dg.body}</div></div>`,
+    `<div class="ps-row wide"><div class="ps-label"><b>갱신 기록</b><small>${esc(`최근 갱신의 입력 크기·결과·실패 이유예요. 이 기기 플러그인 저장소에 성공 ${diagKeep().ok}건·실패 ${diagKeep().fail}건까지 두고 오래된 것부터 지워요. 토큰은 한글 1자=1, 그 외 0.3으로 어림했어요.`)}</small></div><div class="ps-ctl">${dg.body}</div></div>`,
     ppRow('diag-clear', '', { ctl: `<button class="gx-mini danger" data-action="pp-diag-clear" ${peopleUi.diag?.length ? '' : 'disabled'}>진단 지우기</button>` }),
   ].join(''));
 }
@@ -1026,6 +1027,12 @@ export async function handlePeople(action: string, value: string | undefined, ct
       if (i < 0) return true;
       const k = v.slice(0, i);
       const val = v.slice(i + 1);
+      // 갱신 기록 보관 건수는 이 기기 설정 (기록이 모든 채팅 공용)
+      if (k === 'diag_keep' || k === 'diag_fail_keep') {
+        await savePrefs((p) => ({ ...p, [k === 'diag_keep' ? 'diagKeep' : 'diagFailKeep']: Number(val) }));
+        env.render();
+        return true;
+      }
       if (!(k in PP_DEFAULTS)) return true;
       // 처음 「매 턴」 또는 「메인」으로 바꾸면 비용 안내 한 줄
       if (!peopleUi.warned && ((k === 'when' && val === 'turn') || (k === 'model' && val === 'main'))) {

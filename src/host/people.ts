@@ -31,7 +31,7 @@ import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, setWalletCap,
 import { applyItemChanges, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
 import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
-import { getPrefs } from '../core/settings';
+import { DIAG_KEEP_DEFAULT, getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
 import { guideSections, guideTxt } from '../core/guides';
 
@@ -84,8 +84,9 @@ export async function loadDiag(): Promise<DiagRun[]> {
     return [];
   }
 }
-/** keep = 남길 건수 (설정 「갱신 기록 보관」: 성공·실패) */
-export async function pushDiag(run: DiagRun, keepRaw: boolean, keep: { ok: number; fail: number }): Promise<void> {
+/** 남길 건수: 이 기기 설정 「갱신 기록 보관」(성공·실패). 기록이 모든 채팅 공용이라 채팅마다 다르지 않다 */
+export const diagKeep = (): { ok: number; fail: number } => ({ ok: getPrefs().diagKeep ?? DIAG_KEEP_DEFAULT.ok, fail: getPrefs().diagFailKeep ?? DIAG_KEEP_DEFAULT.fail });
+export async function pushDiag(run: DiagRun, keepRaw: boolean, keep = diagKeep()): Promise<void> {
   try {
     const list = await loadDiag();
     const item = keepRaw ? run : { ...run, system: undefined, data: undefined, raw: run.ok ? undefined : run.raw };
@@ -508,7 +509,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       console.log(`[goei] 인물 기록 갱신 실패: ${diag.error}`);
     } finally {
       diag.ms = Date.now() - t0;
-      await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
+      await pushDiag(diag, settings.keepRaw);
     }
     if (result.errors.length >= 3) break;
   }
@@ -646,7 +647,7 @@ async function consolidateInner(ctx: ChatContext, name: string, settings: People
     return { ok: false, message: `정리 실패: ${diag.error}` };
   } finally {
     diag.ms = Date.now() - t0;
-    await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
+    await pushDiag(diag, settings.keepRaw);
     setStatus({ busy: false, label: '' });
   }
 }
@@ -708,7 +709,7 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
     return null;
   } finally {
     diag.ms = Date.now() - t0;
-    await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
+    await pushDiag(diag, settings.keepRaw);
   }
 }
 
@@ -746,7 +747,7 @@ export async function directorNoteText(chat: Chat, store: PeopleStore, people: s
       return null;
     } finally {
       diag.ms = Date.now() - t0;
-      await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
+      await pushDiag(diag, settings.keepRaw);
     }
   };
   let r = await call(built, 'director', built.search);

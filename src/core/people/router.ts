@@ -42,7 +42,7 @@ export function buildRouter(chat: Chat, store: PeopleStore, names: NameEntry[], 
   const base = o.prompt?.trim() ? o.prompt.trim() : [guideTxt('Router', 'ROLE'), guideTxt('Router', 'RULES')].filter(Boolean).join('\n');
   const system = [base.replace('{{MAX}}', String(max)), o.rules?.trim() ? `${guideTxt('Router', 'USER_RULES.HEAD')}\n${o.rules.trim()}` : ''].filter(Boolean).join('\n');
   const data = { input: input.slice(0, 4000), recent, catalog };
-  const key = hash(JSON.stringify({ input, recent: recent.map((r) => r.text.slice(0, 400)), names: catalog.map((c) => c.name), system: system.length }));
+  const key = hash(JSON.stringify({ input, recent: recent.map((r) => r.text.slice(0, 400)), names: catalog.map((c) => c.name), system: system.length, max }));
   return { system, data, key, max };
 }
 

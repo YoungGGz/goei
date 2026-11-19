@@ -22,6 +22,10 @@ const Sel = await mod('people/select');
 const Ro = await mod('people/router');
 const Inj = await mod('people/inject');
 const Def = await mod('setdef/people');
+// 갱신 기록(진단)은 기기 저장소를 쓴다: 호스트 쪽은 한 묶음으로 만들어 설정(core/settings)을 같이 쓴다
+const hostFile = join(dir, 'host.mjs');
+await build({ stdin: { contents: "export * as H from './src/host/people';\nexport * as Set from './src/core/settings';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, format: 'esm', platform: 'node', target: 'es2022', charset: 'utf8', loader: { '.txt': 'text', '.css': 'text' }, outfile: hostFile, logLevel: 'silent' });
+const { H, Set: Prefs } = await import(pathToFileURL(hostFile));
 
 const person = (name, extra = {}) => ({ name, faction: 'A00', seeded: { from: 'none', at: '' }, slots: {}, affinity: { base: 0 }, address: { toUser: '요원', register: '반말' }, express: 1, aliases: [], axes: T.DEFAULT_AXES(), axesFrom: 'default', patterns: [], candidates: {}, ...extra });
 const chat = (...msgs) => ({ message: msgs.map(([role, data, chatId]) => ({ role, data, chatId })) });
@@ -29,11 +33,11 @@ const NAMES = ['가람', '나래', '다온', '라온', '마루', '바다', '사�
 
 test('기본값은 예전 값 그대로, 잘못된 값은 기본값, 범위 밖은 끝 값', () => {
   const s = St.peopleSettings({});
-  assert.deepEqual([s.patternsCap, s.evidenceCap, s.sceneMax, s.batchTurns, s.observedMax, s.unknownMax, s.diagKeep, s.diagFailKeep], [30, 40, 6, 6, 4, 5, 10, 30]);
-  const bad = St.peopleSettings({ $pp_patterns_cap: 'abc', $pp_evidence_cap: '', $pp_scene_max: 'null', $pp_batch_turns: 'x', $pp_observed_max: '-', $pp_unknown_max: 'NaN', $pp_diag_keep: '열', $pp_diag_fail_keep: null });
-  assert.deepEqual([bad.patternsCap, bad.evidenceCap, bad.sceneMax, bad.batchTurns, bad.observedMax, bad.unknownMax, bad.diagKeep, bad.diagFailKeep], [30, 40, 6, 6, 4, 5, 10, 30]);
-  const out = St.peopleSettings({ $pp_patterns_cap: '0', $pp_evidence_cap: '9999', $pp_scene_max: '0', $pp_batch_turns: '99', $pp_observed_max: '-3', $pp_unknown_max: '100', $pp_diag_keep: '0', $pp_diag_fail_keep: '500' });
-  assert.deepEqual([out.patternsCap, out.evidenceCap, out.sceneMax, out.batchTurns, out.observedMax, out.unknownMax, out.diagKeep, out.diagFailKeep], [5, 200, 1, 20, 1, 20, 1, 50]);
+  assert.deepEqual([s.patternsCap, s.evidenceCap, s.sceneMax, s.batchTurns, s.observedMax, s.unknownMax], [30, 40, 6, 6, 4, 5]);
+  const bad = St.peopleSettings({ $pp_patterns_cap: 'abc', $pp_evidence_cap: '', $pp_scene_max: 'null', $pp_batch_turns: 'x', $pp_observed_max: '-', $pp_unknown_max: 'NaN' });
+  assert.deepEqual([bad.patternsCap, bad.evidenceCap, bad.sceneMax, bad.batchTurns, bad.observedMax, bad.unknownMax], [30, 40, 6, 6, 4, 5]);
+  const out = St.peopleSettings({ $pp_patterns_cap: '0', $pp_evidence_cap: '9999', $pp_scene_max: '0', $pp_batch_turns: '99', $pp_observed_max: '-3', $pp_unknown_max: '100' });
+  assert.deepEqual([out.patternsCap, out.evidenceCap, out.sceneMax, out.batchTurns, out.observedMax, out.unknownMax], [5, 200, 1, 20, 1, 20]);
   assert.equal(St.peopleSettings({ $pp_scene_max: '3.6' }).sceneMax, 4, '소수는 반올림');
   assert.equal(St.ppNum({ $pp_batch_turns: '8' }, 'batch_turns'), 8);
 });
@@ -71,6 +75,10 @@ test('장면 인물 수: 코드 고르기·Router·갱신기', () => {
   assert.equal(Ro.ROUTER_MAX, 6);
   assert.equal(Ro.buildRouter(c, store, names, '입력').max, 6);
   assert.equal(Ro.buildRouter(c, store, names, '입력', { max: 8 }).max, 8);
+  // 인물 수만 바꿔도 Router 결과를 다시 묻는다 (지침 글 길이는 4 → 8 로 같다)
+  const keyOf = (max) => Ro.buildRouter(c, store, names, '입력', { max, prompt: 'MAX={{MAX}}' }).key;
+  assert.notEqual(keyOf(4), keyOf(8));
+  assert.equal(keyOf(4), keyOf(4));
   const answer = JSON.stringify({ selected: NAMES });
   assert.equal(Ro.parseRouter(answer, store, names).selected.length, 6);
   assert.equal(Ro.parseRouter(answer, store, names, 2).selected.length, 2);
@@ -117,6 +125,7 @@ test('장기 변화 상한: 읽을 때·승인할 때·기록을 옮길 때', ()
   const raw = (vars) => ({ message: [], scriptstate: vars, [T.PEOPLE_KEY]: { people: { 가람: person('가람', { patterns: Array.from({ length: 35 }, (_, i) => `변화 ${i}`) }) } } });
   assert.equal(S.peopleStore(raw({})).people.가람.patterns.length, 30);
   assert.equal(S.peopleStore(raw({ $pp_patterns_cap: '10' })).people.가람.patterns.length, 10);
+  assert.deepEqual(S.peopleStore(raw({ $pp_patterns_cap: '10' })).people.가람.patterns, Array.from({ length: 10 }, (_, i) => `변화 ${i + 25}`), '오래된 것부터 지운다 (최근 것이 남는다)');
   assert.equal(S.peopleStore(raw({ $pp_patterns_cap: '아무거나' })).people.가람.patterns.length, 30);
 
   const c = chat(...Array.from({ length: 20 }, (_, i) => [i % 2 ? 'char' : 'user', `글 ${i}`, `m${i}`]));
@@ -137,8 +146,48 @@ test('장기 변화 상한: 읽을 때·승인할 때·기록을 옮길 때', ()
     store.people.옛이름 = person('옛이름', { patterns: Array.from({ length: 20 }, (_, i) => `가 ${i}`) });
     store.people.가람 = person('가람', { patterns: Array.from({ length: 20 }, (_, i) => `나 ${i}`) });
     assert.ok(cap === undefined ? S.renamePerson(store, '옛이름', '가람', null) : S.renamePerson(store, '옛이름', '가람', null, cap));
-    return store.people.가람.patterns.length;
+    return store.people.가람.patterns;
   };
-  assert.equal(merge(undefined), 30);
-  assert.equal(merge(50), 40);
+  assert.equal(merge(undefined).length, 30);
+  assert.equal(merge(50).length, 40);
+  assert.equal(merge(undefined)[0], '나 10', '옮길 때도 오래된 것부터 지운다');
+  assert.equal(merge(undefined).at(-1), '가 19');
+});
+
+test('갱신 기록 보관: 이 기기 설정 하나 (채팅마다 다르지 않다)', async () => {
+  const rows = Def.PEOPLE_SET.groups.flatMap((g) => g.rows);
+  for (const k of ['diag_keep', 'diag_fail_keep']) {
+    assert.equal(rows.find((r) => r.key === k).scope, 'device', k);
+    assert.equal(St.PP_DEFAULTS[k], undefined, `${k} 는 채팅 설정이 아니다`);
+  }
+  Prefs.setPrefs({});
+  assert.deepEqual(H.diagKeep(), { ok: 10, fail: 30 });
+  assert.deepEqual([Prefs.setPrefs({ diagKeep: 0, diagFailKeep: 500 }).diagKeep, Prefs.getPrefs().diagFailKeep], [undefined, undefined], '범위 밖은 버린다');
+  Prefs.setPrefs({ diagKeep: 5, diagFailKeep: 50 });
+  assert.deepEqual(H.diagKeep(), { ok: 5, fail: 50 });
+
+  const box = {};
+  const before = globalThis.risuai;
+  globalThis.risuai = { pluginStorage: { getItem: async (k) => box[k] ?? null, setItem: async (k, v) => { box[k] = v; } } };
+  try {
+    const run = (i, ok, chatId) => ({ at: `2026-11-19T00:00:${String(i).padStart(2, '0')}`, chat: chatId, ok, indexes: [i], people: [], stage: 'update', reason: '', model: 'aux', outChars: 0, ms: 0 });
+    // 채팅 A·B 가 번갈아 남겨도 같은 수로 자른다: 실패 50건이 다른 채팅의 한 번으로 줄지 않는다
+    for (let i = 0; i < 55; i++) await H.pushDiag(run(i, false, i % 2 ? 'A' : 'B'), false);
+    for (let i = 55; i < 62; i++) await H.pushDiag(run(i, true, 'B'), false);
+    const list = await H.loadDiag();
+    assert.equal(list.filter((r) => !r.ok).length, 50);
+    assert.equal(list.filter((r) => r.ok).length, 5);
+    assert.equal(list.filter((r) => !r.ok)[0].indexes[0], 5, '오래된 것부터 지운다');
+    Prefs.setPrefs({});
+    await H.pushDiag(run(62, true, 'A'), false);
+    assert.deepEqual([(await H.loadDiag()).filter((r) => r.ok).length, (await H.loadDiag()).filter((r) => !r.ok).length], [6, 30]);
+  } finally {
+    globalThis.risuai = before;
+    Prefs.setPrefs({});
+  }
+});
+
+test('장면 인물 수 설명: 항상 포함할 인물만큼 늘어나는 것은 메인 요청뿐', () => {
+  const help = Def.PEOPLE_SET.groups.flatMap((g) => g.rows).find((r) => r.key === 'scene_max').help;
+  assert.match(help, /메인 요청은 항상 포함할 인물이 더 많으면/);
 });

@@ -103,14 +103,12 @@ export const PP_DEFAULTS: Record<string, string> = {
   /** 수 상한 (범위는 PP_NUM). 기본값은 코드에 박혀 있던 값 그대로 */
   /** 인물당 장기 변화 수, 성격 변화 후보 하나에 남기는 관찰 수 */
   patterns_cap: '30', evidence_cap: '40',
-  /** 한 장면에서 기록을 보내는 인물 수 (메인 요청·Router·갱신기 공용. 항상 포함할 인물이 더 많으면 그 수) */
+  /** 한 장면에서 기록을 보내는 인물 수 (메인 요청·Router·갱신기 공용. 메인 요청은 항상 포함할 인물이 더 많으면 그 수) */
   scene_max: '6',
   /** 갱신 호출 한 번에 읽는 응답 수 */
   batch_turns: '6',
   /** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수, 「이 인물이 모르는 사실」 줄 수 */
   observed_max: '4', unknown_max: '5',
-  /** 갱신 기록(진단) 보관 건수: 성공·실패 */
-  diag_keep: '10', diag_fail_keep: '30',
 };
 
 /** 수 상한 설정의 범위 [최소, 최대] */
@@ -121,8 +119,6 @@ export const PP_NUM: Record<string, readonly [number, number]> = {
   batch_turns: [1, 20],
   observed_max: [1, 10],
   unknown_max: [1, 20],
-  diag_keep: [1, 50],
-  diag_fail_keep: [1, 50],
 };
 
 export interface PeopleSettings {
@@ -209,8 +205,6 @@ export interface PeopleSettings {
   observedMax: number;
   unknownMax: number;
   /** 갱신 기록 보관 건수 (성공·실패) */
-  diagKeep: number;
-  diagFailKeep: number;
 }
 
 export type Stage = 'update' | 'director' | 'router' | 'tidy';
@@ -305,8 +299,6 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     batchTurns: ppNum(state, 'batch_turns'),
     observedMax: ppNum(state, 'observed_max'),
     unknownMax: ppNum(state, 'unknown_max'),
-    diagKeep: ppNum(state, 'diag_keep'),
-    diagFailKeep: ppNum(state, 'diag_fail_keep'),
   };
 }
 

@@ -51,7 +51,7 @@ export function peopleStore(chat: Chat): PeopleStore {
       aliases: Array.isArray(p.aliases) ? p.aliases.filter((a): a is string => typeof a === 'string') : [],
       axes: DEFAULT_AXES(),
       axesFrom: p.axesFrom === 'model' || p.axesFrom === 'manual' ? p.axesFrom : 'default',
-      patterns: Array.isArray(p.patterns) ? p.patterns.filter((t): t is string => typeof t === 'string').slice(0, patternsCap) : [],
+      patterns: Array.isArray(p.patterns) ? p.patterns.filter((t): t is string => typeof t === 'string').slice(-patternsCap) : [],
       candidates: readCandidates(p.candidates),
       ...(Number.isInteger(p.reviewTurn) ? { reviewTurn: p.reviewTurn as number } : {}),
       ...(p.sexual && typeof p.sexual === 'object' ? { sexual: readSexual(p.sexual as unknown as Record<string, unknown>) } : {}),
@@ -328,7 +328,7 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
     target.axesFrom = src.axesFrom;
     target.express = src.express;
   }
-  target.patterns = [...new Set([...target.patterns, ...src.patterns])].slice(0, patternsCap);
+  target.patterns = [...new Set([...target.patterns, ...src.patterns])].slice(-patternsCap);
   if (!target.sexual && src.sexual) target.sexual = src.sexual;
   if (!target.faction) target.faction = src.faction;
   if (!target.address.toUser && !target.address.pin && src.address.toUser) target.address = { ...src.address };

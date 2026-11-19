@@ -145,7 +145,14 @@ export interface Prefs {
   walletStart?: number;
   /** 상황판 창 둘레 기기 틀 (PC, 이 기기 공통, 2026-10-29 사용자). 없으면 일반 태블릿. 폰·필드 전체화면·좁은 창에서는 안 그린다 (ui/frame.ts) */
   frame?: 'none' | 'tablet' | 'tactical';
+  /** 인물 갱신 기록(진단) 보관 건수: 성공·실패 (이 기기·모든 채팅 공통. 기록 저장소가 기기에 하나라서). 없으면 10·30 */
+  diagKeep?: number;
+  diagFailKeep?: number;
 }
+
+/** 갱신 기록 보관 건수의 기본값·범위 */
+export const DIAG_KEEP_DEFAULT = { ok: 10, fail: 30 };
+export const DIAG_KEEP_RANGE: readonly [number, number] = [1, 50];
 
 /** 창 바깥 어둡기 기본값 (%). 예전엔 100%라 뒤 채팅이 거의 안 보였다 */
 export const DIM_DEFAULT = 50;
@@ -233,9 +240,11 @@ export function setPrefs(raw: unknown): Prefs {
   const relationsSym = o.relationsSym === false ? false : undefined;
   const frame = o.frame === 'none' || o.frame === 'tactical' ? o.frame : undefined;
   const walletStart = int(o.walletStart, 0, 1_000_000_000_000);
+  const diagOk = int(o.diagKeep, ...DIAG_KEEP_RANGE);
+  const diagFail = int(o.diagFailKeep, ...DIAG_KEEP_RANGE);
   // 띄운 보고서 알림 기억도 남긴다. 최근 50개 (전수검사 11-13)
   const noticedReports = Array.isArray(o.noticedReports) ? [...new Set(o.noticedReports.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.slice(0, 80)))].slice(-50) : [];
-  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
+  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(diagOk !== null ? { diagKeep: diagOk } : {}), ...(diagFail !== null ? { diagFailKeep: diagFail } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
   return prefs;
 }
 
