@@ -59,6 +59,30 @@ test('끝말: 세 글자 이상인 낱말 끝에서만, 같은 글자로 끝나�
   assert.ok(!/Subway|Forest/.test(top('이상한 횟집', '지역 주민의 얼굴', '부산광역시 해운대구')));
 });
 
+test('「~교」는 다리, 종교 이름은 교회, 학교·계급은 아님 (2026-11-19 사용자: 광진교)', () => {
+  const top = (n, t = '') => situationShared('an', n, t)[0].replace('Situation Anomaly ', '');
+  for (const n of ['광진교', '광진교 아래', '잠수교 남단', '영도교', '구포교', '진주교 난간', '삼성교', '금천교에서', '한강 광진교 북단', '성산대교', '월계1교']) assert.equal(top(n), 'Bridge 1', n);
+  for (const n of ['무명찬란교', '무명찬란교 집회', '유대교 회당', '증산교 본부', '태양신교', '새벽빛교 신도 합숙소', '기독교 서점']) assert.ok(!/Bridge/.test(top(n)), n);
+  for (const n of ['무명찬란교', '유대교', '천도교', '태양신교']) assert.match(top(n), /^Church/, n);
+  assert.match(top('새벽빛교', '교주가 신도들을 모아 놓고'), /^Church/);
+  for (const n of ['서울고교', '한빛초교', '세광공업고등학교', '산골분교']) assert.match(top(n), /^School/, n);
+  for (const n of ['간호장교', '대주교 집무', '소방교 김', '등하교 시간', '가격비교']) assert.ok(!/Bridge|Church/.test(top(n)), n);
+  assert.match(top('탑승교'), /^(Generic|Airport)/);
+});
+
+test('「~호」는 호수·배·열차·사람 이름을 가른다 (2026-11-19 사용자: 세월호)', () => {
+  const top = (n, t = '') => situationShared('an', n, t)[0].replace('Situation Anomaly ', '');
+  for (const n of ['세월호', '제3금성호', '금성호 침몰 해역', '대성호 갑판', '한일카페리호', '서해훼리호']) assert.match(top(n), /^Ship/, n);
+  assert.match(top('대성호', '조업 중이던 어선이 표류'), /^Ship/);
+  for (const n of ['무궁화호', '새마을호 객차', '은하호 열차']) assert.equal(top(n), 'Subway 2', n);
+  for (const n of ['옥정호', '소양호', '충주호 유람선 선착장 앞 물가', '유계호 얼음 구멍', '은월호 수몰 지구']) assert.match(top(n), /^Lake 1|^Sea 2/, n);
+  assert.equal(top('유계호', '물안개 속에서 낚시객이 사라짐'), 'Lake 1');
+  for (const n of ['김민호 씨', '이준호', '구미호', '백호', '창간호', '교통호', '3번 참호', '누리호 발사대']) assert.ok(!/^(Lake|Ship)/.test(top(n)), n);
+  // 배 이름으로 정해졌으면 호수 그림이 뒤 후보로도 끼지 않는다
+  assert.ok(!situationShared('an', '세월호').some((k) => /Lake/.test(k)));
+  assert.match(top('김민호 씨 자택'), /^Home/);
+});
+
 test('상황 글은 이름에서 못 고를 때만, 다른 곳을 가리키는 말과 한 글자 낱말은 빼고', () => {
   assert.match(top('은하 목욕탕', '지하철 타고 온 손님'), /^Bathhouse/);
   assert.match(top('세광병원 옥상', '목격자는 인근 경찰서로 이송'), /^Rooftop/);

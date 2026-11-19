@@ -67,7 +67,7 @@ const PLACES = (pw as { places: Place[] }).places;
 
 /** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고, 같은 글자로 끝나는 다른 낱말은 뺀다 */
 const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
-  호: { to: 'Lake', n: 1, not: ['번호', '신호', '보호', '간호', '구호', '암호', '경호', '수호', '변호', '상호', '기호', '부호', '애호', '옹호', '양호'] },
+  호: { to: 'Lake', n: 1, not: ['번호', '신호', '보호', '간호', '구호', '암호', '경호', '수호', '변호', '상호', '기호', '부호', '애호', '옹호', '양호', '괄호', '점호', '전호', '엄호', '원호', '칭호', '존호', '방호', '참호', '산호', '미호', '호호', '선호', '환호', '연호', '국호', '시호', '묘호', '당호', '아호', '별호', '작호', '군호', '문호', '가호', '비호', '맹호', '백호', '흑호', '념호', '집호'] },
   천: { to: 'Riverside', not: ['온천', '수천', '추천', '원천', '실천', '황천'] },
   강: { to: 'Riverside', not: ['건강', '보강', '증강', '철강', '제강', '하강', '특강', '휴강', '개강'] },
   산: { to: 'Forest', not: ['부동산', '낙하산', '화산', '수산', '재산', '유산', '생산', '계산', '출산', '예산', '파산', '해산', '하산', '우산', '자산', '축산', '농산', '임산', '광산', '물산', '정산', '전산', '분산', '확산', '무산', '양산'] },
@@ -81,6 +81,20 @@ const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
   숲: { to: 'Forest', not: [] },
   댐: { to: 'Lake', n: 1, not: [] },
 };
+/** 「~교」로 끝나지만 다리가 아닌 말 (사전에서 「교」로 끝나는 3자 이상 낱말 732개를 갈라 뽑음). 학교류는 표의 낱말이 먼저 받는다 */
+const GYO_NOT = ['학교', '장교', '외교', '대주교', '좌주교', '부주교', '설교', '조교', '비교', '기교', '등교', '하교', '휴교', '모교', '본교', '타교', '국교', '배교', '친교', '절교', '순교', '함교', '근교', '소방교', '탑승교', '실험교', '자매교'];
+/** 종교 이름 (교회 그림으로) */
+const FAITH = ['종교', '불교', '신교', '유교', '회교', '밀교', '기독교', '천주교', '천도교', '그리스도교', '대도교', '선도교', '성도교', '백도교', '가톨릭교', '감리교', '장로교', '침례교', '성결교', '안식교', '구세교', '예수교', '야소교', '유대교', '유태교', '힌두교', '이슬람교', '라마교', '로마교', '마니교', '배화교', '조로아스터교', '자이나교', '시크교', '브라만교', '바라문교', '비슈누교', '모르몬교', '부두교', '드루이드교', '미트라교', '바하이교', '카오다이교', '단군교', '증산교', '보천교', '태을교', '흠치교', '청림교', '수운교', '시천교', '상제교', '천리교', '백백교', '백련교', '통일교', '한얼교', '정토교', '진언교', '대승교', '소승교', '그리스정교', '동방정교', '희랍정교', '러시아정교', '크리스트교', '칼뱅교', '공자교', '인류교', '전진교', '사이비교', '찬란교', '마호메트교', '모하메드교', '바리새교', '네스토리우스교', '오르페우스교', '미이미교', '배물교', '도덕교', '대세교', '태일교', '한검교', '환검교', '제우교', '삼계교', '지나교', '그리스교', '희랍교', '모세교', '율법교', '천법교', '천태교'];
+const FAITH_CUE = /신도|교주|교단|포교|교리|신앙|교인|사이비|집회|예배|숭배|전도|광신|종교|신흥/;
+/** 「~호」가 배·열차 이름임을 알리는 단서 */
+const HO_LAKE = /호숫|호반|수변|둘레|낚시|저수|수몰|수면|물가|물속|물안개|유원지|담수|수상|수심|익사|빙판|얼음|잠긴|수문|제방|오리배/;
+/** 사람 이름을 알리는 말과 흔한 성 */
+const PERSON_CUE = /씨(\s|$)|자택|의 집|일가|가족|부부/;
+const SURNAME = '김이박최정강조윤장임한오서신권황안송류유전홍고문양손배백허남심노하곽성차주우구민진지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용';
+const HO_SHIP_CUE = /침몰|좌초|난파|표류|출항|입항|귀항|항해|승선|선원|선장|선체|선실|선미|갑판|조타|기관실|어선|여객선|유람선|화물선|낚싯배|선박|조업|유령선|구명|해경|뱃|해상|인양/;
+const HO_TRAIN_CUE = /열차|객차|탈선|기관사|선로|철도|차량기지|호차/;
+const HO_SHIP = /(훼리|페리|크루즈|마루|프린세스|익스프레스)호$|^제\s?\d/;
+const hoKind = (t: string): 'lake' | 'ship' | 'train' | '' => (HO_LAKE.test(t) ? 'lake' : HO_SHIP_CUE.test(t) ? 'ship' : HO_TRAIN_CUE.test(t) ? 'train' : '');
 /** 이름에서 장소가 아닌 낱말: 시·도, 시·군·구 (플러그인 지도 이름표) */
 const REGION = new Set<string>();
 for (const n of [...Object.values(SIDO_NAME), ...Object.values(SIGUN).flat()]) {
@@ -100,7 +114,7 @@ const ELSEWHERE = /[가-힣]+\s?(으로|로|에서)\s?(긴급\s?)?(이송|후송
 interface Hit { place: Place; pic?: number; general?: boolean; end: number; len: number }
 
 /** 이름에서 장소 낱말 찾기: 뒤에 나온 낱말이 먼저 (우리말은 뒤 낱말이 더 좁은 자리), 같은 자리면 긴 낱말 */
-function findPlaces(text: string, byPosition: boolean): Hit[] {
+function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
   const tokens = text.split(/[\s,·()[\]「」'"]+/).filter((t) => t && !REGION.has(t));
   const flat = tokens.join('');
   const hits: Hit[] = [];
@@ -136,13 +150,42 @@ function findPlaces(text: string, byPosition: boolean): Hit[] {
     for (const w of p.g?.w ?? []) add(p, w, undefined, true);
     for (const pic of p.pics ?? []) for (const w of pic.w) add(p, w, pic.n);
   }
-  // 끝말 (이름에만)
+  // 끝말 (이름에만). 같은 자리에서 표의 낱말이 이미 맞았으면 끝말은 보지 않는다 (세월호·기차역)
   if (byPosition) {
+    const taken = new Set(hits.filter((h) => h.len > 1).map((h) => h.end));
+    const put = (key: string, end: number, n?: number) => {
+      const place = PLACES.find((p) => p.k === key);
+      if (place) hits.push({ place, pic: n, general: !n, end, len: 1 });
+    };
+    const person = PERSON_CUE.test(text);
     for (const { stem, end } of tokenEnd) {
-      const rule = SUFFIX[stem.slice(-1)];
-      if (!rule || stem.length < 3 || /\d/.test(stem.slice(-2, -1)) || rule.not.some((x) => stem.endsWith(x))) continue;
-      const place = PLACES.find((p) => p.k === rule.to);
-      if (place) hits.push({ place, pic: rule.n, general: !rule.n, end, len: 1 });
+      if (stem.length < 3) continue;
+      const last = stem.slice(-1);
+      if (last === '호' && /\d/.test(stem.slice(-2, -1))) continue;
+      // 종교 이름(유대교·○○신교)은 「대교」 같은 표의 낱말보다 먼저 가른다
+      if (last === '교' && !GYO_NOT.some((x) => stem.endsWith(x)) && (FAITH.some((x) => stem.endsWith(x)) || (!taken.has(end) && FAITH_CUE.test(ctx.replace(stem, ' '))))) {
+        for (let i = hits.length - 1; i >= 0; i--) if (hits[i].end === end) hits.splice(i, 1);
+        put('Church', end);
+        continue;
+      }
+      // 사람 이름(김민호 씨 자택)은 넘긴다
+      if (taken.has(end) || (person && stem.length === 3 && SURNAME.includes(stem[0]))) continue;
+      if (last === '교') {
+        // 다리 이름(광진교). 학교·계급·그 밖의 말이면 넘긴다
+        if (!GYO_NOT.some((x) => stem.endsWith(x))) put('Bridge', end, 1);
+        continue;
+      }
+      const rule = SUFFIX[last];
+      if (!rule || rule.not.some((x) => stem.endsWith(x))) continue;
+      if (last === '호') {
+        // 「~호」는 호수·배·열차·사람 이름·보통 낱말이 다 같은 꼴이다: 이름 → 상황 글 순으로 단서가 있을 때만 받는다 (이름난 호수는 표의 낱말)
+        const kind = HO_SHIP.test(stem) ? 'ship' : hoKind(text) || hoKind(ctx);
+        if (kind === 'ship') put('Ship', end);
+        else if (kind === 'train') put('Subway', end, 2);
+        else if (kind === 'lake') put('Lake', end, 1);
+        continue;
+      }
+      put(rule.to, end, rule.n);
     }
   }
   return hits.sort((a, b) => (byPosition ? b.end - a.end || b.len - a.len : b.len - a.len || a.end - b.end));
@@ -191,7 +234,7 @@ export function situationShared(kind: string, name: string, text = '', loc = '')
     // 특수는 이름만 본다 (나타난 장소는 그 가게와 상관없음)
     return [...rank(KINDS_MS, name, '', name).map((key) => `Situation ${k} ${key}`), 'Situation Mystic Door', `Situation ${k}`];
   }
-  let hits = findPlaces(name, true);
+  let hits = findPlaces(name, true, `${name} ${text}`);
   if (!hits.length && text) hits = findPlaces(text.replace(ELSEWHERE, ' '), false);
   const seen = new Set<string>();
   const places = hits.filter((h) => !seen.has(h.place.k) && seen.add(h.place.k));
