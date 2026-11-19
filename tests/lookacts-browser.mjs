@@ -16,7 +16,7 @@ const actsText = partNames.map((f) => parts[f]).join('');
 const base = { 'p:goei:data-items': distPack('goei-data-items'), 'p:goei:data-looks': distPack('goei-data-looks') };
 const chat = {
   message: [{ role: 'user', data: 'hi', chatId: 'u1' }, { role: 'char', data: '본문\n[▣|2025.03.10|05:52 PM|🌧|8°C|중림동 손길 의원 회복실|목표]', chatId: 'c1' }],
-  scriptstate: { $st_look: ID, $it_act_gap: '5', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify({ list: [], log: [] }) },
+  scriptstate: { $st_look: ID, $it_act_gap_min: '3', $it_act_gap_max: '6', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify({ list: [], log: [] }) },
 };
 const b = await launch();
 const fails = [];

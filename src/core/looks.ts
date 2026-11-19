@@ -61,16 +61,24 @@ export interface LookAct {
   img: string;
 }
 
-/** 아바타 동작 간격 설정 (2026-11-19 사용자: 간격을 코드에 박지 않는다). 한 동작이 끝나고 다음 동작까지 대기로 서 있는 초. 0이면 동작 없이 대기만 */
-export const LOOK_ACT_GAP_VAR = '$it_act_gap';
-export const LOOK_ACT_GAP_DEFAULT = 20;
-export const LOOK_ACT_GAP_MAX = 120;
-export const LOOK_ACT_GAP_STEP = 5;
-export const lookActGap = (vars: Record<string, unknown> | undefined): number => {
-  const raw = vars?.[LOOK_ACT_GAP_VAR];
-  const n = raw === undefined || raw === null || raw === '' ? NaN : Number(raw);
-  return Number.isInteger(n) ? Math.min(LOOK_ACT_GAP_MAX, Math.max(0, n)) : LOOK_ACT_GAP_DEFAULT;
+/** 아바타 동작 간격 설정 (2026-11-19 사용자: 간격을 코드에 박지 않는다, 구간 랜덤, 1초 단위).
+ *  한 동작이 끝나고 다음 동작까지 대기로 서 있는 초 = 최소~최대 사이에서 매번 새로 뽑는다. 최대가 0이면 동작 없이 대기만 */
+export const LOOK_ACT_MIN_VAR = '$it_act_gap_min';
+export const LOOK_ACT_MAX_VAR = '$it_act_gap_max';
+export const LOOK_ACT_GAP_DEFAULT: [number, number] = [12, 24];
+export const LOOK_ACT_GAP_HI = 120;
+/** [최소, 최대] 초 (0~LOOK_ACT_GAP_HI, 최소 ≤ 최대) */
+export const lookActGap = (vars: Record<string, unknown> | undefined): [number, number] => {
+  const one = (key: string, def: number) => {
+    const raw = vars?.[key];
+    const n = raw === undefined || raw === null || raw === '' ? NaN : Number(raw);
+    return Number.isInteger(n) ? Math.min(LOOK_ACT_GAP_HI, Math.max(0, n)) : def;
+  };
+  const hi = one(LOOK_ACT_MAX_VAR, LOOK_ACT_GAP_DEFAULT[1]);
+  return [Math.min(one(LOOK_ACT_MIN_VAR, LOOK_ACT_GAP_DEFAULT[0]), hi), hi];
 };
+/** 이번에 서 있을 초 (rnd = 0~1) */
+export const pickLookGap = ([lo, hi]: [number, number], rnd: number): number => lo + rnd * (hi - lo);
 
 /** 인물별 동작 파일 이름 */
 export const lookActsParts = (id: string, parts: number): string[] => Array.from({ length: parts }, (_, i) => `goei-look-${id}.${i + 1}.txt`);
