@@ -67,6 +67,8 @@ const dirty = new Set<string>();
 let savedIds: string[] | null = null;
 
 let turns: TraceTurn[] | null = null;
+/** 처음 읽기와 찌꺼기 지우기가 끝났는지 */
+let swept = false;
 let loading: Promise<TraceTurn[]> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 /** 지금 열린 턴 (본편 요청 조립이 시작되면 열리고, 다음 조립이 시작되면 닫힌다) */
@@ -96,7 +98,8 @@ async function sweepOrphans(keep: Set<string>): Promise<void> {
 }
 
 async function load(): Promise<TraceTurn[]> {
-  if (turns) return turns;
+  // 찌꺼기 지우기(sweepOrphans)가 끝난 뒤에만 바로 돌려준다: 그 전에 온 호출은 loading 을 기다려 첫 저장이 지우기와 겹치지 않는다
+  if (turns && swept) return turns;
   if (!loading) {
     loading = (async () => {
       try {
@@ -128,6 +131,7 @@ async function load(): Promise<TraceTurn[]> {
       } catch {
         turns = [];
       }
+      swept = true;
       return turns;
     })();
   }
@@ -183,6 +187,7 @@ export async function loadTrace(): Promise<TraceTurn[]> {
 
 export async function clearTrace(): Promise<void> {
   turns = [];
+  swept = true;
   open = null;
   replied = false;
   ended = false;
