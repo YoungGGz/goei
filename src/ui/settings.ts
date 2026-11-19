@@ -28,7 +28,7 @@ import { readIconMisses } from '../core/iconmatch';
 import { aliasCanAdd, aliasChanged, aliasEdit, aliasRowBad, aliasShown, ALIAS_WORD_MAX } from '../core/aliasrows';
 import { pairTable } from '../core/pairrows';
 import { defStored } from '../core/deftext';
-import { LOOK_ACT_GAP_MAX, LOOK_ACT_GAP_STEP, LOOK_ACT_GAP_VAR, lookActGap } from '../core/looks';
+import { LOOK_ACT_GAP_HI, LOOK_ACT_MAX_VAR, LOOK_ACT_MIN_VAR, lookActGap } from '../core/looks';
 import { ITEM_LEFT_WORDS_DEFAULT, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT, ITEM_OFF_WORDS_VAR, ITEM_RULES_DEFAULT, ITEM_RULES_VAR, ITEM_WORDS_MAX, ITEM_LIST_CAP_MAX, ITEM_LIST_CAP_MIN, ITEM_LIST_CAP_STEP, ITEM_LIST_CAP_VAR, itemListCapOf, ITEM_LOG_CAP_MAX, ITEM_LOG_CAP_MIN, ITEM_LOG_CAP_STEP, ITEM_LOG_CAP_VAR, itemLogCapOf, parseItemRules } from '../core/itemrules';
 import { ICON_KIND_LABEL, normIcon } from '../core/iconmatch';
 import { keepOpen } from './panels';
@@ -509,7 +509,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
           D('items-away-turns', '', { ctl: stepper('set-items-away-turns', 'n', itemAwayTurns(itVars) ? `${itemAwayTurns(itVars)}턴` : '계속', itemAwayTurns(itVars) > 0, itemAwayTurns(itVars) < ITEM_AWAY_TURNS_MAX, '치운 물건 기억', busy, [`${ITEM_AWAY_TURNS_MAX}턴`]), help: `두고 오거나 버리거나 잃거나 부서진 물건을 몇 턴 동안 기억할지예요(0~${ITEM_AWAY_TURNS_MAX}, 0이면 계속). 기억하는 동안은 그 응답을 다시 굴리면 돌아오고, 본문에서 되찾으면 같은 물건으로 돌아와요. 지나면 목록에서 지워서, 그 뒤에 되찾으면 새 물건으로 생기고, 치운 응답을 지워도 돌아오지 않아요.` }),
           D('items-list-cap', '', { ctl: stepper('set-items-list-cap', 'n', `${itemListCapOf(itVars)}줄`, itemListCapOf(itVars) > ITEM_LIST_CAP_MIN, itemListCapOf(itVars) < ITEM_LIST_CAP_MAX, '물건 줄 상한', busy, [`${ITEM_LIST_CAP_MAX}줄`]), help: `저장하는 물건 줄 수예요(${ITEM_LIST_CAP_MIN}~${ITEM_LIST_CAP_MAX}). 넘으면 지운 응답의 물건, 팔거나 부서졌거나 다 쓴 물건을 오래된 것부터 지워요. 갖고 있는 물건은 지우지 않아요.` }),
           D('items-logcap', '', { ctl: stepper('set-items-logcap', 'n', `${itemLogCapOf(itVars)}줄`, itemLogCapOf(itVars) > ITEM_LOG_CAP_MIN, itemLogCapOf(itVars) < ITEM_LOG_CAP_MAX, '기록 줄 상한', busy, [`${ITEM_LOG_CAP_MAX}줄`]), help: `얻고·쓰고·버리고·잃은 기록을 몇 줄까지 남길지예요(${ITEM_LOG_CAP_MIN}~${ITEM_LOG_CAP_MAX}). 넘으면 오래된 기록부터 정리하고, 소모품의 남은 횟수는 그대로예요.` }),
-          D('items-act-gap', '', { ctl: stepper('set-items-act-gap', 'n', lookActGap(itVars) ? `${lookActGap(itVars)}초` : '안 함', lookActGap(itVars) > 0, lookActGap(itVars) < LOOK_ACT_GAP_MAX, '아바타 동작 간격', busy, [`${LOOK_ACT_GAP_MAX}초`]), help: `소지품의 내 아바타가 한 동작을 마치고 다음 동작까지 서 있는 시간이에요(0~${LOOK_ACT_GAP_MAX}초, 0이면 동작 없이 서 있기만 해요).` }),
+          D('items-act-gap', '', { ctl: numSet([['최소', stepper('set-items-act-min', 'n', `${lookActGap(itVars)[0]}초`, lookActGap(itVars)[0] > 0, lookActGap(itVars)[0] < LOOK_ACT_GAP_HI, '아바타 동작 간격 최소', busy, [`${LOOK_ACT_GAP_HI}초`])], ['최대', stepper('set-items-act-max', 'n', `${lookActGap(itVars)[1]}초`, lookActGap(itVars)[1] > 0, lookActGap(itVars)[1] < LOOK_ACT_GAP_HI, '아바타 동작 간격 최대', busy, [`${LOOK_ACT_GAP_HI}초`])]]), help: `소지품의 내 아바타가 한 동작을 마치고 다음 동작까지 서 있는 시간이에요. 최소와 최대 사이에서 매번 달라져요(0~${LOOK_ACT_GAP_HI}초). 최대가 0이면 동작 없이 서 있기만 해요.` }),
           D('items-start', itemStartOn(itVars) ? '1' : '0'),
           D('items-left-words', String(itVars?.[ITEM_LEFT_WORDS_VAR] ?? '')),
           D('items-off-words', String(itVars?.[ITEM_OFF_WORDS_VAR] ?? '')),
@@ -597,7 +597,6 @@ const INV_OPTS: Record<string, { key: string; values: string[]; max?: number; mi
   'set-items-away-turns': { key: ITEM_AWAY_TURNS_VAR, values: [], max: ITEM_AWAY_TURNS_MAX, step: ITEM_AWAY_TURNS_STEP, num: itemAwayTurns },
   'set-items-list-cap': { key: ITEM_LIST_CAP_VAR, values: [], max: ITEM_LIST_CAP_MAX, min: ITEM_LIST_CAP_MIN, step: ITEM_LIST_CAP_STEP, num: itemListCapOf },
   'set-items-logcap': { key: ITEM_LOG_CAP_VAR, values: [], max: ITEM_LOG_CAP_MAX, min: ITEM_LOG_CAP_MIN, step: ITEM_LOG_CAP_STEP, num: itemLogCapOf },
-  'set-items-act-gap': { key: LOOK_ACT_GAP_VAR, values: [], max: LOOK_ACT_GAP_MAX, step: LOOK_ACT_GAP_STEP, num: lookActGap },
   'set-wallet-sync': { key: WALLET_SYNC_VAR, values: ['1', '0'] },
   'set-wallet-loose': { key: WALLET_LOOSE_VAR, values: ['1', '0'] },
   'set-wallet-recent': { key: WALLET_RECENT_VAR, values: [], max: WALLET_RECENT_MAX, num: walletRecentN },
@@ -1010,6 +1009,20 @@ export async function handleSettings(action: string, value: string | undefined, 
   }
   // 상점 설정 (set-shop-<키>): 두 범위 같은 처리. 값 검사는 변수마다
   // 소지품·가계부 옵션 (2026-11-07 사용자): 켬/끔·고르기는 값 그대로, 숫자는 −/+ 한 칸씩. 두 범위 같은 처리
+  // 아바타 동작 간격 최소·최대: −/+ 1초씩, 서로 넘으면 다른 쪽도 같이 민다
+  if (action === 'set-items-act-min' || action === 'set-items-act-max') {
+    if (!/^n:[+-]$/.test(v)) return true;
+    const vars = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
+    let [lo, hi] = lookActGap(vars);
+    const d = v.endsWith('+') ? 1 : -1;
+    if (action === 'set-items-act-min') lo = Math.max(0, Math.min(LOOK_ACT_GAP_HI, lo + d));
+    else hi = Math.max(0, Math.min(LOOK_ACT_GAP_HI, hi + d));
+    if (lo > hi) action === 'set-items-act-min' ? (hi = lo) : (lo = hi);
+    const patch = { [LOOK_ACT_MIN_VAR]: String(lo), [LOOK_ACT_MAX_VAR]: String(hi) };
+    if (scope === 'defaults') await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), ...patch } }));
+    else await save(ctx, env, (chat) => (String(chat.scriptstate?.[LOOK_ACT_MIN_VAR] ?? '') === patch[LOOK_ACT_MIN_VAR] && String(chat.scriptstate?.[LOOK_ACT_MAX_VAR] ?? '') === patch[LOOK_ACT_MAX_VAR] ? null : patch));
+    return true;
+  }
   const simple = INV_OPTS[action];
   if (simple) {
     const vars = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
