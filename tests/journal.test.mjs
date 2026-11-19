@@ -368,7 +368,7 @@ test('경과·인물 변화·거래 줄 수 설정: 기본값은 전과 같고, 
   assert.equal(w.inc[0].trail.length, 8);
   assert.equal(w.inc[0].trail[0].text, '첫 발견');
   assert.equal(w.inc[0].trail.at(-1).text, '상황 11');
-  // 보고서 경과: 쌓인 줄이 설정보다 많으면 최근 줄만
+  // 보고서 경과: 쌓인 줄이 설정보다 많으면 첫 발견 줄 + 최근 줄 (엔진과 같은 규칙)
   w = applyOutput(empty(), catalog, S, 'A00', `${IN('진행', 'P001', '첫 발견')}\n${ST('10:00 AM')}`, rng).world;
   for (let i = 0; i < 12; i++) w = applyOutput(w, catalog, S, 'A00', `${IN('진행', 'P001', `상황 ${i}`)}\n${ST('10:10 AM')}`, rng).world;
   endEvent(w, activeEvents(w)[0].key);
@@ -377,6 +377,7 @@ test('경과·인물 변화·거래 줄 수 설정: 기본값은 전과 같고, 
   assert.equal(build({}).length, 13);
   assert.equal(build({ [JR('trail_max')]: '8' }).length, 8);
   assert.equal(build({ [JR('trail_max')]: '8' }).at(-1).text, '상황 11');
+  assert.deepEqual(build({ [JR('trail_max')]: '8' }).map((t) => t.text), ['첫 발견', ...[5, 6, 7, 8, 9, 10, 11].map((i) => `상황 ${i}`)], '줄 수를 낮춘 뒤 새 상황 글 없이 끝나도 첫 발견 줄은 남는다');
   for (const k of ['$jr_trail_max', '$jr_people_max', '$jr_trades_max']) assert.ok(settings.PREF_VAR.test(k), `${k} 는 「기본값으로 저장」 범위`);
 });
 

@@ -124,7 +124,10 @@ function snapshot(input: BuildInput, ev: ClosedEvent, anchor: string, now: strin
   const name = (an ? an.presetName || an.name : e.name) || '이름 미확인';
   const deploy = ev.kind === 'ms' ? (e as MsEntry).visitors : ((e as AnEntry | InEntry).deploy ?? '');
   const agents = parseAgents(deploy, world, catalog, faction);
-  const trail: TrailStep[] = (e.trail?.length ? e.trail : e.situation ? [{ m: e.since, e: ev.epoch, text: cut(e.situation, 160) }] : []).slice(-input.settings.trailMax);
+  const steps: TrailStep[] = e.trail?.length ? e.trail : e.situation ? [{ m: e.since, e: ev.epoch, text: cut(e.situation, 160) }] : [];
+  const max = input.settings.trailMax;
+  // 넘치면 엔진과 같은 규칙: 첫 발견 줄은 두고 마지막 줄들만
+  const trail = steps.length > max ? [steps[0], ...steps.slice(-(max - 1))] : steps;
   const lastText = trail.length ? trail[trail.length - 1].text : '';
   const prefix = ev.cleared ? '클리어 · ' : '';
   const result = prefix + (lastText || '처리 완료');
