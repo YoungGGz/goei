@@ -3,6 +3,7 @@
 // 사라진 항목은 지우지 않는다 (화면에서 회색, 되살리기 가능).
 import type { Chat, ChatMessage } from '../types';
 import { messageText } from '../refs';
+import { PP_DEFAULTS, ppNum } from './settings';
 import { findStatusTags } from '../world/status';
 import { AXES, PEOPLE_KEY, SLOTS, SLOT_META, DOC_TYPES, REGISTERS, DEFAULT_AXES, EXPRESS_TO_AXIS, emptyStore, expressOf, type Candidate, type Change, type Doc, type Entry, type LastRun, type Observation, type PeopleStore, type Person, type Register, type SexualProfile, type SexualRecord, type SlotId, SEXUAL_CHARS } from './types';
 
@@ -31,6 +32,7 @@ export function peopleStore(chat: Chat): PeopleStore {
   const raw = chat[PEOPLE_KEY] as Partial<PeopleStore> | undefined;
   const out = emptyStore();
   if (!raw || typeof raw !== 'object') return out;
+  const patternsCap = ppNum(chat.scriptstate, 'patterns_cap');
   for (const [name, p] of Object.entries(raw.people ?? {})) {
     if (!p || typeof p !== 'object' || typeof p.name !== 'string') continue;
     const slots: Person['slots'] = {};
@@ -49,7 +51,7 @@ export function peopleStore(chat: Chat): PeopleStore {
       aliases: Array.isArray(p.aliases) ? p.aliases.filter((a): a is string => typeof a === 'string') : [],
       axes: DEFAULT_AXES(),
       axesFrom: p.axesFrom === 'model' || p.axesFrom === 'manual' ? p.axesFrom : 'default',
-      patterns: Array.isArray(p.patterns) ? p.patterns.filter((t): t is string => typeof t === 'string').slice(0, 30) : [],
+      patterns: Array.isArray(p.patterns) ? p.patterns.filter((t): t is string => typeof t === 'string').slice(0, patternsCap) : [],
       candidates: readCandidates(p.candidates),
       ...(Number.isInteger(p.reviewTurn) ? { reviewTurn: p.reviewTurn as number } : {}),
       ...(p.sexual && typeof p.sexual === 'object' ? { sexual: readSexual(p.sexual as unknown as Record<string, unknown>) } : {}),
@@ -300,7 +302,7 @@ export function undoLastRun(store: PeopleStore): number {
  *  같은 말로 적힌 다른 사람의 글에 이 기록이 골라지고 그 사람 항목이 이 기록에 적힌다. to 도 호칭 기록이면(호칭끼리 합침) 받는다: 호칭 기록은 갱신기가 한 사람의 것으로 알고 읽는다.
  *  글 속에 적힌 옛 호칭(다른 항목 본문·인용)은 바꾸지 않는다.
  *  호칭 표시(provisional)는 from 과 함께 없어진다 (to 가 원래 호칭 기록이면 to 것은 남는다) */
-export function renamePerson(store: PeopleStore, from: string, to: string, seed: Person | null): boolean {
+export function renamePerson(store: PeopleStore, from: string, to: string, seed: Person | null, patternsCap = Number(PP_DEFAULTS.patterns_cap)): boolean {
   const src = store.people[from];
   const target = store.people[to] ?? seed;
   if (!src || !target || from === to) return false;
@@ -326,7 +328,7 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
     target.axesFrom = src.axesFrom;
     target.express = src.express;
   }
-  target.patterns = [...new Set([...target.patterns, ...src.patterns])].slice(0, 30);
+  target.patterns = [...new Set([...target.patterns, ...src.patterns])].slice(0, patternsCap);
   if (!target.sexual && src.sexual) target.sexual = src.sexual;
   if (!target.faction) target.faction = src.faction;
   if (!target.address.toUser && !target.address.pin && src.address.toUser) target.address = { ...src.address };

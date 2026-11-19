@@ -100,6 +100,29 @@ export const PP_DEFAULTS: Record<string, string> = {
   /** 다른 보조 호출과 병렬 */
   parallel: '0',
   keep_raw: '1',
+  /** 수 상한 (범위는 PP_NUM). 기본값은 코드에 박혀 있던 값 그대로 */
+  /** 인물당 장기 변화 수, 성격 변화 후보 하나에 남기는 관찰 수 */
+  patterns_cap: '30', evidence_cap: '40',
+  /** 한 장면에서 기록을 보내는 인물 수 (메인 요청·Router·갱신기 공용. 항상 포함할 인물이 더 많으면 그 수) */
+  scene_max: '6',
+  /** 갱신 호출 한 번에 읽는 응답 수 */
+  batch_turns: '6',
+  /** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수, 「이 인물이 모르는 사실」 줄 수 */
+  observed_max: '4', unknown_max: '5',
+  /** 갱신 기록(진단) 보관 건수: 성공·실패 */
+  diag_keep: '10', diag_fail_keep: '30',
+};
+
+/** 수 상한 설정의 범위 [최소, 최대] */
+export const PP_NUM: Record<string, readonly [number, number]> = {
+  patterns_cap: [5, 100],
+  evidence_cap: [10, 200],
+  scene_max: [1, 12],
+  batch_turns: [1, 20],
+  observed_max: [1, 10],
+  unknown_max: [1, 20],
+  diag_keep: [1, 50],
+  diag_fail_keep: [1, 50],
 };
 
 export interface PeopleSettings {
@@ -175,6 +198,19 @@ export interface PeopleSettings {
   directorRules: string;
   parallel: boolean;
   keepRaw: boolean;
+  /** 인물당 장기 변화 수 상한 · 후보 하나의 관찰 수 상한 */
+  patternsCap: number;
+  evidenceCap: number;
+  /** 한 장면에서 기록을 보내는 인물 수 */
+  sceneMax: number;
+  /** 갱신 호출 한 번에 읽는 응답 수 */
+  batchTurns: number;
+  /** 인물마다 넣는 승인 전 성격 관찰 수 · 모르는 사실 줄 수 */
+  observedMax: number;
+  unknownMax: number;
+  /** 갱신 기록 보관 건수 (성공·실패) */
+  diagKeep: number;
+  diagFailKeep: number;
 }
 
 export type Stage = 'update' | 'director' | 'router' | 'tidy';
@@ -183,6 +219,13 @@ export const STAGES_ALL: Stage[] = ['update', 'director', 'router', 'tidy'];
 export function ppValue(state: Record<string, unknown> | undefined, key: string): string {
   const v = state?.[PP(key)];
   return v === undefined || v === null || v === '' || v === 'null' ? (PP_DEFAULTS[key] ?? '') : String(v);
+}
+
+/** 수 상한 설정 하나 (PP_NUM 의 열쇠). 수가 아니면 기본값, 범위 밖이면 끝 값, 소수는 반올림 */
+export function ppNum(state: Record<string, unknown> | undefined, key: string): number {
+  const [lo, hi] = PP_NUM[key];
+  const n = Number(ppValue(state, key));
+  return Math.max(lo, Math.min(hi, Math.round(Number.isFinite(n) ? n : Number(PP_DEFAULTS[key]))));
 }
 
 export function peopleSettings(state: Record<string, unknown> | undefined): PeopleSettings {
@@ -256,6 +299,14 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     directorRules: v('director_rules').slice(0, 2000),
     parallel: v('parallel') === '1',
     keepRaw: v('keep_raw') !== '0',
+    patternsCap: ppNum(state, 'patterns_cap'),
+    evidenceCap: ppNum(state, 'evidence_cap'),
+    sceneMax: ppNum(state, 'scene_max'),
+    batchTurns: ppNum(state, 'batch_turns'),
+    observedMax: ppNum(state, 'observed_max'),
+    unknownMax: ppNum(state, 'unknown_max'),
+    diagKeep: ppNum(state, 'diag_keep'),
+    diagFailKeep: ppNum(state, 'diag_fail_keep'),
   };
 }
 

@@ -8,6 +8,7 @@ import { OPENNESS_MAX, OPENNESS_STAGES, REGISTERS, SEXUAL_CHARS, STAGES, opennes
 import { axesLinesEn, liveEvidence } from './axes';
 import { SEXUAL_POLICY, isSexualAxis, sexualDirectorPolicy } from './sexual';
 import { guideTxt } from '../guides';
+import { PP_DEFAULTS } from './settings';
 import { SPEECH_ENTRY_CHARS, parseSpeechMarker } from './speech';
 
 /* 모델에 가는 글(머리·칸 이름표·꼬리 글·단계별 행동 글)은 전부 지침 「메인 요청에 붙는 글」(Main) 절에서 읽는다. 코드에는 글을 두지 않는다 (2026-11-14 사용자).
@@ -41,6 +42,8 @@ export interface BlockOpts extends AffinityOpts {
   axes?: boolean;
   /** 승인 전 성격 관찰(모으는 중인 후보)도 6축 줄 아래에 넣을지 (설정 「성격 관찰 포함」). 성적 축 후보는 넣지 않는다 */
   axesObserved?: boolean;
+  /** 넣는 승인 전 성격 관찰 수 (설정, 기본 OBSERVED_MAX) */
+  observedMax?: number;
   /** 블록에서 뺄 칸 (Director 가 같은 칸을 `slots` 로 따로 받을 때) */
   omitSlots?: Set<SlotId>;
   /** 켜진 기능 (전용 칸을 넣을지 정함). 없으면 기본 칸만 */
@@ -70,7 +73,7 @@ const FEATURE_GROUPS: { key: string; slots: SlotId[] }[] = [
 /** 예산을 넘으면 오래된 항목부터 뺀다: 지난 일 → 아는 것 → 행동 → 장면 → 목표 순. 다른 절은 그대로 */
 export const TRIM_ORDER: (keyof Person['slots'])[] = ['history', 'knowledge', 'behavior', 'scene', 'threads'];
 /** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수 */
-export const OBSERVED_MAX = 4;
+export const OBSERVED_MAX = Number(PP_DEFAULTS.observed_max);
 
 /** 블록에 실을 칸 항목 (글자 예산으로 줄이기 전). request.ts 의 넘침 줄이기도 이 항목으로 글자를 센다 */
 export function blockEntries(p: Person, live: Liveness, o: Pick<BlockOpts, 'sheet' | 'mode' | 'omitSlots'> = {}): Partial<Record<keyof Person['slots'], Entry[]>> {
@@ -119,13 +122,13 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
   if (per.length) out.push(main('PEOPLE.BLOCK.PERSONALITY') + '\n' + lines(per));
   if (o.axes) out.push(main('PEOPLE.BLOCK.AXES') + '\n' + axesLinesEn(p.axes).join('\n') + (p.patterns?.length ? '\n' + main('PEOPLE.BLOCK.PATTERNS') + '\n' + p.patterns.map((t) => `- ${plain(t, 300)}`).join('\n') : ''));
   if (o.axes && o.axesObserved) {
-    // 모으는 중인 후보 가운데 살아 있는 관찰이 있는 것, 관찰이 많은 것부터 넷까지
+    // 모으는 중인 후보 가운데 살아 있는 관찰이 있는 것, 관찰이 많은 것부터 설정한 수까지
     const seen = Object.values(p.candidates ?? {})
       .filter((c) => c.status === 'collecting' && !isSexualAxis(c.axis))
       .map((c) => ({ c, n: liveEvidence(c, live).length }))
       .filter((x) => x.n > 0)
       .sort((a, b) => b.n - a.n)
-      .slice(0, OBSERVED_MAX);
+      .slice(0, o.observedMax ?? OBSERVED_MAX);
     if (seen.length) out.push(main('PEOPLE.BLOCK.AXES_OBSERVED') + '\n' + seen.map(({ c }) => main('PEOPLE.BLOCK.AXES_OBSERVED_ITEM', { axis: c.axis === 'pattern' ? 'pattern' : main(`PEOPLE.AXIS_LABEL.${c.axis}`), direction: c.direction, pattern: plain(c.pattern, 120) })).join('\n'));
   }
   // 성적 욕망·이상성욕 (원본 people_profile 의 sexual_desire/paraphilia + policy sexual_context_only)
@@ -186,10 +189,10 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
 }
 
 /**
- * 이 인물이 모르는 것: 다른 인물의 「아는 정보」에 있지만 이 인물의 아는 정보에 없는 사실 (최근 것 우선, 최대 5).
+ * 이 인물이 모르는 것: 다른 인물의 「아는 정보」에 있지만 이 인물의 아는 정보에 없는 사실 (최근 것 우선, 최대 수는 설정, 기본 5).
  * 리수폿 Director 의 지식 경계를 코드로 흉내 내는 가장 싼 방법.
  */
-export function unknownTo(p: Person, store: PeopleStore, live: Liveness, max = 5): string[] {
+export function unknownTo(p: Person, store: PeopleStore, live: Liveness, max = Number(PP_DEFAULTS.unknown_max)): string[] {
   const mine = liveEntries(p.slots.knowledge, live).map((e) => norm(e.text));
   const seen = new Set<string>();
   const out: { text: string; pos: number }[] = [];

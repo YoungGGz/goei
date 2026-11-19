@@ -6,6 +6,7 @@ import { hash, isAlive, plain, type Liveness } from './store';
 import { AXES, AXIS_LABEL, CANDIDATE_READY, DEFAULT_AXES, EXPRESS_TO_AXIS, SEXUAL_CHARS, SEXUAL_READY, axisBand, axisBandText, expressOf, type Axes, type Axis, type Candidate, type CandidateDirection, type Observation, type Person, type SexualAxis } from './types';
 import { SEXUAL_FIELD_OF, ensureSexual, isSexualAxis } from './sexual';
 import { guideTxt } from '../guides';
+import { PP_DEFAULTS } from './settings';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 export const axisValue = (v: unknown): number => clamp(Math.round(Number(v) || 0), 0, 100);
@@ -61,7 +62,7 @@ export interface ObserveInput {
 }
 
 /** 관찰 하나를 후보에 더한다. 같은 메시지의 같은 후보 관찰은 하나만. 거절된 후보는 더 모으지 않고, 승인·되돌린 후보 뒤에는 새 후보를 연다 */
-export function observe(p: Person, o: ObserveInput, now: string): { ok: true; candidate: Candidate; fresh: boolean } | { ok: false; reason: string } {
+export function observe(p: Person, o: ObserveInput, now: string, evidenceCap = Number(PP_DEFAULTS.evidence_cap)): { ok: true; candidate: Candidate; fresh: boolean } | { ok: false; reason: string } {
   ensureAxes(p);
   const sexual = isSexualAxis(o.axis);
   const pattern = plain(o.pattern, sexual ? SEXUAL_CHARS : 120);
@@ -83,7 +84,7 @@ export function observe(p: Person, o: ObserveInput, now: string): { ok: true; ca
   // 성적 축: 제안 글은 최신 것으로 바꾸되, 더 짧아져 정보가 줄면 전 글을 지킨다 (원본 shouldPreserveInformation)
   if (sexual && !fresh && pattern.length >= cand.pattern.length * 0.6) cand.pattern = pattern;
   const ob: Observation = { id: `o${hash(`${cand.id}|${o.anchor}|${o.seq}|${o.reason}`)}`, anchor: o.anchor, seq: o.seq, quote: plain(o.quote, 60), reason: plain(o.reason, 100), strength: axisValue(o.strength), confidence: axisValue(o.confidence) };
-  cand.evidence = [...cand.evidence, ob].slice(-40);
+  cand.evidence = [...cand.evidence, ob].slice(-evidenceCap);
   p.candidates[cand.id] = cand;
   return { ok: true, candidate: cand, fresh };
 }
@@ -109,7 +110,7 @@ export function candidateStats(c: Candidate, live: Liveness): CandidateStats {
 export const reviewCandidates = (p: Person, live: Liveness): Candidate[] => Object.values(p.candidates ?? {}).filter((c) => c.status === 'collecting' && candidateStats(c, live).ready);
 
 /** 승인: 축이면 delta 만큼 움직이고(출처 manual), pattern 이면 장기 변화에 더하거나 뺀다 */
-export function approveCandidate(p: Person, id: string, live: Liveness, now: string): string | null {
+export function approveCandidate(p: Person, id: string, live: Liveness, now: string, patternsCap = Number(PP_DEFAULTS.patterns_cap)): string | null {
   const c = p.candidates[id];
   if (!c || c.status !== 'collecting') return '승인할 수 있는 후보가 아니에요';
   const st = candidateStats(c, live);
@@ -126,7 +127,7 @@ export function approveCandidate(p: Person, id: string, live: Liveness, now: str
       p.patterns = p.patterns.filter((t) => t !== c.pattern);
       c.applied = { pattern: c.pattern, removed: had };
     } else {
-      if (!p.patterns.includes(c.pattern)) p.patterns = [...p.patterns, c.pattern].slice(-30);
+      if (!p.patterns.includes(c.pattern)) p.patterns = [...p.patterns, c.pattern].slice(-patternsCap);
       c.applied = { pattern: c.pattern };
     }
   } else {
@@ -149,13 +150,13 @@ export function rejectCandidate(p: Person, id: string, now: string): string | nu
 }
 
 /** 되돌리기: 승인으로 바뀐 축·장기 변화를 전으로 */
-export function revertCandidate(p: Person, id: string, now: string): string | null {
+export function revertCandidate(p: Person, id: string, now: string, patternsCap = Number(PP_DEFAULTS.patterns_cap)): string | null {
   const c = p.candidates[id];
   if (!c || c.status !== 'approved' || !c.applied) return '되돌릴 수 있는 후보가 아니에요';
   const ap = c.applied;
   if ('sexual' in ap) { const sx = ensureSexual(p); sx[SEXUAL_FIELD_OF[ap.sexual]] = { text: ap.before, at: now, manual: true }; }
   else if ('axis' in ap) setAxes(p, { ...p.axes, [ap.axis]: ap.before }, 'manual');
-  else if (ap.removed) p.patterns = [...p.patterns, ap.pattern].slice(-30);
+  else if (ap.removed) p.patterns = [...p.patterns, ap.pattern].slice(-patternsCap);
   else p.patterns = p.patterns.filter((t) => t !== ap.pattern);
   c.status = 'reverted';
   c.at = now;

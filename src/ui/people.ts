@@ -13,7 +13,7 @@ import { backfillPeople, chatId, clearDiag, consolidatePerson, loadDiag, rereadP
 import { anchorOf, changeId, entryId, entryStates, isAlive, liveChanges, liveEntries, liveness, messageKey, peopleStore, plain, putChange, putEntry, splitUnread, withPeople, type EntryState, type Liveness } from '../core/people/store';
 import { addressOf, affinityView, opennessOf, tasteOf } from '../core/people/affinity';
 import { factionNow, knownFactionCodes, stageMid as factionStageMid, userFactionOf } from '../core/people/faction';
-import { FEATURES, NUMERIC_FEATURES, PP, PP_DEFAULTS, peopleSettings, ppValue, type Feature, type NumericFeature, type Stage } from '../core/people/settings';
+import { FEATURES, NUMERIC_FEATURES, PP, PP_DEFAULTS, peopleSettings, ppNum, ppValue, type Feature, type NumericFeature, type Stage } from '../core/people/settings';
 import { decideSpeechPending, speechState } from '../core/people/speech';
 import { SEXUAL_FIELDS, SEXUAL_LABEL, SEXUAL_FIELD_OF, ensureSexual, explicitOn, isSexualAxis, setSexualText, sexualFieldOn, sexualGlobal } from '../core/people/sexual';
 import { undoLastRun } from '../core/people/store';
@@ -279,7 +279,7 @@ function diagTable(ctx: ChatContext, keepRaw: boolean): { toggle: string; body: 
     return { toggle: '', body: '<p class="ps-note">진단을 읽는 중…</p>' };
   }
   const here = chatId(ctx);
-  const mine = (peopleUi.diagAll ? list : list.filter((r) => r.chat === here)).slice(-40).reverse();
+  const mine = (peopleUi.diagAll ? list : list.filter((r) => r.chat === here)).slice(-(ppNum(ctx.chat.scriptstate, 'diag_keep') + ppNum(ctx.chat.scriptstate, 'diag_fail_keep'))).reverse();
   const toggle = `<label class="pp-check"><input type="checkbox" data-change="pp-diag-all" ${peopleUi.diagAll ? 'checked' : ''}> 전부 ${list.length}건 중 이 채팅 ${list.filter((r) => r.chat === here).length}건</label>`;
   if (!mine.length) return { toggle, body: `<p class="ps-note">${peopleUi.diagAll ? '아직 갱신 기록이 없어요.' : '이 채팅의 갱신 기록이 아직 없어요.'}</p>` };
   const rows = mine.map((r) => {
@@ -387,15 +387,19 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ppRow('inject', s.inject),
     ppRow('always', '', { ctl: `<input class="gx-search pp-always" data-change="pp-always" name="pp-always" value="${esc(v('always'))}" placeholder="예: 쟈알디, 스팡달" maxlength="400" aria-label="항상 포함할 인물">` }),
     ppRow('scene_carry', v('scene_carry') === '1' ? '1' : '0'),
+    ppRow('scene_max', String(s.sceneMax)),
+    ppRow('unknown_max', String(s.unknownMax)),
     ppRow('block_cap', String(s.blockCap)),
     // 이 두 줄은 딸린 기능(문서 기록·성격)이 꺼져 있어도 보인다: 기능 줄이 이 칸보다 아래에 있어, 숨기면 한 번에 바꾼 값을 되돌릴 때 이 줄을 찾지 못한다
     ppRow('docs_inject', s.docsInject ? '1' : '0'),
     ppRow('axes_obs_inject', s.axesObsInject ? '1' : '0'),
+    s.axesObsInject ? ppRow('observed_max', String(s.observedMax)) : '',
   ].join('');
   const refRows = [
     ppRow('recent_msgs', String(s.recentMsgs)),
     ppRow('prev_pairs', String(s.prevPairs)),
     ppRow('span_cap', String(s.spanCap)),
+    ppRow('batch_turns', String(s.batchTurns)),
     ppRow('hypa', v('hypa') === '1' ? '1' : '0'),
     s.hypa ? ppRow('hypa_items', String(s.hypaItems)) : '',
     s.hypa ? ppRow('hypa_cap', String(s.hypaCap)) : '',
@@ -438,6 +442,8 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     `<div class="pp-rules one">${ruleBox('pp-rules', '갱신에 덧붙일 지침', v('rules'), '응답 뒤 기록을 쓸 때 판정 규칙을 더해요. 출력 형식은 바꿀 수 없어요.', 4000, '예: 관리국 요원은 서로를 직급으로 부른다', 'pp-rules-save')}</div>`,
     ppRow('parallel', v('parallel') === '1' ? '1' : '0'),
     ppRow('keep_raw', v('keep_raw') === '1' ? '1' : '0'),
+    ppRow('diag_keep', String(s.diagKeep)),
+    ppRow('diag_fail_keep', String(s.diagFailKeep)),
   ].join('');
   const router = [
     ppRow('router', s.router),
@@ -466,6 +472,8 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ...(s.tidy === 'separate' ? [stageModel('tidy', '별도 정리 호출에 쓸 모델이에요. 갱신과 같게 = 위 갱신 모델')] : []),
     ppRow('keep_msgs', String(s.keepMsgs)),
     ppRow('keep_scene', String(s.keepScene)),
+    ppRow('patterns_cap', String(s.patternsCap)),
+    ppRow('evidence_cap', String(s.evidenceCap)),
   ].join('');
   return `<div class="ph-form pp-set">
     <header class="ph-room-head"><button class="ph-tool ph-back" data-action="set-feat-back" aria-label="설정으로">${ICONS.back}</button><div class="ph-room-title"><b>인물 설정</b><small>${canChat ? '이 채팅' : '이 채팅 · 시작 전'}</small></div><span class="ph-act">${defaultsButtons('pp')}</span></header>${defaultsConfirm('pp')}
@@ -497,7 +505,7 @@ export function peopleDiagPane(ctx: ChatContext, canChat = true): string {
   return group('진단', [
     ppRow('update_now', '', { ctl: updateBar(ctx, canChat) }),
     dg.toggle ? ppRow('diag_all', '', { ctl: dg.toggle }) : '',
-    `<div class="ps-row wide"><div class="ps-label"><b>갱신 기록</b><small>${esc('최근 갱신의 입력 크기·결과·실패 이유예요. 이 기기 플러그인 저장소에 성공 10건·실패 30건까지 두고 오래된 것부터 지워요. 토큰은 한글 1자=1, 그 외 0.3으로 어림했어요.')}</small></div><div class="ps-ctl">${dg.body}</div></div>`,
+    `<div class="ps-row wide"><div class="ps-label"><b>갱신 기록</b><small>${esc(`최근 갱신의 입력 크기·결과·실패 이유예요. 이 기기 플러그인 저장소에 성공 ${s.diagKeep}건·실패 ${s.diagFailKeep}건까지 두고 오래된 것부터 지워요. 토큰은 한글 1자=1, 그 외 0.3으로 어림했어요.`)}</small></div><div class="ps-ctl">${dg.body}</div></div>`,
     ppRow('diag-clear', '', { ctl: `<button class="gx-mini danger" data-action="pp-diag-clear" ${peopleUi.diag?.length ? '' : 'disabled'}>진단 지우기</button>` }),
   ].join(''));
 }
@@ -1203,7 +1211,7 @@ export async function handlePeople(action: string, value: string | undefined, ct
         const p = store.people[who];
         if (!p) return false;
         const now = new Date().toISOString();
-        const err = action === 'pp-axis-approve' ? approveCandidate(p, id, liveness(chat), now) : action === 'pp-axis-reject' ? rejectCandidate(p, id, now) : revertCandidate(p, id, now);
+        const err = action === 'pp-axis-approve' ? approveCandidate(p, id, liveness(chat), now, ppNum(chat.scriptstate, 'patterns_cap')) : action === 'pp-axis-reject' ? rejectCandidate(p, id, now) : revertCandidate(p, id, now, ppNum(chat.scriptstate, 'patterns_cap'));
         if (err) throw new Error(err);
         return true;
       });

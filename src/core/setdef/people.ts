@@ -1,6 +1,9 @@
 // 인물 기록·세력 설정 정의표. 버튼은 「pp-set」에 값 「열쇠=값」.
 // 「기록할 것」 목록과 단계별 모델, 조건에 따라 보이는 줄의 조건은 아직 화면 코드(ui/people.ts)에 있다
-import type { SetPage } from './types';
+import type { SetCtl, SetPage } from './types';
+
+/** 수 상한 한 줄: 다른 상한 줄(지난 기록 보관 범위·장면 메모 보관)처럼 값 셋 가운데 고른다. 가운데가 기본값 */
+const pick = (...ns: number[]): SetCtl => ({ t: 'seg', opts: ns.map((n): [string, string] => [String(n), String(n)]) });
 
 export const PEOPLE_SET: SetPage = {
   id: 'pp',
@@ -86,6 +89,8 @@ export const PEOPLE_SET: SetPage = {
         { key: 'tidy', label: '정리 방식', ctl: { t: 'seg', opts: [['same', '같은 호출에 얹기'], ['separate', '별도 호출']] }, help: '같은 호출 = 그 턴의 갱신 요청에 「합쳐라」를 얹음 (추가 호출 없음, 모델은 갱신 모델). 별도 = 갱신 뒤 그 인물만 정리 호출 1회.' },
         { key: 'keep_msgs', label: '지난 기록 보관 범위', ctl: { t: 'seg', opts: [['100', '100'], ['200', '200'], ['400', '400']] }, help: '채팅 뒤쪽 메시지 이 수 안의 지난 기록과 호감 계기는 그대로 남겨서, 응답을 지우거나 다시 굴려도 되살아나요. 그보다 오래된 것은 지우거나 하나로 합쳐요.' },
         { key: 'keep_scene', label: '장면 메모 보관', ctl: { t: 'seg', opts: [['10', '10'], ['20', '20'], ['40', '40']] }, help: '최근 응답 이 수만큼의 Director 메모와 장면 인물 목록만 남겨요.' },
+        { key: 'patterns_cap', label: '장기 변화 상한', ctl: pick(15, 30, 60), help: '한 인물에 남기는 장기 변화 수예요. 넘으면 오래된 것부터 지워요.' },
+        { key: 'evidence_cap', label: '후보당 관찰 상한', ctl: pick(20, 40, 80), help: '성격 변화 후보 하나에 남기는 관찰 수예요. 넘으면 오래된 관찰부터 지워요.' },
       ],
     },
     {
@@ -93,8 +98,12 @@ export const PEOPLE_SET: SetPage = {
       rows: [
         { key: 'prev_pairs', label: '직전 쌍 포함', ctl: { t: 'seg', opts: [['0', '0'], ['1', '1'], ['2', '2']] }, help: '읽는 구간 앞에 맥락으로 붙이는 유저·봇 쌍 수' },
         { key: 'block_cap', label: '컨텍스트 글자 상한', ctl: { t: 'seg', opts: [['8000', '8,000'], ['16000', '16,000'], ['32000', '32,000']] }, help: '메인 요청에 넣는 기록 블록 전체 글자 수. 장면 인물 수로 나눠 배분하고, 넘치는 인물은 지난 일부터 빼요.' },
+        { key: 'scene_max', label: '장면 인물 수', ctl: pick(4, 6, 8), help: '한 장면에서 기록을 보내는 인물 수의 상한이에요. 메인 요청·Router·갱신에 같이 써요. 항상 포함할 인물이 더 많으면 그 수만큼 보내요.' },
+        { key: 'unknown_max', label: '모르는 사실 수', ctl: pick(3, 5, 10), help: '인물마다 「이 인물이 모르는 사실」로 보내는 줄 수의 상한이에요. 최근 것부터 보내요.' },
         { key: 'docs_inject', label: '기록 문서 포함', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '사건·장소·세력·물건 문서 가운데 지금 장면과 관련된 것을 메인 요청에 넣어요. 컨텍스트 글자 상한 안에서 넣어요.' },
         { key: 'axes_obs_inject', label: '성격 관찰 포함', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '아직 승인하지 않은 성격 관찰도 메인 요청의 인물 기록에 넣어요. 끄면 승인한 변화만 들어가요.' },
+        { key: 'observed_max', label: '성격 관찰 수', ctl: pick(2, 4, 8), help: '인물마다 메인 요청에 넣는 승인 전 성격 관찰 수의 상한이에요. 관찰이 많이 쌓인 것부터 넣어요.' },
+        { key: 'batch_turns', label: '한 번에 읽는 응답 수', ctl: pick(3, 6, 12), help: '갱신 호출 한 번에 읽는 응답 수의 상한이에요. 안 읽은 응답이 더 많으면 나눠서 여러 번 불러요.' },
         { key: 'span_cap', label: '응답 길이 상한', ctl: { t: 'seg', opts: [['12000', '12,000'], ['20000', '20,000'], ['40000', '40,000']] }, help: '한 번에 읽는 응답 글자 수. 이걸 넘는 응답은 보내지 않고 거부해요(진단 기록에 남음). 맥락 구간만 중간을 접어요.' },
         { key: 'parallel', label: '다른 보조 호출과 병렬', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '끄면 이미지·괴담톡 같은 다른 보조 호출 앞에 차례로 돌아요.' },
         { key: 'hypa', label: '하이파 참조', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: 'Risu 하이파 메모리(HypaMemory) 요약을 갱신기·Director 자료에 배경으로 넣어요. 이번 입력·최근 글·장면 인물 이름과 관련 있는 요약부터, 중요 표시한 요약은 먼저. 근거로는 안 써요. 토큰이 늘어요' },
@@ -102,6 +111,8 @@ export const PEOPLE_SET: SetPage = {
         { key: 'hypa_cap', label: '하이파 글자 상한', ctl: { t: 'seg', opts: [['3000', '3,000'], ['6000', '6,000'], ['12000', '12,000']] }, help: '요약 전체 글자 상한. Director 는 최대 6,000자' },
         { key: 'hypa_plus', label: '하이파 플러스도 읽기', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: 'HypaPlus 플러그인이 저장한 기억·사실 노드도 같이 넣어요' },
         { key: 'keep_raw', label: '원문 보관', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '진단에 보낸 프롬프트·응답 원문을 남겨요 (이 기기 플러그인 저장소).' },
+        { key: 'diag_keep', label: '갱신 기록 보관 (성공)', ctl: pick(5, 10, 20), help: '성공한 갱신 기록을 이 기기에 남기는 건수예요. 넘으면 오래된 것부터 지워요.' },
+        { key: 'diag_fail_keep', label: '갱신 기록 보관 (실패)', ctl: pick(15, 30, 50), help: '실패한 갱신 기록을 이 기기에 남기는 건수예요. 넘으면 오래된 것부터 지워요.' },
       ],
     },
     {

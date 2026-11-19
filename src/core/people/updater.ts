@@ -22,7 +22,7 @@ import { leftWordIn, offWordIn } from '../itemrules';
 import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
 import { imgTagNames } from '../imgtag';
 import { capScene, changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
-import type { Feature, PeopleSettings } from './settings';
+import { PP_DEFAULTS, type Feature, type PeopleSettings } from './settings';
 import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type Doc, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
@@ -30,8 +30,8 @@ const msgs = (chat: Chat): ChatMessage[] => (Array.isArray(chat.message) ? chat.
 
 // ── 묶음 계획 ──
 
-/** 안 읽은 응답들을 6턴 또는 글자 상한 단위로 묶는다 (앞에서부터) */
-export function planBatches(chat: Chat, unread: number[], spanCap: number, maxTurns = 6): number[][] {
+/** 안 읽은 응답들을 maxTurns(설정, 기본 6)턴 또는 글자 상한 단위로 묶는다 (앞에서부터) */
+export function planBatches(chat: Chat, unread: number[], spanCap: number, maxTurns = Number(PP_DEFAULTS.batch_turns)): number[][] {
   const list = msgs(chat);
   const out: number[][] = [];
   let cur: number[] = [];
@@ -304,7 +304,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   };
   for (const t of texts) for (const n of match(t)) push(n);
   const scoped = { ...chat, message: list.slice(0, Math.max(...batch) + 1) } as Chat;
-  for (const n of scenePeople(scoped, store, match, { recent: 2 })) push(n);
+  for (const n of scenePeople(scoped, store, match, { recent: 2, max: o.settings.sceneMax })) push(n);
   // 항상 포함할 인물 (설정 always, 원본 tracking_review): 글에 안 나와도 되짚되, 안 나온 건 근거가 아니다
   const tracked = o.settings.always.filter((n) => store.people[n] && !o.exclude?.includes(n));
   for (const n of tracked) push(n);
@@ -325,7 +325,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   // 장면에 남아 있는 인물 (설정 「장면 인물 유지」): 묶음 앞 응답 끝에 갱신기가 장면에 있다고 본 사람. 글에 이름이 안 나와도 이어서 읽게, 위에서 고른 사람들 뒤에 넣는다
   const carried = o.settings.sceneCarry && !o.only?.length ? carriedScene(store, chat, first) : [];
   for (const n of carried) push(n);
-  const chosen = o.only?.length ? o.only.filter((n) => store.people[n]).slice(0, 6) : people.slice(0, 6);
+  const chosen = o.only?.length ? o.only.filter((n) => store.people[n]).slice(0, o.settings.sceneMax) : people.slice(0, o.settings.sceneMax);
   // 초상: 확정 응답에 초상 태그가 뜬 장면 인물 (태그는 span 에서 지워져 모델이 못 본다). 태그의 이름 부분을 이름 표의 영문 표기로 찾는다
   const tagOwner = (tag: string): string | null => {
     const t = tag.toLowerCase();
@@ -379,7 +379,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     doc_types: DOC_TYPES.filter((t) => o.settings.features.has(docFeature(t) as Feature)),
     people: chosen.map((n) => {
       const p = store.people[n];
-      return { ...personPayload(p, live, changes, wantNote || o.settings.features.has('perception') ? unknownTo(p, store, live) : undefined, { taste: o.settings.features.has('taste'), openness: o.settings.features.has('openness'), axes: o.settings.features.has('axes'), turnCap: o.settings.turnCap, slots: slotsFor(o.settings.features, o.settings.qualitative), qual: o.settings.qualitative, sexual: o.settings, aff: { temper: temperOf(n), speed: o.settings.speed, speedDown: o.settings.speedDown, turnCap: o.settings.turnCap }, folded: store.folded[n] ?? 0 }), values: o.values[n] ?? '' };
+      return { ...personPayload(p, live, changes, wantNote || o.settings.features.has('perception') ? unknownTo(p, store, live, o.settings.unknownMax) : undefined, { taste: o.settings.features.has('taste'), openness: o.settings.features.has('openness'), axes: o.settings.features.has('axes'), turnCap: o.settings.turnCap, slots: slotsFor(o.settings.features, o.settings.qualitative), qual: o.settings.qualitative, sexual: o.settings, aff: { temper: temperOf(n), speed: o.settings.speed, speedDown: o.settings.speedDown, turnCap: o.settings.turnCap }, folded: store.folded[n] ?? 0 }), values: o.values[n] ?? '' };
     }),
     known_names: Object.keys(store.people),
     ...(handles.length ? { handles } : {}),
@@ -822,7 +822,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     if (from) {
       const old = [from, ...store.people[from].aliases];
       const seed = store.people[to] ? null : seedPerson(to, ctx.sheetOf?.(to) ?? null, ctx.baseOf?.(to) ?? {}, ctx.now);
-      renamePerson(store, from, to, seed);
+      renamePerson(store, from, to, seed, ctx.settings.patternsCap);
       for (const k of old) moved.set(norm(k), to);
       report.applied.renamed.push({ from, to });
       continue;
@@ -1057,7 +1057,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         continue;
       }
       perWho.set(who, n);
-      const res = observe(store.people[who], { axis, direction: x.direction, pattern: str(x.pattern), anchor: ev.anchor, seq: nextSeq(ev.anchor), quote: x.quote, reason: str(x.reason) || str(x.pattern), strength: Number(x.strength ?? 50), confidence: Number(x.confidence ?? 50) }, now);
+      const res = observe(store.people[who], { axis, direction: x.direction, pattern: str(x.pattern), anchor: ev.anchor, seq: nextSeq(ev.anchor), quote: x.quote, reason: str(x.reason) || str(x.pattern), strength: Number(x.strength ?? 50), confidence: Number(x.confidence ?? 50) }, now, ctx.settings.evidenceCap);
       if (!res.ok) {
         drop('observation', x, res.reason, who);
         continue;

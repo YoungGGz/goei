@@ -69,7 +69,7 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
       ...(() => { const t = sexualTexts(p, s); return { ...(t.desire ? { sexual_desire: { text: t.desire, policy: SEXUAL_POLICY } } : {}), ...(t.paraphilia ? { paraphilia: { text: t.paraphilia, policy: SEXUAL_POLICY } } : {}) }; })(),
       record: personBlock(p, store, live, changes, { mode: 'record', unknown: [], speechMarks: true, temper: temperOf(n), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap, maxChars: Math.max(1, recordCap - slotChars), taste: s.features.has('taste'), openness: s.features.has('openness'), axes: false, features: s.features, qual: s.qualitative, omitSlots: new Set(featureSlots) }),
       ...(Object.keys(slots).length ? { slots } : {}),
-      unknown_to: unknownTo(p, store, live),
+      unknown_to: unknownTo(p, store, live, s.unknownMax),
     };
   });
   const rhythm = s.directorFeatures && s.features.has('rhythm')

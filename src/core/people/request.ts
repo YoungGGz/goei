@@ -35,12 +35,12 @@ export interface RequestOpts {
   people?: string[];
 }
 
-/** 코드가 고르는 장면 인물: 항상 포함(always) + 글에 이름이 나온 사람·동행·장면 유지(byCode). 자리 수는 6명(항상 포함이 더 많으면 그 수) */
+/** 코드가 고르는 장면 인물: 항상 포함(always) + 글에 이름이 나온 사람·동행·장면 유지(byCode). 자리 수는 설정 「장면 인물 수」(항상 포함이 더 많으면 그 수) */
 function codePeople(chat: Chat, o: RequestOpts): { always: string[]; byCode: string[]; max: number } {
   const match = nameMatcher(entriesOf(o.store, o.extraNames ?? {}));
   const always = o.settings.always.filter((n) => o.store.people[n]);
-  const byCode = scenePeople(chat, o.store, match, { input: o.input, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
-  return { always, byCode, max: Math.max(6, always.length) };
+  const byCode = scenePeople(chat, o.store, match, { input: o.input, max: o.settings.sceneMax, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
+  return { always, byCode, max: Math.max(o.settings.sceneMax, always.length) };
 }
 
 /** 코드가 고른 인물만으로 장면 인물 자리가 찼나. 차 있으면 모델 Router 가 고른 인물은 전부 잘리므로 그 호출을 건너뛴다 */
@@ -94,7 +94,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
     const note = o.settings.director === 'note' ? latestNote(o.store, n, live) : null;
     const sx = sexualTexts(p, o.settings);
     const sexualPolicy = !policyShown;
-    const unknown = o.settings.features.has('perception') ? unknownTo(p, o.store, live) : [];
+    const unknown = o.settings.features.has('perception') ? unknownTo(p, o.store, live, o.settings.unknownMax) : [];
     make.push((maxChars) =>
       personBlock(p, o.store, live, changes, {
         sheet,
@@ -111,6 +111,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
         openness: o.settings.features.has('openness'),
         axes: o.settings.features.has('axes'),
         axesObserved: o.settings.axesObsInject,
+        observedMax: o.settings.observedMax,
         features: o.settings.features,
         qual: o.settings.qualitative,
         sexual: sx,

@@ -74,8 +74,6 @@ export interface DiagRun {
   raw?: string;
 }
 const DIAG_KEY = 'goei-people-diag';
-const DIAG_KEEP = 10;
-const DIAG_FAIL_KEEP = 30;
 
 export async function loadDiag(): Promise<DiagRun[]> {
   try {
@@ -86,13 +84,14 @@ export async function loadDiag(): Promise<DiagRun[]> {
     return [];
   }
 }
-export async function pushDiag(run: DiagRun, keepRaw: boolean): Promise<void> {
+/** keep = 남길 건수 (설정 「갱신 기록 보관」: 성공·실패) */
+export async function pushDiag(run: DiagRun, keepRaw: boolean, keep: { ok: number; fail: number }): Promise<void> {
   try {
     const list = await loadDiag();
     const item = keepRaw ? run : { ...run, system: undefined, data: undefined, raw: run.ok ? undefined : run.raw };
     list.push(item);
-    const ok = list.filter((r) => r.ok).slice(-DIAG_KEEP);
-    const bad = list.filter((r) => !r.ok).slice(-DIAG_FAIL_KEEP);
+    const ok = list.filter((r) => r.ok).slice(-keep.ok);
+    const bad = list.filter((r) => !r.ok).slice(-keep.fail);
     const next = [...ok, ...bad].sort((a, b) => a.at.localeCompare(b.at));
     await risuai.pluginStorage.setItem(DIAG_KEY, JSON.stringify(next));
   } catch {
@@ -292,7 +291,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       return withPeople(cur, s);
     }).catch(() => null);
   }
-  const batches = planBatches(ctx.chat, unread, settings.spanCap);
+  const batches = planBatches(ctx.chat, unread, settings.spanCap, settings.batchTurns);
   const id = chatId(ctx);
   // 다시 읽기의 비우기는 첫 성공 저장과 함께 한다. 그 전엔 자료용 사본에서만 비운다 (전수검사 11-13)
   let pendingClear = o.scope?.clear;
@@ -509,7 +508,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       console.log(`[goei] 인물 기록 갱신 실패: ${diag.error}`);
     } finally {
       diag.ms = Date.now() - t0;
-      await pushDiag(diag, settings.keepRaw);
+      await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
     }
     if (result.errors.length >= 3) break;
   }
@@ -647,7 +646,7 @@ async function consolidateInner(ctx: ChatContext, name: string, settings: People
     return { ok: false, message: `정리 실패: ${diag.error}` };
   } finally {
     diag.ms = Date.now() - t0;
-    await pushDiag(diag, settings.keepRaw);
+    await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
     setStatus({ busy: false, label: '' });
   }
 }
@@ -682,7 +681,7 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
   // 항상 포함·글에 나온 사람·동행·장면 유지만으로 장면 인물 자리가 찼으면 모델이 고른 인물은 들어갈 자리가 없다: 부르지 않는다
   if (sceneFullByCode(chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) return null;
   const names = allNames(roster);
-  const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf });
+  const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, max: settings.sceneMax, prompt: routerBase(), rules: settings.routerRules, identityOf });
   if (routerCache?.key === built.key) {
     routerHints = routerCache.hints;
     return routerCache.selected;
@@ -709,7 +708,7 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
     return null;
   } finally {
     diag.ms = Date.now() - t0;
-    await pushDiag(diag, settings.keepRaw);
+    await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
   }
 }
 
@@ -747,7 +746,7 @@ export async function directorNoteText(chat: Chat, store: PeopleStore, people: s
       return null;
     } finally {
       diag.ms = Date.now() - t0;
-      await pushDiag(diag, settings.keepRaw);
+      await pushDiag(diag, settings.keepRaw, { ok: settings.diagKeep, fail: settings.diagFailKeep });
     }
   };
   let r = await call(built, 'director', built.search);
@@ -781,7 +780,7 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
   const roster = rosterOf(ctx.char.globalLore);
   const names = allNames(roster);
   if (settings.router === 'model' && Object.keys(store.people).length && !sceneFullByCode(ctx.chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) {
-    const b = buildRouter(ctx.chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf: sheetOf(ctx) });
+    const b = buildRouter(ctx.chat, store, names, input, { exclude, recent: settings.recentMsgs, max: settings.sceneMax, prompt: routerBase(), rules: settings.routerRules, identityOf: sheetOf(ctx) });
     out.router = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];
   }
   if ((settings.director === 'scene' || settings.director === 'facts') && Object.keys(store.people).length) {
