@@ -7,10 +7,10 @@ import { scanAgents } from '../world/tags';
 import { addressOf, affinityView, opennessOf, tasteOf, type AffinityOpts } from './affinity';
 import { SPEECH_ENTRY_CHARS, applySpeechSign, parseSpeechMarker, speechVariety } from './speech';
 import { SEXUAL_FIELDS, SEXUAL_AXIS_OF, explicitOn, isSexualAxis, sexualAnyOn, sexualFieldOn, sexualGlobal, setSexualText } from './sexual';
-import { unknownTo } from './inject';
+import { unknownTo, suspicionShown } from './inject';
 import { seedPerson } from './seed';
 import { temperOf, type RosterRow } from './base';
-import { rhythmClock, rhythmClockLines, parseHookHead, turnAt, type RhythmClock } from './rhythm';
+import { rhythmClock, rhythmClockLines, rhythmNow, hookActive, parseHookHead, retireHookText, turnAt, type RhythmClock } from './rhythm';
 import { axesView, ensureAxes, isAxis, isDirection, observe, readAxes, setAxes, pruneCandidates } from './axes';
 import { AXES } from './types';
 import { factionNow, knownFactionCodes, sceneFactionCodes, stageMid, userFactionOf, factionName as factionNameOf } from './faction';
@@ -22,16 +22,16 @@ import { leftWordIn, offWordIn } from '../itemrules';
 import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
 import { imgTagNames } from '../imgtag';
 import { capScene, changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
-import type { Feature, PeopleSettings } from './settings';
-import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
+import { PP_DEFAULTS, type Feature, type PeopleSettings } from './settings';
+import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type Doc, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 const msgs = (chat: Chat): ChatMessage[] => (Array.isArray(chat.message) ? chat.message : []);
 
 // ── 묶음 계획 ──
 
-/** 안 읽은 응답들을 6턴 또는 글자 상한 단위로 묶는다 (앞에서부터) */
-export function planBatches(chat: Chat, unread: number[], spanCap: number, maxTurns = 6): number[][] {
+/** 안 읽은 응답들을 maxTurns(설정, 기본 6)턴 또는 글자 상한 단위로 묶는다 (앞에서부터) */
+export function planBatches(chat: Chat, unread: number[], spanCap: number, maxTurns = Number(PP_DEFAULTS.batch_turns)): number[][] {
   const list = msgs(chat);
   const out: number[][] = [];
   let cur: number[] = [];
@@ -113,30 +113,51 @@ export function cleanSpan(raw: string, cap: number): string {
   return `${head}\n${guideTxt('UpdaterExtra', 'SPAN.FOLD')}\n${tail}`;
 }
 
-/** 갱신기 자료의 문서 항목 (docs_now): 켜진 종류의 살아 있는 항목.
- *  설정 「기록 문서 항목 상한」(0 = 제한 없음)을 넘으면 장면과 관련된 항목(문서 이름이 이 묶음의 글에 나왔거나 장면 인물이 얽힘)을 최근 것부터, 남는 자리는 나머지를 최근 것부터 채운다. 싣는 차례는 그대로 */
-export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[]) {
-  const rows = Object.values(store.docs).filter((d) => settings.features.has(docFeature(d.type) as Feature)).flatMap((d) => {
+/** 장면과 관련된 문서 항목 고르기 (메인 요청의 기록 문서 블록과 갱신기 자료 docs_now 가 같이 쓰는 한 가지 규칙, 2026-11-17 사용자 결정):
+ *  켜진 종류의 살아 있는 항목 가운데 문서 이름이 texts 에 나왔거나 장면 인물이 얽힌 것을, 최근 것부터 maxChars 안에서 고르고 일어난 차례로 돌려준다.
+ *  크기는 부르는 쪽이 실제로 싣는 글의 길이(sizeOf)로 잰다. 서사 리듬 문서는 여기서 다루지 않는다 */
+export function relatedDocs(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[], maxChars: number, sizeOf: (d: Doc, e: Entry) => number, base = 0): { doc: Doc; entry: Entry }[] {
+  const rows: { pos: number; seq: number; doc: Doc; entry: Entry }[] = [];
+  for (const d of Object.values(store.docs)) {
+    if (d.type === 'rhythm' || !settings.features.has(docFeature(d.type) as Feature)) continue;
     const named = !!d.key && texts.some((t) => t.includes(d.key));
-    return liveEntries(d.entries, live).map((e) => ({ near: named || (e.who ?? []).some((n) => scene.includes(n)), pos: live.at.get(e.anchor) ?? -1, seq: e.seq, item: { type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) } }));
-  });
-  // 상한은 사건·장소·세력·물건 문서만 센다 (설정 도움말대로). 서사 리듬 기록은 세지 않고 늘 보낸다
-  const capped = rows.filter((r) => r.item.type !== 'rhythm');
-  if (settings.docsCap <= 0 || capped.length <= settings.docsCap) return rows.map((r) => r.item);
-  const keep = new Set([...capped].sort((a, b) => Number(b.near) - Number(a.near) || b.pos - a.pos || b.seq - a.seq).slice(0, settings.docsCap));
-  return rows.filter((r) => r.item.type === 'rhythm' || keep.has(r)).map((r) => r.item);
+    for (const e of liveEntries(d.entries, live)) {
+      if (!named && !(e.who ?? []).some((n) => scene.includes(n))) continue;
+      rows.push({ pos: live.at.get(e.anchor) ?? -1, seq: e.seq, doc: d, entry: e });
+    }
+  }
+  rows.sort((a, b) => a.pos - b.pos || a.seq - b.seq);
+  const kept: { doc: Doc; entry: Entry }[] = [];
+  let size = base;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    size += sizeOf(rows[i].doc, rows[i].entry);
+    if (size > maxChars) break;
+    kept.unshift({ doc: rows[i].doc, entry: rows[i].entry });
+  }
+  return kept;
+}
+
+const docItem = (d: Doc, e: Entry) => ({ type: d.type, key: d.key, id: e.id, text: e.text, ...(e.date ? { date: e.date } : {}), ...(e.place ? { place: e.place } : {}), ...(e.who?.length ? { who: e.who } : {}) });
+
+/** 갱신기 자료의 문서 항목 (docs_now): 메인 요청과 같은 규칙(relatedDocs)으로 고른 사건·장소·세력·물건 항목 + 서사 리듬 기록(문서마다 최신 줄, 끝난 떡밥 빼고 = rhythmNow).
+ *  몫은 메인 요청과 같이 「컨텍스트 글자 상한 ÷ (장면 인물 수 + 1)」 */
+export function docsNow(store: PeopleStore, live: Liveness, settings: PeopleSettings, texts: string[], scene: string[]) {
+  const rhythm = settings.features.has(docFeature('rhythm') as Feature) ? rhythmNow(store, live).map((r) => docItem(r.doc, r.entry)) : [];
+  const related = relatedDocs(store, live, settings, texts, scene, Math.floor(settings.blockCap / (scene.length + 1)), (d, e) => JSON.stringify(docItem(d, e)).length + 1);
+  return [...related.map((r) => docItem(r.doc, r.entry)), ...rhythm];
 }
 
 /** 인물 기록을 자료용으로 (칸별 id·본문, 상한을 넘으면 오래된 history·scene 부터 뺀다) */
 /** 인물의 살아 있는 기록 글자 수 (저장 상한 판정) */
 export function recordChars(p: Person, live: Liveness): number {
-  return SLOTS.reduce((n, s) => n + liveEntries(p.slots[s], live).reduce((m, e) => m + e.text.length, 0), 0);
+  // 의심 칸은 세지 않는다: 정리(merge·정리 호출)로 줄일 수 없는 칸이라, 세면 상한을 넘은 인물이 갱신마다 정리 대상으로 다시 올라간다
+  return SLOTS.filter((s) => s !== 'suspicion').reduce((n, s) => n + liveEntries(p.slots[s], live).reduce((m, e) => m + e.text.length, 0), 0);
 }
 
 export function personPayload(p: Person, live: Liveness, changes: Change[], unknown?: string[], extra: { taste?: boolean; openness?: boolean; axes?: boolean; turnCap?: number; slots?: SlotId[]; qual?: Set<string>; sexual?: PeopleSettings; aff?: AffinityOpts; folded?: number } = {}) {
   const entries: Record<string, { id: string; text: string; target?: string; kind?: string; pin?: true }[]> = {};
   for (const s of extra.slots ?? SLOTS) {
-    const list = liveEntries(p.slots[s], live);
+    const list = s === 'suspicion' ? suspicionShown(liveEntries(p.slots[s], live)) : liveEntries(p.slots[s], live);
     if (!list.length) continue;
     entries[s] = list.map((e) => ({ id: e.id, text: e.text, ...(e.target ? { target: e.target } : {}), ...(e.kind ? { kind: e.kind } : {}), ...(e.pin ? { pin: true as const } : {}) }));
   }
@@ -283,7 +304,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   };
   for (const t of texts) for (const n of match(t)) push(n);
   const scoped = { ...chat, message: list.slice(0, Math.max(...batch) + 1) } as Chat;
-  for (const n of scenePeople(scoped, store, match, { recent: 2 })) push(n);
+  for (const n of scenePeople(scoped, store, match, { recent: 2, max: o.settings.sceneMax })) push(n);
   // 항상 포함할 인물 (설정 always, 원본 tracking_review): 글에 안 나와도 되짚되, 안 나온 건 근거가 아니다
   const tracked = o.settings.always.filter((n) => store.people[n] && !o.exclude?.includes(n));
   for (const n of tracked) push(n);
@@ -304,7 +325,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   // 장면에 남아 있는 인물 (설정 「장면 인물 유지」): 묶음 앞 응답 끝에 갱신기가 장면에 있다고 본 사람. 글에 이름이 안 나와도 이어서 읽게, 위에서 고른 사람들 뒤에 넣는다
   const carried = o.settings.sceneCarry && !o.only?.length ? carriedScene(store, chat, first) : [];
   for (const n of carried) push(n);
-  const chosen = o.only?.length ? o.only.filter((n) => store.people[n]).slice(0, 6) : people.slice(0, 6);
+  const chosen = o.only?.length ? o.only.filter((n) => store.people[n]).slice(0, o.settings.sceneMax) : people.slice(0, o.settings.sceneMax);
   // 초상: 확정 응답에 초상 태그가 뜬 장면 인물 (태그는 span 에서 지워져 모델이 못 본다). 태그의 이름 부분을 이름 표의 영문 표기로 찾는다
   const tagOwner = (tag: string): string | null => {
     const t = tag.toLowerCase();
@@ -320,6 +341,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   const roster = o.settings.rosterCap > 0 && rosterAll.length > o.settings.rosterCap ? [...rosterAll.filter(rosterNear), ...rosterAll.filter((r) => !rosterNear(r))].slice(0, o.settings.rosterCap) : rosterAll;
   // 대기 이름: 근거 응답이 채팅에 살아 있는 줄만 싣는다 (다시 굴리거나 지운 응답에서만 나온 이름은 이야기에 없던 이름이다).
   // 설정 「이름 없는 인물 기록」이 꺼져 있으면 호칭으로 올라온 줄도 뺀다 (다시 와도 받지 않는다)
+  // 대기 줄은 근거 응답이 채팅 뒤쪽 FOLD_KEEP_MSGS 밖으로 나가면 버려진다 (store.ts prunePending) — 여기서는 살아 있는 것을 그대로 싣는다
   const waiting = fresh ? Object.entries(store.pending).filter(([, row]) => live.at.has(row.anchor) && (o.settings.newUnnamed || !row.provisional)) : [];
   const held = waiting.map(([name]) => name);
   // 호칭: 호칭으로 적어 둔 기록 전부 + 호칭으로 올라와 기다리는 이름. 이름 옮기기(renames)의 from 이 될 수 있는 이름이 이것이다
@@ -357,7 +379,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     doc_types: DOC_TYPES.filter((t) => o.settings.features.has(docFeature(t) as Feature)),
     people: chosen.map((n) => {
       const p = store.people[n];
-      return { ...personPayload(p, live, changes, wantNote || o.settings.features.has('perception') ? unknownTo(p, store, live) : undefined, { taste: o.settings.features.has('taste'), openness: o.settings.features.has('openness'), axes: o.settings.features.has('axes'), turnCap: o.settings.turnCap, slots: slotsFor(o.settings.features, o.settings.qualitative), qual: o.settings.qualitative, sexual: o.settings, aff: { temper: temperOf(n), speed: o.settings.speed, speedDown: o.settings.speedDown, turnCap: o.settings.turnCap }, folded: store.folded[n] ?? 0 }), values: o.values[n] ?? '' };
+      return { ...personPayload(p, live, changes, wantNote || o.settings.features.has('perception') ? unknownTo(p, store, live, o.settings.unknownMax) : undefined, { taste: o.settings.features.has('taste'), openness: o.settings.features.has('openness'), axes: o.settings.features.has('axes'), turnCap: o.settings.turnCap, slots: slotsFor(o.settings.features, o.settings.qualitative), qual: o.settings.qualitative, sexual: o.settings, aff: { temper: temperOf(n), speed: o.settings.speed, speedDown: o.settings.speedDown, turnCap: o.settings.turnCap }, folded: store.folded[n] ?? 0 }), values: o.values[n] ?? '' };
     }),
     known_names: Object.keys(store.people),
     ...(handles.length ? { handles } : {}),
@@ -713,7 +735,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     return true;
   };
   // 근거 응답이 채팅에서 사라진 대기 줄은 먼저 버린다 (다시 굴린 응답이 2턴 규칙의 「다른 응답」으로 세어지지 않게)
-  prunePending(store, chat);
+  prunePending(store, chat, ctx.settings.newPeople !== 'confirm', ctx.settings.keepMsgs);
   let newCount = 0;
   for (const n of ctx.only?.length ? [] : r.new_people ?? []) {
     const given = plain(n?.name, 40);
@@ -800,7 +822,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     if (from) {
       const old = [from, ...store.people[from].aliases];
       const seed = store.people[to] ? null : seedPerson(to, ctx.sheetOf?.(to) ?? null, ctx.baseOf?.(to) ?? {}, ctx.now);
-      renamePerson(store, from, to, seed);
+      renamePerson(store, from, to, seed, ctx.settings.patternsCap);
       for (const k of old) moved.set(norm(k), to);
       report.applied.renamed.push({ from, to });
       continue;
@@ -1035,7 +1057,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         continue;
       }
       perWho.set(who, n);
-      const res = observe(store.people[who], { axis, direction: x.direction, pattern: str(x.pattern), anchor: ev.anchor, seq: nextSeq(ev.anchor), quote: x.quote, reason: str(x.reason) || str(x.pattern), strength: Number(x.strength ?? 50), confidence: Number(x.confidence ?? 50) }, now);
+      const res = observe(store.people[who], { axis, direction: x.direction, pattern: str(x.pattern), anchor: ev.anchor, seq: nextSeq(ev.anchor), quote: x.quote, reason: str(x.reason) || str(x.pattern), strength: Number(x.strength ?? 50), confidence: Number(x.confidence ?? 50) }, now, ctx.settings.evidenceCap);
       if (!res.ok) {
         drop('observation', x, res.reason, who);
         continue;
@@ -1230,7 +1252,8 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     }
     // 리듬 시계 (리수폿 H): 훅 행동은 응답당 1개, 새 훅은 간격·동시 상한을 채울 때만
     if (type === 'rhythm' && typeof d.key === 'string' && d.key.startsWith('hook:') && d.op !== 'remove' && input.clock) {
-      const isNew = !store.docs[`rhythm:${plain(d.key, 40)}`];
+      // 끝난 떡밥은 갱신기에 보내지 않으니, 같은 이름을 다시 쓰면 새로 심는 것으로 본다
+      const isNew = !input.clock.hooks.some((h) => h.key === plain(d.key, 40) && hookActive(h.stage));
       if (isNew && !input.clock.plantAllowed) {
         drop('doc', d, `새 훅을 심을 수 없음 (${input.clock.plantBlocked})`, d.key);
         continue;
@@ -1264,9 +1287,12 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     let replaces: string | undefined;
     // replace 없는 upsert: 문서가 비어 있으면 add, 항목이 하나뿐이면 그것을 고친다 (전수검사 11-13)
     const drid = typeof d.replace === 'string' ? d.replace.trim() : '';
-    const dop = d.op === 'upsert' && !drid && cur.length === 0 ? 'add' : d.op;
+    // 리듬 문서는 열쇠마다 지금 상태 하나다 (요청에도 최신 줄 하나만 싣는다, rhythm.ts rhythmNow):
+    // add 나 replace 없는 upsert 는 최신 줄을 고친다. 줄이 따로 쌓여 갱신기가 볼 수도 고칠 수도 없게 되지 않게 (2026-11-17)
+    const one = type === 'rhythm' && !drid && cur.length > 0 && (d.op === 'add' || d.op === 'upsert');
+    const dop = one ? 'upsert' : d.op === 'upsert' && !drid && cur.length === 0 ? 'add' : d.op;
     if (dop === 'upsert' || dop === 'remove') {
-      const target = drid ? cur.find((x) => x.id === drid) : dop === 'upsert' && cur.length === 1 ? cur[0] : undefined;
+      const target = drid ? cur.find((x) => x.id === drid) : one ? cur[cur.length - 1] : dop === 'upsert' && cur.length === 1 ? cur[0] : undefined;
       if (!target) {
         drop('doc', d, 'replace 가 실제 항목이 아님');
         continue;
@@ -1286,7 +1312,9 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       continue;
     }
     const seq = nextSeq(ev.anchor);
-    const body = dop === 'remove' ? `${resolvedPrefix()} ${cur.find((x) => x.id === replaces)!.text}`.slice(0, 200) : text;
+    // 떡밥을 remove 로 닫으면 끝난 단계(retired)로 적는다: 「(해소)」를 앞에 붙이면 머리 표식이 안 읽혀 끝난 떡밥으로 걸러지지 않았다
+    const gone = dop === 'remove' ? cur.find((x) => x.id === replaces)!.text : '';
+    const body = dop === 'remove' ? (type === 'rhythm' && key.startsWith('hook:') && retireHookText(gone)) || `${resolvedPrefix()} ${gone}`.slice(0, 200) : text;
     if (putDoc(store, type, key, { id: entryId(`${type}:${key}`, 'doc', ev.anchor, seq, body), text: body, src: 'story', anchor: ev.anchor, seq, ...(norm(str(d.quote)).length >= 3 ? { quote: d.quote } : {}), ...(replaces ? { replaces } : {}), ...(d.date ? { date: plain(d.date, 20) } : {}), ...(d.place ? { place: plain(d.place, 40) } : {}), ...(Array.isArray(d.who) ? { who: d.who.map((w) => plain(w, 30)).filter(Boolean).slice(0, 8) } : {}) })) report.applied.docs++;
   }
 
@@ -1625,7 +1653,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     const last = Math.max(...input.indexes);
     if (list[last]) {
       (store.scene ??= {})[messageKey(list[last], last)] = present;
-      capScene(store, chat, messageKey(list[last], last));
+      capScene(store, chat, messageKey(list[last], last), ctx.settings.keepScene);
     }
   }
 

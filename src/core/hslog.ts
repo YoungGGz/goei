@@ -5,13 +5,13 @@ import { tokens } from './gnet';
 import { related, type Focus } from './focus';
 import { guideTxt } from './guides';
 import { aliveAnchors } from './wallet';
-import { HS_KEY, hsPayText, liveOrders, type HsShow } from './homeshop';
+import { HS_KEY, hsLogKeep, hsPayText, liveOrders, type HsShow } from './homeshop';
 import { messageKey } from './people/store';
 import type { Chat } from './types';
 
 /** 시청 기록 (채팅 변수, JSON) */
 export const HS_LOG_VAR = '$hs_log';
-/** 기록 줄 수 한계: 넘으면 오래된 줄부터 버린다 (변수가 끝없이 자라지 않게. 내 채팅·주문은 맨 나중에 버린다) */
+/** 기록 줄 수 한계의 기본값 (설정 「시청 기록 줄 수」): 넘으면 오래된 줄부터 버린다 (변수가 끝없이 자라지 않게. 내 채팅·주문은 맨 나중에 버린다) */
 export const HS_LOG_MAX = 400;
 /** 진행자 줄의 who: 지침 「망상홈쇼핑」의 LOG_HOST_NICK 절. 적는 쪽(ui/hsplayer.ts)과 가려내는 쪽(여기)이 같은 절을 읽는다 */
 export const hsLogHost = (): string => guideTxt('Hs', 'LOG_HOST_NICK');
@@ -117,10 +117,11 @@ export function appendLog(vars: Vars, show: Pick<HsShow, 'key' | 'title' | 'part
   if (turn && log.at !== turn) { log.at = turn; changed = true; }
   if (!changed) return {};
   // 한계: 내 채팅·주문이 아닌 오래된 줄부터, 그래도 넘으면 가장 오래된 줄부터
-  let over = log.entries.length - HS_LOG_MAX;
+  const max = hsLogKeep(vars);
+  let over = log.entries.length - max;
   if (over > 0) {
     log.entries = log.entries.filter((e) => mine(e) || over-- <= 0);
-    if (log.entries.length > HS_LOG_MAX) log.entries = log.entries.slice(-HS_LOG_MAX);
+    if (log.entries.length > max) log.entries = log.entries.slice(-max);
   }
   return logVars(log);
 }

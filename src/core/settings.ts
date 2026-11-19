@@ -4,6 +4,7 @@ import { GUIDE_NAMES, isGuideName, setGuideOverride, RULE_TARGETS, setUserRules,
 import type { LoreEntry, ScriptState } from './types';
 import { DEFAULT_SETTINGS, type WorldSettings } from './world/engine';
 import { imgFold, imgRecent, imgSize } from './imgtag';
+import { journalSettings } from './journal/settings';
 
 export type AssetModel = 'main' | 'aux';
 
@@ -39,7 +40,7 @@ export const BASIC_DEFAULTS: BasicSettings = { anomalyOn: true, assetOn: true, a
 
 /** 괴이 생성 수치. label은 옛 Settings 로어북 「괴이생성」의 항목 이름 (원본 WG.spec) */
 export interface WorldField {
-  key: Exclude<keyof WorldSettings, 'agent_limit'>;
+  key: Exclude<keyof WorldSettings, 'agent_limit' | 'trail_cap'>;
   label: string;
   max: number | null;
   fraction: boolean;
@@ -66,6 +67,7 @@ export const WORLD_SPEC: WorldField[] = (
     ['인시던트 RP 유지 시간', 'incident_ttl', 8760, true],
     ['미스틱 사이트 RP 유지 시간', 'mystic_ttl', 8760, true],
     ['인시던트 중 거점 비율', 'landmark_share', 100, false],
+    ['클리어 기록 상한', 'cleared_cap', 1000, false],
   ] as [string, WorldField['key'], number | null, boolean][]
 ).map(([label, key, max, fraction]) => ({ key, label, max, fraction }));
 
@@ -143,7 +145,25 @@ export interface Prefs {
   walletStart?: number;
   /** 상황판 창 둘레 기기 틀 (PC, 이 기기 공통, 2026-10-29 사용자). 없으면 일반 태블릿. 폰·필드 전체화면·좁은 창에서는 안 그린다 (ui/frame.ts) */
   frame?: 'none' | 'tablet' | 'tactical';
+  /** 인물 갱신 기록(진단) 보관 건수: 성공·실패 (이 기기·모든 채팅 공통. 기록 저장소가 기기에 하나라서). 없으면 10·30 */
+  diagKeep?: number;
+  diagFailKeep?: number;
+  /** 호출 기록에 남기는 턴 수 (이 기기·모든 채팅 공통. 기록 저장소가 기기에 하나라서). 없으면 5 */
+  traceKeep?: number;
+  /** AI 상담: 채팅마다 남기는 대화 줄 수 · 대화를 남기는 채팅 수 (이 기기·모든 채팅 공통. 대화 저장소가 기기에 하나라서). 없으면 80·30 */
+  consultLines?: number;
+  consultChats?: number;
 }
+
+/** 갱신 기록 보관 건수의 기본값·범위 */
+export const DIAG_KEEP_DEFAULT = { ok: 10, fail: 30 };
+export const DIAG_KEEP_RANGE: readonly [number, number] = [1, 50];
+/** 호출 기록 보관 턴 수·AI 상담 보관 줄 수·채팅 수의 기본값·범위 (기본값 = 전에 코드에 고정돼 있던 값) */
+export const TRACE_KEEP_DEFAULT = 5;
+export const TRACE_KEEP_RANGE: readonly [number, number] = [1, 20];
+export const CONSULT_KEEP_DEFAULT = { lines: 80, chats: 30 };
+export const CONSULT_LINES_RANGE: readonly [number, number] = [20, 500];
+export const CONSULT_CHATS_RANGE: readonly [number, number] = [1, 100];
 
 /** 창 바깥 어둡기 기본값 (%). 예전엔 100%라 뒤 채팅이 거의 안 보였다 */
 export const DIM_DEFAULT = 50;
@@ -152,7 +172,7 @@ export const DIM_STEPS = [0, 25, 50, 75, 100];
 let prefs: Prefs = { basic: {}, world: {} };
 
 /** 기능 설정으로 기본값에 담을 수 있는 채팅 변수 (상태·기록 변수는 빼고 설정만) */
-export const PREF_VAR = /^(\$ph_(model|auto|status|related|context|incoming|incoming_chance|group_invites|group_invite_chance|announcements|announcement_gap|announcement_history|announcement_page_size|all_contacts|anomaly_contacts|storage_(auto|limit)_(dm|group|notice))|\$lb_cfg_lb-(gn|gal|wpf|sm)\.[a-z_]+|\$(gn|gal|wpf|sm)_storage_(auto|limit)_dm|\$nw_(mode|model|length|refresh_previous|writing_request|context)|\$ph_context_(messages|announcements)|\$(ph|nw)_adv_[a-z_]+|\$hq_(adv_[a-z_]+|ui)|\$gen_[a-z_]+|\$pp_[a-z_]+|\$jr_[a-z_]+|\$st_col_(date|time|weather|temp|place|target|companions|deployed|identity|wallet|points)|\$st_wallet_(edit|sync|loose|recent)|\$it_(on|slots|limit|push|auto|start|spent|state|detail|logturns|rules|left_words|off_words|scope|skip)|\$sh_[a-z_]+|\$(cos|bm|hs)_sh_[a-z_]+|\$hs_on|\$net_joint|\$ph_(habits|reactions|banter|banter_chance|banter_min|banter_max|view_(auto|preset|pov|speak|scope|size))|\$nw_(auto|footnotes|images)|\$it_(carry|edit|icon_alias|icon_pool)|\$(cos|bm)_roll_(on|genres|tiers|useful|gmode|tmode)|\$bm_desk_(on|axes|again|avoid)|\$cos_(ready|truth|fixed)|\$hs_(net|chat_min|chat_max|chat_gap|cue_min|cue_max|say_cue_min|say_cue_max|say_chat_min|say_chat_max|read|drop|drop_rate|drop_fast|drop_step|soon_at|end_lo|end_hi|main|main_kinds|main_tokens|main_turns|speed|hold|frame|fx_cut|fx_bulb|fx_tear|tear_p|fx_scan|fill_lo|fill_hi|fill_cool|rare_p|rare_cool|clips|scale_pc|scale_ph|next|turn|lock|left|call_lo|call_hi|aud_on|peek|say|barter|talk|tel|retry))$/;
+export const PREF_VAR = /^(\$ph_(model|auto|status|related|context|incoming|incoming_chance|group_invites|group_invite_chance|announcements|announcement_gap|announcement_history|announcement_page_size|all_contacts|anomaly_contacts|storage_(auto|limit)_(dm|group|notice))|\$lb_cfg_lb-(gn|gal|wpf|sm)\.[a-z_]+|\$(gn|gal|wpf|sm)_storage_(auto|limit)_dm|\$nw_(mode|model|length|refresh_previous|writing_request|context)|\$ph_context_(messages|announcements)|\$(ph|nw)_adv_[a-z_]+|\$hq_(adv_[a-z_]+|ui)|\$gen_[a-z_]+|\$pp_[a-z_]+|\$jr_[a-z_]+|\$st_col_(date|time|weather|temp|place|target|companions|deployed|identity|wallet|points)|\$st_wallet_(edit|sync|loose|recent|cap)|\$it_(on|slots|limit|push|auto|start|spent|state|detail|logturns|logcap|away_turns|list_cap|rules|left_words|off_words|scope|skip)|\$sh_[a-z_]+|\$(cos|bm|hs)_sh_[a-z_]+|\$hs_on|\$net_joint|\$ph_(habits|reactions|banter|banter_chance|banter_min|banter_max|view_(auto|preset|pov|speak|scope|size))|\$nw_(auto|footnotes|images)|\$it_(carry|edit|icon_alias|icon_pool)|\$(cos|bm)_roll_(on|genres|tiers|useful|gmode|tmode)|\$bm_desk_(on|axes|again|avoid|keep)|\$cos_(ready|truth|fixed)|\$hs_(say_host|say_flow|prev_keep|talk_keep|order_keep|log_keep|net|chat_min|chat_max|chat_gap|cue_min|cue_max|say_cue_min|say_cue_max|say_chat_min|say_chat_max|read|drop|drop_rate|drop_fast|drop_step|soon_at|end_lo|end_hi|main|main_kinds|main_tokens|main_turns|speed|hold|frame|fx_cut|fx_bulb|fx_tear|tear_p|fx_scan|fill_lo|fill_hi|fill_cool|rare_p|rare_cool|clips|scale_pc|scale_ph|next|turn|lock|left|call_lo|call_hi|aud_on|peek|say|barter|talk|tel|retry))$/;
 
 export function getPrefs(): Prefs {
   return prefs;
@@ -231,9 +251,14 @@ export function setPrefs(raw: unknown): Prefs {
   const relationsSym = o.relationsSym === false ? false : undefined;
   const frame = o.frame === 'none' || o.frame === 'tactical' ? o.frame : undefined;
   const walletStart = int(o.walletStart, 0, 1_000_000_000_000);
+  const diagOk = int(o.diagKeep, ...DIAG_KEEP_RANGE);
+  const diagFail = int(o.diagFailKeep, ...DIAG_KEEP_RANGE);
+  const traceKeep = int(o.traceKeep, ...TRACE_KEEP_RANGE);
+  const consultLines = int(o.consultLines, ...CONSULT_LINES_RANGE);
+  const consultChats = int(o.consultChats, ...CONSULT_CHATS_RANGE);
   // 띄운 보고서 알림 기억도 남긴다. 최근 50개 (전수검사 11-13)
   const noticedReports = Array.isArray(o.noticedReports) ? [...new Set(o.noticedReports.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.slice(0, 80)))].slice(-50) : [];
-  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
+  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(diagOk !== null ? { diagKeep: diagOk } : {}), ...(diagFail !== null ? { diagFailKeep: diagFail } : {}), ...(traceKeep !== null ? { traceKeep } : {}), ...(consultLines !== null ? { consultLines } : {}), ...(consultChats !== null ? { consultChats } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
   return prefs;
 }
 
@@ -344,6 +369,7 @@ export function worldDefaults(lore: LoreEntry[] | undefined): WorldSettings {
   }
   Object.assign(out, prefs.world);
   out.agent_limit = basicDefaults(lore).agentLimit;
+  out.trail_cap = journalSettings(prefs.vars).trailMax;
   return out;
 }
 
@@ -356,6 +382,8 @@ export function worldSettings(lore: LoreEntry[] | undefined, ss?: ScriptState): 
     if (n !== null) out[f.key] = n;
   }
   out.agent_limit = basicSettings(lore, ss).agentLimit;
+  // 경과 줄 수는 설정 「일지」의 값 (보고서 경과와 같은 수)
+  out.trail_cap = journalSettings(ss).trailMax;
   return out;
 }
 

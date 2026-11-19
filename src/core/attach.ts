@@ -21,8 +21,10 @@ export const ATTACH_HINTS: Record<UserKind, string> = {
   gift: '보낼 선물 이름을 적어 주세요',
 };
 export const ATTACH_MAX = 3;
-/** 한 요청에 실제로 붙이는 사진 수 */
+/** 한 요청에 실제로 붙이는 사진 수의 기본값 */
 export const IMAGE_MAX = 8;
+/** 지금 채팅의 값 (생성 공통 「요청당 사진」, core/advanced.ts applyGenLimits 가 맞춘다) */
+export const ATTACH_LIMITS = { images: IMAGE_MAX };
 
 export interface BodyPart {
   kind: PartKind;
@@ -215,8 +217,8 @@ export function prepareAttachmentGroups<T extends Msg>(groups: T[][]): { groups:
   // 글은 지침 「요청 공통」의 ATTACH.* 절
   const lines = [guideTxt('Common', 'ATTACH.DATA')];
   const images: string[] = [];
-  // 실제 사진은 최근 것부터 IMAGE_MAX장까지만 붙인다 (요청이 너무 커지지 않게)
-  const withImage = new Set(list.map((a, i) => (a.kind === 'image' && a.asset ? i : -1)).filter((i) => i >= 0).slice(-IMAGE_MAX));
+  // 실제 사진은 최근 것부터 「요청당 사진」 장까지만 붙인다 (요청이 너무 커지지 않게)
+  const withImage = new Set(list.map((a, i) => (a.kind === 'image' && a.asset ? i : -1)).filter((i) => i >= 0).slice(-Math.max(1, ATTACH_LIMITS.images)));
   list.forEach((a, i) => {
     if (a.kind === 'image' && a.asset && !withImage.has(i)) {
       lines.push(`A${i + 1} ${JSON.stringify({ kind: 'image', content: a.content, note: guideTxt('Common', 'ATTACH.OLDER') })}`);

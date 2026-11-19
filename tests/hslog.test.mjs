@@ -74,6 +74,26 @@ test('시청 기록: 줄 수 한계 — 오래된 줄부터 버리되 내 채팅
   assert.equal(log.entries[2].text, '줄 52', '가장 오래된 시청자 줄 52개가 빠졌다');
 });
 
+test('시청 기록: 줄 수 한계는 설정($hs_log_keep)을 따른다 — 기본 400, 잘못된 값은 기본값', () => {
+  const show = showOf('k1');
+  const many = Array.from({ length: 500 }, (_, i) => chat(0, `닉${i}`, `줄 ${i}`));
+  const count = (set) => readLog(appendLog(set, show, many)).entries.length;
+  assert.equal(HS_LOG_MAX, 400);
+  assert.equal(count({}), 400);
+  assert.equal(count({ $hs_log_keep: '60' }), 60);
+  assert.equal(count({ $hs_log_keep: '2000' }), 500);
+  assert.equal(count({ $hs_log_keep: '글자' }), 400);
+  assert.equal(count({ $hs_log_keep: '' }), 400);
+  assert.equal(count({ $hs_log_keep: '1' }), 50, '범위 밖은 끝 값');
+  // 줄여도 내 채팅·주문은 남긴다
+  let vars = { $hs_log_keep: '60', ...appendLog({}, show, [me(0, '맨 처음 내 말'), buy(0, '전화 주문: 「행운의 무전기」')]) };
+  vars = { ...vars, ...appendLog(vars, show, many) };
+  const log = readLog(vars);
+  assert.equal(log.entries.length, 60);
+  assert.equal(log.entries[0].text, '맨 처음 내 말');
+  assert.equal(log.entries.at(-1).text, '줄 499');
+});
+
 test('설정: 기본값 · 끄기 · 종류 · 토큰 범위 · 설정 표', () => {
   assert.deepEqual(hsMainSettings(undefined), { on: true, kinds: ['show', 'chat', 'say', 'buy'], tokens: 3000, turns: 0 });
   assert.equal(hsMainSettings({ $hs_main: '0' }).on, false);

@@ -177,7 +177,11 @@ currency: points
 @@END
 
 @@SECTION HEAD_BOUGHT
-[이번 방문에 산 것]
+[지금까지 산 것: 산 때|이름|값|효과]
+@@END
+
+@@SECTION BOUGHT_LINE
+{when}|{name}|{price}p|{effect}
 @@END
 
 @@SECTION HEAD_OWNER_BOUGHT

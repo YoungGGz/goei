@@ -92,7 +92,14 @@ test('새로고침: 선쪽지 출처는 그대로 본문과 함께 가고, 받�
   const plan = allowed(st);
   const all = optionsOf(userText(C.refreshPrompt(src(), st, plan, '나', {})));
   assert.equal(all.incomingOrigin.content, BODY, '출처 글이 작업 입력에 따로 없으니 본문과 함께');
-  assert.equal(all.previousIncoming.length, 6, '기본값: 전부');
+  assert.equal(all.previousIncoming.length, 6, '기본값 50통 안이면 전부');
+  const many = board();
+  many.dms = Array.from({ length: 60 }, (_, i) => ({ nick: `보낸이${i}`, side: 'npc', body: `쪽지 ${i}`, unread: false, date: '' }));
+  const def = optionsOf(userText(C.refreshPrompt(src(), many, allowed(many), '나', {})));
+  assert.equal(def.previousIncoming.length, 50, '기본값: 최근 50통');
+  assert.equal(def.previousIncoming[0].body, '쪽지 10');
+  const zero = optionsOf(userText(C.refreshPrompt(src({ [ADV('incoming_prev')]: '0' }), many, allowed(many), '나', {})));
+  assert.equal(zero.previousIncoming.length, 60, '0 = 전부');
   const two = optionsOf(userText(C.refreshPrompt(src({ [ADV('incoming_prev')]: '2' }), st, plan, '나', {})));
   assert.deepEqual(two.previousIncoming.map((m) => m.body), ['쪽지 4', '쪽지 5']);
   // 넘기지 않은 옛 쪽지와 같은 것이 와도 저장할 때 걸러진다
@@ -203,10 +210,10 @@ test('메인 요청: 장면과 무관하게 늘 넣는 최근 글·쪽지 수를
 
 test('새 설정의 기본값은 지금 동작 그대로다', () => {
   const v = (k) => C.advanced.advValue({}, 'gn', k);
-  assert.deepEqual(['activity', 'dm_public', 'incoming_prev', 'ctx_recent_posts', 'ctx_recent_dms'].map(v), ['1', '8', '0', '1', '5']);
+  assert.deepEqual(['activity', 'dm_public', 'incoming_prev', 'ctx_recent_posts', 'ctx_recent_dms'].map(v), ['1', '8', '50', '1', '5']);
   assert.deepEqual(C.advanced.advChanged({}, 'gn'), []);
   C.advanced.applyAdvanced({});
-  assert.deepEqual([C.HISTORY.activity, C.HISTORY.dmPublic, C.HISTORY.incomingPrev, C.CONTEXT.recentPosts, C.CONTEXT.recentDms], [true, 8, 0, 1, 5]);
+  assert.deepEqual([C.HISTORY.activity, C.HISTORY.dmPublic, C.HISTORY.incomingPrev, C.CONTEXT.recentPosts, C.CONTEXT.recentDms], [true, 8, 50, 1, 5]);
 });
 
 test('자동 새로고침 결과: 채팅이 이어져도 그 응답이 그대로면 쓰고, 다시 굴렸거나 지웠으면 쓰지 않는다', () => {
@@ -350,4 +357,110 @@ test('다양성 강화: 확률이 더 낮은 벌을 쓰고, 확률이 없거나 
   assert.equal(C.sampledBoard({ posts: A, alternativePosts: B, postsProb: '', alternativeProb: 0.06 }), B);
   assert.equal(C.sampledBoard({ posts: A, alternativePosts: [] }), A, '두 번째 벌이 비면 첫 벌');
   assert.equal(C.sampledBoard({ posts: [], alternativePosts: B, postsProb: 0.01, alternativeProb: 0.09 }), B, '첫 벌이 비면 두 번째 벌');
+});
+
+test('새로고침: 댓글은 글마다 최근 30개와 그 윗댓글만 넘기고, 돌아온 번호는 넘긴 차례로 읽는다', () => {
+  const st = board();
+  // 댓글 80개: 1번은 뿌리, 75번은 1번의 답글, 나머지는 뿌리
+  st.posts[1].comments = Array.from({ length: 80 }, (_, i) => cm(`c${i + 1}`, `댓글 ${i + 1}`, i + 1 === 75 ? 1 : 0));
+  const plan = C.incomingPlan(src().chat, st, { ...C.gnetSettings({}), incoming: false }, '나', () => 0);
+  const prompt = C.refreshPrompt(src(), st, plan, '나', {});
+  const text = userText(prompt);
+  const line = text.split('\n').find((l) => l.includes('"posts"') && l.includes('댓글 80'));
+  const sent = JSON.parse(line.slice(line.indexOf('{"posts"'))).posts.find((p) => p.id === 100002).comments;
+  assert.equal(sent.length, 31, '최근 30개 + 75번의 윗댓글 1번');
+  assert.deepEqual([sent[0].content, sent[1].content, sent[30].content], ['댓글 1', '댓글 51', '댓글 80']);
+  assert.equal(sent.find((c) => c.content === '댓글 75').parent, 1, 'parent 는 넘긴 배열 안의 차례');
+  assert.ok(!text.includes('댓글 50"'), '옛 댓글은 안 넘긴다');
+  // 응답: 새 댓글만. parent 2 = 넘긴 둘째(저장 51번), parent 32 = 첫 새 댓글
+  const value = { posts: [{ id: 100002, comments: [{ author: '새1', content: '51번에 답', parent: 2 }, { author: '새2', content: '새1에 답', parent: 32 }, { author: '새3', content: '뿌리', parent: 0 }] }] };
+  const got = C.applyBoard(st, structuredClone(st), value, { nick: '나', settings: C.gnetSettings({}), date: '2025.01.01 11:00', sent: prompt.sent }).st.posts.find((p) => p.id === 100002).comments;
+  assert.equal(got.length, 83);
+  assert.deepEqual(got.slice(80).map((c) => c.parent), [51, 81, 0]);
+});
+
+test('새로고침: 내 글도 참조할 글 수 안의 것만 넘기고, 안 넘긴 내 글은 그대로 남는다', () => {
+  const st = board();
+  st.posts = [...Array.from({ length: 12 }, (_, i) => post(100100 + i)), post(100001, { mine: true, nick: '나', body: '뒤로 밀린 내 글' })];
+  st.seq = 100200;
+  const plan = C.incomingPlan(src().chat, st, { ...C.gnetSettings({}), incoming: false }, '나', () => 0);
+  st.posts[12].comments = [cm('a', '옛 댓글')];
+  const prompt = C.refreshPrompt(src(), st, plan, '나', {});
+  const text = userText(prompt);
+  assert.ok(!text.includes('뒤로 밀린 내 글'));
+  assert.ok(!text.includes('100001'), '안 넘긴 글은 번호도 알리지 않는다');
+  // 모델이 못 본 글을 돌려줘도 그 글은 그대로 둔다
+  const value = { posts: [{ id: 100201, author: 'x', title: '새 글', content: '새 본문', comments: [] }, { id: 100001, views: 99, comments: [{ author: 'z', content: '지어낸 댓글', parent: 0 }] }] };
+  const res = C.applyBoard(st, structuredClone(st), value, { nick: '나', settings: C.gnetSettings({}), date: '2025.01.01 11:00', sent: prompt.sent });
+  assert.deepEqual(res.st.posts.find((p) => p.id === 100001).comments.map((c) => c.body), ['옛 댓글']);
+});
+
+test('쪽지 원글: 글이 살아 있으면 본문을 상대마다 또 적지 않고, 글이 사라지면 사본을 남긴다', () => {
+  const st = board();
+  for (const q of st.posts) q.id += 2000000;
+  st.seq += 2000000;
+  const long = '긴 본문 '.repeat(200);
+  st.posts[2].body = long;
+  for (let i = 0; i < 30; i++) st.sources[`상대${i}`] = C.sourceFor(st.posts[2], 0);
+  st.sources['댓글상대'] = C.sourceFor(st.posts[1], 1);
+  const raw = C.encode(st);
+  assert.equal(count(raw, long.trim().slice(0, 40)) >= 1, true);
+  assert.equal(raw.split('\n').filter((l) => l.startsWith('T|') && l.includes('긴 본문')).length, 0, 'T 줄에는 본문이 없다');
+  const back = C.decode(raw);
+  assert.deepEqual(back.sources, st.sources, '읽으면 전과 같은 원글');
+  // 글이 게시판·보관함에서 사라진 뒤 저장: 사본이 T 줄에 남는다
+  back.posts = back.posts.filter((p) => p.id !== 2100001);
+  const raw2 = C.encode(back);
+  assert.equal(raw2.split('\n').filter((l) => l.startsWith('T|') && l.includes('긴 본문')).length, 30);
+  assert.deepEqual(C.decode(raw2).sources, st.sources);
+  // 보관함으로 간 글은 번호만으로 찾는다
+  const arch = C.decode(raw);
+  arch.archive.push(...arch.posts.splice(2, 1));
+  assert.deepEqual(C.decode(C.encode(arch)).sources, st.sources);
+});
+
+test('공개 글 참고의 댓글 수·전체 길이, 주요 인물 닉네임 수: 기본값은 전과 같고 설정으로 바뀐다', () => {
+  const v = (k) => C.advanced.advValue({}, 'gn', k);
+  assert.deepEqual(['dm_public_comments', 'dm_public_chars', 'keyfig_keep'].map(v), ['12', '12000', '60']);
+  C.advanced.applyAdvanced({});
+  assert.deepEqual([C.HISTORY.dmPublicComments, C.HISTORY.dmPublicChars, C.HISTORY.keyFigures], [12, 12000, 60]);
+
+  const many = () => ({ posts: [post(100001, { comments: Array.from({ length: 20 }, (_, i) => cm(`c${i + 1}`, `댓글 ${i + 1}`)) })], archive: [], dms: [], sources: {}, seq: 100001 });
+  const ids = (st) => C.publicBoard(st, '', 'A').posts[0].comments.map((c) => c.id);
+  assert.deepEqual(ids(many()), Array.from({ length: 12 }, (_, i) => i + 9), '기본: 최근 12개');
+  C.advanced.applyAdvanced({ [ADV('dm_public_comments')]: '3' });
+  assert.deepEqual(ids(many()), [18, 19, 20]);
+  C.advanced.applyAdvanced({ [ADV('dm_public_comments')]: '0' });
+  assert.deepEqual(ids(many()), [], '0이면 댓글은 안 넣음');
+  for (const bad of ['-1', '201', '1.5', 'x', '']) {
+    C.advanced.applyAdvanced({ [ADV('dm_public_comments')]: bad });
+    assert.equal(C.HISTORY.dmPublicComments, 12, `틀린 값 ${bad}`);
+  }
+
+  // 전체 길이: 기본(12000자)에서는 긴 글 셋 가운데 둘만, 줄이면 하나, 늘리면 다 들어간다
+  const long = () => ({ posts: [1, 2, 3].map((i) => post(100000 + i, { body: 'abcd '.repeat(900) })), archive: [], dms: [], sources: {}, seq: 100003 });
+  C.advanced.applyAdvanced({});
+  assert.equal(C.publicBoard(long(), '', 'A').posts.length, 2);
+  C.advanced.applyAdvanced({ [ADV('dm_public_chars')]: '5000' });
+  assert.equal(C.publicBoard(long(), '', 'A').posts.length, 1);
+  C.advanced.applyAdvanced({ [ADV('dm_public_chars')]: '50000' });
+  assert.equal(C.publicBoard(long(), '', 'A').posts.length, 3);
+  for (const bad of ['0', '999', '200001', 'x']) {
+    C.advanced.applyAdvanced({ [ADV('dm_public_chars')]: bad });
+    assert.equal(C.HISTORY.dmPublicChars, 12000, `틀린 값 ${bad}`);
+  }
+
+  // 주요 인물 닉네임 수
+  const rows = Array.from({ length: 70 }, (_, i) => ({ keyFigure: `인물${i + 1}`, nickname: `닉${i + 1}`, note: '' }));
+  C.advanced.applyAdvanced({});
+  const kept = C.keyFigures(C.mergeKeyFigures({}, rows));
+  assert.equal(kept.length, 60);
+  assert.equal(kept[0].keyFigure, '인물11');
+  C.advanced.applyAdvanced({ [ADV('keyfig_keep')]: '5' });
+  assert.deepEqual(C.keyFigures(C.mergeKeyFigures({}, rows)).map((x) => x.keyFigure), ['인물66', '인물67', '인물68', '인물69', '인물70']);
+  for (const bad of ['0', '501', 'x']) {
+    C.advanced.applyAdvanced({ [ADV('keyfig_keep')]: bad });
+    assert.equal(C.HISTORY.keyFigures, 60, `틀린 값 ${bad}`);
+  }
+  C.advanced.applyAdvanced({});
 });

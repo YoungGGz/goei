@@ -28,8 +28,6 @@ export interface TrailStep {
   /** ≤160자 */
   text: string;
 }
-/** 항목당 경과 상한. 넘치면 둘째(첫 발견 글 다음)부터 지운다 */
-export const TRAIL_CAP = 24;
 export const TRAIL_TEXT_MAX = 160;
 
 /** 진행 중 항목이 공통으로 더 가지는 칸 (일지·보고서용) */
@@ -167,6 +165,10 @@ export interface WorldSettings {
   mystic_ttl: number;
   landmark_share: number;
   agent_limit: number;
+  /** 항목당 경과 상한 (설정 「일지」의 경과 줄 수). 넘치면 둘째(첫 발견 글 다음)부터 지운다 */
+  trail_cap: number;
+  /** 기억할 클리어 괴이 이름 수. 0 = 제한 없음 */
+  cleared_cap: number;
 }
 
 /** 원본 WG.spec 기본값 */
@@ -192,6 +194,8 @@ export const DEFAULT_SETTINGS: WorldSettings = {
   mystic_ttl: 24,
   landmark_share: 50,
   agent_limit: 12,
+  trail_cap: 24,
+  cleared_cap: 200,
 };
 
 export type Rng = () => number;
@@ -268,21 +272,21 @@ function close(w: WorldState, kind: ClosedEvent['kind'], e: AnEntry | InEntry | 
   (w.closed ??= []).push({ kind, entry: structuredClone(e), cause, minute, epoch: w.epoch, ...(cleared ? { cleared: true } : {}) });
 }
 /** 상황 글이 바뀌었을 때만 경과에 한 줄 (같은 글 반복·빈 글은 안 쌓는다). 상한을 넘으면 첫 발견 글은 두고 둘째부터 지운다 */
-function pushTrail(w: WorldState, e: Tracked, text: string) {
+function pushTrail(w: WorldState, e: Tracked, text: string, cap: number) {
   const t = text.trim().slice(0, TRAIL_TEXT_MAX);
   if (!t) return;
   const trail = (e.trail ??= []);
   if (trail.length && trail[trail.length - 1].text === t) return;
   trail.push({ m: w.minute, e: w.epoch, text: t });
-  while (trail.length > TRAIL_CAP) trail.splice(1, 1);
+  while (trail.length > Math.max(2, cap)) trail.splice(1, 1);
 }
 /** 종료 태그의 상황 칸: 있으면 항목의 상황 글과 경과 마지막 줄로 (closed 스냅숏의 「결과」가 종료 글이 되게). 비어 있으면 그대로 */
-function closingText(w: WorldState, e: Tracked & { situation?: string }, situation: string | undefined, c: Catalog, faction: string) {
+function closingText(w: WorldState, e: Tracked & { situation?: string }, situation: string | undefined, c: Catalog, faction: string, cap: number) {
   if (!situation) return;
   const text = codesToNames(situation, c, faction);
   if (!text.trim()) return;
   e.situation = text;
-  pushTrail(w, e, text);
+  pushTrail(w, e, text, cap);
 }
 function endAn(w: WorldState, e: AnEntry, cause: CloseCause = 'model', cleared = false, minute: number | null = w.minute) {
   remember(w, 'an', e, e.grade);
@@ -559,11 +563,12 @@ function applyAnomalies(w: WorldState, c: Catalog, s: WorldSettings, faction: st
     if (t.state !== '활성') {
       if (t.state === '클리어') {
         const names = [e.presetName, e.name, t.name].filter((n): n is string => validName(n));
-        w.cleared = [...new Set([...(w.cleared ?? []), ...names])].slice(-200);
+        const all = [...new Set([...(w.cleared ?? []), ...names])];
+        w.cleared = s.cleared_cap > 0 ? all.slice(-s.cleared_cap) : all;
       }
       // 종료 태그(격리·소멸·클리어)에 적힌 상황 글은 보고서 「결과」(마지막 상황 글)가 된다 — 끝내기 전에 경과에 넣는다 (사용자 결정 2026-10-29)
       const end = takeEndAt(w, e, t.situation, e.exploring ? null : dueAt(e, e.kind, s));
-      closingText(w, e, end.text, c, faction);
+      closingText(w, e, end.text, c, faction, s.trail_cap);
       endAn(w, e, 'model', t.state === '클리어', end.minute);
       continue;
     }
@@ -576,7 +581,7 @@ function applyAnomalies(w: WorldState, c: Catalog, s: WorldSettings, faction: st
     // 상황 칸이 없는 옛 카드 지침이면 비워 둔다 (그때는 위키 요약이 대신 보인다)
     if (t.situation) {
       e.situation = codesToNames(t.situation, c, faction);
-      pushTrail(w, e, e.situation);
+      pushTrail(w, e, e.situation, s.trail_cap);
     }
   }
   if (pending && handled) w.pending.an = undefined;
@@ -612,12 +617,12 @@ function applyIncidents(w: WorldState, c: Catalog, s: WorldSettings, faction: st
     if (w.pending.in === t.name) w.pending.in = undefined;
     if (t.state === '종료') {
       const end = takeEndAt(w, e, t.situation, dueAt(e, 'incident', s));
-      closingText(w, e, end.text, c, faction);
+      closingText(w, e, end.text, c, faction, s.trail_cap);
       endIn(w, e, 'model', end.minute);
       continue;
     }
     e.situation = t.situation ? codesToNames(t.situation, c, faction) : '';
-    if (e.situation) pushTrail(w, e, e.situation);
+    if (e.situation) pushTrail(w, e, e.situation, s.trail_cap);
     if (t.deploy) e.deploy = t.deploy;
     if (e.state !== '진행' || e.since === null) e.since = w.minute;
     e.state = '진행';
@@ -642,14 +647,14 @@ function applyMysticSites(w: WorldState, c: Catalog, s: WorldSettings, faction: 
     if (w.pending.ms === t.name) w.pending.ms = undefined;
     if (t.state === '소실') {
       const end = takeEndAt(w, e, t.situation, dueAt(e, 'mystic', s));
-      closingText(w, e, end.text, c, faction);
+      closingText(w, e, end.text, c, faction, s.trail_cap);
       endMs(w, e, 'model', end.minute);
       continue;
     }
     e.visitors = t.visitors || '없음';
     if (t.situation) {
       e.situation = codesToNames(t.situation, c, faction);
-      pushTrail(w, e, e.situation);
+      pushTrail(w, e, e.situation, s.trail_cap);
     }
     if (e.since === null) e.since = w.minute;
     e.state = '출현';

@@ -27,11 +27,11 @@ export const PP_DEFAULTS: Record<string, string> = {
   director_search: '1',
   director_features: '1',
   /** 리수폿 A: 장면 인물 고르기. code = 이름이 나온 사람(비용 0), model = 보조 모델이 이름 목록을 보고 고름 (턴당 +1회) */
-  router: 'code',
+  router: 'model',
   router_timeout: '60',
   /** 2026-11-07 (전수검사 4 의 L·M·P, 원본 trackedCharactersByScope·stageContext·Router 지침): 항상 포함할 인물(쉼표·줄바꿈), Router·Director 가 보는 최근 글 수, Router 에 덧붙일 지침 */
   always: '',
-  recent_msgs: '4',
+  recent_msgs: '2',
   router_rules: '',
   /** 리수폿 J-2 단계별 모델: same = 갱신 모델과 같게 */
   model_director: 'same', model_router: 'same', model_tidy: 'same',
@@ -52,14 +52,14 @@ export const PP_DEFAULTS: Record<string, string> = {
   sexual_desire: '1', paraphilia: '1', explicit_style: '1',
   affinity: '1', register: '1', perception: '1',
   /** 말투의 다변화 (원본 features.register.variety off/one/two · change ask/auto · signLimit 1~9). 2026-11-07 K. core/people/speech.ts */
-  register_variety: 'off', register_change: 'ask', register_sign_limit: '3', perception_ext: '1', suspicion: '1',
+  register_variety: 'one', register_change: 'ask', register_sign_limit: '3', perception_ext: '0', suspicion: '1',
   docs_event: '1', docs_location: '1', docs_faction: '1', docs_item: '1', npc_emotion: '1',
   /** 수치 사용 (1) / 정성 모드 (0). 호감·의심·음란도 (리수폿 E). 취향 띠는 호감 수치가 켜져 있을 때만 */
   /** 2026-11-07 사용자 결정(O): 의심은 원본처럼 정성(글)이 기본. 수치는 스위치로 */
   num_affinity: '1', num_suspicion: '0', num_openness: '1',
-  /** 리수폿 선택 기능: 취향 띠·음란도 기본 끔 */
-  /** 2026-11-07 사용자 결정(O): 서사 리듬은 원본처럼 기본 켬 */
-  taste: '0', openness: '0', rhythm: '1',
+  /** 음란도 기본 끔. 취향 띠 기본 켬·인식 확장 기본 끔 (사용자 2026-11-17: 원본 리수폿 실제 동작에 맞춤) */
+  /** 2026-11-17 사용자 결정: 서사 리듬 기본 끔 (원본 리수폿도 전용 모드에서 꺼져 있음) */
+  taste: '1', openness: '0', rhythm: '0',
   /** 세력 평판 (docs/설계안_세력평판.md). 기본 켬. 본편 주입 켬. 구간 경계 [우호, 호의, 중립, 경계 하한]. 몹 목격 무게 half/full/off */
   faction_rep: '1',
   /** 세력 평판 수치 (1) / 정성 모드 (0): 갱신기가 단계(적대…우호)와 이유만 판단, 계기 점수·구간 경계·몹 목격 무게 안 씀 (11-07 사용자: 호감·의심·음란도처럼 따라간다) */
@@ -84,10 +84,12 @@ export const PP_DEFAULTS: Record<string, string> = {
   person_cap: '10000',
   /** 본편 요청에 넣는 기록 블록 전체 상한 (글자). 리수폿 Director 참고 상한과 같은 16,000 */
   block_cap: '16000',
-  /** 사건·장소·세력·물건 문서 가운데 장면과 관련된 것을 메인 요청에 넣는다 (컨텍스트 글자 상한 안에서). 기본 끔 */
-  docs_inject: '0',
-  /** 갱신기 자료(docs_now)에 싣는 사건·장소·세력·물건 문서 항목 수 상한. 0 = 제한 없음 */
-  docs_cap: '0',
+  /** 지난 기록 보관 범위: 채팅 뒤쪽 메시지 이 수 안의 죽은 줄·호감 계기·음란도 변화·대기 줄은 그대로 둔다 (store.ts FOLD_KEEP_MSGS. 2026-11-17 사용자: 설정으로) */
+  keep_msgs: '200',
+  /** 장면 메모 보관: 최근 응답 이 수만큼의 Director 메모·장면 인물 목록만 남긴다 (store.ts SCENE_KEEP. 2026-11-17 사용자: 설정으로) */
+  keep_scene: '20',
+  /** 사건·장소·세력·물건 문서 가운데 장면과 관련된 것을 메인 요청에 넣는다 (컨텍스트 글자 상한 안에서). 기본 켬 (사용자 2026-11-17) */
+  docs_inject: '1',
   /** 승인 전 성격 관찰(후보)도 메인 요청의 인물 기록에 넣는다. 기본 끔 */
   axes_obs_inject: '0',
   /** 저장 상한을 넘긴 인물 정리: same = 같은 갱신 호출에 얹음(기본), separate = 별도 호출 */
@@ -98,6 +100,25 @@ export const PP_DEFAULTS: Record<string, string> = {
   /** 다른 보조 호출과 병렬 */
   parallel: '0',
   keep_raw: '1',
+  /** 수 상한 (범위는 PP_NUM). 기본값은 코드에 박혀 있던 값 그대로 */
+  /** 인물당 장기 변화 수, 성격 변화 후보 하나에 남기는 관찰 수 */
+  patterns_cap: '30', evidence_cap: '40',
+  /** 한 장면에서 기록을 보내는 인물 수 (메인 요청·Router·갱신기 공용. 메인 요청은 항상 포함할 인물이 더 많으면 그 수) */
+  scene_max: '6',
+  /** 갱신 호출 한 번에 읽는 응답 수 */
+  batch_turns: '6',
+  /** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수, 「이 인물이 모르는 사실」 줄 수 */
+  observed_max: '4', unknown_max: '5',
+};
+
+/** 수 상한 설정의 범위 [최소, 최대] */
+export const PP_NUM: Record<string, readonly [number, number]> = {
+  patterns_cap: [5, 100],
+  evidence_cap: [10, 200],
+  scene_max: [1, 12],
+  batch_turns: [1, 20],
+  observed_max: [1, 10],
+  unknown_max: [1, 20],
 };
 
 export interface PeopleSettings {
@@ -158,9 +179,11 @@ export interface PeopleSettings {
   lang: 'ko' | 'en';
   personCap: number;
   blockCap: number;
+  /** 지난 기록을 그대로 두는 채팅 뒤쪽 메시지 수 (20~2000) */
+  keepMsgs: number;
+  /** 메모·장면 인물 목록을 남기는 최근 응답 수 (2~200) */
+  keepScene: number;
   docsInject: boolean;
-  /** 갱신기 자료의 문서 항목 수 상한 (0 = 제한 없음) */
-  docsCap: number;
   axesObsInject: boolean;
   tidy: 'same' | 'separate';
   /** 세력 평판 정성 모드 (num_faction_rep = 0) */
@@ -171,6 +194,17 @@ export interface PeopleSettings {
   directorRules: string;
   parallel: boolean;
   keepRaw: boolean;
+  /** 인물당 장기 변화 수 상한 · 후보 하나의 관찰 수 상한 */
+  patternsCap: number;
+  evidenceCap: number;
+  /** 한 장면에서 기록을 보내는 인물 수 */
+  sceneMax: number;
+  /** 갱신 호출 한 번에 읽는 응답 수 */
+  batchTurns: number;
+  /** 인물마다 넣는 승인 전 성격 관찰 수 · 모르는 사실 줄 수 */
+  observedMax: number;
+  unknownMax: number;
+  /** 갱신 기록 보관 건수 (성공·실패) */
 }
 
 export type Stage = 'update' | 'director' | 'router' | 'tidy';
@@ -179,6 +213,13 @@ export const STAGES_ALL: Stage[] = ['update', 'director', 'router', 'tidy'];
 export function ppValue(state: Record<string, unknown> | undefined, key: string): string {
   const v = state?.[PP(key)];
   return v === undefined || v === null || v === '' || v === 'null' ? (PP_DEFAULTS[key] ?? '') : String(v);
+}
+
+/** 수 상한 설정 하나 (PP_NUM 의 열쇠). 수가 아니면 기본값, 범위 밖이면 끝 값, 소수는 반올림 */
+export function ppNum(state: Record<string, unknown> | undefined, key: string): number {
+  const [lo, hi] = PP_NUM[key];
+  const n = Number(ppValue(state, key));
+  return Math.max(lo, Math.min(hi, Math.round(Number.isFinite(n) ? n : Number(PP_DEFAULTS[key]))));
 }
 
 export function peopleSettings(state: Record<string, unknown> | undefined): PeopleSettings {
@@ -202,7 +243,7 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     directorReuse: v('director_reuse') !== '0',
     directorSearch: v('director_search') !== '0',
     directorFeatures: v('director_features') !== '0',
-    router: v('router') === 'model' ? 'model' : 'code',
+    router: v('router') === 'code' ? 'code' : 'model',
     routerTimeout: num('router_timeout', 5, 300),
     always: [...new Set(v('always').split(/[,\n]/).map((x) => x.trim().normalize('NFC')).filter(Boolean))].slice(0, 12),
     recentMsgs: num('recent_msgs', 0, 12),
@@ -240,8 +281,9 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     lang: v('lang') === 'en' ? 'en' : 'ko',
     personCap: num('person_cap', 2000, 40000),
     blockCap: num('block_cap', 4000, 64000),
+    keepMsgs: Math.round(num('keep_msgs', 20, 2000)),
+    keepScene: Math.round(num('keep_scene', 2, 200)),
     docsInject: v('docs_inject') === '1',
-    docsCap: num('docs_cap', 0, 1000),
     axesObsInject: v('axes_obs_inject') === '1',
     tidy: v('tidy') === 'separate' ? 'separate' : 'same',
     factionQual: v('faction_rep') === '1' && v('num_faction_rep') === '0',
@@ -251,6 +293,12 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     directorRules: v('director_rules').slice(0, 2000),
     parallel: v('parallel') === '1',
     keepRaw: v('keep_raw') !== '0',
+    patternsCap: ppNum(state, 'patterns_cap'),
+    evidenceCap: ppNum(state, 'evidence_cap'),
+    sceneMax: ppNum(state, 'scene_max'),
+    batchTurns: ppNum(state, 'batch_turns'),
+    observedMax: ppNum(state, 'observed_max'),
+    unknownMax: ppNum(state, 'unknown_max'),
   };
 }
 

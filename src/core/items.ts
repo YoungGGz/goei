@@ -20,7 +20,7 @@ import { boxLanded } from './homeshop';
 import { EQUIP_LABEL, EQUIP_SLOTS, STATE_LABEL, cleanIcon, itemEquip, itemState, itemUses, itemWeight, type ItemEquip, type ItemState } from './itemtraits';
 export * from './itemtraits';
 import type { StartItem } from './startitems';
-import { FORM_EMPTY, kindOfIcon, leftWordIn, nameFilled, offWordIn, traitsFor } from './itemrules';
+import { FORM_EMPTY, itemListCap, itemLogCap, kindOfIcon, leftWordIn, nameFilled, offWordIn, traitsFor } from './itemrules';
 import { splitIconWord } from './iconmatch';
 export * from './itemrules';
 
@@ -119,7 +119,7 @@ export type ItemOut = 'left' | 'gone' | 'drop' | 'destroy';
 export type ItemLogWhat = 'get' | 'use' | 'drop' | 'gone' | 'destroy' | 'merge' | 'sell' | 'left' | 'off';
 export type ItemLogBy = 'story' | 'manual' | 'use' | 'store';
 
-/** 사용·처분 기록 한 줄 (화면 「기록」·찾기). 상한 없음, 저장 안전용 400줄 */
+/** 사용·처분 기록 한 줄 (화면 「기록」·찾기). 상한 없음, 저장 안전용 줄 상한(설정, 기본 400줄) */
 export interface ItemLog {
   id: string;
   name: string;
@@ -136,6 +136,8 @@ export interface ItemLog {
   icon?: string;
   /** off 줄: 손 칸에서 넣은 것 (없으면 장비 칸에서 해제). 본편 말·기록 탭 말을 나눈다 (사용자 2026-11-14 C-10·C-11) */
   hand?: boolean;
+  /** drop 줄: 사용자가 버린 때의 마지막 메시지 키 (물건 줄의 outKey 와 같은 값). 줄을 잊은 뒤에도 그 앞 응답을 근거로 도로 생기지 않게 본다 (forgottenBefore) */
+  key?: string;
   at: string;
 }
 
@@ -470,16 +472,14 @@ export function addItemLog(it: Items, l: Omit<ItemLog, 'id' | 'at'> & { id?: str
   return compactLog({ ...it, log: [...it.log, row] }, alive && withAnchor(alive, row.anchor));
 }
 
-/** 줄 수 한도 (넘으면 아래 정리) */
-const ITEM_LIST_CAP = 200;
-const ITEM_LOG_CAP = 400;
+/** 줄 수 한도 (넘으면 아래 정리): 물건 줄은 설정 「물건 줄 상한」(core/itemrules.ts itemListCap), 기록 줄은 설정 「기록 줄 상한」(itemLogCap) */
 /** 방금 넣은 줄의 응답은 살아 있는 것으로 본다 (정리가 새 줄을 지우지 않게) */
 const withAnchor = (alive: Set<string>, anchor: string): Set<string> => (!anchor || alive.has(anchor) ? alive : new Set([...alive, anchor]));
 
 /** 물건 줄 정리 (전수검사 11-13: 그냥 앞에서 자르면 시작 장비가 빠졌다). 한도를 넘은 만큼 오래된 것부터
  *  ① 기준 응답이 사라진 줄 → ② 판·파괴된·다 쓴 줄. 살아 있는 줄과 직접 넣은·시작 줄(anchor '')은 빼지 않는다 */
 function compactList(it: Items, alive: Set<string>): Items {
-  let over = it.list.length - ITEM_LIST_CAP;
+  let over = it.list.length - itemListCap();
   if (over <= 0) return it;
   const drop = new Set<Item>();
   const tiers: ((e: Item) => boolean)[] = [
@@ -495,15 +495,16 @@ function compactList(it: Items, alive: Set<string>): Items {
 
 /** 기록 정리 (전수검사 11-13: 사용 기록이 잘리면 다 쓴 소모품이 되살았다). 한도를 넘은 만큼 오래된 것부터
  *  ① 기준 응답이 사라진 줄(alive 를 알 때) → ② 남은 횟수와 무관한 줄 → ③ 살아 있는 사용 기록: 그 횟수를 물건의 처음 횟수에서 먼저 빼 둬 남은 횟수가 그대로.
- *  처음 횟수가 1 아래로 내려가야 하면 그 줄은 남긴다 */
+ *  처음 횟수가 1 아래로 내려가야 하면 그 줄은 남긴다. 방금 넣은 마지막 줄은 빼지 않는다 */
 function compactLog(it: Items, alive?: Set<string>): Items {
-  let over = it.log.length - ITEM_LOG_CAP;
+  let over = it.log.length - itemLogCap();
   if (over <= 0) return it;
   const drop = new Set<ItemLog>();
   let list = it.list;
   const counted = (l: ItemLog) => l.what === 'use' && list.find((x) => x.id === l.item)?.uses !== undefined;
+  const old = it.log.slice(0, -1);
   const take = (ok: (l: ItemLog) => boolean) => {
-    for (const l of it.log) {
+    for (const l of old) {
       if (over <= 0) return;
       if (!drop.has(l) && ok(l)) { drop.add(l); over--; }
     }
@@ -520,6 +521,63 @@ function compactLog(it: Items, alive?: Set<string>): Items {
   return drop.size ? { ...it, list, log: it.log.filter((l) => !drop.has(l)) } : it;
 }
 
+/** 치운 물건 기억 (2026-11-17 사용자: 치운 물건은 치운 뒤 N턴까지만 기억한다. 종류를 나누지 않는다). 0 = 계속 */
+export const ITEM_AWAY_TURNS_VAR = '$it_away_turns';
+export const ITEM_AWAY_TURNS_DEFAULT = 30;
+export const ITEM_AWAY_TURNS_MAX = 300;
+export const ITEM_AWAY_TURNS_STEP = 5;
+export const itemAwayTurns = (vars: Record<string, unknown> | undefined): number => {
+  const raw = vars?.[ITEM_AWAY_TURNS_VAR];
+  if (raw === undefined || raw === null || raw === '') return ITEM_AWAY_TURNS_DEFAULT;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 ? Math.min(ITEM_AWAY_TURNS_MAX, n) : ITEM_AWAY_TURNS_DEFAULT;
+};
+/** 그 메시지 뒤로 기준 메시지(asOf, 없으면 채팅 끝)까지 온 봇 응답 수 (턴 세기는 recentItemLog 와 같이 봇 응답 하나 = 1턴). 채팅에 없는 키는 undefined.
+ *  기준을 받는 까닭: 갱신기가 밀린 응답·지난 응답을 읽을 때는 「지금 읽는 응답」에서 세야 한다 (채팅 끝에서 세면 몇 턴 만에 되찾은 것도 잊은 것이 된다) */
+function turnsAfter(chat: Chat, asOf?: string): (key: string) => number | undefined {
+  const list = chat.message ?? [];
+  const upTo = new Map<string, number>();
+  let n = 0;
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].role === 'char') n++;
+    upTo.set(messageKey(list[i], i), n);
+  }
+  const end = (asOf ? upTo.get(asOf) : undefined) ?? n;
+  return (key) => { const k = upTo.get(key); return k === undefined ? undefined : Math.max(0, end - k); };
+}
+/** 치운 물건을 아직 기억하는가: 치운 때(치운 응답, 사용자가 버린 것은 그때의 마지막 메시지)에서 turns 턴 안이면 기억한다.
+ *  치운 때를 모르는 줄(키가 없거나 그 메시지가 사라짐)은 나이를 모르니 기억한다. 저장 정리(forgetAway)와 자료 items_away(itemsAwayOf)가 같이 쓴다 */
+function awayKept(e: Item, after: (key: string) => number | undefined, turns: number): boolean {
+  if (turns <= 0) return true;
+  const key = e.outAt || e.outKey;
+  const n = key ? after(key) : undefined;
+  return n === undefined || n <= turns;
+}
+/** 치운 지 설정 「치운 물건 기억」 턴이 지난 줄을 목록에서 지운다. 기록 줄(log)과 갖고 있는 물건은 건드리지 않는다 */
+export function forgetAway(it: Items, chat: Chat, asOf?: string): Items {
+  const turns = itemAwayTurns(chat.scriptstate);
+  if (turns <= 0 || !it.list.some((e) => e.outHow)) return it;
+  const alive = aliveAnchors(chat);
+  const after = turnsAfter(chat, asOf);
+  const list = it.list.filter((e) => !isOut(e, alive) || awayKept(e, after, turns));
+  return list.length === it.list.length ? it : { ...it, list };
+}
+
+/** 줄을 잊은 뒤(forgetAway)에도 지키는 것: 사용자가 버린 물건·파괴된 물건은 그 전의 응답을 근거로 다시 생기지 않는다.
+ *  줄이 남아 있을 때는 줄이 막는다(applyItemChanges 의 버린 때 검사·addItem 의 같은 id 검사). 줄이 없으면 살아 있는 기록 줄(drop·destroy)로 같은 것을 본다:
+ *  그 물건을 얻은 바로 그 응답이거나, 버린 때(key)·부서진 응답(anchor)보다 앞의 응답이 근거면 새로 만들지 않는다 */
+function forgottenBefore(it: Items, alive: Set<string>, order: string[], c: { name: string; anchor: string }): boolean {
+  if (it.list.some((e) => e.outHow && sameItemName(e.name, c.name))) return false;
+  const at = order.indexOf(c.anchor);
+  const id = itemId(c.anchor, c.name);
+  return it.log.some((l) => {
+    if ((l.what !== 'drop' && l.what !== 'destroy') || (l.anchor && !alive.has(l.anchor)) || !sameItemName(l.name, c.name)) return false;
+    if (l.item === id) return true;
+    const when = order.indexOf(l.what === 'drop' ? l.key ?? '' : l.anchor);
+    return at >= 0 && when >= 0 && (l.what === 'drop' ? at <= when : at < when);
+  });
+}
+
 /** 물건 빼기 → 기록에 한 줄. what: drop(버림)·gone(본문에서 없어짐)·destroy(파괴)·sell(상점에 팖) */
 /** 버림·없어짐·두고 옴·파괴는 목록에서 지우지 않고 숨긴다 (outHow): 치운 응답을 다시 굴리면 돌아오고, 다시 얻으면 같은 물건으로 되살아난다 (addItem).
  *  장착 칸에서도 내린다. 그 밖(상점 맞교환·상자 열기)과 다 쓴 소모품(hard)은 지금처럼 줄을 지운다.
@@ -531,7 +589,7 @@ export function removeItem(it: Items, id: string, what: ItemLogWhat, by: ItemLog
   const place = p0 ? clean(p0, 30) : '';
   const how: ItemOut | '' = hard ? '' : what === 'left' ? 'left' : what === 'gone' ? 'gone' : what === 'drop' ? 'drop' : what === 'destroy' ? 'destroy' : '';
   const note = what === 'left' ? [`두고 옴${place ? `: ${place}` : ''}`, logExtra.note].filter(Boolean).join(' · ') : logExtra.note;
-  const log = { name: cur.name, item: id, ...(cur.icon ? { icon: cur.icon } : {}), what, by, anchor, ...(logExtra.quote ? { quote: logExtra.quote } : {}), ...(note ? { note } : {}) };
+  const log = { name: cur.name, item: id, ...(cur.icon ? { icon: cur.icon } : {}), what, by, anchor, ...(logExtra.quote ? { quote: logExtra.quote } : {}), ...(note ? { note } : {}), ...(how === 'drop' && key ? { key } : {}) };
   if (!how) return addItemLog({ ...it, list: it.list.filter((x) => x.id !== id) }, log);
   const { slot: _s, held: _h, backAt: _b, place: _p, outKey: _k, ...rest } = cur;
   const out: Item = { ...rest, outHow: how, outAt: anchor, ...(place ? { place } : {}), ...(key ? { outKey: key } : {}) };
@@ -1220,11 +1278,13 @@ export function itemsNowOf(chat: Chat, pictures?: (name: string, icon?: string) 
 }
 
 /** 자료 items_away: 치워 둔 물건(되살릴 수 있는 것)의 이름·자리. 되찾으면 갱신기가 이 이름 그대로 new 를 쓴다 */
-export function itemsAwayOf(chat: Chat): { name: string; place?: string }[] {
+export function itemsAwayOf(chat: Chat, asOf?: string): { name: string; place?: string }[] {
   const it = readItems(chat.scriptstate);
   const alive = aliveAnchors(chat);
+  const turns = itemAwayTurns(chat.scriptstate);
+  const after = turnsAfter(chat, asOf);
   return outItems(it, alive)
-    .filter((e) => outItemOf(it, alive, e.name) === e)
+    .filter((e) => outItemOf(it, alive, e.name) === e && awayKept(e, after, turns))
     .map((e) => ({ name: e.name, ...(e.place ? { place: e.place } : {}) }));
 }
 
@@ -1289,6 +1349,8 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
       // 사용자가 버린 물건: 버린 때보다 뒤의 메시지가 근거일 때만 되살린다 (같은 응답·앞 응답을 근거로 도로 생기지 않게)
       const back = outItemOf(it, alive, c.name);
       if (back?.outHow === 'drop' && !(order.indexOf(c.anchor) > (back.outKey ? order.indexOf(back.outKey) : -1) && order.includes(c.anchor))) continue;
+      // 잊은 물건(설정 「치운 물건 기억」이 지나 줄을 지운 것): 버리거나 부서지기 전의 응답을 근거로 도로 생기지 않게 기록으로 본다
+      if (!back && !cur && forgottenBefore(it, alive, order, c)) continue;
       // 범위 설정에서 뺀 종류는 새로 만들지 않는다 (갖고 있던 것을 되찾는 것은 받는다)
       if (!back && !cur && opts.skipKinds?.length && opts.skipKinds.includes(kindOfIcon(c.icon))) continue;
       // 「빈 X」를 지닌 채 「… X」를 새로 얻었다고 오면(찬 수집기) 같은 물건이 찬 것 — 줄을 둘로 두지 않고 그 줄을 바꾼다

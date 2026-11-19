@@ -8,6 +8,7 @@
 // - 목록에 없는 id, 바꿀 수 없는 줄, 고를 수 없는 값, 범위 밖 수, 너무 긴 글은 여기서 걸러 적용될 길이 없다.
 // 지침 글: 플러그인 내장 지침 「Consult」(지침/AI상담.txt, 설정 → 지침 → AI 상담에서 고침).
 import { fillGuide, guideSections, guideTxt } from './guides';
+import { CONSULT_KEEP_DEFAULT, getPrefs } from './settings';
 
 export interface ConsultItem {
   id: string;
@@ -161,4 +162,14 @@ export function checkConsult(items: ConsultItem[], set: { id: string; raw: strin
     if (value !== item.cur) ok.set(s.id, { id: s.id, value });
   }
   return { ok: [...ok.values()], bad };
+}
+
+/** 남기는 양: 이 기기 설정 「AI 상담 대화 보관」(채팅마다 줄 수)·「AI 상담 보관 채팅」(채팅 수). 대화 저장소가 모든 채팅 공용이라 채팅마다 다르지 않다 */
+export const consultKeep = (): { lines: number; chats: number } => ({ lines: getPrefs().consultLines ?? CONSULT_KEEP_DEFAULT.lines, chats: getPrefs().consultChats ?? CONSULT_KEEP_DEFAULT.chats });
+
+/** 저장 전 정리: 상담한 지 오래된 채팅부터 지우고, 남은 채팅은 최근 줄만 남긴다 (store 를 직접 고친다) */
+export function trimConsult(store: Record<string, { lines: unknown[]; at?: number }>, keep = consultKeep()): void {
+  const keys = Object.keys(store).sort((a, b) => (store[b].at ?? 0) - (store[a].at ?? 0));
+  for (const k of keys.slice(keep.chats)) delete store[k];
+  for (const k of Object.keys(store)) store[k].lines = store[k].lines.slice(-keep.lines);
 }

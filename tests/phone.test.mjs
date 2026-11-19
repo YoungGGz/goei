@@ -79,7 +79,7 @@ test('storage trim keeps a conversation baseline', () => {
   const st = P.blankState();
   const r = dmRoom('c_1');
   st.rooms[r.id] = r;
-  for (let i = 0; i < 45; i++) P.push(st, r, i % 2 ? 'c_1' : 'me', `m${i}`, '');
+  for (let i = 0; i < P.STORAGE.dm + 5; i++) P.push(st, r, i % 2 ? 'c_1' : 'me', `m${i}`, '');
   P.trimRooms(st);
   assert.equal(r.messages.length, P.STORAGE.dm);
   assert.equal(r.trimmedRecords, 5);
@@ -450,4 +450,73 @@ test('관전: 반응 칸은 이모지 반응이 켜져 있고 혼잣말이 아�
   assert.doesNotMatch(sys({ '$ph_reactions': '0' }), /reactions/);
   assert.match(sys({ '$ph_view_preset': 'mono' }), /At most 30 messages; each text content at most 600 characters\./);
   assert.doesNotMatch(sys({}), /__VIEW_LIMIT/);
+});
+
+test('확인 요청: 말풍선은 최근에 말이 오간 방 몇 개만, 인물 로어북은 그 방 인원에게만 붙는다', { skip: !realLore }, () => {
+  const chat = chatOf({ '$ph_incoming': '1' }, [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }]);
+  const d = P.directory(realLore, chat);
+  const st = P.blankState();
+  const talk = d.contacts.slice(0, 12);
+  for (const c of talk) {
+    const r = dmRoom(c.id, { people: { [c.id]: P.personOf(c) } });
+    st.rooms[r.id] = r; st.order.push(r.id);
+    for (let i = 0; i < 15; i++) P.push(st, r, i % 2 ? 'me' : c.id, `${c.id} 말 ${i}`, '');
+  }
+  const run = (vars = {}) => JSON.parse(PP.refreshPrompt({ char: { globalLore: realLore }, chat: { ...chat, scriptstate: { ...chat.scriptstate, ...vars } } }, st, d, {}, () => 0).prompt.messages[1].content);
+  const body = run();
+  const withTalk = body.rooms.filter((r) => r.messages.length);
+  assert.equal(withTalk.length, 10, '기본: 방 10개만 말풍선과 함께');
+  assert.ok(withTalk.every((r) => r.messages.length === 10), '방마다 최근 10개');
+  // 가장 나중에 말이 오간 방(마지막에 넣은 방)이 들어가고, 가장 오래된 두 방은 방 정보와 대화 상태만
+  const old = body.rooms.filter((r) => [talk[0].id, talk[1].id].some((id) => r.id === `dm_${id}`));
+  assert.ok(old.length === 2 && old.every((r) => !r.messages.length && r.conversationState && !r.candidateOnly));
+  assert.ok(withTalk.some((r) => r.id === `dm_${talk[11].id}`));
+  // 인물 로어북: 말풍선과 함께 넘긴 방의 인원만
+  const lore = new Set(body.participants.filter((p) => p.lore).map((p) => p.sender));
+  const full = new Set(withTalk.flatMap((r) => r.activeMembers));
+  assert.ok(lore.size > 0 && [...lore].every((id) => full.has(id)), '그 밖의 사람에게는 로어북 글이 없다');
+  const blank = body.participants.filter((p) => !full.has(p.sender));
+  assert.ok(blank.length > 0 && blank.every((p) => p.lore === ''));
+  assert.ok(blank.some((p) => p.hasCharacterLore), '로어북이 있는지는 그대로 알린다');
+  // 설정: 0 = 전부
+  assert.equal(run({ '$ph_adv_check_rooms': '0' }).rooms.filter((r) => r.messages.length).length, 12);
+  assert.equal(run({ '$ph_adv_check_rooms': '3' }).rooms.filter((r) => r.messages.length).length, 3);
+});
+
+test('확인 요청: 로어북을 뺀 사람의 인물 로어북이 다른 자리로 다시 실리지 않고, 말풍선 없이 넘긴 방의 말은 다른 방 참조로 간다', { skip: !realLore }, () => {
+  const chat = chatOf({ '$ph_incoming': '1' }, [{ role: 'user', data: 'a' }, { role: 'char', data: 'b' }]);
+  const d = P.directory(realLore, chat);
+  const st = P.blankState();
+  const talk = d.contacts.slice(0, 4);
+  for (const c of talk) {
+    const r = dmRoom(c.id, { people: { [c.id]: P.personOf(c) } });
+    st.rooms[r.id] = r; st.order.push(r.id);
+    for (let i = 0; i < 4; i++) P.push(st, r, i % 2 ? 'me' : c.id, `${c.id} 말 ${i}`, '');
+  }
+  // 가장 최근 방: 첫 사람(오래된 1:1 방의 상대)이 든 단톡
+  const g = { id: 'g_1', kind: 'group', name: '모임', members: [talk[0].id, talk[3].id], people: { [talk[0].id]: P.personOf(talk[0]), [talk[3].id]: P.personOf(talk[3]) }, messages: [], draft: '', unread: 0 };
+  st.rooms[g.id] = g; st.order.push(g.id);
+  P.push(st, g, talk[3].id, '단톡 말', '');
+  const src = { char: { globalLore: realLore }, chat: { ...chat, scriptstate: { ...chat.scriptstate, '$ph_adv_check_rooms': '2', '$ph_banter': '1', '$ph_banter_chance': '100' } } };
+  const body = JSON.parse(PP.refreshPrompt(src, st, d, {}, () => 0.99).prompt.messages[1].content);
+  const withTalk = body.rooms.filter((r) => r.messages.length).map((r) => r.id);
+  assert.deepEqual(withTalk.sort(), ['g_1', `dm_${talk[3].id}`].sort());
+  const noLore = body.participants.filter((p) => p.lore === '' && p.hasCharacterLore);
+  assert.ok(noLore.length > 0);
+  const refs = JSON.stringify(body.narratorOnly.universe.activeLoreBooks.filter((x) => x.kind === 'direct'));
+  const full = body.participants.filter((p) => p.lore);
+  assert.ok(full.length > 0);
+  let checked = 0;
+  for (const p of noLore) {
+    const own = PP.refreshPrompt({ ...src, chat: { ...src.chat, scriptstate: { ...src.chat.scriptstate, '$ph_adv_check_rooms': '0' } } }, st, d, {}, () => 0.99);
+    const all = JSON.parse(own.prompt.messages[1].content).participants.find((x) => x.sender === p.sender).lore;
+    if (!all) continue; // 대화한 적 없는 후보는 어느 설정에서도 로어북 글이 없다
+    checked++;
+    assert.ok(!refs.includes(JSON.stringify(all).slice(1, 80)), `${p.name}: 로어북이 universe 로 다시 실리지 않는다`);
+  }
+  assert.ok(checked > 0);
+  // 첫 사람과의 오래된 1:1 방은 말풍선 없이 갔지만, 그 말은 다른 방 참조로 간다
+  assert.ok((body.crossRoomMessages ?? []).some((m) => m.room === `dm_${talk[0].id}`));
+  // 수다는 말풍선과 함께 넘긴 방에서만
+  assert.ok(body.rooms.filter((r) => r.banter).every((r) => r.messages.length > 0));
 });

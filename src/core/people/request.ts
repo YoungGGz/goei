@@ -4,14 +4,14 @@ import { sexualTexts } from './sexual';
 import type { Chat } from '../types';
 import { blockEntries, peopleBlock, personBlock, rhythmBlock, unknownTo, TRIM_ORDER } from './inject';
 import { nameMatcher, scenePeople, carriedScene, entriesOf } from './select';
-import { liveChanges, liveEntries, liveness, type Liveness } from './store';
-import { latestNote } from './updater';
-import { rhythmClock, rhythmClockLines } from './rhythm';
+import { liveChanges, liveness, type Liveness } from './store';
+import { latestNote, relatedDocs } from './updater';
+import { rhythmClock, rhythmClockLines, rhythmNow } from './rhythm';
 import { factionNow, factionsBlock, sceneFactionCodes, userFactionOf } from './faction';
 import { messageText } from '../refs';
 import { fixedSections } from './seed';
 import type { PeopleSettings } from './settings';
-import { docFeature, type PeopleStore, type Temper } from './types';
+import type { PeopleStore, Temper } from './types';
 import { guideTxt } from '../guides';
 
 export interface PromptMessage {
@@ -35,12 +35,12 @@ export interface RequestOpts {
   people?: string[];
 }
 
-/** 코드가 고르는 장면 인물: 항상 포함(always) + 글에 이름이 나온 사람·동행·장면 유지(byCode). 자리 수는 6명(항상 포함이 더 많으면 그 수) */
+/** 코드가 고르는 장면 인물: 항상 포함(always) + 글에 이름이 나온 사람·동행·장면 유지(byCode). 자리 수는 설정 「장면 인물 수」(항상 포함이 더 많으면 그 수) */
 function codePeople(chat: Chat, o: RequestOpts): { always: string[]; byCode: string[]; max: number } {
   const match = nameMatcher(entriesOf(o.store, o.extraNames ?? {}));
   const always = o.settings.always.filter((n) => o.store.people[n]);
-  const byCode = scenePeople(chat, o.store, match, { input: o.input, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
-  return { always, byCode, max: Math.max(6, always.length) };
+  const byCode = scenePeople(chat, o.store, match, { input: o.input, max: o.settings.sceneMax, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
+  return { always, byCode, max: Math.max(o.settings.sceneMax, always.length) };
 }
 
 /** 코드가 고른 인물만으로 장면 인물 자리가 찼나. 차 있으면 모델 Router 가 고른 인물은 전부 잘리므로 그 호출을 건너뛴다 */
@@ -55,25 +55,10 @@ export function sceneFullByCode(chat: Chat, o: RequestOpts): boolean {
 export function docsBlockFor(chat: Chat, o: RequestOpts, people: string[], live: Liveness, maxChars: number): string {
   const list = Array.isArray(chat.message) ? chat.message : [];
   const texts = [...(o.input ? [o.input] : []), ...list.slice(-2).map((m) => messageText(String(m.data ?? '')))];
-  const rows: { pos: number; seq: number; line: string }[] = [];
-  for (const d of Object.values(o.store.docs)) {
-    if (d.type === 'rhythm' || !(o.settings.features as Set<string>).has(docFeature(d.type))) continue;
-    const named = !!d.key && texts.some((t) => t.includes(d.key));
-    for (const e of liveEntries(d.entries, live)) {
-      if (!named && !(e.who ?? []).some((n) => people.includes(n))) continue;
-      rows.push({ pos: live.at.get(e.anchor) ?? -1, seq: e.seq, line: guideTxt('Main', 'DOCS.ITEM', { type: d.type, key: d.key, text: e.text }) });
-    }
-  }
-  if (!rows.length) return '';
-  rows.sort((a, b) => a.pos - b.pos || a.seq - b.seq);
   const head = guideTxt('Main', 'DOCS.HEAD');
-  const kept: string[] = [];
-  let size = head.length;
-  for (let i = rows.length - 1; i >= 0; i--) {
-    size += rows[i].line.length + 1;
-    if (size > maxChars) break;
-    kept.unshift(rows[i].line);
-  }
+  const line = (d: { type: string; key: string }, e: { text: string }) => guideTxt('Main', 'DOCS.ITEM', { type: d.type, key: d.key, text: e.text });
+  // 고르는 규칙은 갱신기 자료(docs_now)와 같다 (updater.ts relatedDocs)
+  const kept = relatedDocs(o.store, live, o.settings, texts, people, maxChars, (d, e) => line(d, e).length + 1, head.length).map((r) => line(r.doc, r.entry));
   return kept.length ? [head, ...kept].join('\n') : '';
 }
 
@@ -109,7 +94,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
     const note = o.settings.director === 'note' ? latestNote(o.store, n, live) : null;
     const sx = sexualTexts(p, o.settings);
     const sexualPolicy = !policyShown;
-    const unknown = o.settings.features.has('perception') ? unknownTo(p, o.store, live) : [];
+    const unknown = o.settings.features.has('perception') ? unknownTo(p, o.store, live, o.settings.unknownMax) : [];
     make.push((maxChars) =>
       personBlock(p, o.store, live, changes, {
         sheet,
@@ -126,6 +111,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
         openness: o.settings.features.has('openness'),
         axes: o.settings.features.has('axes'),
         axesObserved: o.settings.axesObsInject,
+        observedMax: o.settings.observedMax,
         features: o.settings.features,
         qual: o.settings.qualitative,
         sexual: sx,
@@ -176,7 +162,7 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
   const sheets = own.slice(0, keep).map((x) => x.sheet).filter((x): x is string => !!x);
   // 서사 리듬 (선택): 장면 전체 기록과 메모를 맨 앞에
   if (o.settings.features.has('rhythm')) {
-    const docs = Object.values(o.store.docs).filter((d) => d.type === 'rhythm').flatMap((d) => liveEntries(d.entries, live).slice(-1).map((e) => ({ key: d.key, text: e.text })));
+    const docs = rhythmNow(o.store, live).map((r) => ({ key: r.doc.key, text: r.entry.text }));
     const note = o.settings.director === 'note' ? latestNote(o.store, '@rhythm', live)?.now : null;
     const rb = rhythmBlock(docs, note, rhythmClockLines(rhythmClock(o.store, chat, live)));
     if (rb) blocks.unshift(rb);

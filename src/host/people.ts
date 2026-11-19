@@ -7,6 +7,7 @@ import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, rep
 import { loadContext, updateChat, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
 import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, pruneScene } from '../core/people/store';
+import { foldCues, foldOpenness, pruneEntries, pruneNotes } from '../core/people/prune';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
 import { applyUpdate, assemblePrompt, buildUpdate, sectionBody, shopKeyLine, pickupKeyLine, clearStoryRecords, enabledSections, mentionIndexes, parseUpdate, planBatches, type ApplyReport } from '../core/people/updater';
@@ -27,10 +28,10 @@ import { findStatusTags } from '../core/world/status';
 import { colConfig } from '../core/world/statuscols';
 import { mentionsPoints, pointsOn, pointsVars, readPoints, syncPointsToStatus } from '../core/points';
 import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
-import { applyItemChanges, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
-import { bmAsked, bmOrdersVars, liveBmOrders } from '../core/orders';
+import { applyItemChanges, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
+import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
-import { getPrefs } from '../core/settings';
+import { DIAG_KEEP_DEFAULT, getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
 import { guideSections, guideTxt } from '../core/guides';
 
@@ -73,8 +74,6 @@ export interface DiagRun {
   raw?: string;
 }
 const DIAG_KEY = 'goei-people-diag';
-const DIAG_KEEP = 10;
-const DIAG_FAIL_KEEP = 30;
 
 export async function loadDiag(): Promise<DiagRun[]> {
   try {
@@ -85,13 +84,15 @@ export async function loadDiag(): Promise<DiagRun[]> {
     return [];
   }
 }
-export async function pushDiag(run: DiagRun, keepRaw: boolean): Promise<void> {
+/** 남길 건수: 이 기기 설정 「갱신 기록 보관」(성공·실패). 기록이 모든 채팅 공용이라 채팅마다 다르지 않다 */
+export const diagKeep = (): { ok: number; fail: number } => ({ ok: getPrefs().diagKeep ?? DIAG_KEEP_DEFAULT.ok, fail: getPrefs().diagFailKeep ?? DIAG_KEEP_DEFAULT.fail });
+export async function pushDiag(run: DiagRun, keepRaw: boolean, keep = diagKeep()): Promise<void> {
   try {
     const list = await loadDiag();
     const item = keepRaw ? run : { ...run, system: undefined, data: undefined, raw: run.ok ? undefined : run.raw };
     list.push(item);
-    const ok = list.filter((r) => r.ok).slice(-DIAG_KEEP);
-    const bad = list.filter((r) => !r.ok).slice(-DIAG_FAIL_KEEP);
+    const ok = list.filter((r) => r.ok).slice(-keep.ok);
+    const bad = list.filter((r) => !r.ok).slice(-keep.fail);
     const next = [...ok, ...bad].sort((a, b) => a.at.localeCompare(b.at));
     await risuai.pluginStorage.setItem(DIAG_KEY, JSON.stringify(next));
   } catch {
@@ -291,7 +292,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       return withPeople(cur, s);
     }).catch(() => null);
   }
-  const batches = planBatches(ctx.chat, unread, settings.spanCap);
+  const batches = planBatches(ctx.chat, unread, settings.spanCap, settings.batchTurns);
   const id = chatId(ctx);
   // 다시 읽기의 비우기는 첫 성공 저장과 함께 한다. 그 전엔 자료용 사본에서만 비운다 (전수검사 11-13)
   let pendingClear = o.scope?.clear;
@@ -318,6 +319,11 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const pointsUse = pointsOn(fresh.chat);
       const pointBal = pointsUse ? walletBalance(readPoints(fresh.chat.scriptstate), aliveAnchors(fresh.chat)) : null;
       const batchKeys = batches[b].map((i) => (fresh.chat.message[i] ? messageKey(fresh.chat.message[i], i) : '')).filter(Boolean);
+      // 치운 물건 기억의 턴을 세는 기준: 이번에 읽는 응답 가운데 가장 뒤의 것 (core/items.ts turnsAfter)
+      // 지울 때는 가장 뒤의 응답에서, 자료 items_away 는 가장 앞의 응답에서 센다 (한 묶음에 여러 응답: 앞 응답에서 되찾은 물건의 이름이 빠지지 않게)
+      const keyAt = (i: number) => (fresh.chat.message[i] ? messageKey(fresh.chat.message[i], i) : undefined);
+      const asOfKey = keyAt(Math.max(...batches[b]));
+      const awayAsOf = keyAt(Math.min(...batches[b]));
       // 소지품 (core/items.ts): 설정 「보조 모델이 읽기」가 켜져 있으면 지금 목록을 자료에 넣고 소지품 절을 켠다
       const itemsOn = itemAutoOn(fresh.chat.scriptstate);
       const itemsNow = itemsOn ? itemsNowOf(fresh.chat, itemPictures) : null;
@@ -333,7 +339,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const prevChar = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' && i < lastChar ? i : a), -1);
       const prevKey = prevChar >= 0 ? messageKey(fresh.chat.message[prevChar], prevChar) : '';
       const pickNames = !o.scope?.only && lastChar >= 0 && batches[b].includes(lastChar) && bmPickupConfirm(fresh.chat.scriptstate) ? bmAsked(liveBmOrders(fresh.chat.scriptstate, aliveAnchors(fresh.chat)), prevKey).map((x) => x.item.name) : [];
-      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat) : [] });
+      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat, awayAsOf) : [] });
       // 지침은 자료를 본 뒤 조립한다 (저장 상한을 넘긴 인물이 있으면 정리 절을 켠다)
       const sections = enabledSections(settings);
       if (input.tidy.length) sections.add('tidy');
@@ -403,11 +409,16 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         });
         diag.report = report;
         // 되돌리기용 (리수폿 J-4): 이 갱신이 새로 만든 것. 다시 읽기(only)는 적지 않는다
-        // 변경 기록(store.log)은 접지 않고 전부 남긴다 (사용자 결정 나-80 ②). 여기서 접기 함수를 부르지 않는다
         if (!o.scope?.only) recordRun(s, before, new Date().toISOString(), report.applied.renamed);
         // 다시 굴려(지워서) 채팅에서 사라진 응답이 만든 변경 줄만 버린다 (사용자 2026-11-14 F-1 (나)). 장면 인물 목록도 같이
         dropGoneChanges(s, cur);
         pruneScene(s, cur);
+        // 인물 기록·문서의 죽은 줄도 같은 때 치운다 (2026-11-17 사용자: 원본처럼 지난 이력 60개만)
+        pruneEntries(s, cur, settings.keepMsgs);
+        pruneNotes(s, cur, settings.keepScene);
+        // 오래된 호감 계기는 숫자로 합친다 (2026-11-17 사용자: 원본처럼. 11-14 「전부 남기기」를 대신함)
+        foldCues(s, cur, settings, temperOf, settings.keepMsgs);
+        foldOpenness(s, cur, settings.keepMsgs);
         let next = cur;
         // 이름을 옮긴 기록이 설정 「항상 포함할 인물」에 옛 호칭으로 적혀 있으면 새 이름으로 고쳐 적는다 (이름으로 적는 채팅 저장값은 인물 기록 밖에 이것뿐)
         const always = renameAlways(cur.scriptstate?.[PP('always')], report.applied.renamed);
@@ -443,16 +454,23 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           const orders = liveBmOrders(next.scriptstate, alive);
           const done = confirmBmPickups(readItems(next.scriptstate), orders, bmAsked(orders, prevKey), report.pickup.names, alive, report.pickup.anchor, itemChanges);
           itemChanges = done.changes;
-          if (done.got.length) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(done.it), ...bmOrdersVars(done.orders) } };
+          if (done.got.length) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(done.it), ...bmOrdersVars(done.orders, bmOrdersKeep(next.scriptstate)) } };
         }
         if (itemChanges.length) {
           // 판정 표·「두고 옴」 말은 이 채팅의 설정으로 (core/itemrules.ts). order = 메시지 차례 (사용자가 버린 물건은 버린 뒤의 메시지가 근거일 때만 되살린다)
           setItemRules(next.scriptstate);
           // 포인트몰 수령 대기 중인 물건을 본문이 먼저 받았으면 새로 만들지 않고 그 대기 줄을 받은 것으로 (core/items.ts settleBmPickups)
           const bm = settleBmPickups(readItems(next.scriptstate), liveBmOrders(next.scriptstate, aliveAnchors(next)), aliveAnchors(next), itemChanges);
-          if (bm.settled) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...bmOrdersVars(bm.orders) } };
+          if (bm.settled) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...bmOrdersVars(bm.orders, bmOrdersKeep(next.scriptstate)) } };
           const it = applyItemChanges(bm.it, aliveAnchors(next), bm.changes, { state: itemStateOn(next.scriptstate), skipKinds: ITEM_SCOPE_SKIP[itemScope(next.scriptstate)], order: (next.message ?? []).map((m, i) => messageKey(m, i)) });
           next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it) } };
+        }
+        // 치운 지 오래된 물건 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway). 변화를 적용한 뒤에 (이번에 되찾은 줄은 남게),
+        // 턴은 요청의 items_away 와 같이 이번에 읽은 마지막 응답에서 센다 (밀린 응답·지난 응답을 읽을 때 채팅 끝에서 세지 않게)
+        if (itemsOn) {
+          const it0 = readItems(next.scriptstate);
+          const it1 = forgetAway(it0, next, asOfKey);
+          if (it1 !== it0) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it1) } };
         }
         // 상점 판단 (11-09): 판단한 응답 끝의 표식을 갱신기 판단대로 바꾸고(있으면 붙이고 없으면 지움) 본편과 같은 정리(settleShop)를 돌린다.
         // 화면의 「상점 열기」 카드는 표식에서 그려지니 본편이 판단할 때와 같은 길로 뜬다
@@ -662,7 +680,7 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
   // 항상 포함·글에 나온 사람·동행·장면 유지만으로 장면 인물 자리가 찼으면 모델이 고른 인물은 들어갈 자리가 없다: 부르지 않는다
   if (sceneFullByCode(chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) return null;
   const names = allNames(roster);
-  const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf });
+  const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, max: settings.sceneMax, prompt: routerBase(), rules: settings.routerRules, identityOf });
   if (routerCache?.key === built.key) {
     routerHints = routerCache.hints;
     return routerCache.selected;
@@ -761,7 +779,7 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
   const roster = rosterOf(ctx.char.globalLore);
   const names = allNames(roster);
   if (settings.router === 'model' && Object.keys(store.people).length && !sceneFullByCode(ctx.chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) {
-    const b = buildRouter(ctx.chat, store, names, input, { exclude, recent: settings.recentMsgs, prompt: routerBase(), rules: settings.routerRules, identityOf: sheetOf(ctx) });
+    const b = buildRouter(ctx.chat, store, names, input, { exclude, recent: settings.recentMsgs, max: settings.sceneMax, prompt: routerBase(), rules: settings.routerRules, identityOf: sheetOf(ctx) });
     out.router = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];
   }
   if ((settings.director === 'scene' || settings.director === 'facts') && Object.keys(store.people).length) {

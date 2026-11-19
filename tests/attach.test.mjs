@@ -75,3 +75,27 @@ test('phone storage and notice settings', () => {
   assert.equal(P.cooldownReady(cool, 'announcement'), true);
   assert.equal(P.cooldownReady({ ...cool, scriptstate: { ...cool.scriptstate, $ph_announcement_gap: '5' } }, 'announcement'), false);
 });
+
+test('초대받은 단톡방 정리: 수를 넘으면 오래 조용한 초대 방만 지운다', () => {
+  const st = { version: 2, seq: 0, mid: 0, rooms: {}, order: [] };
+  const mk = (id, extra = {}) => {
+    const r = { id, kind: 'group', members: ['a', 'b'], people: { a: { id: 'a', name: 'A' }, b: { id: 'b', name: 'B' } }, messages: [], draft: '', unread: 0, ...extra };
+    st.rooms[id] = r; st.order.push(id);
+    P.push(st, r, 'a', `${id} 말`, '');
+    return r;
+  };
+  for (let i = 1; i <= 6; i++) mk(`g_${i}`, { inviter: 'a' });
+  mk('g_mine');                                   // 내가 만든 방
+  P.push(st, st.rooms.g_1, 'me', '내가 말함', ''); // 내가 말한 초대 방
+  st.rooms.g_2.unread = 1;                        // 안 읽은 말
+  st.rooms.g_3.draft = '쓰다 만 글';
+  assert.deepEqual(P.phoneStorage({}, 'invited'), { auto: true, limit: 20 });
+  assert.deepEqual(P.phoneStorage({}, 'dm'), { auto: true, limit: 100 });
+  assert.deepEqual(P.trimInvited(st, 20), [], '수 안이면 그대로');
+  // 초대 방 6개, 상한 2 → 4개를 지워야 하지만 지울 수 있는 것은 g_4·g_5·g_6 가운데 열어 둔 g_4 를 뺀 둘
+  assert.deepEqual(P.trimInvited(st, 2, 'g_4'), ['g_5', 'g_6']);
+  assert.deepEqual(Object.keys(st.rooms).sort(), ['g_1', 'g_2', 'g_3', 'g_4', 'g_mine']);
+  assert.deepEqual(st.order, ['g_1', 'g_2', 'g_3', 'g_4', 'g_mine']);
+  assert.equal(P.invitedCap({ $ph_storage_auto_invited: '0' }), Infinity);
+  assert.equal(P.invitedCap({ $ph_storage_limit_invited: '5' }), 5);
+});

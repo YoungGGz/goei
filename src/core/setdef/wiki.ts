@@ -18,6 +18,7 @@ export const WIKI_SET: SetPage = {
         { key: 'adv_turns', label: '챗로그 포함', ctl: { t: 'adv', item: 'turns' } },
         { key: 'adv_refs', label: '넘길 내용', ctl: { t: 'advchips', items: ['desc', 'authors', 'persona', 'active', 'related', 'secondary'] } },
         { key: 'adv_ref_count', label: '관련·2차 참조 최대', ctl: { t: 'adv', item: 'ref_count' } },
+        { key: 'adv_image_count', label: '그림 후보 최대', ctl: { t: 'adv', item: 'image_count' } },
         { key: 'refresh_previous', label: '다시 쓸 때 이전 문서 참조', ctl: onOff(), help: '문서를 다시 쓸 때 이전 문서를 요청에 넣어요' },
         { key: 'adv_budget', label: '요청 토큰 상한', ctl: { t: 'adv', item: 'budget' } },
       ],

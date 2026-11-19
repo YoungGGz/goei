@@ -1,6 +1,6 @@
 // 「설정」 탭: 원본 설정 창의 동작·요원창·캐릭터 이미지 항목. 값은 이 채팅의 $st_* 변수에 두고,
 // 범위: 이 채팅($st_*·$wg_*) / 새 채팅 기본값(플러그인 저장소) / 카드 명부(directory.ts, 카드 로어북).
-import { ckWide, defRow, helpBox, numCtl, numSet, setGroup, setRow, stepSizeText, type CkActs, type CkBand, type CkNum, type RowScope } from './setrow';
+import { ckWide, defRow, helpBox, numCtl, numSet, setGroup, setRow, stepBox, stepSizeText, type CkActs, type CkBand, type CkNum, type RowScope } from './setrow';
 import { SETTINGS_SET } from '../core/setdef/settings';
 import { findDef } from '../core/setdef/types';
 import { mallSettingsPane } from './malls';
@@ -11,10 +11,12 @@ import { GUIDE_NAMES, guideTxt, setGuideOverride } from '../core/guides';
 import { onOffSwitch, switchHtml } from './controls';
 import { repaintTheme } from './theme';
 import {
-  AGENT_MAX, basicDefaults, DIM_DEFAULT, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
+  AGENT_MAX, basicDefaults, CONSULT_CHATS_RANGE, CONSULT_LINES_RANGE, DIM_DEFAULT, TRACE_KEEP_RANGE, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
 } from '../core/settings';
 import type { WorldSettings } from '../core/world/engine';
 import { savePrefs, saveVarDefaults, varDefaultsToLoad } from '../host/prefs';
+import { keepTurns } from '../host/trace';
+import { consultKeep } from '../core/consult';
 import { activeBooksRow, advSections } from './advanced';
 import { ASSET_NOTE } from '../core/asset';
 import { IMG_FOLD, IMG_RECENT, IMG_SIZE, imgFold, imgRecent, imgSize, setImgHidden } from '../core/imgtag';
@@ -26,13 +28,14 @@ import { readIconMisses } from '../core/iconmatch';
 import { aliasCanAdd, aliasChanged, aliasEdit, aliasRowBad, aliasShown, ALIAS_WORD_MAX } from '../core/aliasrows';
 import { pairTable } from '../core/pairrows';
 import { defStored } from '../core/deftext';
-import { ITEM_LEFT_WORDS_DEFAULT, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT, ITEM_OFF_WORDS_VAR, ITEM_RULES_DEFAULT, ITEM_RULES_VAR, ITEM_WORDS_MAX, parseItemRules } from '../core/itemrules';
+import { ITEM_LEFT_WORDS_DEFAULT, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT, ITEM_OFF_WORDS_VAR, ITEM_RULES_DEFAULT, ITEM_RULES_VAR, ITEM_WORDS_MAX, ITEM_LIST_CAP_MAX, ITEM_LIST_CAP_MIN, ITEM_LIST_CAP_STEP, ITEM_LIST_CAP_VAR, itemListCapOf, ITEM_LOG_CAP_MAX, ITEM_LOG_CAP_MIN, ITEM_LOG_CAP_STEP, ITEM_LOG_CAP_VAR, itemLogCapOf, parseItemRules } from '../core/itemrules';
 import { ICON_KIND_LABEL, normIcon } from '../core/iconmatch';
 import { keepOpen } from './panels';
-import { invOn, ITEM_SCOPE_VAR, ITEM_SKIP_MAX, ITEM_SKIP_VAR, itemScope, itemSkip, ITEM_ICON_POOL_VAR, itemIconPoolOn, ITEM_AUTO_VAR, ITEM_DETAIL_VAR, ITEM_LOGTURNS_MAX, ITEM_LOGTURNS_VAR, ITEM_RESUMED_VAR, ITEM_SPENT_VAR, ITEM_START_VAR, ITEM_STATE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, ITEM_USE_VAR, itemDetail, itemLogTurns, itemStartOn, itemStateOn, ITEM_LIMIT_DEFAULT, ITEM_LIMIT_VAR, ITEM_ICON_ALIAS_VAR, ITEM_ON_VAR, ITEM_SLOTS_MAX, ITEM_SLOTS_MIN, ITEM_SLOTS_VAR, itemAutoOn, itemLimit, itemSlots, ITEM_CARRY_MAX, ITEM_CARRY_MIN, ITEM_CARRY_PC_VAR, ITEM_CARRY_VAR, ITEM_EDIT_VAR, itemCarrySetting, itemEditOn, itemWeight } from '../core/items';
+import { invOn, ITEM_SCOPE_VAR, ITEM_SKIP_MAX, ITEM_SKIP_VAR, itemScope, itemSkip, ITEM_ICON_POOL_VAR, itemIconPoolOn, ITEM_AUTO_VAR, ITEM_DETAIL_VAR, ITEM_LOGTURNS_MAX, ITEM_LOGTURNS_VAR, ITEM_AWAY_TURNS_MAX, ITEM_AWAY_TURNS_STEP, ITEM_AWAY_TURNS_VAR, itemAwayTurns, ITEM_RESUMED_VAR, ITEM_SPENT_VAR, ITEM_START_VAR, ITEM_STATE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, ITEM_USE_VAR, itemDetail, itemLogTurns, itemStartOn, itemStateOn, ITEM_LIMIT_DEFAULT, ITEM_LIMIT_VAR, ITEM_ICON_ALIAS_VAR, ITEM_ON_VAR, ITEM_SLOTS_MAX, ITEM_SLOTS_MIN, ITEM_SLOTS_VAR, itemAutoOn, itemLimit, itemSlots, ITEM_CARRY_MAX, ITEM_CARRY_MIN, ITEM_CARRY_PC_VAR, ITEM_CARRY_VAR, ITEM_EDIT_VAR, itemCarrySetting, itemEditOn, itemWeight } from '../core/items';
 import { SHOP_AMOUNTS, isGiveKey, isGiveShop, isShopAmount, isShopFn, shopAmountNone, shopFnVar, shopGiveVar } from '../core/shopfn';
-import { SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags } from '../core/shop';
-import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
+import { SHOP_SHELF_HI, SHOP_SHELF_LO, SHOP_SHELF_VAR, SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags, SHOP_LIMITS, isShopLimit } from '../core/shop';
+import { BM_ORDERS_KEEP_VAR, COS_ORDERS_KEEP_VAR, ORDERS_KEEP_RANGE } from '../core/orders';
+import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT, WALLET_CAP_MAX, WALLET_CAP_MIN, WALLET_CAP_STEP, WALLET_CAP_VAR, walletCapOf } from '../core/wallet';
 import { updateChat, type ChatContext } from '../host/risu';
 import { barButtons, directoryBar, directoryDone, directoryDoneClear, directorySearch, directoryView } from './directory';
 import { drawerBox } from './drawer';
@@ -243,6 +246,7 @@ function stepper(action: string, key: string, shown: string, canDown: boolean, c
 function worldStep(key: WorldField['key']): number {
   if (key.endsWith('_p') || key === 'landmark_share') return 10;
   if (key.endsWith('_ttl')) return 6;
+  if (key === 'cleared_cap') return 50;
   return 1;
 }
 
@@ -274,6 +278,7 @@ function worldGrid(w: WorldSettings, busy: boolean): string {
     ${group('', [
       field('사건의 거점 비율', n('landmark_share', '사건의 거점 비율', '%'), '사건이 생길 때 등록된 거점(본부·지사 같은 장소)에서 생길 비율이에요. 나머지는 지도의 아무 곳에서 생겨요.'),
       field('추가 발생 여유분', numSet([['괴이', n('extra_cap', '괴이 여유분', '개')], ['사건', n('extra_in_cap', '사건 여유분', '개')], ['특수', n('extra_ms_cap', '특수 여유분', '개')]]), '직접 고르거나 RP 중에 새로 등장한 것을 동시 최대와 따로 기록할 수 있는 수예요.'),
+      field('클리어 기록 상한', n('cleared_cap', '클리어 기록 상한', '개'), '클리어한 괴이 이름을 몇 개까지 기억할지예요. 넘으면 오래된 이름부터 잊어요. 기억하는 괴이는 위키 문서의 스포일러 문단이 처음부터 펼쳐져요. 0이면 모두 기억해요.'),
     ].join(''))}`;
 }
 
@@ -422,9 +427,13 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       D('dim', '', { ctl: dimSlider(getPrefs().dim ?? DIM_DEFAULT, busy) }),
       // 호출 진행 창 (11-09 사용자): 채팅을 보내면 라우터→디렉터→메인→갱신기→인터넷이 어디까지 돌았는지 (host/progwin.ts)
       D('progress', getPrefs().progress === false ? '0' : '1'),
+      // 호출 기록·AI 상담 대화는 기기에 하나뿐인 저장소라 보관하는 양도 이 기기에 하나 (core/settings.ts)
+      D('trace-keep', '', { ctl: stepBox('set-trace-keep', 'n', keepTurns(), ...TRACE_KEEP_RANGE, '턴', '호출 기록 보관', busy) }),
       // 창 둘레 기기 틀 (2026-10-29 사용자, ui/frame.ts). 좁아서 숨긴 상태는 app.ts 가 .gx 에 data-frame-hidden 으로 적는다
       D('frame', getPrefs().frame ?? 'tablet', { help: `PC에서 상황판 창 둘레에 그리는 기기 틀로, 폰에서는 그리지 않고 창 폭이 모자라면 자동으로 숨겨요.${document.querySelector<HTMLElement>('.gx')?.dataset.frameHidden === '1' ? '<br><span class="st-frame-note">지금 창 폭이 좁아 프레임을 숨겼어요</span>' : ''}` }),
       D('editor-width', String(getPrefs().editorWidth ?? 90)),
+      D('consult-lines', '', { ctl: stepBox('set-consult-lines', 'n', consultKeep().lines, ...CONSULT_LINES_RANGE, '줄', 'AI 상담 대화 보관', busy) }),
+      D('consult-chats', '', { ctl: stepBox('set-consult-chats', 'n', consultKeep().chats, ...CONSULT_CHATS_RANGE, '개', 'AI 상담 보관 채팅', busy) }),
     ].join(''))}`,
     image: `${group('', [
       D('asset', s.assetOn ? '1' : '0'),
@@ -463,6 +472,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
         ...(colCfg.wallet === 'off' ? [] : [
           D('wallet-loose', walletLoose(itVars) ? '1' : '0'),
           D('wallet-recent', '', { ctl: stepper('set-wallet-recent', 'n', `${walletRecentN(itVars)}줄`, walletRecentN(itVars) > 0, walletRecentN(itVars) < WALLET_RECENT_MAX, '최근 거래 줄 수', busy, [`${WALLET_RECENT_MAX}줄`]), help: `메인 요청의 지난 상태창 아래에 최근 거래를 몇 줄 붙일지예요(0~${WALLET_RECENT_MAX}, 0이면 안 붙여요). 모델이 돈이 어디로 갔는지 알고 이어 써요.` }),
+          D('wallet-cap', '', { ctl: stepper('set-wallet-cap', 'n', `${walletCapOf(itVars)}줄`, walletCapOf(itVars) > WALLET_CAP_MIN, walletCapOf(itVars) < WALLET_CAP_MAX, '거래 줄 상한', busy, [`${WALLET_CAP_MAX}줄`]), help: `가계부와 포인트 장부에 거래를 몇 줄까지 남길지예요(${WALLET_CAP_MIN}~${WALLET_CAP_MAX}). 넘으면 오래된 거래부터 정리하고, 잔고는 그대로예요.` }),
         ]),
       ].join('')),
       colCfg.wallet === 'off' ? '' : group('잔고', [
@@ -495,6 +505,9 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
           D('items-carry', '', { ctl: stepper('set-items-carry', 'n', `${itemCarrySetting(itVars)}kg`, itemCarrySetting(itVars) > ITEM_CARRY_MIN, itemCarrySetting(itVars) < ITEM_CARRY_MAX, '소지 한도', busy, [`${ITEM_CARRY_MAX}kg`]), help: `들 수 있는 무게예요(${ITEM_CARRY_MIN}~${ITEM_CARRY_MAX}kg). 장착한 것까지 모든 물건의 무게를 더해 보여 주고, 넘으면 넘은 만큼 색이 진해져요. 막지는 않고, 메인 요청에는 넘었는지·얼마나 넘었는지만 넘겨요. 고유 인물로 시작하면 명부의 「소지 한도」를 쓰고, 값이 없을 때만 이 값을 써요.${scope === 'chat' && itemWeight(itVars?.[ITEM_CARRY_PC_VAR]) ? ` 이 채팅은 명부 값 ${itemWeight(itVars?.[ITEM_CARRY_PC_VAR])}kg을 써요.` : ''}` }),
           D('items-edit', itemEditOn(itVars) ? '1' : '0'),
           D('items-spent', itemsUiSpent(itVars)),
+          D('items-away-turns', '', { ctl: stepper('set-items-away-turns', 'n', itemAwayTurns(itVars) ? `${itemAwayTurns(itVars)}턴` : '계속', itemAwayTurns(itVars) > 0, itemAwayTurns(itVars) < ITEM_AWAY_TURNS_MAX, '치운 물건 기억', busy, [`${ITEM_AWAY_TURNS_MAX}턴`]), help: `두고 오거나 버리거나 잃거나 부서진 물건을 몇 턴 동안 기억할지예요(0~${ITEM_AWAY_TURNS_MAX}, 0이면 계속). 기억하는 동안은 그 응답을 다시 굴리면 돌아오고, 본문에서 되찾으면 같은 물건으로 돌아와요. 지나면 목록에서 지워서, 그 뒤에 되찾으면 새 물건으로 생기고, 치운 응답을 지워도 돌아오지 않아요.` }),
+          D('items-list-cap', '', { ctl: stepper('set-items-list-cap', 'n', `${itemListCapOf(itVars)}줄`, itemListCapOf(itVars) > ITEM_LIST_CAP_MIN, itemListCapOf(itVars) < ITEM_LIST_CAP_MAX, '물건 줄 상한', busy, [`${ITEM_LIST_CAP_MAX}줄`]), help: `저장하는 물건 줄 수예요(${ITEM_LIST_CAP_MIN}~${ITEM_LIST_CAP_MAX}). 넘으면 지운 응답의 물건, 팔거나 부서졌거나 다 쓴 물건을 오래된 것부터 지워요. 갖고 있는 물건은 지우지 않아요.` }),
+          D('items-logcap', '', { ctl: stepper('set-items-logcap', 'n', `${itemLogCapOf(itVars)}줄`, itemLogCapOf(itVars) > ITEM_LOG_CAP_MIN, itemLogCapOf(itVars) < ITEM_LOG_CAP_MAX, '기록 줄 상한', busy, [`${ITEM_LOG_CAP_MAX}줄`]), help: `얻고·쓰고·버리고·잃은 기록을 몇 줄까지 남길지예요(${ITEM_LOG_CAP_MIN}~${ITEM_LOG_CAP_MAX}). 넘으면 오래된 기록부터 정리하고, 소모품의 남은 횟수는 그대로예요.` }),
           D('items-start', itemStartOn(itVars) ? '1' : '0'),
           D('items-left-words', String(itVars?.[ITEM_LEFT_WORDS_VAR] ?? '')),
           D('items-off-words', String(itVars?.[ITEM_OFF_WORDS_VAR] ?? '')),
@@ -570,7 +583,7 @@ function bulkSideVars(chat: Chat, prev: ScriptState | undefined, next: ScriptSta
 
 const itemsUiSpent = (vars: Record<string, unknown> | undefined) => (vars?.[ITEM_SPENT_VAR] === 'keep' ? 'keep' : 'remove');
 /** 소지품·가계부 단순 옵션: 켬/끔·고르기(values) 또는 −/+ 숫자(max·num) */
-const INV_OPTS: Record<string, { key: string; values: string[]; max?: number; num?: (vars: Record<string, unknown> | undefined) => number }> = {
+const INV_OPTS: Record<string, { key: string; values: string[]; max?: number; min?: number; step?: number; num?: (vars: Record<string, unknown> | undefined) => number }> = {
   'set-items-start': { key: ITEM_START_VAR, values: ['1', '0'] },
   'set-items-detail': { key: ITEM_DETAIL_VAR, values: ['full', 'state', 'name'] },
   'set-items-state': { key: ITEM_STATE_VAR, values: ['1', '0'] },
@@ -579,9 +592,13 @@ const INV_OPTS: Record<string, { key: string; values: string[]; max?: number; nu
   'set-items-pool': { key: ITEM_ICON_POOL_VAR, values: ['1', '0'] },
   'set-items-spent': { key: ITEM_SPENT_VAR, values: ['remove', 'keep'] },
   'set-items-logturns': { key: ITEM_LOGTURNS_VAR, values: [], max: ITEM_LOGTURNS_MAX, num: itemLogTurns },
+  'set-items-away-turns': { key: ITEM_AWAY_TURNS_VAR, values: [], max: ITEM_AWAY_TURNS_MAX, step: ITEM_AWAY_TURNS_STEP, num: itemAwayTurns },
+  'set-items-list-cap': { key: ITEM_LIST_CAP_VAR, values: [], max: ITEM_LIST_CAP_MAX, min: ITEM_LIST_CAP_MIN, step: ITEM_LIST_CAP_STEP, num: itemListCapOf },
+  'set-items-logcap': { key: ITEM_LOG_CAP_VAR, values: [], max: ITEM_LOG_CAP_MAX, min: ITEM_LOG_CAP_MIN, step: ITEM_LOG_CAP_STEP, num: itemLogCapOf },
   'set-wallet-sync': { key: WALLET_SYNC_VAR, values: ['1', '0'] },
   'set-wallet-loose': { key: WALLET_LOOSE_VAR, values: ['1', '0'] },
   'set-wallet-recent': { key: WALLET_RECENT_VAR, values: [], max: WALLET_RECENT_MAX, num: walletRecentN },
+  'set-wallet-cap': { key: WALLET_CAP_VAR, values: [], max: WALLET_CAP_MAX, min: WALLET_CAP_MIN, step: WALLET_CAP_STEP, num: walletCapOf },
 };
 
 async function save(ctx: ChatContext, env: SettingsEnv, change: (chat: Chat) => ScriptState | null): Promise<void> {
@@ -726,6 +743,14 @@ export async function shopFamSet(ctx: ChatContext, env: SettingsEnv, scope: 'cha
       if (key === 'min') { lo = n; if (lo > hi) hi = lo; } else { hi = n; if (hi < lo) lo = hi; }
       patch = { [name(SHOP_MIN_VAR)]: String(lo), [name(SHOP_MAX_VAR)]: String(hi) };
     }
+  } else if (key === 'keep_orders') {
+    // 주문 기록 수: 쇼핑몰 둘, 저마다 제 값 (core/orders.ts)
+    const n = int(ORDERS_KEEP_RANGE.min, ORDERS_KEEP_RANGE.max);
+    if (n !== null && (col === 'cos' || col === 'bm')) patch = { [col === 'cos' ? COS_ORDERS_KEEP_VAR : BM_ORDERS_KEEP_VAR]: String(n) };
+  } else if (key.startsWith('limit_')) {
+    // 보관하는 양·참고 글 길이: 네 곳이 한 값 (col 은 늘 shop, core/shop.ts SHOP_LIMITS)
+    const k = key.slice(6);
+    if (col === 'shop' && isShopLimit(k)) { const n = int(SHOP_LIMITS[k].min, SHOP_LIMITS[k].max); if (n !== null) patch = { [SHOP_LIMITS[k].key]: String(n) }; }
   } else if (key === 'ctx' || key.startsWith('give_')) {
     // 가게 표 (넘길 내용 + 맥락 반영): 기본 상점·쇼핑몰 둘, 가게마다 제 값
     const k = key === 'ctx' ? 'ctx' : key.slice(5);
@@ -743,6 +768,7 @@ export async function shopFamSet(ctx: ChatContext, env: SettingsEnv, scope: 'cha
     else if (key === 'thoughts' && ['off', 'inner', 'note'].includes(raw)) patch = { [SHOP_THOUGHTS_VAR]: raw };
     else if (key === 'turns') { const n = int(1, 8); if (n !== null) patch = { [SHOP_TURNS_VAR]: String(n) }; }
     else if (key === 'refs') { const n = int(0, 12); if (n !== null) patch = { [SHOP_REFS_VAR]: String(n) }; }
+    else if (key === 'shelf') { const n = int(SHOP_SHELF_LO, SHOP_SHELF_HI); if (n !== null) patch = { [SHOP_SHELF_VAR]: String(n) }; }
   }
   if (!patch) return env.render(), true;
   const out = patch;
@@ -954,6 +980,14 @@ export async function handleSettings(action: string, value: string | undefined, 
     if (v === '1' || v === '0') await saveDefaults(env, (p) => ({ ...p, progress: v === '0' ? false : undefined }));
     return true;
   }
+  if (action === 'set-trace-keep' || action === 'set-consult-lines' || action === 'set-consult-chats') {
+    // 값은 「n=수」. 범위를 벗어난 수는 범위 끝으로 맞추고, 수가 아니면 그대로 둔다
+    const [key, [lo, hi]] = action === 'set-trace-keep' ? ['traceKeep', TRACE_KEEP_RANGE] as const : action === 'set-consult-lines' ? ['consultLines', CONSULT_LINES_RANGE] as const : ['consultChats', CONSULT_CHATS_RANGE] as const;
+    const raw = v.slice(v.indexOf('=') + 1).trim();
+    const n = Number(raw);
+    if (/^-?\d+$/.test(raw)) await saveDefaults(env, (p) => ({ ...p, [key]: Math.max(lo, Math.min(hi, n)) }));
+    return true;
+  }
   if (action === 'set-frame') {
     if (v === 'none' || v === 'tablet' || v === 'tactical') await saveDefaults(env, (p) => ({ ...p, frame: v === 'tablet' ? undefined : v }));
     return true;
@@ -978,7 +1012,7 @@ export async function handleSettings(action: string, value: string | undefined, 
     const vars = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
     let next: string | null = null;
     if (simple.max !== undefined) {
-      if (/^n:[+-]$/.test(v)) next = String(Math.max(0, Math.min(simple.max, simple.num!(vars) + (v.endsWith('+') ? 1 : -1))));
+      if (/^n:[+-]$/.test(v)) next = String(Math.max(simple.min ?? 0, Math.min(simple.max, simple.num!(vars) + (v.endsWith('+') ? 1 : -1) * (simple.step ?? 1))));
     } else if (simple.values.includes(v)) next = v;
     if (next === null) return true;
     const key = simple.key;
@@ -1026,7 +1060,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       else await save(ctx, env, (chat) => (String(chat.scriptstate?.[SHOP_MIN_VAR] ?? '') === patch[SHOP_MIN_VAR] && String(chat.scriptstate?.[SHOP_MAX_VAR] ?? '') === patch[SHOP_MAX_VAR] ? null : patch));
       return true;
     }
-    const KEY: Record<string, string> = { on: SHOP_ON_VAR, model: SHOP_MODEL_VAR, count: SHOP_COUNT_VAR, ctx: SHOP_CTX_VAR, price: SHOP_PRICE_VAR, diverse: SHOP_DIVERSE_VAR, thoughts: SHOP_THOUGHTS_VAR, prev: SHOP_PREV_VAR, kick: SHOP_KICK_VAR, feature: SHOP_FEATURE_VAR, turns: SHOP_TURNS_VAR, refs: SHOP_REFS_VAR, where: SHOP_WHERE_VAR, judge: SHOP_JUDGE_VAR };
+    const KEY: Record<string, string> = { on: SHOP_ON_VAR, model: SHOP_MODEL_VAR, count: SHOP_COUNT_VAR, ctx: SHOP_CTX_VAR, price: SHOP_PRICE_VAR, diverse: SHOP_DIVERSE_VAR, thoughts: SHOP_THOUGHTS_VAR, prev: SHOP_PREV_VAR, kick: SHOP_KICK_VAR, feature: SHOP_FEATURE_VAR, turns: SHOP_TURNS_VAR, refs: SHOP_REFS_VAR, shelf: SHOP_SHELF_VAR, where: SHOP_WHERE_VAR, judge: SHOP_JUDGE_VAR };
     const k = action.slice(9);
     const key = KEY[k];
     if (!key) return true;
@@ -1039,7 +1073,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       else await save(ctx, env, (chat) => (String(chat.scriptstate?.[key] ?? '') === nv ? null : { [key]: nv }));
       return true;
     }
-    const ok = k === 'price' ? true : k === 'model' ? v === 'main' || v === 'aux' : k === 'count' ? ['0', '1', '2'].includes(v) : k === 'thoughts' ? ['off', 'inner', 'note'].includes(v) : k === 'where' ? v === 'any' || v === 'shop' : k === 'judge' ? ['auto', 'main', 'updater'].includes(v) : k === 'turns' ? /^[1-8]$/.test(v) : k === 'refs' ? /^([0-9]|1[0-2])$/.test(v) : v === '1' || v === '0';
+    const ok = k === 'price' ? true : k === 'model' ? v === 'main' || v === 'aux' : k === 'count' ? ['0', '1', '2'].includes(v) : k === 'thoughts' ? ['off', 'inner', 'note'].includes(v) : k === 'where' ? v === 'any' || v === 'shop' : k === 'judge' ? ['auto', 'main', 'updater'].includes(v) : k === 'turns' ? /^[1-8]$/.test(v) : k === 'refs' ? /^([0-9]|1[0-2])$/.test(v) : k === 'shelf' ? /^\d{2,3}$/.test(v) && Number(v) >= SHOP_SHELF_LO && Number(v) <= SHOP_SHELF_HI : v === '1' || v === '0';
     if (!ok) return true;
     const next = k === 'price' ? v.replace(/\s+/g, ' ').trim().slice(0, 80) : v;
     if (scope === 'defaults') await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), [key]: next } }));

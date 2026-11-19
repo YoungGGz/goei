@@ -136,9 +136,9 @@ test('기록 문서 포함: 기본은 넣지 않고, 켜면 장면과 관련된 
   store.docs['rhythm:scene'] = twDoc('rhythm', 'scene', [['d5', '준비 국면']]);
   const chat = twChat('나루가 정전 사건 보고서를 들고 왔다.');
   const o = (vars = {}) => ({ settings: St.peopleSettings({ $pp_rhythm: '0', ...vars }), store, sheetOf: () => null, user: '주인공' });
-  assert.equal(St.PP_DEFAULTS.docs_inject, '0');
-  const off = R.peopleBlockFor(chat, o()).text;
-  assert.doesNotMatch(off, /Scene-related records|정전됐다|보관 중/, '기본: 문서는 메인 요청에 없다');
+  assert.equal(St.PP_DEFAULTS.docs_inject, '1');
+  const off = R.peopleBlockFor(chat, o({ $pp_docs_inject: '0' })).text;
+  assert.doesNotMatch(off, /Scene-related records|정전됐다|보관 중/, '끔: 문서는 메인 요청에 없다');
   const on = R.peopleBlockFor(chat, o({ $pp_docs_inject: '1' })).text;
   const docLines = on.slice(on.indexOf('## Scene-related records')).split('\n').slice(1);
   assert.deepEqual([...docLines].sort(), ['- event · 정전 사건: 3층 전체가 정전됐다', '- event · 정전 사건: 비상 발전기로 복구됐다', '- item · 은색 열쇠: 나루가 주워서 보관 중'].sort(), '글에 이름이 나온 문서와 장면 인물이 얽힌 항목');

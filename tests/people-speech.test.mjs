@@ -52,12 +52,12 @@ test('조짐 집계: 같은 방향 3번이면 승인 대기(묻기)·변경 가�
 });
 
 test('설정: register_variety/change/sign_limit, 기능 register 끄면 off, 지침 덩어리', () => {
-  assert.equal(St.peopleSettings({}).registerVariety, 'off');
+  assert.equal(St.peopleSettings({}).registerVariety, 'one');
   const s = St.peopleSettings({ $pp_register_variety: 'two', $pp_register_change: 'auto', $pp_register_sign_limit: '5' });
   assert.deepEqual(Sp.speechVariety(s), { level: 'two', mode: 'auto', limit: 5, counted: true });
   assert.equal(Sp.speechVariety(St.peopleSettings({ $pp_register_variety: 'two', $pp_register: '0' })).level, 'off');
   assert.equal(Sp.speechVariety(St.peopleSettings({ $pp_register_variety: 'two', $pp_register_sign_limit: '2' })).counted, false);
-  assert.equal(Sp.speechVarietyBlock(St.peopleSettings({}), 'writer'), '');
+  assert.equal(Sp.speechVarietyBlock(St.peopleSettings({ $pp_register_variety: 'off' }), 'writer'), '');
   const one = Sp.speechVarietyBlock(St.peopleSettings({ $pp_register_variety: 'one' }), 'writer');
   assert.ok(/Speech variety/.test(one) && !/SIGN/.test(one));
   assert.ok(/SIGN closer/.test(Sp.speechVarietyBlock(s, 'writer')));
@@ -102,7 +102,7 @@ test('갱신기 반영: speech upsert 의 SIGN 을 세고, 집계 중 address �
   // 변형 끔이면 address 는 지금까지대로 바로 반영 (SIGN 은 지워짐)
   const store2 = T.emptyStore();
   store2.people.쟈알디 = person('쟈알디');
-  const s0 = St.peopleSettings({ $pp_prev_pairs: '1', $pp_director: 'note' });
+  const s0 = St.peopleSettings({ $pp_register_variety: 'off', $pp_prev_pairs: '1', $pp_director: 'note' });
   const in0 = U.buildUpdate(c, store2, [1], { settings: s0, system: 'S', values: {}, names });
   assert.equal(in0.data.speech_variety, undefined);
   rep = U.applyUpdate(store2, c, in0, { entries: [{ who: '쟈알디', slot: 'speech', op: 'add', target: '@user', text: '요원 (존댓말) SIGN closer: x', m: 'm2', quote: '농담도 하네' }], address: [{ who: '쟈알디', toUser: '너', register: '반말', m: 'm2', quote: '농담도 하네' }] }, { settings: s0 });
@@ -116,6 +116,6 @@ test('Director 자료: 말투 다변화가 켜지면 register 지침 뒤에 안�
   store.people.쟈알디 = person('쟈알디');
   const on = D.buildDirector(c, store, ['쟈알디'], '입력', St.peopleSettings({ $pp_register_variety: 'one' }), { 쟈알디: '' });
   assert.ok(/not to repeat a quoted example line/.test(on.system));
-  const off = D.buildDirector(c, store, ['쟈알디'], '입력', St.peopleSettings({}), { 쟈알디: '' });
+  const off = D.buildDirector(c, store, ['쟈알디'], '입력', St.peopleSettings({ $pp_register_variety: 'off' }), { 쟈알디: '' });
   assert.ok(!/not to repeat a quoted example line/.test(off.system));
 });

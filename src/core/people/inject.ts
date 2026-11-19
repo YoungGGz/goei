@@ -8,6 +8,7 @@ import { OPENNESS_MAX, OPENNESS_STAGES, REGISTERS, SEXUAL_CHARS, STAGES, opennes
 import { axesLinesEn, liveEvidence } from './axes';
 import { SEXUAL_POLICY, isSexualAxis, sexualDirectorPolicy } from './sexual';
 import { guideTxt } from '../guides';
+import { PP_DEFAULTS } from './settings';
 import { SPEECH_ENTRY_CHARS, parseSpeechMarker } from './speech';
 
 /* 모델에 가는 글(머리·칸 이름표·꼬리 글·단계별 행동 글)은 전부 지침 「메인 요청에 붙는 글」(Main) 절에서 읽는다. 코드에는 글을 두지 않는다 (2026-11-14 사용자).
@@ -41,6 +42,8 @@ export interface BlockOpts extends AffinityOpts {
   axes?: boolean;
   /** 승인 전 성격 관찰(모으는 중인 후보)도 6축 줄 아래에 넣을지 (설정 「성격 관찰 포함」). 성적 축 후보는 넣지 않는다 */
   axesObserved?: boolean;
+  /** 넣는 승인 전 성격 관찰 수 (설정, 기본 OBSERVED_MAX) */
+  observedMax?: number;
   /** 블록에서 뺄 칸 (Director 가 같은 칸을 `slots` 로 따로 받을 때) */
   omitSlots?: Set<SlotId>;
   /** 켜진 기능 (전용 칸을 넣을지 정함). 없으면 기본 칸만 */
@@ -70,7 +73,7 @@ const FEATURE_GROUPS: { key: string; slots: SlotId[] }[] = [
 /** 예산을 넘으면 오래된 항목부터 뺀다: 지난 일 → 아는 것 → 행동 → 장면 → 목표 순. 다른 절은 그대로 */
 export const TRIM_ORDER: (keyof Person['slots'])[] = ['history', 'knowledge', 'behavior', 'scene', 'threads'];
 /** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수 */
-export const OBSERVED_MAX = 4;
+export const OBSERVED_MAX = Number(PP_DEFAULTS.observed_max);
 
 /** 블록에 실을 칸 항목 (글자 예산으로 줄이기 전). request.ts 의 넘침 줄이기도 이 항목으로 글자를 센다 */
 export function blockEntries(p: Person, live: Liveness, o: Pick<BlockOpts, 'sheet' | 'mode' | 'omitSlots'> = {}): Partial<Record<keyof Person['slots'], Entry[]>> {
@@ -82,6 +85,20 @@ export function blockEntries(p: Person, live: Liveness, o: Pick<BlockOpts, 'shee
     for (const k of ['identity', 'personality'] as const) if (kept[k]) kept[k] = kept[k]!.filter((e) => !(e.src === 'seed' && dup.has(e.text)));
   }
   return kept;
+}
+
+/** 요청에 싣는 의심 칸 줄 (수치 모드): 사례(대상·종류)마다 묶어, 닫힌 사례(마지막 표식이 [해소])는 마지막 줄 하나만, 열린 사례는 줄 전부.
+ *  저장은 그대로다 (점수는 updater.ts suspicionCases 가 저장된 줄 전부로 센다. 다시 열면 열린 사례가 되어 옛 줄도 다시 실린다).
+ *  닫힌 사례의 [시작]·[단서]·[반응] 줄까지 요청마다 전부 실리던 것 (2026-11-17) */
+export function suspicionShown<T extends { text: string; target?: string; kind?: string }>(list: T[]): T[] {
+  const last = new Map<string, { closed: boolean; at: number }>();
+  const key = (e: T) => `${e.target}|${e.kind}`;
+  list.forEach((e, i) => {
+    const m = /^\[(시작|단서|반응|해소)/.exec(e.text);
+    const cur = last.get(key(e)) ?? { closed: false, at: i };
+    last.set(key(e), { closed: m ? (m[1] === '해소' ? true : m[1] === '시작' ? false : cur.closed) : cur.closed, at: i });
+  });
+  return list.filter((e, i) => { const c = last.get(key(e))!; return !c.closed || c.at === i; });
 }
 
 /** 한 인물의 블록. 비어 있는 절은 빼고, 보통(무관심) 단계면 관계 줄을 짧게 */
@@ -105,13 +122,13 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
   if (per.length) out.push(main('PEOPLE.BLOCK.PERSONALITY') + '\n' + lines(per));
   if (o.axes) out.push(main('PEOPLE.BLOCK.AXES') + '\n' + axesLinesEn(p.axes).join('\n') + (p.patterns?.length ? '\n' + main('PEOPLE.BLOCK.PATTERNS') + '\n' + p.patterns.map((t) => `- ${plain(t, 300)}`).join('\n') : ''));
   if (o.axes && o.axesObserved) {
-    // 모으는 중인 후보 가운데 살아 있는 관찰이 있는 것, 관찰이 많은 것부터 넷까지
+    // 모으는 중인 후보 가운데 살아 있는 관찰이 있는 것, 관찰이 많은 것부터 설정한 수까지
     const seen = Object.values(p.candidates ?? {})
       .filter((c) => c.status === 'collecting' && !isSexualAxis(c.axis))
       .map((c) => ({ c, n: liveEvidence(c, live).length }))
       .filter((x) => x.n > 0)
       .sort((a, b) => b.n - a.n)
-      .slice(0, OBSERVED_MAX);
+      .slice(0, o.observedMax ?? OBSERVED_MAX);
     if (seen.length) out.push(main('PEOPLE.BLOCK.AXES_OBSERVED') + '\n' + seen.map(({ c }) => main('PEOPLE.BLOCK.AXES_OBSERVED_ITEM', { axis: c.axis === 'pattern' ? 'pattern' : main(`PEOPLE.AXIS_LABEL.${c.axis}`), direction: c.direction, pattern: plain(c.pattern, 120) })).join('\n'));
   }
   // 성적 욕망·이상성욕 (원본 people_profile 의 sexual_desire/paraphilia + policy sexual_context_only)
@@ -159,7 +176,7 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
   if (be.length) out.push(main('PEOPLE.BLOCK.BEHAVIOR') + '\n' + lines(be));
   const th = slot('threads');
   if (th.length) out.push(main('PEOPLE.BLOCK.THREADS') + '\n' + lines(th));
-  const su = o.qual?.has('suspicion') ? [] : slot('suspicion');
+  const su = o.qual?.has('suspicion') ? [] : suspicionShown(slot('suspicion'));
   if (su.length) out.push(main('PEOPLE.BLOCK.SUSPICION') + '\n' + su.map((e) => `- ${e.target ? main('PEOPLE.BLOCK.SUSPICION_ABOUT', { target: e.target === '@user' ? user : e.target }) : ''}${e.kind ? ` [${e.kind}]` : ''}: ${plain(e.text, 200)}`).join('\n'));
   const hi = slot('history');
   if (hi.length) out.push(main('PEOPLE.BLOCK.HISTORY') + '\n' + lines(hi));
@@ -172,10 +189,10 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
 }
 
 /**
- * 이 인물이 모르는 것: 다른 인물의 「아는 정보」에 있지만 이 인물의 아는 정보에 없는 사실 (최근 것 우선, 최대 5).
+ * 이 인물이 모르는 것: 다른 인물의 「아는 정보」에 있지만 이 인물의 아는 정보에 없는 사실 (최근 것 우선, 최대 수는 설정, 기본 5).
  * 리수폿 Director 의 지식 경계를 코드로 흉내 내는 가장 싼 방법.
  */
-export function unknownTo(p: Person, store: PeopleStore, live: Liveness, max = 5): string[] {
+export function unknownTo(p: Person, store: PeopleStore, live: Liveness, max = Number(PP_DEFAULTS.unknown_max)): string[] {
   const mine = liveEntries(p.slots.knowledge, live).map((e) => norm(e.text));
   const seen = new Set<string>();
   const out: { text: string; pos: number }[] = [];

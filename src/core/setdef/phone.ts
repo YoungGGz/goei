@@ -3,8 +3,8 @@ import { BANTER_ROWS, NOTICE_PAGE_SIZES, STORAGE_MAX } from '../phone';
 import { onOff, type SetDef, type SetPage } from './types';
 
 const KEEP_HELP = '최근 기록만 남기고, 지운 대화는 흐름 요약으로 남겨요';
-const keep = (k: 'dm' | 'group' | 'notice', label: string): SetDef => ({
-  key: `storage_auto_${k}`, label, ctl: onOff('0'), help: KEEP_HELP,
+const keep = (k: 'dm' | 'group' | 'notice' | 'invited', label: string, help = KEEP_HELP): SetDef => ({
+  key: `storage_auto_${k}`, label, ctl: onOff('0'), help,
   inline: { key: `storage_limit_${k}`, lo: 1, hi: STORAGE_MAX, unit: '개', aria: '남길 수', whenOn: true, step: 5 },
 });
 const pct = (key: string) => ({ key, lo: 0, hi: 100, unit: '%', aria: '확률' });
@@ -39,6 +39,7 @@ export const PHONE_SET: SetPage = {
         { key: 'context', label: '사용', common: 'ctx', ctl: onOff('0'), help: '지금 장면과 관련된 괴담톡 대화가 메인 요청에 붙어요' },
         { key: 'adv_ctx', label: '붙일 것', ctl: { t: 'advchips', items: ['ctx_focus', 'ctx_messages', 'ctx_notices_on', 'ctx_views', 'ctx_reactions', 'ctx_habits'] } },
         { key: 'adv_ctx_history', label: '넣을 말풍선', ctl: { t: 'adv', item: 'ctx_history' } },
+        { key: 'adv_ctx_recent', label: '늘 넣을 최근 말풍선', ctl: { t: 'adv', item: 'ctx_recent' } },
         { key: 'adv_ctx_notices', label: '넣을 공지', ctl: { t: 'adv', item: 'ctx_notices' } },
         { key: 'adv_ctx_tokens', label: '컨텍스트 토큰 상한', ctl: { t: 'adv', item: 'ctx_tokens' } },
       ],
@@ -47,6 +48,7 @@ export const PHONE_SET: SetPage = {
       title: '답장',
       rows: [
         { key: 'habits', label: '말버릇 기록', ctl: onOff('0'), help: '연락처마다 문자 습관(맞춤법·답장 속도)을 기억해 다음 답장에도 이어 가요' },
+        { key: 'adv_habit_keep', label: '말버릇 보관', ctl: { t: 'adv', item: 'habit_keep' } },
         { key: 'reactions', label: '이모지 반응', ctl: onOff('0'), help: '메시지에 👍3 같은 반응이 붙어요. 본 사람 수를 넘지 않고, 1:1에서는 상대가 내 메시지에만 달아요' },
       ],
     },
@@ -57,6 +59,7 @@ export const PHONE_SET: SetPage = {
         { key: 'adv_cd_incoming', label: '선톡 받은 뒤 쉬는 턴', ctl: { t: 'adv', item: 'cd_incoming' } },
         { key: 'group_invites', label: '단톡방 초대 받기', ctl: onOff('0'), inline: pct('group_invite_chance') },
         { key: 'adv_cd_invite', label: '초대 받은 뒤 쉬는 턴', ctl: { t: 'adv', item: 'cd_invite' } },
+        { key: 'adv_check_rooms', label: '기록을 넘길 방', ctl: { t: 'adv', item: 'check_rooms' } },
         { key: 'adv_check_contacts', label: '선톡·초대 후보', ctl: { t: 'adv', item: 'check_contacts' } },
         { key: 'banter', label: '단톡 수다', ctl: onOff('0'), inline: pct('banter_chance'), help: '새 메시지를 확인할 때 이 확률로 내 단톡방 하나에서 사람들끼리 대화가 오가요. 응답이 길어져요' },
         { key: 'banter', label: '단톡 수다 줄 수', ctl: { t: 'minmax', lo: BANTER_ROWS[0], hi: BANTER_ROWS[1], unit: '줄', act: 'num' }, help: `수다 한 번에 오가는 말 수예요(${BANTER_ROWS[0]}~${BANTER_ROWS[1]}). 그 안에서 모델이 정해요` },
@@ -81,6 +84,8 @@ export const PHONE_SET: SetPage = {
         { key: 'view_speak', label: '시점 인물 대사', ctl: onOff('0'), help: '켜면 시점 인물의 말도 모델이 써요. 끄면 시점 인물은 조용히 있어요' },
         { key: 'view_scope', label: '등장인물 범위', show: { key: 'view_preset', eq: 'side' }, ctl: { t: 'seg', opts: [['0', '주요 인물'], ['1', '장면 안'], ['2', '장면 안 주요 인물'], ['3', '자율']] } },
         { key: 'view_size', label: '방 크기', show: { key: 'view_preset', eq: 'side' }, ctl: { t: 'seg', opts: [['0', '자동'], ['1', '둘이서'], ['2', '여럿']] } },
+        { key: 'adv_view_rooms', label: '보기 전용 방 보관', ctl: { t: 'adv', item: 'view_rooms' } },
+        { key: 'adv_view_history', label: '보기 전용 방 말풍선 보관', ctl: { t: 'adv', item: 'view_history' } },
       ],
     },
     {
@@ -96,6 +101,7 @@ export const PHONE_SET: SetPage = {
         keep('dm', '1:1 대화 정리'),
         keep('group', '단톡방 정리'),
         keep('notice', '공지 정리'),
+        keep('invited', '초대받은 단톡방 정리', '초대받은 단톡방이 이 수를 넘으면 오래 조용한 방부터 지워요. 내가 말한 방, 안 읽은 말이 있는 방, 내가 만든 방은 지우지 않아요'),
       ],
     },
     {

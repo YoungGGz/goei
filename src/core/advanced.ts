@@ -2,8 +2,10 @@
 // 기능마다 접힌 칸 하나에 모은다. 손대지 않아도 원본 기본값으로 돌아간다. 값은 이 채팅의 변수에 두고,
 // 각 설정 화면의 「덮어쓰기」로 새 채팅 기본값에 같이 담긴다.
 import { CONTEXT as GN_CONTEXT, HISTORY as GN_HISTORY, LIMITS as GN_LIMITS } from './gnet';
+import { ATTACH_LIMITS } from './attach';
 import { guideTxt } from './guides';
 import { COOLDOWN as PH_COOLDOWN, HISTORY as PH_HISTORY, LIMITS as PH_LIMITS } from './phone';
+import { VIEW_STORE as PH_VIEW_STORE } from './phoneView';
 
 export type AdvFeature = 'gn' | 'ph' | 'nw' | 'gen';
 
@@ -65,6 +67,9 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('reiterate', '다시 보기', 0, 0, 2, '회', { zero: '안 함', hint: '첫 응답을 받은 뒤 「지침과 형식을 빠짐없이 지켰나 다시 읽고, 괜찮으면 그대로, 아니면 고쳐서」를 이만큼 더 물어요. 형식·규칙을 더 잘 지키지만 한 번마다 호출이 하나 늘어요. 기능마다 따로 정할 수도 있어요' }),
         { key: 'user_msgs', label: '유저 메시지', type: 'pick', def: '1', opts: [['1', '포함'], ['0', '빼기']], hint: '괴담넷·괴담톡·위키·상점 요청에 넣는 최근 대화에 내가 쓴 메시지를 넣을지예요. 빼면 내가 쓴 지시문이 게시판·톡·위키로 새지 않지만, 내 행동은 응답 문장으로만 짐작해요' },
         num('concurrent', '동시 요청', 0, 0, 5, '개', { zero: '제한 없음', hint: '괴담넷·괴담톡·위키·상점·쇼핑몰·망상홈쇼핑 요청을 한 번에 몇 개까지 보낼지예요. 넘으면 앞 요청이 끝날 때까지 기다려요. 느린 모델이나 요청 한도가 낮을 때 줄이세요. 인물 기록 요청은 세지 않아요' }),
+        // 기본값 = 전에 코드에 고정돼 있던 값 (사진 8장 · AI 상담 24줄). 호출 기록·AI 상담 보관 수는 이 기기 설정 (core/settings.ts)
+        num('image_max', '요청당 사진', 8, 1, 20, '장', { hint: '요청 하나에 실제 사진을 몇 장까지 붙일지예요. 넘으면 최근 사진만 붙이고 앞의 사진은 설명 글만 보내요. 늘리면 요청이 커져요' }),
+        num('consult_talk', 'AI 상담 지난 대화 참조', 24, 2, 200, '줄', { hint: 'AI 상담 요청에 넣는 지난 대화 줄 수예요. 늘리면 앞의 대화를 더 기억하지만 토큰을 더 써요' }),
       ],
     },
     {
@@ -92,6 +97,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('comments', '답글에 참조할 댓글', 30, 1, 1000, '개'),
         num('dm_history', '답장에 참조할 쪽지', 50, 1, 1000, '통'),
         num('dm_public', '답장에 참조할 공개 글', 8, 0, 50, '개', { zero: '안 넣음' }),
+        num('dm_public_comments', '공개 글마다 댓글', 12, 0, 200, '개', { zero: '안 넣음', hint: '답장에 참조할 공개 글마다 같이 넘기는 최근 댓글의 수예요.' }),
+        num('dm_public_chars', '공개 글 전체 길이', 12000, 1000, 200000, '자', { hint: '답장에 참조할 공개 글과 댓글을 모두 합친 길이의 상한이에요. 넘으면 오래된 댓글부터 빼고, 그래도 넘는 글은 넣지 않아요.' }),
         { key: 'activity', label: '지난 글 활동', type: 'pick', def: '1', opts: [['0', '끔'], ['1', '켬']], hint: '켜면 글 쓰기·댓글·글 하나 새로고침 요청에 게시판의 지난 글을 같이 넘겨 새 댓글과 조회·추천을 받아요. 끄면 넘기지 않아 토큰을 덜 써요.' },
         budget,
       ],
@@ -113,7 +120,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       items: [
         num('incoming_chance', '선쪽지 확률', 100, 0, 100, '%', { v: '$lb_cfg_lb-gn.incoming_chance' }),
         num('cooldown', '받은 뒤 쉬는 턴', 2, 0, 100, '턴', { zero: '안 쉼' }),
-        num('incoming_prev', '선쪽지에 참조할 받은 쪽지', 0, 0, 1000, '통', { zero: '전부' }),
+        num('incoming_prev', '선쪽지에 참조할 받은 쪽지', 50, 0, 1000, '통', { zero: '전부' }),
       ],
     },
     {
@@ -129,6 +136,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('origin_tokens', '쪽지에 붙는 글', 2000, 50, 20000, TOK),
         num('quote_tokens', '쪽지에 붙는 댓글', 1000, 50, 20000, TOK),
         num('history_tokens', '이전 쪽지 한 통', 1500, 50, 20000, TOK),
+        num('keyfig_keep', '보존할 주요 인물 닉네임', 60, 1, 500, '명', { hint: '주요 인물 닉네임을 이 수만큼 기억해요. 넘으면 오래된 것부터 지워요.' }),
       ],
     },
   ],
@@ -142,6 +150,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         // 답장·새 메시지 확인에 붙는 자료의 양 (기본값 = 전과 같은 동작)
         num('board_posts', '괴담넷 글 참조', 8, 0, 8, '개', { zero: '안 넣음', hint: '답장·새 메시지 확인 요청에 참고로 넣는 괴담넷 글 수예요.' }),
         num('cross_history', '다른 방 말풍선 참조', 1000, 0, 1000, '개', { zero: '안 넣음', hint: '참여자가 다른 방에서 주고받은 말을 한 사람당 몇 개까지 넣을지예요. 「지난 기록」 수를 넘지 않아요.' }),
+        num('check_rooms', '기록을 넘길 방', 10, 0, 500, '개', { zero: '전부', hint: '새 메시지를 확인할 때 말풍선과 함께 넘길 방 수예요. 가장 최근에 말이 오간 방부터 넣고, 나머지 방은 방 정보만 넘겨요.' }),
         num('check_contacts', '선톡·초대 후보', 0, 0, 500, '명', { zero: '제한 없음', hint: '새 메시지를 확인할 때 아직 대화한 적 없는 연락처를 몇 명까지 후보로 넣을지예요. 최근 챗로그에 이름이 나온 사람을 먼저 넣어요.' }),
       ],
     },
@@ -154,6 +163,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       ],
       items: [
         num('ctx_history', '넣을 말풍선', 200, 1, 1000, '개'),
+        num('ctx_recent', '늘 넣을 최근 말풍선', 8, 0, 100, '개', { zero: '안 넣음', hint: '「장면에 나온 것만」을 켰을 때, 장면과 관련이 없어도 넣는 가장 최근 말풍선 수예요. 「보기 전용 방」을 붙일 때 가장 최근 방에서 먼저 넣어 두는 말풍선 수도 이 값이에요.' }),
         num('ctx_notices', '넣을 공지', 1, 0, 50, '개'),
         num('ctx_tokens', '컨텍스트 토큰 상한', 4000, 0, 200000, TOK, { zero: '제한 없음' }),
       ],
@@ -179,6 +189,9 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('notice_title', '공지 제목', 80, 10, 300, '자'),
         num('notice_issuer', '공지 발신처', 60, 5, 200, '자'),
         num('invitations', '한 번에 받을 초대', 1, 1, 10, '개'),
+        num('habit_keep', '말버릇 보관', 80, 10, 1000, '명', { hint: '말버릇을 적어 두는 연락처 수예요. 넘으면 오래된 것부터 지워요.' }),
+        num('view_rooms', '보기 전용 방 보관', 30, 1, 200, '개', { hint: '넘으면 오래된 방부터 지워요.' }),
+        num('view_history', '보기 전용 방 말풍선 보관', 300, 10, 2000, '개', { hint: '한 방에 남겨 두는 말풍선 수예요. 넘으면 오래된 것부터 지워요.' }),
       ],
     },
   ],
@@ -187,7 +200,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
     {
       title: '참조',
       chips: [chip('desc', '봇 설명', 1), chip('authors', '작가 노트', 1), chip('persona', '페르소나', 1), chip('active', '상시 로어북', 1), chip('related', '관련 로어북', 1), chip('secondary', '2차 참조', 1)],
-      items: [turns(8), num('ref_count', '관련·2차 참조 최대', 20, 1, 200, '개'), { ...budget, hint: '넘으면 이전 문서, 2차 참조, 관련 로어북, 오래된 챗로그 순으로 줄여요' }],
+      items: [turns(8), num('ref_count', '관련·2차 참조 최대', 20, 1, 200, '개'), num('image_count', '그림 후보 최대', 30, 1, 200, '장', { hint: '문서를 쓸 때 본문에 넣을 수 있는 그림으로 알려 주는 수예요. 참고 자료나 제목에 나온 그림만 넣어요.' }), { ...budget, hint: '넘으면 이전 문서, 2차 참조, 관련 로어북, 오래된 챗로그 순으로 줄여요' }],
     },
     {
       title: '컨텍스트 포함',
@@ -287,12 +300,21 @@ export const loreLimits = (state: State): { depth: number; budget: number } => (
 /** 본편 요청에 늘 붙는 지침 가운데 세력 요약·요원 명단을 넣을지 (🏷️Tag 는 늘 넣는다) */
 export const alwaysBookOn = (state: State, kind: 'tag' | 'faction' | 'roster'): boolean => kind === 'tag' || advValue(state, 'gen', kind === 'faction' ? 'lore_faction' : 'lore_roster') !== '0';
 
+/** 요청당 사진 수를 지금 채팅 값으로 (applyAdvanced · host/risu.ts loadContext) */
+export function applyGenLimits(state: State): void {
+  ATTACH_LIMITS.images = advNum(state, 'gen', 'image_max');
+}
+
+/** AI 상담: 모델에 넘기는 지난 대화 줄 수 */
+export const consultTalk = (state: State): number => advNum(state, 'gen', 'consult_talk');
+
 // 깊은 곳(응답 검사, 저장 정리)에서 쓰는 상수 묶음은 지금 채팅 값으로 맞춰 둔다.
 // 창을 열거나 고칠 때, 채팅 요청 전, 자동 새로고침 전에 부른다 (모두 한 번에 한 채팅만 다룬다).
 const GN_LIMIT_KEYS = Object.keys(GN_LIMITS) as (keyof typeof GN_LIMITS)[];
 const PH_LIMIT_KEYS = Object.keys(PH_LIMITS) as (keyof typeof PH_LIMITS)[];
 
 export function applyAdvanced(state: State): void {
+  applyGenLimits(state);
   const g = (k: string) => advNum(state, 'gn', k);
   const p = (k: string) => advNum(state, 'ph', k);
   for (const k of GN_LIMIT_KEYS) GN_LIMITS[k] = g(k);
@@ -302,6 +324,9 @@ export function applyAdvanced(state: State): void {
   GN_HISTORY.turns = g('turns');
   GN_HISTORY.cooldown = g('cooldown');
   GN_HISTORY.dmPublic = g('dm_public');
+  GN_HISTORY.dmPublicComments = g('dm_public_comments');
+  GN_HISTORY.dmPublicChars = g('dm_public_chars');
+  GN_HISTORY.keyFigures = g('keyfig_keep');
   GN_HISTORY.incomingPrev = g('incoming_prev');
   GN_HISTORY.activity = advOn(state, 'gn', 'activity');
   GN_CONTEXT.posts = g('ctx_post_count');
@@ -320,6 +345,10 @@ export function applyAdvanced(state: State): void {
   PH_HISTORY.context = p('ctx_history');
   PH_HISTORY.contextNotices = p('ctx_notices');
   PH_HISTORY.contextTokens = p('ctx_tokens');
+  PH_HISTORY.contextRecent = p('ctx_recent');
+  PH_HISTORY.habits = p('habit_keep');
+  PH_VIEW_STORE.rooms = p('view_rooms');
+  PH_VIEW_STORE.history = p('view_history');
   PH_HISTORY.focus = advOn(state, 'ph', 'ctx_focus');
   PH_HISTORY.contextViews = advOn(state, 'ph', 'ctx_views');
   PH_HISTORY.contextReactions = advOn(state, 'ph', 'ctx_reactions');

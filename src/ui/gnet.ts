@@ -26,7 +26,7 @@ import { factionNames, parseCatalog } from '../core/world/catalog';
 import { generate, type LlmMessage, type RetryOptions } from '../host/llm';
 import { craftSettings, featureModel } from '../core/craft';
 import type { Joint } from '../host/joint';
-import { genSettings } from '../core/advanced';
+import { applyAdvanced, genSettings } from '../core/advanced';
 import { fnBudget } from '../core/reffn';
 import { fitPrompt } from '../core/budget';
 import { personaText } from '../host/user';
@@ -227,6 +227,8 @@ const viewing = (site: BoardSite) => { const u = uiFor(site); return { post: u.s
 /** made: 자동 새로고침이 맞춰 만든 응답 (autoRefreshGnet 이 넘긴다) */
 function refreshBoard(ctx: ChatContext, env: GnetEnv, automatic = false, joint?: Joint, made?: TurnMark) {
   return run(ctx, env, automatic ? '채팅 응답에 맞춰 게시판을 새로 불러오는 중이에요.' : '게시판을 불러오는 중이에요.', async () => {
+    // 이 채팅의 고급 설정으로 맞춘다 (선쪽지 쉬는 턴을 열려 있는 다른 채팅 값으로 보지 않게)
+    applyAdvanced(ctx.chat.scriptstate);
     const startLength = ctx.chat.message?.length ?? 0;
     const before = readGnet(ctx.chat);
     const nick = userNick(ctx.chat.scriptstate);
@@ -243,7 +245,7 @@ function refreshBoard(ctx: ChatContext, env: GnetEnv, automatic = false, joint?:
         note = '그 응답이 바뀌어서 이번 자동 새로고침 결과는 저장하지 않았어요.';
         return null;
       }
-      const res = withRaw(raw, () => applyBoard(before, readGnet(chat), value, { nick, settings: s, date: dateNow(chat) }));
+      const res = withRaw(raw, () => applyBoard(before, readGnet(chat), value, { nick, settings: s, date: dateNow(chat), sent: prompt.sent }));
       const inc = saveIncoming(chat, res.st, (value as { incoming?: unknown }).incoming, plan);
       note = [res.notice, res.emptyComments ? '이번 게시판에는 댓글이 하나도 없어요.' : '', inc.note].filter(Boolean).join(' ');
       const figs = s.keyFigures ? mergeKeyFigures(chat.scriptstate, (value as { keyFigures?: unknown }).keyFigures) : null;

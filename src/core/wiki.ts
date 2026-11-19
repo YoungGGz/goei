@@ -276,10 +276,10 @@ export function wikiPrompt(src: RefSource, req: WikiRequest, s: WikiSettings, fa
   const system = [sec['NW.GUIDE'], sec[s.mode === 'faithful' ? 'NW.FAITHFUL' : 'NW.EXPAND'], sec[lengthKey], sec['NW.LINKS_OPEN'], sec['NW.FORMAT']];
   if (story && sec['NW.HISTORY']) system.push(sec['NW.HISTORY']);
   if (previous && sec['NW.PREVIOUS']) system.push(sec['NW.PREVIOUS']);
-  // 본문 그림·정보칸 표정 (라이트보드 나무위키 W3, 2026-11-06). 참고 자료나 제목에 나온 그림만, 30장까지
+  // 본문 그림·정보칸 표정 (라이트보드 나무위키 W3, 2026-11-06). 참고 자료나 제목에 나온 그림만, 설정한 수까지 (기본 30장)
   const pool = `${req.title}\n${refText(rows)}\n${story}`;
   // 주제 그림은 표시(subject)로 가린다. 표시가 없는 옛 호출만 첫 항목을 주제로 본다 (전수검사 11-13)
-  const images = (req.images ?? []).filter((x, i) => (x.subject ?? i === 0) || (x.label && pool.includes(x.label))).slice(0, 30);
+  const images = (req.images ?? []).filter((x, i) => (x.subject ?? i === 0) || (x.label && pool.includes(x.label))).slice(0, advNum(src.chat.scriptstate, 'nw', 'image_count'));
   if (images.length && sec['NW.IMAGES']) system.push(sec['NW.IMAGES'].replace('__NW_IMAGES__', images.map((x) => guideTxt('Wiki', 'NW.IMAGES_ITEM', { name: x.name, label: x.label })).join('\n')));
   if (req.moods?.length && sec['NW.PORTRAIT']) system.push(sec['NW.PORTRAIT'].replace('__NW_MOODS__', req.moods.join(', ')));
   const language = genSettings(src.chat.scriptstate).language;
@@ -610,7 +610,10 @@ export function wikiTitlePrompt(src: RefSource, candidates: string[], written: s
   // 머리말·목록 줄 꼴은 지침 「괴이위키」 NW.TITLE_* 절
   const item = (t: string) => guideTxt('Wiki', 'NW.TITLE_ITEM', { title: t });
   let user = `${guideTxt('Wiki', 'NW.TITLE_HEAD_CANDIDATES')}\n${candidates.map(item).join('\n')}`;
-  if (written.length) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_WRITTEN')}\n${written.map(item).join('\n')}`;
+  // 이미 쓴 문서는 후보에 있는 제목만 넘긴다: 모델은 후보 안에서만 고르니 그 밖의 제목은 쓸 데가 없고, 문서를 쓸수록 목록만 길어진다
+  const cand = new Set(candidates);
+  const done = written.filter((t) => cand.has(t));
+  if (done.length) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_WRITTEN')}\n${done.map(item).join('\n')}`;
   if (story) user += `\n\n${guideTxt('Wiki', 'NW.TITLE_HEAD_STORY')}\n${story}`;
   return [
     { role: 'system', content: factionCodesToNames(rule, names) },

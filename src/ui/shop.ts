@@ -28,7 +28,7 @@ import { addItem, dropUse, EQUIP_LABEL, gridItems, ITEM_USE_AT_VAR, itemLeft, it
 import { getPrefs } from '../core/settings';
 import { guideTxt } from '../core/guides';
 import {
-  applyShelf, applyTalk, cancelSell, closeSale, currentShop, markSold, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
+  applyShelf, applyTalk, cancelSell, closeSale, currentShop, markSold, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
   type ShopItem, type ShopSource, type ShopState,
 } from '../core/shop';
 import { ICONS } from './icons';
@@ -309,10 +309,12 @@ const chatKey = (ctx: ChatContext) => `${ctx.charIndex}:${ctx.chatIndex}`;
 export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ctx.chat.scriptstate), give?: ShopGive): ShopSource {
   const src = playerSource({ char: ctx.char as RefSource['char'], chat: ctx.chat, persona: personaText() } as RefSource);
   const vars = ctx.chat.scriptstate ?? {};
+  // 위키 문서·사건 보고를 몇 자까지 넘길지 (설정 → 상점, 상점 넷이 같이 쓰는 값)
+  const limits = shopLimits(vars);
   // 최근 챗로그는 맥락 반영이 꺼져 있어도 관련 로어북을 고를 때는 읽는다
   const story = storyText(recentTurns(ctx.chat, give ? give.turns : sh.turns, genSettings(vars).userMessages));
   const doc = findDoc(ctx.chat, st.shop, ctx.char.globalLore);
-  const extra = doc ? [{ source: guideTxt('Shop', 'REFS_WIKI_SOURCE', { shop: st.shop }), content: innerBody(doc.body).slice(0, 3000) }] : [];
+  const extra = doc ? [{ source: guideTxt('Shop', 'REFS_WIKI_SOURCE', { shop: st.shop }), content: innerBody(doc.body).slice(0, limits.wiki) }] : [];
   const text = `${st.shop}\n${st.owner}\n${story}`;
   let rows: RefRow[];
   if (give) {
@@ -334,7 +336,7 @@ export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ct
   }
   // 잔고는 상점 모델에 넘기지 않는다 (설정 「넘기는 것·남는 것」): 상태창 줄에서 잔고 칸을 빼고 다시 만든다 (11-08 전수점검: 잔고 칸이 그대로 갔다)
   if (status) status = rebuildStatusLine(status, usedCols(colConfig(vars)).filter((c) => c !== 'wallet' && c !== 'points'));
-  const situation = ['$an_report', '$in_report'].map((k) => String(vars[k] ?? '').trim()).filter(Boolean).join('\n').slice(0, 1500);
+  const situation = ['$an_report', '$in_report'].map((k) => String(vars[k] ?? '').trim()).filter(Boolean).join('\n').slice(0, limits.report);
   const identity = peopleSettings(vars).on ? identityText(peopleStore(ctx.chat).identity) : '';
   // 가게 표와 기능 표 가운데 하나라도 맥락 반영이 꺼져 있으면 신분·상태창·괴이·챗로그를 넘기지 않는다
   // 양 표 「지난 대화」: 진열·문의 요청에 같이 넘기는 지난 문의 대화의 줄 수 (give 가 없으면 전부)
@@ -356,7 +358,7 @@ function saleDone<C extends ChatContext['chat']>(chat: C, shop: string, itemId: 
   const w = addWalletEntry(l0, { id: freshWalletId(l0, `sl_${itemId}_${now.sales.length}`, now.key), anchor: now.key, amount: o.price, memo: o.name, src: 'store' }, aliveAnchors(chat));
   // 판 물건은 판 돈과 같은 응답에 묶여 숨는다(응답을 다시 굴리면 같이 돌아옴, core/items.ts sellItem). 장착 칸에서도 빠지고, 「사용」 자리에 놓여 있었으면 거기서도 뺀다
   const items = sellItem(it0, itemId, now.key, `${now.shop}에 팖`);
-  const nextShop = closeSale(now, now.key);
+  const nextShop = closeSale(now, now.key, shopLimits(chat.scriptstate));
   if (!nextShop) return null;
   // 답을 기다리는 중·정리 중에는 「사용」 자리를 건드리지 않는다 (요청에 실린 사용이 기록 없이 빠지지 않게, host/usebox.ts useLocked)
   const q = chat.scriptstate?.[ITEM_USE_AT_VAR] || useLocked() ? null : readItemUse(chat.scriptstate);
@@ -385,7 +387,7 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
       next = applyShelf(st0, value, s);
     } else {
       const { value } = await generate(talkPrompt(src, s), s.model, parseTalk, opts);
-      next = applyTalk(st0, value, s.kick, s.talkStock);
+      next = applyTalk(st0, value, s.kick, s.talkStock, s.shelf, s.keep);
       // 말로 판 것: 주인이 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리
       if (value.deal && next.sell && typeof next.sell.price === 'number') deal = next.sell.itemId;
     }
@@ -583,7 +585,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       shopUi.chip = '';
       shopUi.chipKind = '';
       shopUi.pick = false;
-      const next = sayToOwner(st, text);
+      const next = sayToOwner(st, text, shopLimits(ctx.chat.scriptstate));
       const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
         const now = readShop(chat.scriptstate);
         if (!now || now.shop !== st.shop) return null;
@@ -615,7 +617,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
         const paid = p ? { paidWith: guideTxt('Main', 'INVENTORY.SHOP.PAID_POINTS', { price: target.price.toLocaleString('en-US'), extra: target.pay ? ` ${guideTxt('Main', 'MALL.PAID.EXTRA', { pay: target.pay })}` : '' }) } : { price: target.price, ...(walletId ? { walletId } : {}), ...(target.pay ? { paidWith: target.pay } : {}) };
         const items = addItem(readItems(chat.scriptstate), alive, { name: target.name, desc: target.desc, effect: target.effect, truth: target.truth, use: target.use, uses: target.uses, equip: target.equip, icon: target.icon, weight: target.weight, from: 'store', store: 'shop', anchor: now.key, ...paid });
         bought = true;
-        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? pointsVars(w) : walletVars(w)), ...itemsVars(items), ...shopVars(markSold(now, target.id, now.key)) } }; // 산 응답 키를 적어 다시 굴리면 되살게 (전수검사 11-13)
+        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? pointsVars(w) : walletVars(w)), ...itemsVars(items), ...shopVars(markSold(now, target.id, now.key, storyStamp(chat))) } }; // 산 응답 키를 적어 다시 굴리면 되살게 (전수검사 11-13)
       });
       shopUi.detail = '';
       shopUi.info = bought ? `「${it.name}」을 샀어요. 소지품에 들어갔어요.` : pts ? '포인트가 모자라거나 이미 팔린 물건이에요.' : '잔고가 모자라거나 이미 팔린 물건이에요.';

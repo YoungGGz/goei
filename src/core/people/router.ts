@@ -7,11 +7,12 @@ import { hash, liveEntries, liveness, plain } from './store';
 import type { NameEntry } from './select';
 import type { PeopleStore } from './types';
 import { guideTxt } from '../guides';
+import { PP_DEFAULTS } from './settings';
 
 export interface RouterInput { system: string; data: Record<string, unknown>; key: string; max: number }
 export interface RouterHint { name: string; aliases: string[]; quote: string }
 export interface RouterResult { selected: string[]; newCharacters: RouterHint[] }
-export const ROUTER_MAX = 6;
+export const ROUTER_MAX = Number(PP_DEFAULTS.scene_max);
 
 /** 요청 자료: 이름 목록 + 최근 글 + 입력 */
 /** 명단 전체 예산 (원본 identity_context 12,000자) */
@@ -41,7 +42,7 @@ export function buildRouter(chat: Chat, store: PeopleStore, names: NameEntry[], 
   const base = o.prompt?.trim() ? o.prompt.trim() : [guideTxt('Router', 'ROLE'), guideTxt('Router', 'RULES')].filter(Boolean).join('\n');
   const system = [base.replace('{{MAX}}', String(max)), o.rules?.trim() ? `${guideTxt('Router', 'USER_RULES.HEAD')}\n${o.rules.trim()}` : ''].filter(Boolean).join('\n');
   const data = { input: input.slice(0, 4000), recent, catalog };
-  const key = hash(JSON.stringify({ input, recent: recent.map((r) => r.text.slice(0, 400)), names: catalog.map((c) => c.name), system: system.length }));
+  const key = hash(JSON.stringify({ input, recent: recent.map((r) => r.text.slice(0, 400)), names: catalog.map((c) => c.name), system: system.length, max }));
   return { system, data, key, max };
 }
 

@@ -126,10 +126,10 @@ test('괴담톡 요청: 요청 종류마다 제 줄을 쓴다 (넘길 내용·�
   assert.ok(!has(p.view, '둘째 턴 글') && has(p.view, '셋째 턴 글') && !has(p.check, '셋째 턴 글') && has(p.reply, '첫째 턴 글'));
   // 옛 메뉴 칩·옛 「인물 로어북」 변수는 요청을 바꾸지 않는다
   assert.deepEqual(phonePrompts(core, { '$ph_adv_desc': '0', '$ph_related': '0', '$ph_adv_secondary': '1' }), base);
-  // 지난 기록: 답장·새 메시지 확인은 방 말풍선 (정하지 않으면 「방마다 참조할 말풍선」 값), 보기 전용 방은 앞 방 말풍선 (기본 30)
+  // 지난 기록: 답장은 방 말풍선 (정하지 않으면 「방마다 참조할 말풍선」 값), 새 메시지 확인은 방마다 최근 10개 (사용자 2026-11-17), 보기 전용 방은 앞 방 말풍선 (기본 30)
   assert.ok(has(base.reply, '말풍선0번') && has(base.view, '앞방말10번') && !has(base.view, '앞방말9번'));
   p = phonePrompts(core, { [PF('reply', 'history')]: '10', [PF('view', 'history')]: '5' });
-  assert.ok(!has(p.reply, '말풍선29번') && has(p.reply, '말풍선30번') && has(p.check, '말풍선0번'));
+  assert.ok(!has(p.reply, '말풍선29번') && has(p.reply, '말풍선30번') && !has(p.check, '말풍선29번') && has(p.check, '말풍선30번'));
   assert.ok(!has(p.view, '앞방말34번') && has(p.view, '앞방말35번'));
   p = phonePrompts(core, { '$ph_adv_room_history': '10', [PF('check', 'history')]: '20' });
   assert.ok(!has(p.reply, '말풍선29번') && has(p.reply, '말풍선30번'), '답장은 물려받는다');
@@ -166,13 +166,13 @@ test('양 표: 따로 정한 값, 물려받기, 요청 토큰 상한', () => {
   assert.equal(fnBudget({ '$ph_adv_budget': '4000', [PF('view', 'budget')]: '1500' }, 'ph', 'reply'), 4000);
   // 지난 기록
   assert.deepEqual(['refresh', 'post', 'comment', 'dm'].map((k) => fnHistory({}, 'gn', k)), [10, 10, 30, 50]);
-  assert.deepEqual(['reply', 'check', 'view'].map((k) => fnHistory({}, 'ph', k)), [100, 100, 30]);
+  assert.deepEqual(['reply', 'check', 'view'].map((k) => fnHistory({}, 'ph', k)), [100, 10, 30]);
   assert.equal(fnHistoryVar('gn', 'refresh'), G('refresh_posts'));
   assert.equal(fnHistoryVar('gn', 'comment'), G('comments'));
   assert.equal(fnHistoryVar('gn', 'dm'), G('dm_history'));
   assert.equal(fnHistoryVar('gn', 'post'), GF('post', 'history'));
   assert.equal(fnHistory({ [G('refresh_posts')]: '7' }, 'gn', 'post'), 10, '글 쓰기는 새로고침의 글 수를 빌리지 않는다');
-  assert.equal(fnHistory({ '$ph_adv_room_history': '40' }, 'ph', 'check'), 40);
+  assert.equal(fnHistory({ '$ph_adv_room_history': '40' }, 'ph', 'check'), 10, '새 메시지 확인은 방 말풍선 값을 물려받지 않는다');
   assert.equal(fnHistory({ '$ph_adv_room_history': '40', [PF('check', 'history')]: '15' }, 'ph', 'check'), 15);
   assert.equal(fnHistory({ '$ph_adv_room_history': '40' }, 'ph', 'view'), 30);
   assert.equal(fnHistorySetKey('gn', 'dm'), 'dm_history');
@@ -208,7 +208,7 @@ test('기본 상태의 요청문 = 기본값을 하나하나 적은 상태의 �
     for (const c of REF_CHIP_KEYS) explicit[PF(key, c)] = c === 'secondary' ? '0' : '1';
     explicit[PF(key, 'turns')] = '8';
     explicit[PF(key, 'budget')] = '0';
-    explicit[PF(key, 'history')] = key === 'view' ? '30' : '100';
+    explicit[PF(key, 'history')] = key === 'view' ? '30' : key === 'check' ? '10' : '100';
   }
   for (const s of ['gn', 'gal', 'wpf', 'sm']) assert.deepEqual(boardPrompts(core, explicit, s), boardPrompts(core, {}, s), s);
   assert.deepEqual(phonePrompts(core, explicit), phonePrompts(core));

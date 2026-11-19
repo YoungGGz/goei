@@ -10,11 +10,18 @@ export const JR_DEFAULTS: Record<string, string> = {
   report_cap: '100',
   /** 쌓이는 목록(일지·연대기·가계부 거래·소지품 기록)에 한 번에 보일 줄 수. 넘는 줄은 「더 보기」 (2026-11-12 사용자, ui/more.ts) */
   list_page: '30',
+  /** 보고서 한 건에 남기는 경과 줄 수 (상황판 항목이 쌓는 경과도 같은 수) · 인물 변화 줄 수 · 거래 줄 수 */
+  trail_max: '24',
+  people_max: '12',
+  trades_max: '12',
 };
 
 export const JR_JOURNAL_CAP = { min: 100, max: 2000, step: 100 } as const;
 export const JR_REPORT_CAP = { min: 20, max: 300, step: 10 } as const;
 export const JR_LIST_PAGE = { min: 10, max: 100, step: 10 } as const;
+export const JR_TRAIL_MAX = { min: 8, max: 96, step: 8 } as const;
+export const JR_PEOPLE_MAX = { min: 4, max: 48, step: 4 } as const;
+export const JR_TRADES_MAX = { min: 4, max: 48, step: 4 } as const;
 
 export type ChatCardMode = 'off' | 'mine' | 'all';
 
@@ -23,6 +30,9 @@ export interface JournalSettings {
   journalCap: number;
   reportCap: number;
   listPage: number;
+  trailMax: number;
+  peopleMax: number;
+  tradesMax: number;
 }
 
 export function jrValue(state: Record<string, unknown> | undefined, key: string): string {
@@ -44,5 +54,8 @@ export function journalSettings(state: Record<string, unknown> | undefined): Jou
     // 보고서 상한은 일지 상한을 넘지 못한다: 줄은 지워졌는데 보고서만 남아 열 길이 없는 일을 막는다 (전수검사 11-13, 사용자 13-2 (다))
     reportCap: Math.min(num('report_cap', JR_REPORT_CAP.min, JR_REPORT_CAP.max), journalCap),
     listPage: num('list_page', JR_LIST_PAGE.min, JR_LIST_PAGE.max),
+    trailMax: num('trail_max', JR_TRAIL_MAX.min, JR_TRAIL_MAX.max),
+    peopleMax: num('people_max', JR_PEOPLE_MAX.min, JR_PEOPLE_MAX.max),
+    tradesMax: num('trades_max', JR_TRADES_MAX.min, JR_TRADES_MAX.max),
   };
 }

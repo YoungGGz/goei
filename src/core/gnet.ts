@@ -107,8 +107,8 @@ export function gnetRetention(state: Record<string, unknown> | undefined): { aut
   return { auto: flag !== '0', limit };
 }
 export const LIMITS = { replies_min: 0, replies: 4, post_tokens: 4000, title_tokens: 80, dm_tokens: 1500, comment_tokens: 1000, origin_tokens: 2000, quote_tokens: 1000, history_tokens: 1500 };
-/** dmPublic: 쪽지 답장에 같이 넘기는 공개 글 수 (0 = 안 넘김). incomingPrev: 선쪽지 겹침 확인용으로 넘기는 받은 쪽지 수 (0 = 전부). activity: 글 쓰기·댓글·글 하나 새로고침에 「다른 글 활동」을 넣는지 */
-export const HISTORY = { refresh: 10, post: 99999, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2, dmPublic: 8, incomingPrev: 0, activity: true };
+/** dmPublic: 쪽지 답장에 같이 넘기는 공개 글 수 (0 = 안 넘김). dmPublicComments: 그 글마다 넘기는 최근 댓글 수 (0 = 안 넘김). dmPublicChars: 공개 글 참고 전체의 글자 상한. keyFigures: 기억해 두는 주요 인물 닉네임 수. incomingPrev: 선쪽지 겹침 확인용으로 넘기는 받은 쪽지 수 (0 = 전부). activity: 글 쓰기·댓글·글 하나 새로고침에 「다른 글 활동」을 넣는지 */
+export const HISTORY = { refresh: 10, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2, dmPublic: 8, dmPublicComments: 12, dmPublicChars: 12000, keyFigures: 60, incomingPrev: 50, activity: true };
 export const CONTEXT = { posts: 5, comments: 10, dms: 30, tokens: 3000, includePosts: true, includeDms: true, ownOnly: false, focus: true, recentPosts: 1, recentDms: 5 };
 /** 개수 설정 (2026-11-08 사용자: 단계 고르기 대신 최소·최대 직접). 새로고침 글 수, 새 글마다 댓글 수, 지난 글에 새로 붙는 활동 댓글 수. 내 글·댓글에 달릴 새 답글 수는 고급 설정(replies_min·replies) */
 export const COUNT_RANGE = { post: [1, 20], cmt: [0, 20], act: [0, 20] } as const;
@@ -212,7 +212,7 @@ export function mergeKeyFigures(state: Record<string, unknown> | undefined, rows
     else continue;
     changed = true;
   }
-  return changed ? { [GN_KEYFIG]: JSON.stringify(list.slice(-60)) } : null;
+  return changed ? { [GN_KEYFIG]: JSON.stringify(list.slice(-HISTORY.keyFigures)) } : null;
 }
 
 /** 글쓴이를 비운 글의 익명 닉 (저장되어 다시 모델에 가고, 화면이 익명 글쓴이를 알아보는 데도 쓴다): 지침 「요청 공통」 GNET.ANON_AUTHOR 절 */
@@ -292,11 +292,16 @@ export const blank = (): GState => ({ posts: [], archive: [], dms: [], sources: 
 export function decode(raw: unknown): GState {
   const st = blank();
   const map = new Map<number, GPost>();
+  const refill = new Map<string, number>();
   for (const line of String(raw ?? '').split('\n')) {
     const p = fields(line);
     if (p[0] === 'Q' && Number.isFinite(Number(p[1]))) st.seq = Math.max(st.seq, postId(p[1]) ?? 0);
     else if (p[0] === 'T' && p.length >= 6) {
-      st.sources[cut(p[1], 80)] = { postid: postId(p[2]) ?? 0, title: p[3], body: p[4], author: cut(p[5], 80), quote: p[6] ?? '', quoteAuthor: p[7] ?? '' };
+      const nick = cut(p[1], 80);
+      st.sources[nick] = { postid: postId(p[2]) ?? 0, title: p[3], body: p[4], author: cut(p[5], 80), quote: p[6] ?? '', quoteAuthor: p[7] ?? '' };
+      // 아홉째 칸 = 본문을 비워 적은 줄의 본문 글자 수 (encode 참고)
+      if (/^\d+$/.test(p[8] ?? '')) refill.set(nick, Number(p[8]));
+      else refill.delete(nick);
     } else if ((p[0] === 'P' || p[0] === 'A') && p.length >= 9) {
       // A = 보관함의 글 (P 와 같은 꼴). 옛 판은 모르는 줄이라 건너뛴다
       const id = postId(p[1]);
@@ -320,6 +325,12 @@ export function decode(raw: unknown): GState {
       st.dms.push({ nick: cut(p[1], 80), side: p[2] === 'me' ? 'me' : 'npc', body: p[3], unread: p[4] === '1', date: validDate(p[5] ?? '') });
     }
   }
+  // 원글 본문을 비워 적은 T 줄은 그 글에서 적어 둔 글자 수만큼 다시 채운다 (설정·토크나이저와 무관하게 저장 때와 같은 글)
+  for (const [nick, n] of refill) {
+    const s = st.sources[nick];
+    const post = map.get(s.postid);
+    if (post) Object.assign(s, { title: post.title, body: [...post.body].slice(0, n).join(''), author: post.nick });
+  }
   // 예전 낮은 번호는 한 번만 옮긴다 (원본과 같음)
   if (st.seq < G_POST_BASE) {
     for (const post of [...st.posts, ...st.archive]) post.id += G_POST_BASE;
@@ -328,6 +339,9 @@ export function decode(raw: unknown): GState {
   }
   return st;
 }
+
+/** 쪽지 원글로 넘기는 글 부분 (제목·자른 본문·글쓴이) */
+const sourceHead = (p: GPost) => ({ title: p.title, body: trimTokens(p.body, LIMITS.origin_tokens), author: p.nick });
 
 export function encode(st: GState): string {
   const out = ['GN1', `Q|${st.seq || G_POST_BASE}`];
@@ -339,7 +353,17 @@ export function encode(st: GState): string {
     out.push(['A', p.id, en(p.date), en(p.nick), en(p.title), p.views, p.votes, en(p.body), p.mine ? '1' : '0', en(p.tag ?? ''), p.scrap ? '1' : '0', p.voted ? '1' : '0', p.down ? '1' : '0'].join('|'));
     for (const c of p.comments) out.push(['AC', p.id, c.parent, en(c.nick), en(c.body), c.mine ? '1' : '0', c.unread ? '1' : '0', en(c.time ?? '')].join('|'));
   }
-  for (const [nick, s] of Object.entries(st.sources)) out.push(['T', en(nick), s.postid || 0, en(s.title), en(s.body), en(s.author), en(s.quote), en(s.quoteAuthor)].join('|'));
+  // 쪽지 원글: 그 글이 게시판·보관함에 그대로 있으면 본문을 상대마다 또 적지 않고 글 번호만 적는다 (decode 가 글에서 다시 채운다).
+  // 글이 없어졌거나 내용이 달라졌으면 가진 사본을 그대로 적는다
+  const byId = new Map([...st.posts, ...(st.archive ?? [])].map((p) => [p.id, p]));
+  for (const [nick, s] of Object.entries(st.sources)) {
+    const post = s.postid > 0 ? byId.get(s.postid) : undefined;
+    // 사본이 그 글의 앞부분과 똑같을 때만 비운다 (사본은 본문을 앞에서 자른 것)
+    const same = !!post && post.title === s.title && post.nick === s.author && post.body.startsWith(s.body);
+    out.push(same
+      ? ['T', en(nick), s.postid, '', '', '', en(s.quote), en(s.quoteAuthor), [...s.body].length].join('|')
+      : ['T', en(nick), s.postid || 0, en(s.title), en(s.body), en(s.author), en(s.quote), en(s.quoteAuthor)].join('|'));
+  }
   for (const d of st.dms) out.push(['D', en(d.nick), d.side, en(d.body), d.unread ? '1' : '0', en(d.date)].join('|'));
   return out.join('\n');
 }
@@ -644,7 +668,7 @@ export function findPublicSource(st: GState, nick: string): GSource | undefined 
 export function sourceFor(p: GPost, ci: number): GSource {
   const c = ci > 0 ? p.comments[ci - 1] : undefined;
   return {
-    postid: p.id, title: p.title, body: trimTokens(p.body, LIMITS.origin_tokens), author: p.nick,
+    postid: p.id, ...sourceHead(p),
     quote: c ? trimTokens(c.body, LIMITS.quote_tokens) : '', quoteAuthor: c ? c.nick : '',
   };
 }
@@ -734,6 +758,9 @@ export interface BoardOptions {
   nick: string;
   settings: GnetSettings;
   date: string;
+  /** 요청에 실제로 넘긴 글과 그 댓글 번호 (refreshPrompt 가 돌려준 것). 여기 없는 저장 글은 모델이 못 본 글이라 응답이 와도 그대로 둔다.
+   *  안 주면 저장 글과 댓글이 전부 갔다고 읽는다 */
+  sent?: Map<number, number[]>;
 }
 
 // 요청에서 첨부 기록은 [ATTACHMENT An]으로 바뀌어 간다. 돌아온 유지 댓글을 저장 댓글과 맞춰 볼 때 쓴다 (전수검사 11-13)
@@ -780,6 +807,14 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     if (!isObj(raw)) continue;
     let pid = int(raw.id);
     const prev = pid !== null ? old.get(pid) : undefined;
+    // 요청에 안 넘긴 저장 글: 모델이 본문·댓글을 못 봤으므로 돌아온 것을 쓰지 않고 그대로 남긴다
+    if (prev && o.sent && !o.sent.has(prev.id)) {
+      if (!seen.has(prev.id)) {
+        seen.add(prev.id);
+        posts.push(prev);
+      }
+      continue;
+    }
     const author = str(raw.author).trim();
     if (!prev && (raw.mine === true || author === o.nick)) {
       skippedPosts++;
@@ -825,7 +860,9 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     // 옛 지침(저장 댓글을 그대로 다시 쓰고 번호는 돌려준 배열 차례)으로 온 응답도 받는다: 앞 k줄이 모두 저장 댓글과 같으면 옛 꼴.
     // 새 댓글 하나가 저장 댓글과 우연히 같아도(짧은 반응 줄) 새 꼴로 읽어 다른 새 댓글의 parent 번호를 지킨다.
     // 앞 k줄이 모두 같아도(저장 댓글 1개, 반복되는 짧은 반응) 어느 댓글의 parent 가 옛 꼴로는 자기 뒤(i+1 이상)이고 새 꼴로는 자기 앞이면 새 꼴
-    const savedCount = prev ? prev.comments.length : 0;
+    // 요청에는 저장 댓글 가운데 고른 것만 차례대로 갔다 (boardJson). 모델이 쓰는 번호는 그 차례(1..k)이고 새 댓글은 k+1..
+    const sent = prev ? o.sent?.get(prev.id) ?? prev.comments.map((_, i) => i + 1) : [];
+    const savedCount = sent.length;
     const sameAsSaved = (c: unknown): boolean => {
       if (!isObj(c)) return false;
       const a = str(c.author).trim();
@@ -838,7 +875,7 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
     };
     const oldShape = comments.length >= savedCount && comments.slice(0, savedCount).every(sameAsSaved) && !comments.some(newOnlyParent);
     const onlyNew = savedCount > 0 && !oldShape;
-    if (onlyNew) for (let k = 1; k <= savedCount; k++) remap.set(k, k);
+    if (onlyNew) for (let k = 1; k <= savedCount; k++) remap.set(k, sent[k - 1]);
     comments.forEach((c, i) => {
       const n = onlyNew ? savedCount + i + 1 : i + 1;
       if (!isObj(c)) return void remap.set(n, false);
@@ -1099,21 +1136,31 @@ export interface ActivitySnapshot {
   commentsAllowed: boolean;
 }
 
+/** 요청에 넘길 댓글 번호 (1부터, 오름차순): 가장 새 `limit` 개 + extra + 그 댓글들이 답한 윗댓글 줄기.
+ *  다른 글 활동·새로고침·댓글 반응이 같이 쓴다 */
+export function recentComments(p: GPost, limit = HISTORY.comment, extra: number[] = []): number[] {
+  const selected = new Set<number>();
+  const total = p.comments.length;
+  const starts = [...extra];
+  for (let n = Math.max(1, total - limit + 1); n <= total; n++) starts.push(n);
+  for (const n of starts) {
+    let k = n;
+    const visited = new Set<number>();
+    while (p.comments[k - 1] && !visited.has(k)) {
+      visited.add(k);
+      selected.add(k);
+      k = p.comments[k - 1].parent;
+    }
+  }
+  return [...selected].sort((a, b) => a - b);
+}
+
 /** posts = 다른 글 활동으로 넘길 게시판 글 수 (글 쓰기는 기능 표의 「지난 기록」, 그 밖은 새로고침의 글 수) */
 export function activityContext(st: GState, targetId: number | null, posts_ = HISTORY.refresh): { posts: ActivityPost[]; snapshots: Map<number, ActivitySnapshot> } {
   const posts: ActivityPost[] = [];
   const snapshots = new Map<number, ActivitySnapshot>();
   for (const p of st.posts.slice(0, posts_)) {
-    const selected = new Set<number>();
-    for (let n = Math.max(1, p.comments.length - HISTORY.comment + 1); n <= p.comments.length; n++) {
-      let k = n;
-      const visited = new Set<number>();
-      while (p.comments[k - 1] && !visited.has(k)) {
-        visited.add(k);
-        selected.add(k);
-        k = p.comments[k - 1].parent;
-      }
-    }
+    const selected = new Set(recentComments(p));
     const allowed = p.id !== targetId;
     // 작업 대상 글은 본문·댓글이 작업 입력(post·comments)에 이미 있으므로 여기서는 번호·제목·수치만 넘긴다 (조회·추천 증가는 그대로 받는다)
     posts.push({
@@ -1230,7 +1277,8 @@ export function incomingTask(plan: IncomingPlan, head: string, activityPosts?: A
       };
     }
     // 겹침 확인용 받은 쪽지: 수를 정했으면 가장 새 것부터 그만큼만 (같은 발신자·같은 본문은 commitIncoming 이 따로 거른다)
-    body.previousIncoming = HISTORY.incomingPrev > 0 ? plan.history.slice(-HISTORY.incomingPrev) : plan.history;
+    body.previousIncoming = (HISTORY.incomingPrev > 0 ? plan.history.slice(-HISTORY.incomingPrev) : plan.history)
+      .map((m) => ({ ...m, body: trimTokens(m.body, LIMITS.history_tokens) }));
   }
   if (activityPosts) body.activityPosts = activityPosts;
   return `\n${head}\n${JSON.stringify(body)}`;

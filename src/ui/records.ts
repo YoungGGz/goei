@@ -5,7 +5,7 @@
 // 설정 「기록」 묶음(journalSettingsPane)도 여기: 채팅에 보고서 표시 · 일지를 메인 요청에 · 일지 상한 · 보고서 상한 ($jr_*).
 import { setRow, stepSizeText } from './setrow';
 import {
-  JOURNAL_KIND_LABEL, JR, JR_JOURNAL_CAP, JR_LIST_PAGE, JR_REPORT_CAP, journalClock, journalNewestFirst, journalSettings, jrValue, pinReport, readJournal, readReports, reportVars,
+  JOURNAL_KIND_LABEL, JR, JR_JOURNAL_CAP, JR_LIST_PAGE, JR_PEOPLE_MAX, JR_REPORT_CAP, JR_TRADES_MAX, JR_TRAIL_MAX, journalClock, journalNewestFirst, journalSettings, jrValue, pinReport, readJournal, readReports, reportVars,
   type JournalKind, type JournalRow, type Report,
   buildChronicle, CHRON_KIND_LABEL, type ChronEntry, type ChronKind,
 } from '../core/journal';
@@ -612,6 +612,9 @@ export function journalSettingsPane(ctx: ChatContext, canChat = true): string {
     row('일지 상한', stepper('journal_cap', `${s.journalCap.toLocaleString('en-US')}줄`, s.journalCap > JR_JOURNAL_CAP.min, s.journalCap < JR_JOURNAL_CAP.max, '일지 상한', JR_JOURNAL_CAP.step, [`${JR_JOURNAL_CAP.max.toLocaleString('en-US')}줄`]), `넘치면 오래된 줄부터 지워요 (${JR_JOURNAL_CAP.min.toLocaleString('en-US')}~${JR_JOURNAL_CAP.max.toLocaleString('en-US')}). 채팅 저장 크기에 더해져요.`),
     row('보고서 상한', stepper('report_cap', `${s.reportCap}건`, s.reportCap > JR_REPORT_CAP.min, s.reportCap < Math.min(JR_REPORT_CAP.max, s.journalCap), '보고서 상한', JR_REPORT_CAP.step, [`${JR_REPORT_CAP.max}건`]), `넘치면 오래된 보고서부터 지워요 (${JR_REPORT_CAP.min}~${JR_REPORT_CAP.max}). 고정한 보고서는 상한에 들지 않아요.`),
     row('한 번에 보일 줄 수', stepper('list_page', `${s.listPage}줄`, s.listPage > JR_LIST_PAGE.min, s.listPage < JR_LIST_PAGE.max, '한 번에 보일 줄 수', JR_LIST_PAGE.step, [`${JR_LIST_PAGE.max}줄`]), `일지·연대기·가계부·소지품 기록 목록에 처음 보일 줄 수예요 (${JR_LIST_PAGE.min}~${JR_LIST_PAGE.max}). 넘는 줄은 목록 아래 「더 보기」를 누르면 나와요.`),
+    row('경과 줄 수', stepper('trail_max', `${s.trailMax}줄`, s.trailMax > JR_TRAIL_MAX.min, s.trailMax < JR_TRAIL_MAX.max, '경과 줄 수', JR_TRAIL_MAX.step, [`${JR_TRAIL_MAX.max}줄`]), `괴이·사건 하나의 진행 상황을 몇 줄까지 남겨 보고서 「경과」에 보일지예요 (${JR_TRAIL_MAX.min}~${JR_TRAIL_MAX.max}). 넘치면 처음 한 줄은 두고 오래된 줄부터 지워요.`),
+    row('인물 변화 줄 수', stepper('people_max', `${s.peopleMax}줄`, s.peopleMax > JR_PEOPLE_MAX.min, s.peopleMax < JR_PEOPLE_MAX.max, '인물 변화 줄 수', JR_PEOPLE_MAX.step, [`${JR_PEOPLE_MAX.max}줄`]), `보고서 한 건에 호감도 변화를 몇 줄까지 적을지예요 (${JR_PEOPLE_MAX.min}~${JR_PEOPLE_MAX.max}). 변화가 큰 사람부터 적어요.`),
+    row('거래 줄 수', stepper('trades_max', `${s.tradesMax}줄`, s.tradesMax > JR_TRADES_MAX.min, s.tradesMax < JR_TRADES_MAX.max, '거래 줄 수', JR_TRADES_MAX.step, [`${JR_TRADES_MAX.max}줄`]), `보고서 한 건에 가계부 거래를 몇 줄까지 적을지예요 (${JR_TRADES_MAX.min}~${JR_TRADES_MAX.max}). 넘으면 최근 거래만 적어요.`),
   ].join('');
   return `<div class="ph-form jr-set">
     <header class="ph-room-head"><button class="ph-tool ph-back" data-action="set-feat-back" aria-label="설정으로">${ICONS.back}</button><div class="ph-room-title"><b>일지 설정</b><small>${canChat ? '이 채팅' : '이 채팅 · 시작 전'}</small></div><span class="ph-act">${defaultsButtons('jr')}</span></header>${defaultsConfirm('jr')}
@@ -667,6 +670,9 @@ async function handleJournalSettings(action: string, v: string, ctx: ChatContext
     if (key === 'journal_cap') next = Math.max(JR_JOURNAL_CAP.min, Math.min(JR_JOURNAL_CAP.max, s.journalCap + dir * JR_JOURNAL_CAP.step));
     else if (key === 'report_cap') next = Math.max(JR_REPORT_CAP.min, Math.min(JR_REPORT_CAP.max, s.journalCap, s.reportCap + dir * JR_REPORT_CAP.step));
     else if (key === 'list_page') next = Math.max(JR_LIST_PAGE.min, Math.min(JR_LIST_PAGE.max, s.listPage + dir * JR_LIST_PAGE.step));
+    else if (key === 'trail_max') next = Math.max(JR_TRAIL_MAX.min, Math.min(JR_TRAIL_MAX.max, s.trailMax + dir * JR_TRAIL_MAX.step));
+    else if (key === 'people_max') next = Math.max(JR_PEOPLE_MAX.min, Math.min(JR_PEOPLE_MAX.max, s.peopleMax + dir * JR_PEOPLE_MAX.step));
+    else if (key === 'trades_max') next = Math.max(JR_TRADES_MAX.min, Math.min(JR_TRADES_MAX.max, s.tradesMax + dir * JR_TRADES_MAX.step));
     else return true;
     if (String(next) === jrValue(ctx.chat.scriptstate, key)) return true;
     // 일지 상한을 보고서 상한 아래로 내리면 보고서 상한도 같이 내린다 (사용자 13-2 (다))

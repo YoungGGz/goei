@@ -1,8 +1,9 @@
 // 호출 흐름 기록 (11-07 사용자: 「가장 최근 요청과 마지막 응답 결과를 프로세스 형태로」). 한 턴 = 본편 요청 조립 → 보조 호출들 → 본편 응답 → 응답 뒤 보조 호출들.
 // 플러그인이 부르는 보조 호출은 전부 host/llm.ts runModel 을 거치므로 거기서 한 건씩 적고, 본편 요청·응답은 body.ts 가 적는다.
-// 저장: 플러그인 저장소 goei-trace 에 최근 TRACE_KEEP 턴의 id 목록, 턴마다 goei-trace:<id> (바뀐 턴만 다시 쓴다. 전수검사 11-13). 요청·응답 원문은 한 건당 TRACE_TEXT 자까지(앞 2/3 + 뒤 1/3). 화면은 ui/editor/trace.ts.
+// 저장: 플러그인 저장소 goei-trace 에 최근 「호출 기록 보관」 턴(기본 TRACE_KEEP)의 id 목록, 턴마다 goei-trace:<id> (바뀐 턴만 다시 쓴다. 전수검사 11-13). 요청·응답 원문은 한 건당 TRACE_TEXT 자까지(앞 2/3 + 뒤 1/3). 화면은 ui/editor/trace.ts.
 import type { LlmMessage } from './llm';
 import { tokens } from '../core/gnet';
+import { getPrefs, TRACE_KEEP_DEFAULT } from '../core/settings';
 import { PROGRESS_WATCHDOG, progressBegin, progressMain, progressMainTokens, progressReply, progressTurn } from '../core/progress';
 
 export interface TraceCall {
@@ -51,7 +52,9 @@ export interface TraceTurn {
   calls: TraceCall[];
 }
 
-export const TRACE_KEEP = 5;
+/** 남기는 턴 수의 기본값. 지금 값은 이 기기 설정 「호출 기록 보관」: 기록이 모든 채팅 공용이라 채팅마다 다르지 않다 */
+export const TRACE_KEEP = TRACE_KEEP_DEFAULT;
+export const keepTurns = (): number => getPrefs().traceKeep ?? TRACE_KEEP;
 /** 요청·응답 글 하나의 보관 한도. 사실상 생략 없이 전부 남긴다 (2026-11-13 사용자: 「대부분 생략이 되어있는데 꼭 생략해야 하나」). 전에는 6000자·본편 40000자 */
 export const TRACE_TEXT = 400000;
 /** 본편 요청 메시지 하나의 보관 한도 */
@@ -67,6 +70,8 @@ const dirty = new Set<string>();
 let savedIds: string[] | null = null;
 
 let turns: TraceTurn[] | null = null;
+/** 처음 읽기와 찌꺼기 지우기가 끝났는지 */
+let swept = false;
 let loading: Promise<TraceTurn[]> | null = null;
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
 /** 지금 열린 턴 (본편 요청 조립이 시작되면 열리고, 다음 조립이 시작되면 닫힌다) */
@@ -83,8 +88,21 @@ export const clip = (s: string, max = TRACE_TEXT): string => {
   return `${s.slice(0, head)}\n…(${s.length - max}자 생략)…\n${s.slice(-tail)}`;
 };
 
+/** 저장소의 goei-trace:<id> 가운데 목록에 없는 것을 지운다. 못 지워도 진행 */
+async function sweepOrphans(keep: Set<string>): Promise<void> {
+  try {
+    const keys: unknown = await risuai.pluginStorage.keys();
+    for (const k of Array.isArray(keys) ? keys : []) {
+      if (typeof k === 'string' && k.startsWith(`${KEY}:`) && !keep.has(k.slice(KEY.length + 1))) await risuai.pluginStorage.removeItem(k).catch(() => {});
+    }
+  } catch {
+    /* 무시 */
+  }
+}
+
 async function load(): Promise<TraceTurn[]> {
-  if (turns) return turns;
+  // 찌꺼기 지우기(sweepOrphans)가 끝난 뒤에만 바로 돌려준다: 그 전에 온 호출은 loading 을 기다려 첫 저장이 지우기와 겹치지 않는다
+  if (turns && swept) return turns;
   if (!loading) {
     loading = (async () => {
       try {
@@ -110,9 +128,13 @@ async function load(): Promise<TraceTurn[]> {
           for (const t of turns) dirty.add(t.id);
           savedIds = null;
         }
+        // 목록에 없는 턴 기록을 지운다: 저장하다 앱이 닫히거나 지우기가 실패하면 그 턴 기록(몇 MB)이 저장소에 남아 다시는 안 지워졌다.
+        // 첫 저장보다 먼저 끝난다 (save 가 load 를 기다린다)
+        await sweepOrphans(new Set(savedIds ?? []));
       } catch {
         turns = [];
       }
+      swept = true;
       return turns;
     })();
   }
@@ -144,7 +166,7 @@ function save(id?: string): void {
     saveTimer = null;
     void (async () => {
       try {
-        const keep = (await load()).slice(-TRACE_KEEP);
+        const keep = (await load()).slice(-keepTurns());
         const ids = keep.map((t) => t.id);
         const write = keep.filter((t) => dirty.has(t.id));
         dirty.clear();
@@ -168,6 +190,7 @@ export async function loadTrace(): Promise<TraceTurn[]> {
 
 export async function clearTrace(): Promise<void> {
   turns = [];
+  swept = true;
   open = null;
   replied = false;
   ended = false;
@@ -186,7 +209,7 @@ export async function clearTrace(): Promise<void> {
 async function push(t: TraceTurn): Promise<void> {
   const list = await load();
   list.push(t);
-  while (list.length > TRACE_KEEP) list.shift();
+  while (list.length > keepTurns()) list.shift();
   save(t.id);
 }
 

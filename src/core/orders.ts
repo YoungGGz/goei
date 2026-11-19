@@ -11,6 +11,11 @@ type Vars = Record<string, unknown> | undefined;
 
 export const COS_ORDERS_KEY = '$cos_orders';
 export const COS_ORDERS_MAX = 12;
+/** 주문 기록을 몇 건까지 둘지 (설정 → 상점). 기본은 COS_ORDERS_MAX·BM_ORDERS_MAX */
+export const ORDERS_KEEP_RANGE = { min: 5, max: 200, step: 5 } as const;
+export const COS_ORDERS_KEEP_VAR = '$cos_sh_keep_orders';
+const keepOf = (v: unknown, def: number): number => { const n = Number(v); return v === undefined || v === null || v === '' || !Number.isFinite(n) ? def : Math.max(ORDERS_KEEP_RANGE.min, Math.min(ORDERS_KEEP_RANGE.max, Math.round(n))); };
+export const cosOrdersKeep = (vars: Vars): number => keepOf(vars?.[COS_ORDERS_KEEP_VAR], COS_ORDERS_MAX);
 
 /** 견적 → 주문. item 은 받을 때 소지품에 들어갈 물건 (진실 포함, 화면엔 이름만) */
 export interface CosOrder {
@@ -50,16 +55,17 @@ export const liveOrders = (vars: Vars, alive: Set<string>): CosOrder[] =>
     .map((o) => (o.taken && o.takenKey && !alive.has(o.takenKey) ? { ...o, taken: false, takenKey: undefined } : o))
     .filter((o) => o.taken || !o.anchor || alive.has(o.anchor));
 /** 넘치면 받은 것(taken)부터 오래된 순으로 버린다. 선납하고 아직 안 받은 주문은 버리지 않는다 (릴리스 점검 11-09: 돈만 나가고 주문이 사라졌다) */
-export function pruneOrders(list: CosOrder[]): CosOrder[] {
+export function pruneOrders(list: CosOrder[], max = COS_ORDERS_MAX): CosOrder[] {
   const out = [...list];
-  while (out.length > COS_ORDERS_MAX) {
+  while (out.length > max) {
     const i = out.findIndex((o) => o.taken);
     if (i < 0) break;
     out.splice(i, 1);
   }
   return out;
 }
-export const ordersVars = (list: CosOrder[]): Record<string, string> => ({ [COS_ORDERS_KEY]: list.length ? JSON.stringify(pruneOrders(list)) : '' });
+/** max: 둘 수 (cosOrdersKeep). 안 주면 기본 */
+export const ordersVars = (list: CosOrder[], max = COS_ORDERS_MAX): Record<string, string> => ({ [COS_ORDERS_KEY]: list.length ? JSON.stringify(pruneOrders(list, max)) : '' });
 
 /** 지금 작중 시각 (분): 채팅 끝에서부터 상태창 [▣] 줄을 찾는다. 없으면 null */
 export function worldMinute(chat: Chat): number | null {
@@ -191,6 +197,8 @@ export function settleReady(chat: Chat, on: boolean, site = 'cos'): Chat['messag
 
 export const BM_ORDERS_KEY = '$bm_orders';
 export const BM_ORDERS_MAX = 40;
+export const BM_ORDERS_KEEP_VAR = '$bm_sh_keep_orders';
+export const bmOrdersKeep = (vars: Vars): number => keepOf(vars?.[BM_ORDERS_KEEP_VAR], BM_ORDERS_MAX);
 
 /** 수령 대기 한 줄. item 은 살 때 진열대의 것 그대로 (숨긴 진실 포함) */
 export type BmOrder = Pick<CosOrder, 'id' | 'anchor' | 'price' | 'item' | 'walletId' | 'taken' | 'takenKey'> & {
@@ -221,16 +229,17 @@ export const liveBmOrders = (vars: Vars, alive: Set<string>): BmOrder[] =>
 /** 아직 안 받은 것 */
 export const bmWaiting = (vars: Vars, alive: Set<string>): BmOrder[] => liveBmOrders(vars, alive).filter((o) => !o.taken);
 /** 넘치면 받은 것부터 오래된 순으로 버린다. 안 받은 것은 버리지 않는다 */
-export function pruneBmOrders(list: BmOrder[]): BmOrder[] {
+export function pruneBmOrders(list: BmOrder[], max = BM_ORDERS_MAX): BmOrder[] {
   const out = [...list];
-  while (out.length > BM_ORDERS_MAX) {
+  while (out.length > max) {
     const i = out.findIndex((o) => o.taken);
     if (i < 0) break;
     out.splice(i, 1);
   }
   return out;
 }
-export const bmOrdersVars = (list: BmOrder[]): Record<string, string> => ({ [BM_ORDERS_KEY]: list.length ? JSON.stringify(pruneBmOrders(list)) : '' });
+/** max: 둘 수 (bmOrdersKeep). 안 주면 기본 */
+export const bmOrdersVars = (list: BmOrder[], max = BM_ORDERS_MAX): Record<string, string> => ({ [BM_ORDERS_KEY]: list.length ? JSON.stringify(pruneBmOrders(list, max)) : '' });
 /** 받은 것으로 적는다 (ids 가 없으면 안 받은 것 전부). 받은 줄들을 같이 돌려준다 */
 export function takeBmOrders(list: BmOrder[], takenKey: string, ids?: string[]): { list: BmOrder[]; got: BmOrder[] } {
   const got: BmOrder[] = [];

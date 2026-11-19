@@ -113,7 +113,7 @@ refresh: consider a relevant follow-up or first incoming message; a click create
 @@END
 
 @@SECTION REFRESH
-Check supplied rooms independently; first decide whether there is reason to speak. Do not generate a fresh topic for every eligible contact. receiveMessages=false forbids updates to that room. An empty direct room establishes no relationship; any or all rooms may be silent.
+Check supplied rooms independently; first decide whether there is reason to speak. Do not generate a fresh topic for every eligible contact. receiveMessages=false forbids updates to that room. An empty direct room establishes no relationship; any or all rooms may be silent. A room that is not candidateOnly but has empty messages already has history that was left out of this request: judge it by conversationState only, never invent or continue its earlier content, and stay silent there unless the current story gives a clear new reason to write.
 updates: PATCH rows, each supplied room ID at most once. Omit silent rooms. Do not create or rename rooms here.
 invitations: use GROUP_INVITES only when invitationCheck.allowed; otherwise []. announcements: require announcementCheck.allowed and ANNOUNCEMENTS; otherwise []. Every limit is a ceiling; keep the entire result complete.
 @@END

@@ -6,6 +6,7 @@ import { keyRegex, nameEndsAt } from '../lore';
 import { findStatusTags } from '../world/status';
 import { messageHash, messageKey } from './store';
 import type { PeopleStore } from './types';
+import { PP_DEFAULTS } from './settings';
 
 export interface NameEntry {
   name: string;
@@ -72,7 +73,7 @@ export function scenePeople(chat: Chat, store: PeopleStore, match: (text: string
     for (const c of tags.at(-1)?.companions ?? []) for (const n of match(c)) push(n);
   }
   for (const n of o.carry ?? []) push(n);
-  return out.slice(0, o.max ?? 6);
+  return out.slice(0, o.max ?? Number(PP_DEFAULTS.scene_max));
 }
 
 /** 장면에 남아 있는 인물 (설정 「장면 인물 유지」): before 앞의 마지막 응답에 갱신기가 적어 둔 이름 가운데 기록이 있는 사람.

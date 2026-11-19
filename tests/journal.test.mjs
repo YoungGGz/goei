@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseCatalog, DEFAULT_SETTINGS, applyOutput, bootstrap, parseWorld, serializeWorld, endEvent, activeEvents, processOutput, startWorldVars, readWorld, locName,
-  TRAIL_CAP, buildClosures, readJournal, readReports, rewindClosures, trimJournal, trimReports, pinReport, recordVars, journalSettings, JR, JR_DEFAULTS,
+  buildClosures, readJournal, readReports, rewindClosures, trimJournal, trimReports, pinReport, recordVars, journalSettings, JR, JR_DEFAULTS,
   journalLine, mineReasons, periodOf, parseAgents, settings,
 } from '../dist-test/core.mjs';
 // 묶음 3: PNG 카드(순수 그리기)
@@ -32,6 +32,8 @@ const catalog = parseCatalog([
 // 발생 추첨은 끈다 (종료만 본다)
 const S = { ...DEFAULT_SETTINGS, preset_p: 0, random_p: 0, incident_p: 0, mystic_p: 0, agent_limit: 2 };
 const rng = () => 0.99;
+// 경과 상한의 기본값 (전에 코드에 고정돼 있던 24)
+const TRAIL_CAP = DEFAULT_SETTINGS.trail_cap;
 
 const ST = (time, target = '없음', companions = '없음', deployed = '없음') => `[▣|2025.01.01|${time}|☀️|4°C|서울 종로구 거리|${target}|${companions}|${deployed}]`;
 const IN = (state, deploy, situation) => `[IN|서울 종로구|관리국 본부|${state}|${deploy}|${situation}]`;
@@ -348,12 +350,43 @@ test('상한 설정대로 조립 때 잘린다', () => {
 
 // ── 설정 ──
 
+test('경과·인물 변화·거래 줄 수 설정: 기본값은 전과 같고, 설정대로 바뀌고, 틀린 값은 기본값·범위로', () => {
+  assert.equal(TRAIL_CAP, 24);
+  const s = journalSettings({ [JR('trail_max')]: '8', [JR('people_max')]: '20', [JR('trades_max')]: '4' });
+  assert.deepEqual([s.trailMax, s.peopleMax, s.tradesMax], [8, 20, 4]);
+  const bad = journalSettings({ [JR('trail_max')]: 'abc', [JR('people_max')]: '', [JR('trades_max')]: 'null' });
+  assert.deepEqual([bad.trailMax, bad.peopleMax, bad.tradesMax], [24, 12, 12]);
+  const out = journalSettings({ [JR('trail_max')]: '0', [JR('people_max')]: '999', [JR('trades_max')]: '-3' });
+  assert.deepEqual([out.trailMax, out.peopleMax, out.tradesMax], [8, 48, 4]);
+  // 상황판이 쌓는 경과도 같은 설정을 따른다
+  assert.equal(settings.worldSettings([], undefined).trail_cap, 24);
+  assert.equal(settings.worldSettings([], { [JR('trail_max')]: '16' }).trail_cap, 16);
+  assert.equal(settings.worldSettings([], { [JR('trail_max')]: 'x' }).trail_cap, 24);
+  const S8 = { ...S, trail_cap: 8 };
+  let w = applyOutput(empty(), catalog, S8, 'A00', `${IN('진행', 'P001', '첫 발견')}\n${ST('10:00 AM')}`, rng).world;
+  for (let i = 0; i < 12; i++) w = applyOutput(w, catalog, S8, 'A00', `${IN('진행', 'P001', `상황 ${i}`)}\n${ST('10:10 AM')}`, rng).world;
+  assert.equal(w.inc[0].trail.length, 8);
+  assert.equal(w.inc[0].trail[0].text, '첫 발견');
+  assert.equal(w.inc[0].trail.at(-1).text, '상황 11');
+  // 보고서 경과: 쌓인 줄이 설정보다 많으면 첫 발견 줄 + 최근 줄 (엔진과 같은 규칙)
+  w = applyOutput(empty(), catalog, S, 'A00', `${IN('진행', 'P001', '첫 발견')}\n${ST('10:00 AM')}`, rng).world;
+  for (let i = 0; i < 12; i++) w = applyOutput(w, catalog, S, 'A00', `${IN('진행', 'P001', `상황 ${i}`)}\n${ST('10:10 AM')}`, rng).world;
+  endEvent(w, activeEvents(w)[0].key);
+  const chat = { message: [{ role: 'user', data: '시작' }, { role: 'char', data: `글\n${ST('10:00 AM')}` }], scriptstate: {} };
+  const build = (vars) => buildClosures({ chat, index: 1, world: w, closed: w.closed, catalog, faction: 'A00', settings: journalSettings(vars) }).added[0].trail;
+  assert.equal(build({}).length, 13);
+  assert.equal(build({ [JR('trail_max')]: '8' }).length, 8);
+  assert.equal(build({ [JR('trail_max')]: '8' }).at(-1).text, '상황 11');
+  assert.deepEqual(build({ [JR('trail_max')]: '8' }).map((t) => t.text), ['첫 발견', ...[5, 6, 7, 8, 9, 10, 11].map((i) => `상황 ${i}`)], '줄 수를 낮춘 뒤 새 상황 글 없이 끝나도 첫 발견 줄은 남는다');
+  for (const k of ['$jr_trail_max', '$jr_people_max', '$jr_trades_max']) assert.ok(settings.PREF_VAR.test(k), `${k} 는 「기본값으로 저장」 범위`);
+});
+
 test('기록 설정: 기본값·경계값·글자', () => {
   const d = journalSettings(undefined);
-  assert.deepEqual(d, { chatCard: 'mine', journalCap: 500, reportCap: 100, listPage: 30 });
+  assert.deepEqual(d, { chatCard: 'mine', journalCap: 500, reportCap: 100, listPage: 30, trailMax: 24, peopleMax: 12, tradesMax: 12 });
   assert.equal(JR_DEFAULTS.chat_card, 'mine');
   const s = journalSettings({ [JR('chat_card')]: 'off', [JR('journal_cap')]: '-5', [JR('report_cap')]: 'abc' });
-  assert.deepEqual(s, { chatCard: 'off', journalCap: 100, reportCap: 100, listPage: 30 });
+  assert.deepEqual(s, { chatCard: 'off', journalCap: 100, reportCap: 100, listPage: 30, trailMax: 24, peopleMax: 12, tradesMax: 12 });
   assert.equal(journalSettings({ [JR('chat_card')]: 'all' }).chatCard, 'all');
   assert.equal(journalSettings({ [JR('chat_card')]: 'weird' }).chatCard, 'mine');
   for (const k of ['$jr_chat_card', '$jr_journal_cap', '$jr_report_cap']) assert.ok(settings.PREF_VAR.test(k), `${k} 는 「기본값으로 저장」 범위`);

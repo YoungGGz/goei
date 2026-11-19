@@ -115,8 +115,8 @@ async function sweepPage(page, pageId, mode, log) {
     const label = `[${pageId}/${mode}] ${next.row} · ${next.action}=${next.value ?? next.key}`;
     clicked++;
     if (process.env.QC_VERBOSE) console.log(`  ${label} (${Date.now() - t0}ms)`);
-    // 기대: 기능 페이지는 늘 채팅 변수. 그 밖은 「이 기기」 배지면 prefs, 아니면 범위대로
-    const expect = FEATURE.has(pageId) ? 'chat' : next.device ? 'prefs' : next.badge === '이 채팅' ? 'chat' : next.badge === '새 채팅 기본값' ? 'prefs' : mode === 'chat' ? 'chat' : 'prefs';
+    // 기대: 「이 기기」 배지가 붙은 줄은 어느 페이지든 prefs (인물의 갱신 기록 보관처럼 기능 페이지에도 기기 값이 있다). 기능 페이지의 나머지는 늘 채팅 변수, 그 밖은 범위대로
+    const expect = next.device ? 'prefs' : FEATURE.has(pageId) ? 'chat' : next.badge === '이 채팅' ? 'chat' : next.badge === '새 채팅 기본값' ? 'prefs' : mode === 'chat' ? 'chat' : 'prefs';
     // 확인창을 여는 조작(상황판 끄기)·저장 안 하는 조작은 둘 다 안 바뀔 수 있다: 그건 따로 본다
     if (next.action === 'set-anomaly' && next.value === 'off' && mode === 'chat') {
       assert.ok(!prefsChanged && !wroteChat, `${label}: 끄기는 확인창만`);

@@ -3,6 +3,7 @@
 // 사라진 항목은 지우지 않는다 (화면에서 회색, 되살리기 가능).
 import type { Chat, ChatMessage } from '../types';
 import { messageText } from '../refs';
+import { PP_DEFAULTS, ppNum } from './settings';
 import { findStatusTags } from '../world/status';
 import { AXES, PEOPLE_KEY, SLOTS, SLOT_META, DOC_TYPES, REGISTERS, DEFAULT_AXES, EXPRESS_TO_AXIS, emptyStore, expressOf, type Candidate, type Change, type Doc, type Entry, type LastRun, type Observation, type PeopleStore, type Person, type Register, type SexualProfile, type SexualRecord, type SlotId, SEXUAL_CHARS } from './types';
 
@@ -31,6 +32,7 @@ export function peopleStore(chat: Chat): PeopleStore {
   const raw = chat[PEOPLE_KEY] as Partial<PeopleStore> | undefined;
   const out = emptyStore();
   if (!raw || typeof raw !== 'object') return out;
+  const patternsCap = ppNum(chat.scriptstate, 'patterns_cap');
   for (const [name, p] of Object.entries(raw.people ?? {})) {
     if (!p || typeof p !== 'object' || typeof p.name !== 'string') continue;
     const slots: Person['slots'] = {};
@@ -49,7 +51,7 @@ export function peopleStore(chat: Chat): PeopleStore {
       aliases: Array.isArray(p.aliases) ? p.aliases.filter((a): a is string => typeof a === 'string') : [],
       axes: DEFAULT_AXES(),
       axesFrom: p.axesFrom === 'model' || p.axesFrom === 'manual' ? p.axesFrom : 'default',
-      patterns: Array.isArray(p.patterns) ? p.patterns.filter((t): t is string => typeof t === 'string').slice(0, 30) : [],
+      patterns: Array.isArray(p.patterns) ? p.patterns.filter((t): t is string => typeof t === 'string').slice(-patternsCap) : [],
       candidates: readCandidates(p.candidates),
       ...(Number.isInteger(p.reviewTurn) ? { reviewTurn: p.reviewTurn as number } : {}),
       ...(p.sexual && typeof p.sexual === 'object' ? { sexual: readSexual(p.sexual as unknown as Record<string, unknown>) } : {}),
@@ -300,7 +302,7 @@ export function undoLastRun(store: PeopleStore): number {
  *  같은 말로 적힌 다른 사람의 글에 이 기록이 골라지고 그 사람 항목이 이 기록에 적힌다. to 도 호칭 기록이면(호칭끼리 합침) 받는다: 호칭 기록은 갱신기가 한 사람의 것으로 알고 읽는다.
  *  글 속에 적힌 옛 호칭(다른 항목 본문·인용)은 바꾸지 않는다.
  *  호칭 표시(provisional)는 from 과 함께 없어진다 (to 가 원래 호칭 기록이면 to 것은 남는다) */
-export function renamePerson(store: PeopleStore, from: string, to: string, seed: Person | null): boolean {
+export function renamePerson(store: PeopleStore, from: string, to: string, seed: Person | null, patternsCap = Number(PP_DEFAULTS.patterns_cap)): boolean {
   const src = store.people[from];
   const target = store.people[to] ?? seed;
   if (!src || !target || from === to) return false;
@@ -326,7 +328,7 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
     target.axesFrom = src.axesFrom;
     target.express = src.express;
   }
-  target.patterns = [...new Set([...target.patterns, ...src.patterns])].slice(0, 30);
+  target.patterns = [...new Set([...target.patterns, ...src.patterns])].slice(-patternsCap);
   if (!target.sexual && src.sexual) target.sexual = src.sexual;
   if (!target.faction) target.faction = src.faction;
   if (!target.address.toUser && !target.address.pin && src.address.toUser) target.address = { ...src.address };
@@ -361,10 +363,16 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
 }
 
 /** 등록 대기 줄(pending)에서 근거 응답이 채팅에 없는 것을 버린다 (다시 굴리거나 지운 응답에서만 나온 이름).
- *  남겨 두면 사라진 응답이 2턴 규칙의 「처음 본 것」으로 세어지고, 그 이름이 갱신기 자료(held_names)로 계속 나간다 */
-export function prunePending(store: PeopleStore, chat: Chat): void {
+ *  남겨 두면 사라진 응답이 2턴 규칙의 「처음 본 것」으로 세어지고, 그 이름이 갱신기 자료(held_names)로 계속 나간다.
+ *  expire: 근거 응답이 채팅 뒤쪽 FOLD_KEEP_MSGS 메시지 밖인 줄도 버린다 (한 번 스치고 다시 안 나온 이름이 끝없이 남아 요청마다 실리지 않게, 2026-11-17).
+ *  그 뒤에 다시 나오면 처음 본 것으로 다시 센다. 「확인 뒤 등록」은 사용자가 고를 목록이라 expire 를 주지 않는다 */
+export function prunePending(store: PeopleStore, chat: Chat, expire = false, keepMsgs = FOLD_KEEP_MSGS): void {
   const at = anchorPositions(chat);
-  for (const [name, row] of Object.entries(store.pending)) if (!at.has(row.anchor)) delete store.pending[name];
+  const cut = expire ? msgs(chat).length - keepMsgs : -1;
+  for (const [name, row] of Object.entries(store.pending)) {
+    const pos = at.get(row.anchor);
+    if (pos === undefined || (pos >= 0 && pos < cut)) delete store.pending[name];
+  }
 }
 
 /** 장면 인물 목록(scene)에서 채팅에 없는 응답의 것을 버린다 (다시 굴리거나 지운 응답) */
@@ -379,12 +387,12 @@ export function pruneScene(store: PeopleStore, chat: Chat): void {
  *  마지막 응답들을 지우거나 다시 굴려도 그 앞 응답의 목록이 있도록 채팅 뒤쪽 몇 개만 둔다 */
 export const SCENE_KEEP = 20;
 /** 장면 인물 목록을 채팅 뒤쪽 SCENE_KEEP 개 응답 것만 남긴다. keep = 방금 적은 응답 (지난 응답을 뒤늦게 읽은 것이면 다음 묶음이 쓰도록 남긴다) */
-export function capScene(store: PeopleStore, chat: Chat, keep?: string): void {
+export function capScene(store: PeopleStore, chat: Chat, keep?: string, keepScene = SCENE_KEEP): void {
   if (!store.scene) return;
   const keys = Object.keys(store.scene);
-  if (keys.length <= SCENE_KEEP) return;
+  if (keys.length <= keepScene) return;
   const at = new Map(msgs(chat).map((m, i) => [messageKey(m, i), i]));
-  const recent = new Set(keys.filter((k) => at.has(k)).sort((a, b) => at.get(b)! - at.get(a)!).slice(0, SCENE_KEEP));
+  const recent = new Set(keys.filter((k) => at.has(k)).sort((a, b) => at.get(b)! - at.get(a)!).slice(0, keepScene));
   for (const k of keys) if (!recent.has(k) && k !== keep) delete store.scene[k];
 }
 
@@ -463,15 +471,17 @@ export function dropGoneChanges(store: PeopleStore, chat: Chat): number {
 // ── 접기 ──
 
 export const LOG_CAP = 800;
-/** 변경 기록 줄이기 (전수검사 11-13, 예전엔 부르는 곳이 없어 끝없이 쌓였다).
- *  ① 지워진 메시지(chatId 기준)에 붙은 변경은 되살아날 수 없으니 버린다 ('#N' 기준은 메시지가 다시 생기면 살아나서 둔다).
+/** 합치지 않고 줄로 남겨 두는 채팅 뒤쪽 메시지 수 (이 안의 응답은 지우거나 다시 굴리면 값이 정확히 되돌아간다) */
+export const FOLD_KEEP_MSGS = 200;
+/** 변경 기록 줄이기. 갱신 저장 때 부른다 (2026-11-17 사용자: 원본처럼 오래된 호감 계기는 숫자 하나로 합친다. 원본은 호감 숫자를 저장하고 이력은 60개만 둔다).
+ *  ① 사라진 응답이 만든 변경은 버린다 (dropGoneChanges).
  *  ② 상한을 넘으면 오래된(최근 200개 메시지 밖) 살아 있는 계기를 사람별 값으로 접는다. refold(그 사람, 접을 계기(순서대로), 지금 접힌 값) → 새 접힌 값, null 이면 그 사람은 접지 않는다.
  *  고정(pin)이 든 사람, 묶음이 경계에 걸친 사람은 값이 달라질 수 있어 접지 않는다. 접은 것은 되돌릴 수 없다 */
-export function foldLog(store: PeopleStore, chat: Chat, refold: (who: string, cues: Change[], folded: number) => number | null): void {
+export function foldLog(store: PeopleStore, chat: Chat, refold: (who: string, cues: Change[], folded: number) => number | null, keepMsgs = FOLD_KEEP_MSGS): void {
+  dropGoneChanges(store, chat);
   const live = liveness(chat);
-  store.log = store.log.filter((c) => c.anchor.startsWith('#') || live.at.has(c.anchor));
   if (store.log.length <= LOG_CAP) return;
-  const cut = msgs(chat).length - 200;
+  const cut = msgs(chat).length - keepMsgs;
   if (cut <= 0) return;
   const key = (c: Change) => c.group ?? c.anchor;
   const pos = (c: Change) => live.at.get(c.anchor) ?? -1;

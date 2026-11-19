@@ -12,6 +12,7 @@
 import type { Chat } from './types';
 import { cleanIcon, ITEM_ON_VAR, itemEquip, itemUses, itemWeight, kindOfIcon, parseTraits, traitsFor, traitsText, type ItemEquip } from './items';
 import { colConfig } from './world/statuscols';
+import { findStatusTags } from './world/status';
 import { messageKey } from './people/store';
 import { parseWon } from './wallet';
 import { craftMessages, type CraftMessage, type ThoughtsMode } from './craft';
@@ -57,6 +58,21 @@ export const OWN_SHOPS_DEFAULT: OwnShop[] = [
 /** 인터넷 접속 표시: 표식 주인 칸 (모델은 `@web`, 정리한 뒤에는 `@web:사이트`) */
 export const WEB_OWNER = '@web';
 export const OWN_MAX = 40;
+/** 진열대 목록 자르기: 파는 물건과 산 물건을 따로 센다 (파는 것 앞에서 SHELF_MAX 개, 산 것 최근 SHELF_MAX 개. 2026-11-17 사용자).
+ *  한 목록으로 앞에서 40개를 자르면, 쇼핑몰처럼 산 물건이 계속 남는 곳은 산 것이 40개가 된 뒤 새 물건이 전부 잘려 진열대가 비었다 */
+export const SHELF_MAX = 40;
+/** 진열대 물건 수 설정 (2026-11-17 사용자: 코드에 박힌 수를 설정으로). 기본 SHELF_MAX, 10~200. 상점 넷이 같이 쓴다 (SHOP_SHARED_VARS) */
+export const SHOP_SHELF_VAR = '$sh_shelf';
+// 하한은 한 번에 받는 물건 수의 최대(SHOP_SIZE_HI 16)보다 커야 한다: 작으면 방금 받은 진열과 끝에 붙는 시그니처 상품이 읽을 때 잘린다
+export const SHOP_SHELF_LO = 20;
+export const SHOP_SHELF_HI = 200;
+export const shelfCap = (vars: Record<string, unknown> | undefined): number => numIn(vars?.[SHOP_SHELF_VAR], SHELF_MAX, SHOP_SHELF_LO, SHOP_SHELF_HI);
+export function capShelf<T extends { sold?: boolean }>(items: T[], cap = SHELF_MAX): T[] {
+  const sold = items.filter((x) => x.sold);
+  const dropSold = new Set(sold.slice(0, Math.max(0, sold.length - cap)));
+  let open = 0;
+  return items.filter((x) => (x.sold ? !dropSold.has(x) : ++open <= cap));
+}
 export function ownShops(vars: Vars): OwnShop[] {
   const raw = vars?.[SHOP_OWN_VAR];
   if (typeof raw !== 'string' || !raw.trim()) return OWN_SHOPS_DEFAULT.map((x) => ({ ...x }));
@@ -113,7 +129,19 @@ export const SHOP_FEATURE_VAR = '$sh_feature';
 /** 상점 넷(기본 상점·우주 쇼핑몰·포인트몰·망상홈쇼핑)이 값 하나를 같이 쓰는 설정: 기본 상점 자리($sh_*)의 값을 넷이 같이 읽는다 (2026-11-11 사용자: 설정 → 상점) */
 /** 문의로 물건 바꾸기 (기본 켬): 끄면 문의 요청에 진열 규칙을 넣지 않고, 주인·운영자가 말로 물건을 더하거나 진열을 새로 짜지 않는다 (값 흥정·빼기는 그대로) */
 export const SHOP_TALK_STOCK_VAR = '$sh_talk_stock';
-export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR, SHOP_TALK_STOCK_VAR];
+/** 보관하는 양·참고 글 길이 (상점 넷이 같이 쓴다). 기본값은 설정이 생기기 전에 코드에 적혀 있던 수 그대로.
+ *  prev 지난 진열대 이름 · sales 판 것 기록 · notes 견적과 정보 쪽지(각각) · talk 문의 대화 줄 · wiki 가게 위키 문서 글자 · report 진행 중 괴이·사건 보고 글자 */
+export const SHOP_LIMITS = {
+  prev: { key: '$sh_keep_prev', def: 40, min: 5, max: 200, step: 5, unit: '개' },
+  sales: { key: '$sh_keep_sales', def: 40, min: 5, max: 200, step: 5, unit: '건' },
+  notes: { key: '$sh_keep_notes', def: 20, min: 5, max: 100, step: 5, unit: '건' },
+  talk: { key: '$sh_keep_talk', def: 40, min: 10, max: 200, step: 10, unit: '줄' },
+  wiki: { key: '$sh_wiki_chars', def: 3000, min: 500, max: 20000, step: 500, unit: '자' },
+  report: { key: '$sh_report_chars', def: 1500, min: 500, max: 10000, step: 500, unit: '자' },
+} as const;
+export type ShopLimit = keyof typeof SHOP_LIMITS;
+export const isShopLimit = (k: string): k is ShopLimit => Object.prototype.hasOwnProperty.call(SHOP_LIMITS, k);
+export const SHOP_SHARED_VARS: string[] = [SHOP_CTX_VAR, SHOP_TURNS_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_DIVERSE_VAR, SHOP_PREV_VAR, SHOP_TALK_STOCK_VAR, SHOP_SHELF_VAR, ...Object.values(SHOP_LIMITS).map((l) => l.key)];
 export const SHOP_SIZE_LO = 1;
 export const SHOP_SIZE_HI = 16;
 
@@ -145,6 +173,10 @@ export interface ShopSettings {
   refs: number;
   /** 문의로 물건을 더하거나 진열을 새로 짤 수 있음 (끄면 문의 요청에서 진열 규칙이 빠진다) */
   talkStock: boolean;
+  /** 진열대에 남기는 물건 수 (파는 것·산 것 따로, 10~200) */
+  shelf: number;
+  /** 기록을 몇 개까지 둘지·참고 글 길이 (shopLimits) */
+  keep: ShopKeep;
 }
 
 type Vars = Record<string, unknown> | undefined;
@@ -177,6 +209,8 @@ export function shopSettings(vars: Vars): ShopSettings {
     turns: numIn(vars?.[SHOP_TURNS_VAR], SHOP_TURNS_DEFAULT, 1, 8),
     refs: numIn(vars?.[SHOP_REFS_VAR], SHOP_REFS_DEFAULT, 0, 12),
     talkStock: vars?.[SHOP_TALK_STOCK_VAR] !== '0',
+    shelf: shelfCap(vars),
+    keep: shopLimits(vars),
   };
 }
 function sizeOf(vars: Vars, legacy: ShopCount): [number, number] {
@@ -190,6 +224,15 @@ function numIn(v: unknown, def: number, lo: number, hi: number): number {
   return v === undefined || v === '' || !Number.isFinite(n) ? def : Math.max(lo, Math.min(hi, Math.round(n)));
 }
 export const shopOn = (vars: Vars): boolean => shopSettings(vars).on;
+/** 보관하는 양·참고 글 길이의 지금 값 (빈 값·수가 아닌 값은 기본값, 범위 밖은 범위 끝) */
+export type ShopKeep = Record<ShopLimit, number>;
+export function shopLimits(vars: Vars): ShopKeep {
+  const out = {} as ShopKeep;
+  for (const k of Object.keys(SHOP_LIMITS) as ShopLimit[]) { const l = SHOP_LIMITS[k]; out[k] = numIn(vars?.[l.key], l.def, l.min, l.max); }
+  return out;
+}
+/** 설정을 건드리지 않은 채팅의 보관하는 양. 상태를 읽고 고치는 함수들(readShop·applyShelf·applyTalk·closeSale·sayToOwner)은 그 채팅의 값(shopLimits)을 받아 쓴다 — 다른 채팅의 값이 섞이지 않게 모듈에 두지 않는다 */
+const KEEP_DEFAULT: ShopKeep = shopLimits(undefined);
 
 // ── 표식 `[shop: 가게|주인]` ──
 
@@ -249,6 +292,8 @@ export interface ShopItem {
   sold?: boolean;
   /** 산 응답 키 — 그 응답이 지워지면(다시 굴리기) 돈이 돌아오니 진열대에도 되살린다 (11-09 전수점검) */
   soldKey?: string;
+  /** 산 때의 작중 날짜·시각 (상태창 글 그대로). 상태창이 없으면 없음 (2026-11-17 사용자) */
+  soldAt?: string;
   /** 숨긴 진짜 효과 (11-09 사용자: 우주몰은 보이는 효과가 광고 문구 — 모호·검열·거짓·뚱딴지·가끔 진실 — 이고 진짜는 플레이어·소지품에 안 보이고 본편 모델만 안다) */
   truth?: string;
 }
@@ -380,7 +425,8 @@ function readOffer(v: unknown): ShopOffer | null {
   };
 }
 
-export function readShop(vars: Vars): ShopState | null {
+/** shelf: 진열대 물건 수, keep: 보관하는 양. vars 가 채팅 변수 그대로가 아니면(상태 하나만 담은 것) 부르는 쪽이 채팅의 값(shelfCap·shopLimits)을 넘긴다 */
+export function readShop(vars: Vars, shelf = shelfCap(vars), keep = shopLimits(vars)): ShopState | null {
   const raw = vars?.[SHOP_VAR];
   if (typeof raw !== 'string' || !raw.trim()) return null;
   try {
@@ -398,17 +444,17 @@ export function readShop(vars: Vars): ShopState | null {
         prices: clean(id.prices, 120),
         ...(id.points ? { points: true } : {}),
       },
-      items: (Array.isArray(o.items) ? o.items.filter(isItem) : []).map((x) => {
+      items: capShelf((Array.isArray(o.items) ? o.items.filter(isItem) : []).map((x) => {
         const { use: _u, uses: _n, equip: _e, icon: _i, weight: _w, ...rest } = x;
         return { ...rest, ...traitsOf(x), desc: clean(x.desc, 120), effect: clean(x.effect, 60) };
-      }).slice(0, 40),
-      talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-40),
+      }), shelf),
+      talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-keep.talk),
       closed: !!o.closed,
-      prev: Array.isArray(o.prev) ? o.prev.filter((x): x is string => typeof x === 'string').slice(-40) : [],
+      prev: Array.isArray(o.prev) ? o.prev.filter((x): x is string => typeof x === 'string').slice(-keep.prev) : [],
       sell: readOffer(o.sell),
-      sales: (Array.isArray(o.sales) ? o.sales : []).filter((x): x is ShopSale => !!x && typeof x === 'object' && typeof (x as ShopSale).name === 'string' && Number.isSafeInteger((x as ShopSale).price)).slice(-40),
-      ...(Array.isArray(o.quotes) && o.quotes.length ? { quotes: o.quotes.filter((q): q is ShopQuote => !!q && typeof q === 'object' && typeof q.id === 'string' && Number.isSafeInteger(q.price) && Number.isFinite(q.hours) && !!q.item && typeof q.item.name === 'string').slice(-20) } : {}),
-      ...(Array.isArray(o.notes) && o.notes.length ? { notes: o.notes.filter((n): n is ShopNote => !!n && typeof n === 'object' && typeof n.id === 'string' && typeof n.title === 'string' && Number.isSafeInteger(n.price) && typeof n.body === 'string').slice(-20) } : {}),
+      sales: (Array.isArray(o.sales) ? o.sales : []).filter((x): x is ShopSale => !!x && typeof x === 'object' && typeof (x as ShopSale).name === 'string' && Number.isSafeInteger((x as ShopSale).price)).slice(-keep.sales),
+      ...(Array.isArray(o.quotes) && o.quotes.length ? { quotes: o.quotes.filter((q): q is ShopQuote => !!q && typeof q === 'object' && typeof q.id === 'string' && Number.isSafeInteger(q.price) && Number.isFinite(q.hours) && !!q.item && typeof q.item.name === 'string').slice(-keep.notes) } : {}),
+      ...(Array.isArray(o.notes) && o.notes.length ? { notes: o.notes.filter((n): n is ShopNote => !!n && typeof n === 'object' && typeof n.id === 'string' && typeof n.title === 'string' && Number.isSafeInteger(n.price) && typeof n.body === 'string').slice(-keep.notes) } : {}),
     };
   } catch {
     return null;
@@ -515,7 +561,7 @@ export function eventShop(chat: Chat): ShopState | null {
   if (st) return st;
   const last = lastBot(chat);
   if (!last || !shopOn(chat.scriptstate)) return null;
-  const snap = readShop({ [SHOP_VAR]: chat.scriptstate?.[SHOP_LAST_VAR] });
+  const snap = readShop({ [SHOP_VAR]: chat.scriptstate?.[SHOP_LAST_VAR] }, shelfCap(chat.scriptstate), shopLimits(chat.scriptstate));
   return snap && snap.key === last.key ? snap : null;
 }
 
@@ -771,9 +817,9 @@ export function applyShelf(st: ShopState, r: ShelfReply, s: ShopSettings): ShopS
   const base: ShopState = { ...st, identity: st.loaded ? st.identity : r.identity, loaded: true };
   const items = withIds(base, r.items).slice(0, 40);
   if (!items.length) throw new ShopError('받은 물건 줄이 모두 겹쳐서 버렸어요. 다시 받아 보세요.');
-  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-40);
+  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-s.keep.prev);
   const talk = r.owner ? [...st.talk, { who: 'owner' as const, text: r.owner, ...keyOf(st) }] : st.talk;
-  return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-40), prev, closed: false };
+  return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-s.keep.talk), prev, closed: false };
 }
 
 /** 코드가 넣는 물건 (쇼핑몰 시그니처 상품): 이미 진열돼 있거나 팔린 것과 같은 이름은 건너뛴다. 지난 목록(prev)에는 넣지 않는다 */
@@ -789,7 +835,7 @@ export function dropItemsNamed(st: ShopState, names: string[]): ShopState {
 
 /** 주인에게 말한 결과를 상태에 (내 말은 부르는 쪽이 먼저 적는다) */
 /** stock: 설정 「문의로 물건 바꾸기」. 꺼져 있으면 응답의 물건 더하기·전체 다시 짜기는 받지 않는다 (값 바꾸기·빼기는 받는다) */
-export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = true): ShopState {
+export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = true, shelf = SHELF_MAX, keep = KEEP_DEFAULT): ShopState {
   const r0: TalkReply = stock ? r1 : { ...r1, all: [], add: [], mode: r1.mode === 'all' ? 'none' : r1.mode };
   // 포인트 상점: 「900p」로 적은 값도 포인트 값으로
   const r = st.identity.points ? { ...r0, all: r0.all.map(pointPrice), add: r0.add.map(pointPrice), reprice: r0.reprice.map(pointPrice) } : r0;
@@ -814,14 +860,14 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
   let noteId = '';
   if (r.info && !notes.some((n) => n.title === r.info!.title)) {
     noteId = `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    notes = [...notes, { id: noteId, ...r.info }].slice(-20);
+    notes = [...notes, { id: noteId, ...r.info }].slice(-keep.notes);
   }
   // 맞춤 주문 견적: 대사에 붙여 두고, 선납하면 주문으로 (같은 이름의 견적이 열려 있으면 바꿔치기)
   let quotes = st.quotes ?? [];
   let quoteId = '';
   if (r.quote) {
     quoteId = `q${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
-    quotes = [...quotes.filter((q) => q.accepted || !sameShopName(q.item.name, r.quote!.item.name)), { id: quoteId, ...r.quote }].slice(-20);
+    quotes = [...quotes.filter((q) => q.accepted || !sameShopName(q.item.name, r.quote!.item.name)), { id: quoteId, ...r.quote }].slice(-keep.notes);
   }
   const talk: ShopLine[] = [...st.talk, { who: 'owner', text: r.owner, ...(noteId ? { note: noteId } : {}), ...(quoteId ? { quote: quoteId } : {}), ...keyOf(st) }];
   let sell = st.sell ?? null;
@@ -843,7 +889,7 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
     }
   }
   const closed = st.closed || (kick && r.closed);
-  return { ...st, items: items.slice(0, 40), talk: talk.slice(-40), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
+  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-keep.talk), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
 }
 
 /** 견적 수락 표시 (없거나 이미 수락했으면 null) */
@@ -878,22 +924,36 @@ export const cancelSell = (st: ShopState): ShopState => ({ ...st, sell: null });
 
 /** 팔기 확정: 부른 값이 있을 때만. 판 것 목록에 남고 팔기 상태는 비운다 */
 /** key: 판 응답 키 (쇼핑몰은 상태 key 가 비어 따로 넘긴다 — 다시 굴리면 판 것 목록에서도 빠지게, 전수검사 11-13) */
-export function closeSale(st: ShopState, key = ''): ShopState | null {
+export function closeSale(st: ShopState, key = '', keep = KEEP_DEFAULT): ShopState | null {
   const o = st.sell;
   if (!o || typeof o.price !== 'number') return null;
-  return { ...st, sell: null, sales: [...st.sales, { name: o.name, price: o.price, ...(key ? { k: key } : keyOf(st)) }].slice(-40) };
+  return { ...st, sell: null, sales: [...st.sales, { name: o.name, price: o.price, ...(key ? { k: key } : keyOf(st)) }].slice(-keep.sales) };
 }
 
-export function sayToOwner(st: ShopState, text: string): ShopState {
+export function sayToOwner(st: ShopState, text: string, keep = KEEP_DEFAULT): ShopState {
   const talk: ShopLine[] = [...st.talk, { who: 'me', text: clean(text, 300), ...keyOf(st) }];
-  return { ...st, talk: talk.slice(-40) };
+  return { ...st, talk: talk.slice(-keep.talk) };
 }
 
-/** 구입: 진열대에서 빠지고(sold) 산 값이 남는다. 없거나 이미 샀으면 그대로 */
-export function markSold(st: ShopState, id: string, key = ''): ShopState {
+/** 지금 작중 날짜·시각: 마지막 상태창의 날짜·시각 글 그대로. 상태창이 없으면 빈 글 */
+export function storyStamp(chat: Chat): string {
+  const list = chat.message ?? [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const m = list[i];
+    if (m.role !== 'char' || typeof m.data !== 'string') continue;
+    const tags = findStatusTags(m.data);
+    if (!tags.length) continue;
+    const tag = tags[tags.length - 1];
+    return clean(`${tag.date ?? ''} ${tag.time ?? ''}`, 40);
+  }
+  return '';
+}
+
+/** 구입: 진열대에서 빠지고(sold) 산 값이 남는다. 없거나 이미 샀으면 그대로 at = 산 때의 작중 날짜·시각 */
+export function markSold(st: ShopState, id: string, key = '', at = ''): ShopState {
   const it = st.items.find((x) => x.id === id && !x.sold);
   if (!it) return st;
-  return { ...st, items: st.items.map((x) => (x.id === id ? { ...x, sold: true, ...(key ? { soldKey: key } : {}) } : x)) };
+  return { ...st, items: st.items.map((x) => (x.id === id ? { ...x, sold: true, ...(key ? { soldKey: key } : {}), ...(at ? { soldAt: at } : {}) } : x)) };
 }
 /** 산·선납한 응답이 지워졌으면(다시 굴리기·삭제) 가계부 거래와 소지품이 같이 죽으니, 진열대·쪽지·견적도 안 산 것으로 되살린다 (11-09 전수점검: 돈은 돌아왔는데 다시 살 수 없었다) */
 export function reviveShop(st: ShopState, alive: Set<string>): ShopState {
@@ -901,7 +961,7 @@ export function reviveShop(st: ShopState, alive: Set<string>): ShopState {
   const drop = <T extends object>(x: T, flag: string, keyName: string): T => { const { [flag]: _f, [keyName]: _k, ...rest } = x as Record<string, unknown>; return rest as T; };
   return {
     ...st,
-    items: st.items.map((x) => (x.sold && dead(x.soldKey) ? drop(x, 'sold', 'soldKey') : x)),
+    items: st.items.map((x) => (x.sold && dead(x.soldKey) ? (({ soldAt: _a, ...r }) => r as ShopItem)(drop(x, 'sold', 'soldKey')) : x)),
     // 판 응답이 지워졌으면 판 것도 없던 일로 (전수검사 11-13)
     sales: st.sales.filter((x) => !dead(x.k)),
     ...(st.notes ? { notes: st.notes.map((n) => (n.bought && dead(n.boughtKey) ? drop(n, 'bought', 'boughtKey') : n)) } : {}),
@@ -1060,7 +1120,11 @@ export function talkPrompt(src: ShopSource, s: ShopSettings, guide: GuideName = 
   const shelf = shelfItems(st).map((x) => `${x.name}|${x.pay ? (x.price ? `${x.pay} + ${x.price}` : x.pay) : x.price}|${traitsText(x)}|${x.icon ?? '-'}|${x.weight ?? '-'}|${x.desc}|${x.effect}|${x.tag === 'rare' ? guideTxt(guide, 'TAG_RARE') : x.tag === 'sale' && x.was ? guideTxt(guide, 'TAG_SALE', { was: x.was }) : ''}${secret ? `|${x.truth ?? '-'}` : ''}`).join('\n') || guideTxt(guide, 'SHELF_EMPTY');
   // 우주몰 진열 줄 끝 칸(숨긴 진짜 효과) 안내: 지침의 SECRET_NOTE 절
   const secretNote = secret ? `\n${guideTxt(guide, 'SECRET_NOTE')}` : '';
-  const sold = soldItems(st).map((x) => x.name).join(', ');
+  // 쇼핑몰(우주 쇼핑몰·포인트몰)은 방문이 따로 없어 지금까지 산 것이 남는다: 한 물건에 한 줄로 산 때·이름·값·효과를 넘긴다 (지침의 BOUGHT_LINE 절, 2026-11-17 사용자).
+  // 일반 가게는 이번 방문에 산 것의 이름만
+  const sold = guide === 'Shop'
+    ? soldItems(st).map((x) => x.name).join(', ')
+    : soldItems(st).map((x) => guideTxt(guide, 'BOUGHT_LINE', { when: x.soldAt || '-', name: x.name, price: x.pay ? (x.price ? `${x.pay} + ${x.price}` : x.pay) : x.price, effect: x.effect || '-' })).join('\n');
   const o = st.sell;
   const g = G(guide);
   // 줄 꼴·진열 규칙은 그 몰 것으로 (우주몰은 진실 칸·SHELF_SECRET 절) (전수검사 11-13)

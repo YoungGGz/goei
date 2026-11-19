@@ -7,7 +7,8 @@ import { CFG, COUNT_RANGE, GN_DEFAULTS, STORAGE_MAX, gnetRetention, gnetSettings
 import { jointOn } from '../core/netjoint';
 import { MALL_NAME, mallSettings } from '../core/malls';
 import { hsName, hsSettings } from '../core/homeshop';
-import { SHOP_SIZE_HI, SHOP_SIZE_LO, shopBlocked, shopSettings, type ShopSettings } from '../core/shop';
+import { SHOP_LIMITS, SHOP_SHELF_HI, SHOP_SHELF_LO, SHOP_SIZE_HI, SHOP_SIZE_LO, shopBlocked, shopLimits, shopSettings, type ShopLimit, type ShopSettings } from '../core/shop';
+import { bmOrdersKeep, cosOrdersKeep, ORDERS_KEEP_RANGE } from '../core/orders';
 import { HS_MAIN_SET, hsMainSettings, type HsLogKind } from '../core/hslog';
 import { SHOP_MAIN_ALL, SHOP_MAIN_KINDS, SHOP_MAIN_LABEL, SHOP_MAIN_LINES, SHOP_PLACES, shopMain, shopMainLines, type ShopPlace } from '../core/shopctx';
 import { advChipsCtl, advCtl } from './advanced';
@@ -137,10 +138,14 @@ export function boardTable(state: State, busy = false): string {
   const limit = setGroup('길이 상한', [
     R('모델이 쓰는 글', set([['글 본문', N('post_tokens')], ['글 제목', N('title_tokens')], ['댓글', N('comment_tokens')], ['쪽지', N('dm_tokens')]])),
     R('쪽지에 같이 넘기는 글', set([['붙는 글', N('origin_tokens')], ['붙는 댓글', N('quote_tokens')], ['이전 쪽지 한 통', N('history_tokens')]]), '글이나 댓글을 보고 쪽지를 보낼 때 같이 넘기는 글 하나의 길이 상한이에요.'),
-    R('답장에 참조할 공개 글', N('dm_public'), '쪽지 답장 요청에 참고로 같이 넘기는 게시판 글의 수예요. 0이면 넘기지 않아요.'),
+    R('답장에 참조할 공개 글', set([['글', N('dm_public')], ['글마다 댓글', N('dm_public_comments')], ['전체 길이', N('dm_public_chars')]]), '쪽지 답장 요청에 참고로 같이 넘기는 게시판 글의 수예요. 0이면 넘기지 않아요.', [
+      ['글마다 댓글', '글마다 같이 넘기는 최근 댓글의 수예요. 0이면 댓글은 넘기지 않아요.'],
+      ['전체 길이', '글과 댓글을 모두 합친 길이의 상한이에요. 넘으면 오래된 댓글부터 빼고, 그래도 넘는 글은 넣지 않아요. 괴담톡 답장에 넣는 괴담넷 글에도 같이 적용돼요.'],
+    ]),
   ].join(''));
   const keep = setGroup('게시판에 남기는 것', [
     R('주요 인물 닉네임 보존', C('keyfigures', s0.keyFigures), '켜면 주요 인물이 쓰던 닉네임을 다음 새로고침에도 그대로 써요.'),
+    R('보존할 닉네임 수', N('keyfig_keep'), '주요 인물 닉네임을 이 수만큼 기억해요. 넘으면 오래된 것부터 지워요.'),
     R('새로고침 때 내 글 유지', C('keepown', s0.keepOwn), '켜면 새로고침으로 글이 바뀔 때 내가 쓴 글은 남겨요.'),
     R('내 댓글 있는 글 유지', C('keepreplied', s0.keepReplied), '켜면 내가 댓글을 단 남의 글도 남겨요.'),
     R('쪽지 자동 정리', `${setSeg('fam-set', 'b:gn:storage', ret.auto ? '1' : '0', ONOFF, busy)}${ret.auto ? numCtl('b:gn:dmkeep', { n: ret.limit, lo: 1, hi: STORAGE_MAX, step: 5 }, '남길 쪽지', '통', busy) : ''}`, '켜면 상대마다 최근 쪽지를 이 수만큼만 남기고 오래된 것은 지워요.'),
@@ -311,9 +316,27 @@ export function shopTable(vars: State, busy = false): string {
     R('다양성 강화', sw('diverse', s0.diverse), '켜면 싼 것, 비싼 것, 흔한 것, 특이한 것을 섞어 받아요.'),
     R('지난 목록 피하기', sw('prev', s0.avoidPrev), '켜면 지난번에 나온 물건을 다시 내지 않게 해요.'),
     R('문의로 물건 바꾸기', sw('talkstock', s0.talkStock), '끄면 주인이나 운영자가 말로 물건을 더하거나 진열을 새로 짜지 않아요. 문의 요청에서 진열 규칙이 빠져 요청이 짧아져요. 값 흥정은 그대로 돼요.'),
+    R('진열대 물건 수', numCtl('s:shop:shelf', { n: s0.shelf, lo: SHOP_SHELF_LO, hi: SHOP_SHELF_HI, step: 10 }, '진열대 물건 수', '개', busy), '진열대에 남기는 물건 수예요. 파는 물건과 산 물건을 따로 이 수만큼 남겨요.'),
+  ].join(''));
+  /* ── 3-2. 보관하는 양·참고 글 길이 (「진열대 물건 수」 바로 아래, 같은 수 조작 numCtl): 네 곳이 같이 쓰는 값(core/shop.ts SHOP_LIMITS)과 쇼핑몰 둘의 주문 기록 수(core/orders.ts) ── */
+  const lim = shopLimits(v);
+  const limBox = (k: ShopLimit, label: string): [string, string] => { const l = SHOP_LIMITS[k]; return [label, numCtl(`s:shop:limit_${k}`, { n: lim[k], lo: l.min, hi: l.max, step: l.step }, label, l.unit, busy)]; };
+  const ordBox = (id: 'cos' | 'bm', n: number): [string, string] => { const name = rows.find((r) => r.id === id)!.name; return [name, numCtl(`s:${id}:keep_orders`, { n, lo: ORDERS_KEEP_RANGE.min, hi: ORDERS_KEEP_RANGE.max, step: ORDERS_KEEP_RANGE.step }, `${name} 주문 기록`, '건', busy)]; };
+  const keepPart = setGroup('보관하는 양', [
+    R('기록', numSet([limBox('prev', '지난 목록'), limBox('sales', '판매 기록'), limBox('notes', '견적·정보'), limBox('talk', '문의 대화')]), `기본 상점과 쇼핑몰 둘이 상점마다 남겨 두는 기록의 수예요. 넘으면 오래된 것부터 지워요. ${hsN}에는 닿지 않아요. 거기는 ${hsN} 설정의 「기억하는 지난 상품 수」·「통화 기록 줄 수」를 따로 써요.`, [
+      ['지난 목록', '「지난 목록 피하기」에 쓰는 지난 물건 이름의 수예요.'],
+      ['판매 기록', '내가 가게에 판 물건의 기록이에요.'],
+      ['견적·정보', '맞춤 주문 견적과 산 정보를 각각 이만큼 남겨요.'],
+      ['문의 대화', '주인이나 운영자와 나눈 대화의 줄 수예요. 「지난 대화」로 넘기는 양은 이 수를 넘지 못해요.'],
+    ]),
+    R('주문 기록', numSet([ordBox('cos', cosOrdersKeep(v)), ordBox('bm', bmOrdersKeep(v))]), '「주문 조회」에 남겨 두는 주문의 수예요. 넘으면 이미 받은 주문부터 지우고, 아직 받지 않은 주문은 지우지 않아요.'),
+    R('참고 글 길이', numSet([limBox('wiki', '위키 문서'), limBox('report', '사건 보고')]), '상점 모델에 넘기는 참고 글의 길이예요. 넘는 부분은 잘라요. 길수록 토큰을 더 써요.', [
+      ['위키 문서', '가게 이름과 같은 위키 문서예요.'],
+      ['사건 보고', '진행 중인 괴이와 사건의 보고예요. 「맥락 반영」이 켜져 있을 때 넘겨요.'],
+    ]),
   ].join(''));
   const note = blocked ? `<p class="gx-hint">${blocked === 'both' ? '소지품과 가계부가' : blocked === 'items' ? '소지품이' : '가계부가'} 꺼져 있어 기본 상점과 쇼핑몰 둘을 쓸 수 없어요. 산 물건은 소지품에, 돈은 가계부로 오가서 둘 다 켜져 있어야 해요.</p>` : '';
   /* ── 3. 기본 상점에만 있는 값: 거래 끊음 + (ui/settings.ts 가 잇는) 열리는 조건 ── */
   const own = s0.on ? `<h2 class="fam-h">기본 상점에만 있는 값</h2>${setGroup('', R('거래 끊음', sw('kick', s0.kick), '켜면 주인이 모욕이나 끝없는 흥정에 거래를 끊을 수 있어요.'))}` : '';
-  return `${note}<h2 class="fam-h">상점마다 따로 정하는 값</h2><div class="fam-wide">${ckWide([call, shelf], L, busy)}${price}${ckWide([giveShop], giveRows.map(({ name, icon }) => nm(icon, name)), busy)}${ckWide([attach], [...places, hsRow].map(({ name, icon }) => nm(icon, name)), busy)}${attachMax}</div>${fnPart}<h2 class="fam-h">네 곳이 같이 쓰는 값</h2>${write}${own}`;
+  return `${note}<h2 class="fam-h">상점마다 따로 정하는 값</h2><div class="fam-wide">${ckWide([call, shelf], L, busy)}${price}${ckWide([giveShop], giveRows.map(({ name, icon }) => nm(icon, name)), busy)}${ckWide([attach], [...places, hsRow].map(({ name, icon }) => nm(icon, name)), busy)}${attachMax}</div>${fnPart}<h2 class="fam-h">네 곳이 같이 쓰는 값</h2>${write}${keepPart}${own}`;
 }

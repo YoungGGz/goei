@@ -132,6 +132,7 @@ export const HS_KEY = {
   next: '$hs_next', turn: '$hs_turn', lock: '$hs_lock', left: '$hs_left',
   drop: '$hs_drop', dropRate: '$hs_drop_rate', dropFast: '$hs_drop_fast', dropStep: '$hs_drop_step', soonAt: '$hs_soon_at', endLo: '$hs_end_lo', endHi: '$hs_end_hi',
   callLo: '$hs_call_lo', callHi: '$hs_call_hi', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk',
+  sayHost: '$hs_say_host', sayFlow: '$hs_say_flow', prevKeep: '$hs_prev_keep', talkKeep: '$hs_talk_keep', orderKeep: '$hs_order_keep', logKeep: '$hs_log_keep',
 } as const;
 /** 숫자 칸 범위·기본값 (설정 화면과 읽기가 같이 쓴다) */
 export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: number; unit: string }> = {
@@ -163,6 +164,14 @@ export const HS_NUM: Record<string, { key: string; lo: number; hi: number; def: 
   endHi: { key: HS_KEY.endHi, lo: 1, hi: 99, def: 8, unit: '개' },
   callLo: { key: HS_KEY.callLo, lo: 1, hi: 60, def: 6, unit: '턴' },
   callHi: { key: HS_KEY.callHi, lo: 1, hi: 60, def: 12, unit: '턴' },
+  // 내 채팅 한 번에 같이 넘기는 것: 방금 나온 진행자 대사 줄 수 · 방금까지 흐른 채팅 줄 수(내 줄까지 쳐서. 화면이 들고 있는 채팅은 60줄)
+  sayHost: { key: HS_KEY.sayHost, lo: 1, hi: 20, def: 4, unit: '줄' },
+  sayFlow: { key: HS_KEY.sayFlow, lo: 1, hi: 60, def: 24, unit: '줄' },
+  // 남겨 두는 수: 지난 상품 이름 · 전화 주문 한 통화의 말 · 주문 · 시청 기록 줄 (넘으면 오래된 것부터 버린다)
+  prevKeep: { key: HS_KEY.prevKeep, lo: 1, hi: 200, def: 24, unit: '개' },
+  talkKeep: { key: HS_KEY.talkKeep, lo: 4, hi: 200, def: 40, unit: '줄' },
+  orderKeep: { key: HS_KEY.orderKeep, lo: 10, hi: 200, def: 40, unit: '건' },
+  logKeep: { key: HS_KEY.logKeep, lo: 50, hi: 2000, def: 400, unit: '줄' },
 };
 /** 주문 전화번호 기본값 */
 export const HS_TEL_DEFAULT = '080-404-0000';
@@ -231,6 +240,11 @@ export interface HsSettings {
   say: boolean;
   barter: boolean;
   talk: boolean;
+  /** 내 채팅 한 번에 같이 넘기는 진행자 대사 줄 수 · 흐른 채팅 줄 수 (내 줄까지 쳐서) */
+  sayHost: number;
+  sayFlow: number;
+  /** 남겨 두는 수: 지난 상품 이름 · 전화 주문 한 통화의 말 · 주문 · 시청 기록 줄 */
+  keep: { prev: number; talk: number; orders: number; log: number };
 }
 /** 수 칸 하나를 적을 값. 최소·최대 줄(pair)이면 최소가 최대를 넘을 때 짝도 같이 맞춘다 (가게 표·게시판 표와 같은 방식, 전수검사 11-13) */
 export function hsNumVars(vars: Vars, k: string, raw: number, pair?: readonly [string, string]): Record<string, string> {
@@ -283,8 +297,13 @@ export function hsSettings(vars: Vars): HsSettings {
     say: vars?.[HS_KEY.say] !== '0',
     barter: vars?.[HS_KEY.barter] !== '0',
     talk: vars?.[HS_KEY.talk] !== '0',
+    sayHost: n(vars, 'sayHost'),
+    sayFlow: n(vars, 'sayFlow'),
+    keep: { prev: n(vars, 'prevKeep'), talk: n(vars, 'talkKeep'), orders: n(vars, 'orderKeep'), log: n(vars, 'logKeep') },
   };
 }
+/** 시청 기록에 남겨 두는 줄 수 (core/hslog.ts appendLog 가 읽는다) */
+export const hsLogKeep = (vars: Vars): number => n(vars, 'logKeep');
 
 /** 동작 분류 고침 글 → { 'B:grin': 'off' }. 한 줄에 「컷:이름=분류」(분류: 기본·가끔·대사·드물게·안씀 또는 base·filler·event·rare·off) */
 const GROUP_WORD: Record<string, ClipGroup> = { base: 'base', 기본: 'base', filler: 'filler', 가끔: 'filler', event: 'event', 대사: 'event', 사건: 'event', rare: 'rare', 드물게: 'rare', off: 'off', 안씀: 'off' };
@@ -485,10 +504,10 @@ export function parseChat(text: string): { shared: HsChatLine[]; parts: HsChatLi
 
 let seq = 0;
 const itemId = (key: string, i: number) => `ms${(Date.now() % 1e9).toString(36)}${(seq++).toString(36)}_${i}_${key.slice(-4)}`;
-/** 받은 편성을 상태로 (지금 부는 처음부터) */
-export function applyShow(st: HsShow, r: ShowReply, key: string): HsShow {
+/** 받은 편성을 상태로 (지금 부는 처음부터). keep = 기억해 둘 지난 상품 이름 수 (설정 「기억하는 지난 상품 수」) */
+export function applyShow(st: HsShow, r: ShowReply, key: string, keep = HS_NUM.prevKeep.def): HsShow {
   const parts = r.items.map((it, i) => ({ item: { ...it, id: itemId(key, i) }, cues: r.cues[i], ...(r.insts?.[i] ? { inst: r.insts[i] } : {}), ...(r.chats?.[i]?.length ? { chat: r.chats[i] } : {}) }));
-  return { loaded: true, key, title: r.title, parts, chat: r.chat, at: 0, prev: [...st.prev, ...st.parts.map((p) => p.item.name)].slice(-24), ...(r.ops ? { ops: r.ops } : {}), tk: key };
+  return { loaded: true, key, title: r.title, parts, chat: r.chat, at: 0, prev: [...st.prev, ...st.parts.map((p) => p.item.name)].slice(-Math.max(1, keep)), ...(r.ops ? { ops: r.ops } : {}), tk: key };
 }
 
 /** 본편 턴이 넘어갔으면 편성 한 칸 넘긴 상태, 아니면 null (다시 굴리기는 턴이 아니다). 자동 호출이 수동이어도 넘긴다 (전수검사 11-13) */
@@ -509,7 +528,7 @@ export function readShow(vars: Vars): HsShow {
       loaded: j.loaded === true && parts.length > 0, key: String(j.key ?? ''), title: String(j.title ?? ''), parts,
       chat: lines(j.chat),
       at: Math.max(0, Math.min(parts.length, Math.floor(Number(j.at) || 0))),
-      prev: Array.isArray(j.prev) ? j.prev.map(String).slice(-24) : [],
+      prev: Array.isArray(j.prev) ? j.prev.map(String).slice(-n(vars, 'prevKeep')) : [],
       ...(j.ops && typeof j.ops === 'object' ? { ops: { hello: String(j.ops.hello ?? ''), done: String(j.ops.done ?? '') } } : {}),
       ...(typeof j.tk === 'string' ? { tk: j.tk } : {}),
     };
@@ -652,7 +671,6 @@ export function nextDrop(left: number, end: number, rest: { ms: number; planned:
 
 export const HS_ORDERS_VAR = '$hs_orders';
 export const HS_AUD_VAR = '$hs_aud';
-export const HS_ORDERS_MAX = 40;
 export interface HsOrder {
   id: string;
   /** 상품 (상자를 열면 소지품에 들어갈 것) */
@@ -683,7 +701,20 @@ export function readOrders(vars: Vars): HsOrder[] {
     return [];
   }
 }
-export const ordersVars = (list: HsOrder[]): Record<string, string> => ({ [HS_ORDERS_VAR]: list.length ? JSON.stringify(list.slice(-HS_ORDERS_MAX)) : '' });
+/** 새 주문을 넣을 때만 부른다. 넘치면 죽은 주문(주문한 응답이 지워진 것)과 다 끝난 연 주문부터 오래된 순으로 버린다. 남길 것만 남으면 수를 넘겨도 둔다.
+ *  남기는 주문: 안 연 상자가 걸린 것(버리면 그 상자를 못 연다) · 시연 호출이 남은 것 · 연 응답이 마지막 응답인 것(다시 굴리면 상자가 미개봉으로 돌아온다).
+ *  now: 살아 있는 응답 키 · 지금 턴 · 마지막 응답 키 */
+export function pruneOrders(list: HsOrder[], max: number, now: { alive: Set<string>; turn: number; last: string }): HsOrder[] {
+  const out = [...list];
+  const keep = (o: HsOrder): boolean => (!o.anchor || now.alive.has(o.anchor)) && (!orderOpened(o, now.alive) || o.dues.some((d) => d >= now.turn) || (!!o.openKey && o.openKey === now.last));
+  while (out.length > Math.max(1, max)) {
+    const i = out.findIndex((o) => !keep(o));
+    if (i < 0) break;
+    out.splice(i, 1);
+  }
+  return out;
+}
+export const ordersVars = (list: HsOrder[]): Record<string, string> => ({ [HS_ORDERS_VAR]: list.length ? JSON.stringify(list) : '' });
 /** 살아 있는 주문 (주문한 응답이 남아 있는 것) */
 export const liveOrders = (vars: Vars, alive: Set<string>): HsOrder[] => readOrders(vars).filter((o) => !o.anchor || alive.has(o.anchor));
 /** 이 응답 뒤에 주문해 상자가 들어온 주문이 있나 (그 턴의 메인 요청에 받는 법 ARRIVE 를 한 번 붙인다. 같은 턴에 열어 버렸어도 들어온 것은 들어온 것) */

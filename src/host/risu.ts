@@ -3,8 +3,9 @@ import { makeAssetCopy, splitAssetCopy } from '../core/world/assetcopy';
 import { setStatusColumns } from '../core/world/statuscols';
 import { setIconAliases, setIconPool } from '../core/iconmatch';
 import { ITEM_ICON_ALIAS_VAR, itemIconPoolOn, setItemRules } from '../core/items';
+import { setWalletCap } from '../core/wallet';
 import type { Chat, LoreEntry } from '../core/types';
-import { applyAdvanced } from '../core/advanced';
+import { applyAdvanced, applyGenLimits } from '../core/advanced';
 import { auxLoreRisu } from '../core/auxlore';
 
 export interface CharacterSnapshot {
@@ -70,7 +71,21 @@ export async function loadContext(): Promise<ChatContext | null> {
   setIconPool(itemIconPoolOn(chat.scriptstate));
   // 소지품 판정 표·「두고 옴」 말·「벗음」 말 (core/itemrules.ts)
   setItemRules(chat.scriptstate);
+  // 요청당 사진 수 (core/advanced.ts)
+  applyGenLimits(chat.scriptstate);
+  // 거래 줄 상한 (core/wallet.ts)
+  setWalletCap(chat.scriptstate);
+  shown = { key: `${charIndex}:${chatIndex}`, state: chat.scriptstate };
   return { charIndex, chatIndex, char, chat };
+}
+
+/** 지금 열려 있는 채팅(마지막으로 읽은 채팅)과 그 채팅 변수. 다른 채팅을 저장한 뒤 보관 수·길이 제한을 이 채팅 값으로 되돌리는 데 쓴다 */
+let shown: { key: string; state: Chat['scriptstate'] } | null = null;
+/** 채팅마다 다른 수(고급 설정 길이 제한·보관 수, 거래 줄 상한, 소지품 표와 줄 상한)를 그 채팅 값으로 맞춘다 */
+function applyChatLimits(state: Chat['scriptstate']): void {
+  applyAdvanced(state);
+  setWalletCap(state);
+  setItemRules(state);
 }
 
 // 같은 채팅 저장은 차례로 (읽고 쓰는 사이에 다른 저장이 끼면 그 변경이 사라진다. 괴담넷·괴담톡 자동 확인이 동시에 저장할 수 있다)
@@ -92,11 +107,26 @@ async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Cha
   const latest = (await risuai.getChatFromIndex(charIndex, chatIndex)) as Chat | null;
   if (!latest) throw new Error('채팅을 찾을 수 없어요. 채팅을 다시 열어 주세요.');
   latest.message ??= [];
-  // 저장 직전에 이 채팅의 고급 설정으로 맞춘다 (길이 제한·보관 수를 다른 채팅 값으로 쓰지 않게)
-  applyAdvanced(latest.scriptstate);
-  const next = mutate(latest);
+  // 저장 직전에 이 채팅의 값으로 맞춘다 (길이 제한·보관 수·거래 줄 상한·소지품 표와 줄 상한을 다른 채팅 값으로 쓰지 않게.
+  // 응답이 끝나기 전에 다른 채팅을 열었어도 그 채팅 값으로 정리하지 않는다)
+  applyChatLimits(latest.scriptstate);
+  const key = `${charIndex}:${chatIndex}`;
+  const read = latest.scriptstate;
+  let next: Chat | null = null;
+  try {
+    next = mutate(latest);
+  } finally {
+    // mutate 가 끝나면 열려 있는 채팅의 값으로 되돌린다. 열려 있는 채팅이면 방금 읽은 값이 그 값이다
+    if (shown && shown.key === key) shown = { key, state: read };
+    if (shown) applyChatLimits(shown.state);
+  }
   if (!next) return null;
   await risuai.setChatToIndex(charIndex, chatIndex, next);
+  // 열려 있는 채팅을 저장했으면 쓰기가 된 뒤에 저장한 값을 그 채팅 값으로 삼는다 (쓰기가 실패하면 읽은 값 그대로)
+  if (shown && shown.key === key) {
+    shown = { key, state: next.scriptstate };
+    applyChatLimits(shown.state);
+  }
   return next;
 }
 
