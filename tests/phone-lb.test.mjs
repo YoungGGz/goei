@@ -141,18 +141,43 @@ test('괴담톡: 말버릇·보기 전용 방 보관 수와 늘 넣을 최근 �
     assert.equal(A.advValue({}, 'ph', 'view_history'), '300');
     assert.equal(habits({}, 90).length, 80);
     assert.deepEqual([P.HISTORY.contextRecent, V.VIEW_STORE.rooms, V.VIEW_STORE.history], [8, 30, 300]);
-    assert.equal(V.readViews(V.writeViews(rooms(40))).length, 30);
+    assert.equal(V.readViews(V.writeViews(rooms(40), true)).length, 30);
     // 설정을 바꾸면 따라간다
     const got = habits({ '$ph_adv_habit_keep': '10', '$ph_adv_view_rooms': '5', '$ph_adv_view_history': '50', '$ph_adv_ctx_recent': '0' }, 90);
     assert.equal(got.length, 10);
     assert.equal(got.at(-1).id, 'c_89', '최근 것이 남는다');
     assert.deepEqual([P.HISTORY.contextRecent, V.VIEW_STORE.rooms, V.VIEW_STORE.history], [0, 5, 50]);
-    const kept = V.readViews(V.writeViews(rooms(40)));
+    const kept = V.readViews(V.writeViews(rooms(40), true));
     assert.deepEqual([kept.length, kept.at(-1).id], [5, 'v_39']);
+    // 새 방을 넣는 저장이 아니면(방을 열거나 지울 때) 보관 수를 넘어도 자르지 않는다
+    assert.equal(V.readViews(V.writeViews(rooms(40))).length, 40);
+    assert.equal(V.readViews(V.writeViews(rooms(40).filter((r) => r.id !== 'v_3'))).length, 39);
     // 틀린 값은 기본값
     assert.equal(habits({ '$ph_adv_habit_keep': '0', '$ph_adv_view_rooms': '-3', '$ph_adv_view_history': '1.5', '$ph_adv_ctx_recent': '999' }, 90).length, 80);
     assert.deepEqual([P.HISTORY.contextRecent, V.VIEW_STORE.rooms, V.VIEW_STORE.history], [8, 30, 300]);
   } finally {
     A.applyAdvanced({});
   }
+});
+
+test('괴담톡: 고급 설정으로 옮긴 수 넷이 설정 화면 줄에 있다 (줄이 없으면 고칠 조작이 없다)', async () => {
+  const { build } = await import('esbuild');
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { pathToFileURL } = await import('node:url');
+  const { advanced: A } = await import('../dist-test/core.mjs');
+  const file = join(await mkdtemp(join(tmpdir(), 'goei-phone-set-')), 'set.mjs');
+  await build({ entryPoints: ['src/core/setdef/phone.ts'], outfile: file, bundle: true, platform: 'node', format: 'esm', loader: { '.txt': 'text' }, logLevel: 'silent' });
+  const { PHONE_SET } = await import(pathToFileURL(file));
+  const rows = PHONE_SET.groups.flatMap((g) => g.rows.map((r) => ({ ...r, group: g.title })));
+  const where = (item) => rows.find((r) => r.ctl.t === 'adv' && r.ctl.item === item)?.group;
+  assert.deepEqual(['ctx_recent', 'habit_keep', 'view_rooms', 'view_history'].map(where), ['컨텍스트 포함', '답장', '보기 전용 방', '보기 전용 방']);
+  // 줄이 가리키는 항목은 모두 실제 고급 설정 항목이다
+  for (const r of rows) {
+    const items = r.ctl.t === 'adv' ? [r.ctl.item] : r.ctl.t === 'advchips' ? r.ctl.items : r.ctl.t === 'advset' ? r.ctl.items.map(([k]) => k) : [];
+    for (const k of items) assert.ok(A.advItem('ph', k), k);
+  }
+  // 「늘 넣을 최근 말풍선」 설명은 보기 전용 방 몫에도 쓰인다고 알린다
+  assert.match(A.advItem('ph', 'ctx_recent').hint, /보기 전용 방/);
 });

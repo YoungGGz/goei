@@ -70,7 +70,8 @@ export function readViews(state: Record<string, unknown> | undefined): ViewRoom[
   }
 }
 
-export const writeViews = (list: ViewRoom[]): Record<string, string> => ({ [PH_VIEWS]: JSON.stringify(list.slice(-VIEW_STORE.rooms)) });
+/** added = 새 방을 넣은 저장. 이때만 보관 수를 넘는 오래된 방을 지운다 (방을 열거나 지울 때는 자르지 않는다: 보관 수를 낮춘 뒤 옛 방을 열면 그 방이 사라졌다) */
+export const writeViews = (list: ViewRoom[], added = false): Record<string, string> => ({ [PH_VIEWS]: JSON.stringify(added ? list.slice(-VIEW_STORE.rooms) : list) });
 export const viewUnread = (list: ViewRoom[]) => list.filter((r) => r.unread).length;
 
 // ── 방은 참여 인물로 가른다 (11-15 사용자: 「같은 인물들이 매번 새 방을 파니까」 이어 쓰라고 한 것 — 인물이 다르면 다른 방) ──

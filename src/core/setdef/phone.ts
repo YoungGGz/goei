@@ -39,6 +39,7 @@ export const PHONE_SET: SetPage = {
         { key: 'context', label: '사용', common: 'ctx', ctl: onOff('0'), help: '지금 장면과 관련된 괴담톡 대화가 메인 요청에 붙어요' },
         { key: 'adv_ctx', label: '붙일 것', ctl: { t: 'advchips', items: ['ctx_focus', 'ctx_messages', 'ctx_notices_on', 'ctx_views', 'ctx_reactions', 'ctx_habits'] } },
         { key: 'adv_ctx_history', label: '넣을 말풍선', ctl: { t: 'adv', item: 'ctx_history' } },
+        { key: 'adv_ctx_recent', label: '늘 넣을 최근 말풍선', ctl: { t: 'adv', item: 'ctx_recent' } },
         { key: 'adv_ctx_notices', label: '넣을 공지', ctl: { t: 'adv', item: 'ctx_notices' } },
         { key: 'adv_ctx_tokens', label: '컨텍스트 토큰 상한', ctl: { t: 'adv', item: 'ctx_tokens' } },
       ],
@@ -47,6 +48,7 @@ export const PHONE_SET: SetPage = {
       title: '답장',
       rows: [
         { key: 'habits', label: '말버릇 기록', ctl: onOff('0'), help: '연락처마다 문자 습관(맞춤법·답장 속도)을 기억해 다음 답장에도 이어 가요' },
+        { key: 'adv_habit_keep', label: '말버릇 보관', ctl: { t: 'adv', item: 'habit_keep' } },
         { key: 'reactions', label: '이모지 반응', ctl: onOff('0'), help: '메시지에 👍3 같은 반응이 붙어요. 본 사람 수를 넘지 않고, 1:1에서는 상대가 내 메시지에만 달아요' },
       ],
     },
@@ -82,6 +84,8 @@ export const PHONE_SET: SetPage = {
         { key: 'view_speak', label: '시점 인물 대사', ctl: onOff('0'), help: '켜면 시점 인물의 말도 모델이 써요. 끄면 시점 인물은 조용히 있어요' },
         { key: 'view_scope', label: '등장인물 범위', show: { key: 'view_preset', eq: 'side' }, ctl: { t: 'seg', opts: [['0', '주요 인물'], ['1', '장면 안'], ['2', '장면 안 주요 인물'], ['3', '자율']] } },
         { key: 'view_size', label: '방 크기', show: { key: 'view_preset', eq: 'side' }, ctl: { t: 'seg', opts: [['0', '자동'], ['1', '둘이서'], ['2', '여럿']] } },
+        { key: 'adv_view_rooms', label: '보기 전용 방 보관', ctl: { t: 'adv', item: 'view_rooms' } },
+        { key: 'adv_view_history', label: '보기 전용 방 말풍선 보관', ctl: { t: 'adv', item: 'view_history' } },
       ],
     },
     {

@@ -895,7 +895,7 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
         id = `v_${Date.now().toString(36)}`;
         list.push({ ...value, id, time, unread: !seen });
       }
-      return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...writeViews(list) } };
+      return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...writeViews(list, !cur) } };
     });
     if (id && !automatic) Object.assign(phone, { sub: 'chats', view: 'view', viewId: id });
     else if (id) note = `「${roomName}」 방에 새 글이 왔어요.`;
