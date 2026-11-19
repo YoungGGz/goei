@@ -59,6 +59,7 @@ export const SETTINGS_SET: SetPage = {
         { key: 'wallet-sync', label: '상태창 잔고 따르기', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '켜면 모델이 상태창 잔고 칸을 바꿨을 때 가계부를 그 값에 맞춰요. 끄면 가계부 값만 믿고, 다음 요청에 넘기는 지난 상태창의 잔고를 가계부 값으로 덮어 모델이 고치게 해요.' },
         { key: 'wallet-loose', label: '거래 읽는 기준', ctl: { t: 'seg', opts: [['0', '금액이 적힌 것만'], ['1', '어림도 받기']] }, help: '금액이 적힌 것만이면 「3만 원을 냈다」처럼 금액이 글에 있는 거래만 적어요. 어림도 받기면 「밥을 사 먹었다」처럼 금액이 없는 거래도 보조 모델이 서울 물가로 어림해 메모에 「(어림)」을 붙여 적어요.' },
         { key: 'wallet-recent', label: '컨텍스트 포함', ctl: { t: 'custom' } },
+        { key: 'wallet-cap', label: '거래 줄 상한', ctl: { t: 'custom' } },
       ],
     },
     {
@@ -83,6 +84,7 @@ export const SETTINGS_SET: SetPage = {
         { key: 'items-spent', label: '다 쓴 물건', ctl: { t: 'seg', opts: [['remove', '목록에서 빼기'], ['keep', '남겨 두기']] }, help: '남은 횟수가 0이 된 소모품을 어떻게 할지예요. 남겨 두면 「다 씀」으로 칸에 남고 메인 요청에도 used up 으로 넘어가요(빈 병·다 쓴 탄창처럼).' },
         { key: 'items-away-turns', label: '치운 물건 기억', ctl: { t: 'custom' } },
         { key: 'items-list-cap', label: '물건 줄 상한', ctl: { t: 'custom' } },
+        { key: 'items-logcap', label: '기록 줄 상한', ctl: { t: 'custom' } },
         { key: 'items-logturns', label: '사용·처분 기록 넘기기', ctl: { t: 'custom' } },
         { key: 'items-start', label: '시작 소지품', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '고유 인물로 시작할 때 명부의 「시작 소지품」을 넣고 손에 드는 것은 손 칸, 장비는 장착할지예요. 새 채팅을 시작할 때만 쓰여요.' },
       ],

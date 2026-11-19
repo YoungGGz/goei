@@ -20,7 +20,7 @@ import { boxLanded } from './homeshop';
 import { EQUIP_LABEL, EQUIP_SLOTS, STATE_LABEL, cleanIcon, itemEquip, itemState, itemUses, itemWeight, type ItemEquip, type ItemState } from './itemtraits';
 export * from './itemtraits';
 import type { StartItem } from './startitems';
-import { FORM_EMPTY, itemListCap, kindOfIcon, leftWordIn, nameFilled, offWordIn, traitsFor } from './itemrules';
+import { FORM_EMPTY, itemListCap, itemLogCap, kindOfIcon, leftWordIn, nameFilled, offWordIn, traitsFor } from './itemrules';
 import { splitIconWord } from './iconmatch';
 export * from './itemrules';
 
@@ -119,7 +119,7 @@ export type ItemOut = 'left' | 'gone' | 'drop' | 'destroy';
 export type ItemLogWhat = 'get' | 'use' | 'drop' | 'gone' | 'destroy' | 'merge' | 'sell' | 'left' | 'off';
 export type ItemLogBy = 'story' | 'manual' | 'use' | 'store';
 
-/** 사용·처분 기록 한 줄 (화면 「기록」·찾기). 상한 없음, 저장 안전용 400줄 */
+/** 사용·처분 기록 한 줄 (화면 「기록」·찾기). 상한 없음, 저장 안전용 줄 상한(설정, 기본 400줄) */
 export interface ItemLog {
   id: string;
   name: string;
@@ -472,8 +472,7 @@ export function addItemLog(it: Items, l: Omit<ItemLog, 'id' | 'at'> & { id?: str
   return compactLog({ ...it, log: [...it.log, row] }, alive && withAnchor(alive, row.anchor));
 }
 
-/** 줄 수 한도 (넘으면 아래 정리). 물건 줄 한도는 설정 「물건 줄 상한」(core/itemrules.ts itemListCap) */
-const ITEM_LOG_CAP = 400;
+/** 줄 수 한도 (넘으면 아래 정리): 물건 줄은 설정 「물건 줄 상한」(core/itemrules.ts itemListCap), 기록 줄은 설정 「기록 줄 상한」(itemLogCap) */
 /** 방금 넣은 줄의 응답은 살아 있는 것으로 본다 (정리가 새 줄을 지우지 않게) */
 const withAnchor = (alive: Set<string>, anchor: string): Set<string> => (!anchor || alive.has(anchor) ? alive : new Set([...alive, anchor]));
 
@@ -498,7 +497,7 @@ function compactList(it: Items, alive: Set<string>): Items {
  *  ① 기준 응답이 사라진 줄(alive 를 알 때) → ② 남은 횟수와 무관한 줄 → ③ 살아 있는 사용 기록: 그 횟수를 물건의 처음 횟수에서 먼저 빼 둬 남은 횟수가 그대로.
  *  처음 횟수가 1 아래로 내려가야 하면 그 줄은 남긴다 */
 function compactLog(it: Items, alive?: Set<string>): Items {
-  let over = it.log.length - ITEM_LOG_CAP;
+  let over = it.log.length - itemLogCap();
   if (over <= 0) return it;
   const drop = new Set<ItemLog>();
   let list = it.list;

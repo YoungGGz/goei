@@ -117,10 +117,28 @@ export function freshWalletId(w: Wallet, base: string, anchor: string): string {
   while (used(`${b}_${i}`)) i++;
   return `${b}_${i}`;
 }
-/** 거래 정리 (전수검사 11-13): 400줄을 넘으면 오래된 것부터 ① 기준 응답이 사라진 거래 → ② 살아 있는 거래는 금액을 start 에 합친 뒤 뺀다 (잔고가 그대로).
+/** 거래 줄 상한 (설정 「거래 줄 상한」, 100~2000, 기본 400): 가계부·포인트 장부가 이 줄 수를 넘으면 오래된 거래부터 정리한다 */
+export const WALLET_CAP_VAR = '$st_wallet_cap';
+export const WALLET_CAP_DEFAULT = 400;
+export const WALLET_CAP_MIN = 100;
+export const WALLET_CAP_MAX = 2000;
+export const WALLET_CAP_STEP = 100;
+export const walletCapOf = (vars: Record<string, unknown> | undefined | null): number => {
+  const raw = vars?.[WALLET_CAP_VAR];
+  if (raw === undefined || raw === null || raw === '') return WALLET_CAP_DEFAULT;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= WALLET_CAP_MIN ? Math.min(WALLET_CAP_MAX, n) : WALLET_CAP_DEFAULT;
+};
+let walletCap = WALLET_CAP_DEFAULT;
+/** 지금 채팅의 거래 줄 상한을 올린다 (host/risu.ts loadContext · 갱신기 적용 직전). 빈 값은 기본값 */
+export function setWalletCap(vars: Record<string, unknown> | undefined | null): void {
+  walletCap = walletCapOf(vars);
+}
+
+/** 거래 정리 (전수검사 11-13): 상한(기본 400줄)을 넘으면 오래된 것부터 ① 기준 응답이 사라진 거래 → ② 살아 있는 거래는 금액을 start 에 합친 뒤 뺀다 (잔고가 그대로).
  *  예전엔 뒤 400줄만 남겨 살아 있는 옛 거래가 잘리면 잔고가 바뀌었다. 방금 넣은 마지막 줄은 빼지 않고, alive 를 모르면 자르지 않는다 */
 function compactWallet(w: Wallet, alive?: Set<string>): Wallet {
-  let over = w.log.length - 400;
+  let over = w.log.length - walletCap;
   if (over <= 0 || !alive) return w;
   const drop = new Set<WalletEntry>();
   let start = w.start;

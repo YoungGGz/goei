@@ -3,7 +3,7 @@
 // 시작 포인트는 0 (등급별 지급은 본문에 적힌 대로 갱신기가 거래로 적는다).
 import type { Chat } from './types';
 import { findStatusTags } from './world/status';
-import { addWalletEntry, aliveAnchors, liveWallet, removeWalletEntry, walletBalance, WALLET_MAX, type Wallet } from './wallet';
+import { addWalletEntry, aliveAnchors, liveWallet, removeWalletEntry, walletBalance, walletCapOf, WALLET_MAX, type Wallet } from './wallet';
 import { messageKey } from './people/store';
 import { colConfig, isPointsOrg, POINTS_ON_VAR } from './world/statuscols';
 import { guideTxt } from './guides';
@@ -18,7 +18,7 @@ export function readPoints(vars: Record<string, unknown> | undefined): Wallet {
   try {
     const o = JSON.parse(raw) as Partial<Wallet>;
     if (!o || typeof o !== 'object') return empty;
-    return { start: Number.isSafeInteger(o.start) ? (o.start as number) : 0, log: Array.isArray(o.log) ? o.log.filter((e) => !!e && typeof e === 'object' && typeof e.id === 'string' && typeof e.anchor === 'string' && Number.isSafeInteger(e.amount) && typeof e.memo === 'string').slice(-400) : [] };
+    return { start: Number.isSafeInteger(o.start) ? (o.start as number) : 0, log: Array.isArray(o.log) ? o.log.filter((e) => !!e && typeof e === 'object' && typeof e.id === 'string' && typeof e.anchor === 'string' && Number.isSafeInteger(e.amount) && typeof e.memo === 'string').slice(-walletCapOf(vars)) : [] };
   } catch {
     return empty;
   }

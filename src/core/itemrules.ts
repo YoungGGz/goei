@@ -23,6 +23,18 @@ export const ITEM_GRADE_WORDS_DEFAULT = ['그늘 → F', '황혼 → E', '땅거
 /** 상태 그림 묶음의 물건인데 그림 말에도 이름에도 어느 그림인지 안 적혔고 「빈」도 아닐 때 쓰는 그림의 등급 — 임시 값 (사용자 결정 대기). 이 한 곳만 바꾸면 된다 (core/datapack.ts formIcon) */
 export const ITEM_FORM_DEFAULT = 'C';
 export const ITEM_WORDS_MAX = 200;
+/** 기록 줄 상한 (설정 「기록 줄 상한」, 100~2000, 기본 400): 사용·처분 기록이 이 줄 수를 넘으면 오래된 줄부터 정리한다 (core/items.ts compactLog) */
+export const ITEM_LOG_CAP_VAR = '$it_logcap';
+export const ITEM_LOG_CAP_DEFAULT = 400;
+export const ITEM_LOG_CAP_MIN = 100;
+export const ITEM_LOG_CAP_MAX = 2000;
+export const ITEM_LOG_CAP_STEP = 100;
+export const itemLogCapOf = (vars: Record<string, unknown> | undefined | null): number => {
+  const raw = vars?.[ITEM_LOG_CAP_VAR];
+  if (raw === undefined || raw === null || raw === '') return ITEM_LOG_CAP_DEFAULT;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= ITEM_LOG_CAP_MIN ? Math.min(ITEM_LOG_CAP_MAX, n) : ITEM_LOG_CAP_DEFAULT;
+};
 export const ITEM_GRADES = ['F', 'E', 'D', 'C', 'B', 'A', 'S'] as const;
 
 /** 「빈」: 빈 그림의 이름(icons.json 「빈 꿈결 수집기」)에 쓰인 말 */
@@ -53,7 +65,7 @@ export function parseItemRules(text: string): { kinds: Map<string, ItemTraits | 
 }
 export const parseWords = (text: string): string[] => [...new Set(String(text ?? '').split(/[,，\n]/).map((w) => w.replace(/\s+/g, ' ').trim()).filter(Boolean))];
 
-interface Rules { traits: ReturnType<typeof parseItemRules>; left: string[]; off: string[]; grades: [string, string][]; listCap: number }
+interface Rules { traits: ReturnType<typeof parseItemRules>; left: string[]; off: string[]; grades: [string, string][]; listCap: number; logCap: number }
 /** 물건 줄 상한 (2026-11-17 사용자: 코드에 박힌 수를 설정으로). 목록($st_items)의 줄이 이 수를 넘으면 사라진 응답의 줄·판·파괴된·다 쓴 줄을 오래된 것부터 뺀다 (core/items.ts compactList) */
 export const ITEM_LIST_CAP_VAR = '$it_list_cap';
 export const ITEM_LIST_CAP_DEFAULT = 200;
@@ -79,7 +91,7 @@ export function parseGradeWords(text: string): [string, string][] {
 }
 const build = (vars: Record<string, unknown> | undefined): Rules => {
   const txt = (k: string, def: string) => { const s = String(vars?.[k] ?? ''); return s.trim() ? s : def; };
-  return { traits: parseItemRules(txt(ITEM_RULES_VAR, ITEM_RULES_DEFAULT)), left: parseWords(txt(ITEM_LEFT_WORDS_VAR, ITEM_LEFT_WORDS_DEFAULT)), off: parseWords(txt(ITEM_OFF_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT)), grades: parseGradeWords(ITEM_GRADE_WORDS_DEFAULT), listCap: itemListCapOf(vars) };
+  return { traits: parseItemRules(txt(ITEM_RULES_VAR, ITEM_RULES_DEFAULT)), left: parseWords(txt(ITEM_LEFT_WORDS_VAR, ITEM_LEFT_WORDS_DEFAULT)), off: parseWords(txt(ITEM_OFF_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT)), grades: parseGradeWords(ITEM_GRADE_WORDS_DEFAULT), listCap: itemListCapOf(vars), logCap: itemLogCapOf(vars) };
 };
 let rules: Rules = build(undefined);
 /** 지금 채팅의 표를 올린다 (host/risu.ts loadContext · 갱신기 적용 직전). 빈 값은 기본 표 */
@@ -88,6 +100,8 @@ export function setItemRules(vars: Record<string, unknown> | undefined | null): 
 }
 /** 지금 채팅의 물건 줄 상한 (setItemRules 가 올린 값) */
 export const itemListCap = (): number => rules.listCap;
+/** 지금 채팅의 기록 줄 상한 */
+export const itemLogCap = (): number => rules.logCap;
 
 /** 그림 낱말(종류/물건말/english)의 종류 코드 (모르면 '') */
 export const kindOfIcon = (icon: unknown): string => splitIconWord(typeof icon === 'string' ? icon : '').kind;
