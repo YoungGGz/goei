@@ -525,7 +525,6 @@ function compactLog(it: Items, alive?: Set<string>): Items {
 export const ITEM_AWAY_TURNS_VAR = '$it_away_turns';
 export const ITEM_AWAY_TURNS_DEFAULT = 30;
 export const ITEM_AWAY_TURNS_MAX = 300;
-export const ITEM_AWAY_TURNS_STEP = 5;
 export const itemAwayTurns = (vars: Record<string, unknown> | undefined): number => {
   const raw = vars?.[ITEM_AWAY_TURNS_VAR];
   if (raw === undefined || raw === null || raw === '') return ITEM_AWAY_TURNS_DEFAULT;

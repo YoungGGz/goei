@@ -16,12 +16,12 @@ export const JR_DEFAULTS: Record<string, string> = {
   trades_max: '12',
 };
 
-export const JR_JOURNAL_CAP = { min: 100, max: 2000, step: 100 } as const;
-export const JR_REPORT_CAP = { min: 20, max: 300, step: 10 } as const;
-export const JR_LIST_PAGE = { min: 10, max: 100, step: 10 } as const;
-export const JR_TRAIL_MAX = { min: 8, max: 96, step: 8 } as const;
-export const JR_PEOPLE_MAX = { min: 4, max: 48, step: 4 } as const;
-export const JR_TRADES_MAX = { min: 4, max: 48, step: 4 } as const;
+export const JR_JOURNAL_CAP = { min: 100, max: 2000 } as const;
+export const JR_REPORT_CAP = { min: 20, max: 300 } as const;
+export const JR_LIST_PAGE = { min: 10, max: 100 } as const;
+export const JR_TRAIL_MAX = { min: 8, max: 96 } as const;
+export const JR_PEOPLE_MAX = { min: 4, max: 48 } as const;
+export const JR_TRADES_MAX = { min: 4, max: 48 } as const;
 
 export type ChatCardMode = 'off' | 'mine' | 'all';
 

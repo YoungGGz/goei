@@ -122,7 +122,6 @@ export const WALLET_CAP_VAR = '$st_wallet_cap';
 export const WALLET_CAP_DEFAULT = 400;
 export const WALLET_CAP_MIN = 100;
 export const WALLET_CAP_MAX = 2000;
-export const WALLET_CAP_STEP = 100;
 export const walletCapOf = (vars: Record<string, unknown> | undefined | null): number => {
   const raw = vars?.[WALLET_CAP_VAR];
   if (raw === undefined || raw === null || raw === '') return WALLET_CAP_DEFAULT;

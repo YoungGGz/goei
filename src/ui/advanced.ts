@@ -1,5 +1,6 @@
 // 「고급 설정」 접는 칸 (v0.16.27, 사용자 설계): 각 기능 설정 맨 아래, 기본은 닫힘. 손대지 않아도 원본 기본값으로 돈다.
 // 바꾼 항목은 이름 앞 점과 되돌리기 버튼으로 보이고, 닫힌 칸 제목에 바꾼 개수가 뜬다.
+import { stepOf } from '../core/stepval';
 import { groupStep, numSet, setRow, setSeg, stepSize } from './setrow';
 import { ADV, advChanged, advItem, advValue, advVar, type AdvFeature, type AdvItem } from '../core/advanced';
 import { ACTIVE_BOOKS_VAR, activeBooks, bookNames, toggleActiveBook, type RefSource } from '../core/refs';
@@ -26,10 +27,10 @@ function control(f: AdvFeature, item: AdvItem, cur: string): string {
       .join('')}</div>`;
   }
   // 숫자: −/+ 단추(사용자 2026-10-27, 상황판 인원 칸과 같은 모양) + 가운데 숫자는 직접 쳐도 된다.
-  // 한 번에 움직이는 폭: 토큰 상한처럼 큰 수(상한 1만 이상)는 500, 나머지는 1. 0이 「공통」「제한 없음」 같은 뜻이면 숫자 대신 그 말
+  // 한 번에 움직이는 폭: 토큰 상한처럼 큰 수(상한 1만 이상)는 100, 나머지는 1. 0이 「공통」「제한 없음」 같은 뜻이면 숫자 대신 그 말
   const min = item.min ?? 0;
   const max = item.max ?? Number.MAX_SAFE_INTEGER;
-  const step = max >= 10000 ? 500 : 1;
+  const step = stepOf(max);
   const n = Math.min(max, Math.max(min, Number(cur) || 0));
   const zero = n === 0 && item.zero;
   const down = Math.max(min, n - step);

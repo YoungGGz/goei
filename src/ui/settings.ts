@@ -1,6 +1,7 @@
 // 「설정」 탭: 원본 설정 창의 동작·요원창·캐릭터 이미지 항목. 값은 이 채팅의 $st_* 변수에 두고,
 // 범위: 이 채팅($st_*·$wg_*) / 새 채팅 기본값(플러그인 저장소) / 카드 명부(directory.ts, 카드 로어북).
-import { ckWide, defRow, helpBox, numCtl, numSet, setGroup, setRow, stepBox, stepSizeText, type CkActs, type CkBand, type CkNum, type RowScope } from './setrow';
+import { stepNext, stepOf } from '../core/stepval';
+import { ckWide, defRow, helpBox, numCtl, numSet, stepIn, setGroup, setRow, stepBox, type CkActs, type CkBand, type CkNum, type RowScope } from './setrow';
 import { SETTINGS_SET } from '../core/setdef/settings';
 import { findDef } from '../core/setdef/types';
 import { mallSettingsPane } from './malls';
@@ -29,14 +30,14 @@ import { aliasCanAdd, aliasChanged, aliasEdit, aliasRowBad, aliasShown, ALIAS_WO
 import { pairTable } from '../core/pairrows';
 import { defStored } from '../core/deftext';
 import { LOOK_ACT_GAP_HI, LOOK_ACT_MAX_VAR, LOOK_ACT_MIN_VAR, lookActGap } from '../core/looks';
-import { ITEM_LEFT_WORDS_DEFAULT, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT, ITEM_OFF_WORDS_VAR, ITEM_RULES_DEFAULT, ITEM_RULES_VAR, ITEM_WORDS_MAX, ITEM_LIST_CAP_MAX, ITEM_LIST_CAP_MIN, ITEM_LIST_CAP_STEP, ITEM_LIST_CAP_VAR, itemListCapOf, ITEM_LOG_CAP_MAX, ITEM_LOG_CAP_MIN, ITEM_LOG_CAP_STEP, ITEM_LOG_CAP_VAR, itemLogCapOf, parseItemRules } from '../core/itemrules';
+import { ITEM_LEFT_WORDS_DEFAULT, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_DEFAULT, ITEM_OFF_WORDS_VAR, ITEM_RULES_DEFAULT, ITEM_RULES_VAR, ITEM_WORDS_MAX, ITEM_LIST_CAP_MAX, ITEM_LIST_CAP_MIN, ITEM_LIST_CAP_VAR, itemListCapOf, ITEM_LOG_CAP_MAX, ITEM_LOG_CAP_MIN, ITEM_LOG_CAP_VAR, itemLogCapOf, parseItemRules } from '../core/itemrules';
 import { ICON_KIND_LABEL, normIcon } from '../core/iconmatch';
 import { keepOpen } from './panels';
-import { invOn, ITEM_SCOPE_VAR, ITEM_SKIP_MAX, ITEM_SKIP_VAR, itemScope, itemSkip, ITEM_ICON_POOL_VAR, itemIconPoolOn, ITEM_AUTO_VAR, ITEM_DETAIL_VAR, ITEM_LOGTURNS_MAX, ITEM_LOGTURNS_VAR, ITEM_AWAY_TURNS_MAX, ITEM_AWAY_TURNS_STEP, ITEM_AWAY_TURNS_VAR, itemAwayTurns, ITEM_RESUMED_VAR, ITEM_SPENT_VAR, ITEM_START_VAR, ITEM_STATE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, ITEM_USE_VAR, itemDetail, itemLogTurns, itemStartOn, itemStateOn, ITEM_LIMIT_DEFAULT, ITEM_LIMIT_VAR, ITEM_ICON_ALIAS_VAR, ITEM_ON_VAR, ITEM_SLOTS_MAX, ITEM_SLOTS_MIN, ITEM_SLOTS_VAR, itemAutoOn, itemLimit, itemSlots, ITEM_CARRY_MAX, ITEM_CARRY_MIN, ITEM_CARRY_PC_VAR, ITEM_CARRY_VAR, ITEM_EDIT_VAR, itemCarrySetting, itemEditOn, itemWeight } from '../core/items';
+import { invOn, ITEM_SCOPE_VAR, ITEM_SKIP_MAX, ITEM_SKIP_VAR, itemScope, itemSkip, ITEM_ICON_POOL_VAR, itemIconPoolOn, ITEM_AUTO_VAR, ITEM_DETAIL_VAR, ITEM_LOGTURNS_MAX, ITEM_LOGTURNS_VAR, ITEM_AWAY_TURNS_MAX, ITEM_AWAY_TURNS_VAR, itemAwayTurns, ITEM_RESUMED_VAR, ITEM_SPENT_VAR, ITEM_START_VAR, ITEM_STATE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, ITEM_USE_VAR, itemDetail, itemLogTurns, itemStartOn, itemStateOn, ITEM_LIMIT_DEFAULT, ITEM_LIMIT_VAR, ITEM_ICON_ALIAS_VAR, ITEM_ON_VAR, ITEM_SLOTS_MAX, ITEM_SLOTS_MIN, ITEM_SLOTS_VAR, itemAutoOn, itemLimit, itemSlots, ITEM_CARRY_MAX, ITEM_CARRY_MIN, ITEM_CARRY_PC_VAR, ITEM_CARRY_VAR, ITEM_EDIT_VAR, itemCarrySetting, itemEditOn, itemWeight } from '../core/items';
 import { SHOP_AMOUNTS, isGiveKey, isGiveShop, isShopAmount, isShopFn, shopAmountNone, shopFnVar, shopGiveVar } from '../core/shopfn';
 import { SHOP_SHELF_HI, SHOP_SHELF_LO, SHOP_SHELF_VAR, SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags, SHOP_LIMITS, isShopLimit } from '../core/shop';
 import { BM_ORDERS_KEEP_VAR, COS_ORDERS_KEEP_VAR, ORDERS_KEEP_RANGE } from '../core/orders';
-import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT, WALLET_CAP_MAX, WALLET_CAP_MIN, WALLET_CAP_STEP, WALLET_CAP_VAR, walletCapOf } from '../core/wallet';
+import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT, WALLET_CAP_MAX, WALLET_CAP_MIN, WALLET_CAP_VAR, walletCapOf } from '../core/wallet';
 import { updateChat, type ChatContext } from '../host/risu';
 import { barButtons, directoryBar, directoryDone, directoryDoneClear, directorySearch, directoryView } from './directory';
 import { drawerBox } from './drawer';
@@ -238,24 +239,15 @@ function current(ctx: ChatContext, scope: SettingsScope): View {
   };
 }
 
-function stepper(action: string, key: string, shown: string, canDown: boolean, canUp: boolean, label: string, busy: boolean, sizes: string[] = []): string {
-  return `<div class="st-step${stepSizeText(shown, ...sizes)}"><button class="gx-step" data-action="${action}" data-value="${key}:-" ${!canDown || busy ? 'disabled' : ''} aria-label="${esc(label)} 줄이기">−</button>
-    <b>${esc(shown)}</b><button class="gx-step" data-action="${action}" data-value="${key}:+" ${!canUp || busy ? 'disabled' : ''} aria-label="${esc(label)} 늘리기">+</button></div>`;
-}
-
-/** 괴이 생성 수치 한 칸의 증감 폭 */
-function worldStep(key: WorldField['key']): number {
-  if (key.endsWith('_p') || key === 'landmark_share') return 10;
-  if (key.endsWith('_ttl')) return 6;
-  if (key === 'cleared_cap') return 50;
-  return 1;
+function stepper(action: string, key: string, n: number, lo: number, hi: number, unit: string, label: string, busy: boolean, zero = ''): string {
+  return stepIn(action, key, n, lo, hi, unit, label, busy, zero);
 }
 
 /** 괴이 발생: 종류 넷이 같은 값을 가지니 격자 하나로 (줄 = 종류, 열 = 값. 인터넷·상점 격자와 같은 틀).
  *  버튼은 set-world 에 「열쇠=값」(수) · 「열쇠:값」(켬·끔)을 보낸다 */
 const WORLD_ACTS: CkActs = { set: 'set-world', num: 'set-world', rel: true };
 const WORLD_KINDS: ['preset' | 'random' | 'incident' | 'mystic', string][] = [['preset', '프리셋 괴이'], ['random', '랜덤 괴이'], ['incident', '사건'], ['mystic', '특수']];
-const worldNum = (w: WorldSettings, key: WorldField['key']): CkNum => ({ n: w[key], lo: 0, hi: WORLD_SPEC.find((x) => x.key === key)?.max ?? 99, step: worldStep(key) });
+const worldNum = (w: WorldSettings, key: WorldField['key']): CkNum => ({ n: w[key], lo: 0, hi: WORLD_SPEC.find((x) => x.key === key)?.max ?? 99 });
 function worldGrid(w: WorldSettings, busy: boolean): string {
   const band: CkBand = {
     title: '괴이 발생',
@@ -454,7 +446,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
     ].join('')) : ''}`,
     board: `${group('', [
       D('anomaly', '', { ctl: anomaly, help: scope === 'chat' ? '켜면 괴이·사건·특수가 저절로 생기고 응답마다 지도와 요원 상태를 갱신해요. 끄면 지금 상황판을 비워요. 커스텀 임무는 꺼져 있어도 쓸 수 있어요.' : '새 채팅을 상황판을 켠 채로 시작할지 정해요.' }),
-      D('agent', '', { ctl: stepper('set-agent', 'n', `${s.agentLimit}명`, s.agentLimit > 0, s.agentLimit < AGENT_MAX, '요원 표시 인원', busy, [`${AGENT_MAX}명`]), help: `상황판과 편성에 보일 등록 요원 수 (0~${AGENT_MAX}명, 0이면 숨김)` }),
+      D('agent', '', { ctl: stepper('set-agent', 'n', s.agentLimit, 0, AGENT_MAX, '명', '요원 표시 인원', busy), help: `상황판과 편성에 보일 등록 요원 수 (0~${AGENT_MAX}명, 0이면 숨김)` }),
       D('support', s.supportOn ? '1' : '0'),
     ].join(''))}
     ${worldGrid(world, busy)}`,
@@ -472,8 +464,8 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
         D('wallet-on', colCfg.wallet === 'off' ? '0' : '1'),
         ...(colCfg.wallet === 'off' ? [] : [
           D('wallet-loose', walletLoose(itVars) ? '1' : '0'),
-          D('wallet-recent', '', { ctl: stepper('set-wallet-recent', 'n', `${walletRecentN(itVars)}줄`, walletRecentN(itVars) > 0, walletRecentN(itVars) < WALLET_RECENT_MAX, '최근 거래 줄 수', busy, [`${WALLET_RECENT_MAX}줄`]), help: `메인 요청의 지난 상태창 아래에 최근 거래를 몇 줄 붙일지예요(0~${WALLET_RECENT_MAX}, 0이면 안 붙여요). 모델이 돈이 어디로 갔는지 알고 이어 써요.` }),
-          D('wallet-cap', '', { ctl: stepper('set-wallet-cap', 'n', `${walletCapOf(itVars)}줄`, walletCapOf(itVars) > WALLET_CAP_MIN, walletCapOf(itVars) < WALLET_CAP_MAX, '거래 줄 상한', busy, [`${WALLET_CAP_MAX}줄`]), help: `가계부와 포인트 장부에 거래를 몇 줄까지 남길지예요(${WALLET_CAP_MIN}~${WALLET_CAP_MAX}). 넘으면 오래된 거래부터 정리하고, 잔고는 그대로예요.` }),
+          D('wallet-recent', '', { ctl: stepper('set-wallet-recent', 'n', walletRecentN(itVars), 0, WALLET_RECENT_MAX, '줄', '최근 거래 줄 수', busy), help: `메인 요청의 지난 상태창 아래에 최근 거래를 몇 줄 붙일지예요(0~${WALLET_RECENT_MAX}, 0이면 안 붙여요). 모델이 돈이 어디로 갔는지 알고 이어 써요.` }),
+          D('wallet-cap', '', { ctl: stepper('set-wallet-cap', 'n', walletCapOf(itVars), WALLET_CAP_MIN, WALLET_CAP_MAX, '줄', '거래 줄 상한', busy), help: `가계부와 포인트 장부에 거래를 몇 줄까지 남길지예요(${WALLET_CAP_MIN}~${WALLET_CAP_MAX}). 넘으면 오래된 거래부터 정리하고, 잔고는 그대로예요.` }),
         ]),
       ].join('')),
       colCfg.wallet === 'off' ? '' : group('잔고', [
@@ -498,18 +490,18 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       ...(!invOn(itVars) ? [] : [
         group('컨텍스트 포함', [
           D('items-detail', itemDetail(itVars)),
-          D('items-logturns', '', { ctl: stepper('set-items-logturns', 'n', `${itemLogTurns(itVars)}턴`, itemLogTurns(itVars) > 0, itemLogTurns(itVars) < ITEM_LOGTURNS_MAX, '기록 턴 수', busy, [`${ITEM_LOGTURNS_MAX}턴`]), help: `최근 몇 턴 동안 얻고·쓰고·버리고·잃은 기록을 [Inventory] 에 「Recently」 한 줄로 붙일지예요(0~${ITEM_LOGTURNS_MAX}, 0이면 안 붙여요).` }),
+          D('items-logturns', '', { ctl: stepper('set-items-logturns', 'n', itemLogTurns(itVars), 0, ITEM_LOGTURNS_MAX, '턴', '기록 턴 수', busy), help: `최근 몇 턴 동안 얻고·쓰고·버리고·잃은 기록을 [Inventory] 에 「Recently」 한 줄로 붙일지예요(0~${ITEM_LOGTURNS_MAX}, 0이면 안 붙여요).` }),
           D('items-limit', '', { ctl: `<input class="st-text" type="text" maxlength="60" value="${esc(itemLimit(itVars))}" data-change="set-items-limit" placeholder="${esc(ITEM_LIMIT_DEFAULT)}" aria-label="지닐 수 있는 한계"${busy ? ' disabled' : ''}>` }),
         ].join('')),
         group('칸과 물건', [
-          D('items-slots', '', { ctl: stepper('set-items-slots', 'n', `${itemSlots(itVars)}칸`, itemSlots(itVars) > ITEM_SLOTS_MIN, itemSlots(itVars) < ITEM_SLOTS_MAX, '칸 수', busy, [`${ITEM_SLOTS_MAX}칸`]), help: `소지품 칸이에요(${ITEM_SLOTS_MIN}~${ITEM_SLOTS_MAX}). 넘쳐도 막지 않고 「17/16」처럼 보여 주며 그대로 메인 요청에 넘겨요.` }),
-          D('items-carry', '', { ctl: stepper('set-items-carry', 'n', `${itemCarrySetting(itVars)}kg`, itemCarrySetting(itVars) > ITEM_CARRY_MIN, itemCarrySetting(itVars) < ITEM_CARRY_MAX, '소지 한도', busy, [`${ITEM_CARRY_MAX}kg`]), help: `들 수 있는 무게예요(${ITEM_CARRY_MIN}~${ITEM_CARRY_MAX}kg). 장착한 것까지 모든 물건의 무게를 더해 보여 주고, 넘으면 넘은 만큼 색이 진해져요. 막지는 않고, 메인 요청에는 넘었는지·얼마나 넘었는지만 넘겨요. 고유 인물로 시작하면 명부의 「소지 한도」를 쓰고, 값이 없을 때만 이 값을 써요.${scope === 'chat' && itemWeight(itVars?.[ITEM_CARRY_PC_VAR]) ? ` 이 채팅은 명부 값 ${itemWeight(itVars?.[ITEM_CARRY_PC_VAR])}kg을 써요.` : ''}` }),
+          D('items-slots', '', { ctl: stepper('set-items-slots', 'n', itemSlots(itVars), ITEM_SLOTS_MIN, ITEM_SLOTS_MAX, '칸', '칸 수', busy), help: `소지품 칸이에요(${ITEM_SLOTS_MIN}~${ITEM_SLOTS_MAX}). 넘쳐도 막지 않고 「17/16」처럼 보여 주며 그대로 메인 요청에 넘겨요.` }),
+          D('items-carry', '', { ctl: stepper('set-items-carry', 'n', itemCarrySetting(itVars), ITEM_CARRY_MIN, ITEM_CARRY_MAX, 'kg', '소지 한도', busy), help: `들 수 있는 무게예요(${ITEM_CARRY_MIN}~${ITEM_CARRY_MAX}kg). 장착한 것까지 모든 물건의 무게를 더해 보여 주고, 넘으면 넘은 만큼 색이 진해져요. 막지는 않고, 메인 요청에는 넘었는지·얼마나 넘었는지만 넘겨요. 고유 인물로 시작하면 명부의 「소지 한도」를 쓰고, 값이 없을 때만 이 값을 써요.${scope === 'chat' && itemWeight(itVars?.[ITEM_CARRY_PC_VAR]) ? ` 이 채팅은 명부 값 ${itemWeight(itVars?.[ITEM_CARRY_PC_VAR])}kg을 써요.` : ''}` }),
           D('items-edit', itemEditOn(itVars) ? '1' : '0'),
           D('items-spent', itemsUiSpent(itVars)),
-          D('items-away-turns', '', { ctl: stepper('set-items-away-turns', 'n', itemAwayTurns(itVars) ? `${itemAwayTurns(itVars)}턴` : '계속', itemAwayTurns(itVars) > 0, itemAwayTurns(itVars) < ITEM_AWAY_TURNS_MAX, '치운 물건 기억', busy, [`${ITEM_AWAY_TURNS_MAX}턴`]), help: `두고 오거나 버리거나 잃거나 부서진 물건을 몇 턴 동안 기억할지예요(0~${ITEM_AWAY_TURNS_MAX}, 0이면 계속). 기억하는 동안은 그 응답을 다시 굴리면 돌아오고, 본문에서 되찾으면 같은 물건으로 돌아와요. 지나면 목록에서 지워서, 그 뒤에 되찾으면 새 물건으로 생기고, 치운 응답을 지워도 돌아오지 않아요.` }),
-          D('items-list-cap', '', { ctl: stepper('set-items-list-cap', 'n', `${itemListCapOf(itVars)}줄`, itemListCapOf(itVars) > ITEM_LIST_CAP_MIN, itemListCapOf(itVars) < ITEM_LIST_CAP_MAX, '물건 줄 상한', busy, [`${ITEM_LIST_CAP_MAX}줄`]), help: `저장하는 물건 줄 수예요(${ITEM_LIST_CAP_MIN}~${ITEM_LIST_CAP_MAX}). 넘으면 지운 응답의 물건, 팔거나 부서졌거나 다 쓴 물건을 오래된 것부터 지워요. 갖고 있는 물건은 지우지 않아요.` }),
-          D('items-logcap', '', { ctl: stepper('set-items-logcap', 'n', `${itemLogCapOf(itVars)}줄`, itemLogCapOf(itVars) > ITEM_LOG_CAP_MIN, itemLogCapOf(itVars) < ITEM_LOG_CAP_MAX, '기록 줄 상한', busy, [`${ITEM_LOG_CAP_MAX}줄`]), help: `얻고·쓰고·버리고·잃은 기록을 몇 줄까지 남길지예요(${ITEM_LOG_CAP_MIN}~${ITEM_LOG_CAP_MAX}). 넘으면 오래된 기록부터 정리하고, 소모품의 남은 횟수는 그대로예요.` }),
-          D('items-act-gap', '', { ctl: numSet([['최소', stepper('set-items-act-min', 'n', `${lookActGap(itVars)[0]}초`, lookActGap(itVars)[0] > 0, lookActGap(itVars)[0] < LOOK_ACT_GAP_HI, '아바타 동작 간격 최소', busy, [`${LOOK_ACT_GAP_HI}초`])], ['최대', stepper('set-items-act-max', 'n', `${lookActGap(itVars)[1]}초`, lookActGap(itVars)[1] > 0, lookActGap(itVars)[1] < LOOK_ACT_GAP_HI, '아바타 동작 간격 최대', busy, [`${LOOK_ACT_GAP_HI}초`])]]), help: `소지품의 내 아바타가 한 동작을 마치고 다음 동작까지 서 있는 시간이에요. 최소와 최대 사이에서 매번 달라져요(0~${LOOK_ACT_GAP_HI}초). 최대가 0이면 동작 없이 서 있기만 해요.` }),
+          D('items-away-turns', '', { ctl: stepper('set-items-away-turns', 'n', itemAwayTurns(itVars), 0, ITEM_AWAY_TURNS_MAX, '턴', '치운 물건 기억', busy, '계속'), help: `두고 오거나 버리거나 잃거나 부서진 물건을 몇 턴 동안 기억할지예요(0~${ITEM_AWAY_TURNS_MAX}, 0이면 계속). 기억하는 동안은 그 응답을 다시 굴리면 돌아오고, 본문에서 되찾으면 같은 물건으로 돌아와요. 지나면 목록에서 지워서, 그 뒤에 되찾으면 새 물건으로 생기고, 치운 응답을 지워도 돌아오지 않아요.` }),
+          D('items-list-cap', '', { ctl: stepper('set-items-list-cap', 'n', itemListCapOf(itVars), ITEM_LIST_CAP_MIN, ITEM_LIST_CAP_MAX, '줄', '물건 줄 상한', busy), help: `저장하는 물건 줄 수예요(${ITEM_LIST_CAP_MIN}~${ITEM_LIST_CAP_MAX}). 넘으면 지운 응답의 물건, 팔거나 부서졌거나 다 쓴 물건을 오래된 것부터 지워요. 갖고 있는 물건은 지우지 않아요.` }),
+          D('items-logcap', '', { ctl: stepper('set-items-logcap', 'n', itemLogCapOf(itVars), ITEM_LOG_CAP_MIN, ITEM_LOG_CAP_MAX, '줄', '기록 줄 상한', busy), help: `얻고·쓰고·버리고·잃은 기록을 몇 줄까지 남길지예요(${ITEM_LOG_CAP_MIN}~${ITEM_LOG_CAP_MAX}). 넘으면 오래된 기록부터 정리하고, 소모품의 남은 횟수는 그대로예요.` }),
+          D('items-act-gap', '', { ctl: numSet([['최소', stepper('set-items-act-min', 'n', lookActGap(itVars)[0], 0, LOOK_ACT_GAP_HI, '초', '아바타 동작 간격 최소', busy)], ['최대', stepper('set-items-act-max', 'n', lookActGap(itVars)[1], 0, LOOK_ACT_GAP_HI, '초', '아바타 동작 간격 최대', busy)]]), help: `소지품의 내 아바타가 한 동작을 마치고 다음 동작까지 서 있는 시간이에요. 최소와 최대 사이에서 매번 달라져요(0~${LOOK_ACT_GAP_HI}초). 최대가 0이면 동작 없이 서 있기만 해요.` }),
           D('items-start', itemStartOn(itVars) ? '1' : '0'),
           D('items-left-words', String(itVars?.[ITEM_LEFT_WORDS_VAR] ?? '')),
           D('items-off-words', String(itVars?.[ITEM_OFF_WORDS_VAR] ?? '')),
@@ -585,7 +577,7 @@ function bulkSideVars(chat: Chat, prev: ScriptState | undefined, next: ScriptSta
 
 const itemsUiSpent = (vars: Record<string, unknown> | undefined) => (vars?.[ITEM_SPENT_VAR] === 'keep' ? 'keep' : 'remove');
 /** 소지품·가계부 단순 옵션: 켬/끔·고르기(values) 또는 −/+ 숫자(max·num) */
-const INV_OPTS: Record<string, { key: string; values: string[]; max?: number; min?: number; step?: number; num?: (vars: Record<string, unknown> | undefined) => number }> = {
+const INV_OPTS: Record<string, { key: string; values: string[]; max?: number; min?: number; num?: (vars: Record<string, unknown> | undefined) => number }> = {
   'set-items-start': { key: ITEM_START_VAR, values: ['1', '0'] },
   'set-items-detail': { key: ITEM_DETAIL_VAR, values: ['full', 'state', 'name'] },
   'set-items-state': { key: ITEM_STATE_VAR, values: ['1', '0'] },
@@ -594,13 +586,13 @@ const INV_OPTS: Record<string, { key: string; values: string[]; max?: number; mi
   'set-items-pool': { key: ITEM_ICON_POOL_VAR, values: ['1', '0'] },
   'set-items-spent': { key: ITEM_SPENT_VAR, values: ['remove', 'keep'] },
   'set-items-logturns': { key: ITEM_LOGTURNS_VAR, values: [], max: ITEM_LOGTURNS_MAX, num: itemLogTurns },
-  'set-items-away-turns': { key: ITEM_AWAY_TURNS_VAR, values: [], max: ITEM_AWAY_TURNS_MAX, step: ITEM_AWAY_TURNS_STEP, num: itemAwayTurns },
-  'set-items-list-cap': { key: ITEM_LIST_CAP_VAR, values: [], max: ITEM_LIST_CAP_MAX, min: ITEM_LIST_CAP_MIN, step: ITEM_LIST_CAP_STEP, num: itemListCapOf },
-  'set-items-logcap': { key: ITEM_LOG_CAP_VAR, values: [], max: ITEM_LOG_CAP_MAX, min: ITEM_LOG_CAP_MIN, step: ITEM_LOG_CAP_STEP, num: itemLogCapOf },
+  'set-items-away-turns': { key: ITEM_AWAY_TURNS_VAR, values: [], max: ITEM_AWAY_TURNS_MAX, num: itemAwayTurns },
+  'set-items-list-cap': { key: ITEM_LIST_CAP_VAR, values: [], max: ITEM_LIST_CAP_MAX, min: ITEM_LIST_CAP_MIN, num: itemListCapOf },
+  'set-items-logcap': { key: ITEM_LOG_CAP_VAR, values: [], max: ITEM_LOG_CAP_MAX, min: ITEM_LOG_CAP_MIN, num: itemLogCapOf },
   'set-wallet-sync': { key: WALLET_SYNC_VAR, values: ['1', '0'] },
   'set-wallet-loose': { key: WALLET_LOOSE_VAR, values: ['1', '0'] },
   'set-wallet-recent': { key: WALLET_RECENT_VAR, values: [], max: WALLET_RECENT_MAX, num: walletRecentN },
-  'set-wallet-cap': { key: WALLET_CAP_VAR, values: [], max: WALLET_CAP_MAX, min: WALLET_CAP_MIN, step: WALLET_CAP_STEP, num: walletCapOf },
+  'set-wallet-cap': { key: WALLET_CAP_VAR, values: [], max: WALLET_CAP_MAX, min: WALLET_CAP_MIN, num: walletCapOf },
 };
 
 async function save(ctx: ChatContext, env: SettingsEnv, change: (chat: Chat) => ScriptState | null): Promise<void> {
@@ -690,7 +682,7 @@ function nextWorld(w: WorldSettings, v: string): [WorldField['key'], number] | n
   // 칸을 비운 채 빠져나오면 0으로 저장하지 않는다 (전수검사 11-13)
   if (op.trim() === '') return null;
   const cur = w[f.key];
-  const step = worldStep(f.key);
+  const step = stepOf(f.max ?? 99);
   const n = op === '+' ? cur + step : op === '-' ? cur - step : Number(op);
   if (!Number.isFinite(n)) return null;
   const clamped = Math.min(f.max ?? 99, Math.max(0, f.fraction ? n : Math.round(n)));
@@ -1009,14 +1001,14 @@ export async function handleSettings(action: string, value: string | undefined, 
   }
   // 상점 설정 (set-shop-<키>): 두 범위 같은 처리. 값 검사는 변수마다
   // 소지품·가계부 옵션 (2026-11-07 사용자): 켬/끔·고르기는 값 그대로, 숫자는 −/+ 한 칸씩. 두 범위 같은 처리
-  // 아바타 동작 간격 최소·최대: −/+ 1초씩, 서로 넘으면 다른 쪽도 같이 민다
+  // 아바타 동작 간격 최소·최대: −/+ 1초씩 또는 직접 입력, 서로 넘으면 다른 쪽도 같이 민다
   if (action === 'set-items-act-min' || action === 'set-items-act-max') {
-    if (!/^n:[+-]$/.test(v)) return true;
     const vars = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
     let [lo, hi] = lookActGap(vars);
-    const d = v.endsWith('+') ? 1 : -1;
-    if (action === 'set-items-act-min') lo = Math.max(0, Math.min(LOOK_ACT_GAP_HI, lo + d));
-    else hi = Math.max(0, Math.min(LOOK_ACT_GAP_HI, hi + d));
+    const to = stepNext(v, action === 'set-items-act-min' ? lo : hi, 0, LOOK_ACT_GAP_HI);
+    if (to === null) return true;
+    if (action === 'set-items-act-min') lo = to;
+    else hi = to;
     if (lo > hi) action === 'set-items-act-min' ? (hi = lo) : (lo = hi);
     const patch = { [LOOK_ACT_MIN_VAR]: String(lo), [LOOK_ACT_MAX_VAR]: String(hi) };
     if (scope === 'defaults') await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), ...patch } }));
@@ -1028,7 +1020,8 @@ export async function handleSettings(action: string, value: string | undefined, 
     const vars = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
     let next: string | null = null;
     if (simple.max !== undefined) {
-      if (/^n:[+-]$/.test(v)) next = String(Math.max(simple.min ?? 0, Math.min(simple.max, simple.num!(vars) + (v.endsWith('+') ? 1 : -1) * (simple.step ?? 1))));
+      const n = /^n(:[+-]|=)/.test(v) ? stepNext(v, simple.num!(vars), simple.min ?? 0, simple.max) : null;
+      if (n !== null) next = String(n);
     } else if (simple.values.includes(v)) next = v;
     if (next === null) return true;
     const key = simple.key;
@@ -1150,12 +1143,14 @@ export async function handleSettings(action: string, value: string | undefined, 
         if (v === '1' || v === '0') await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), [ITEM_AUTO_VAR]: v } }));
         return true;
       case 'set-items-slots': {
-        const next = Math.min(ITEM_SLOTS_MAX, Math.max(ITEM_SLOTS_MIN, itemSlots(getPrefs().vars) + (v.endsWith('+') ? 1 : -1)));
+        const next = stepNext(v, itemSlots(getPrefs().vars), ITEM_SLOTS_MIN, ITEM_SLOTS_MAX);
+        if (next === null) return true;
         await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), [ITEM_SLOTS_VAR]: String(next) } }));
         return true;
       }
       case 'set-items-carry': {
-        const next = Math.min(ITEM_CARRY_MAX, Math.max(ITEM_CARRY_MIN, itemCarrySetting(getPrefs().vars) + (v.endsWith('+') ? 1 : -1)));
+        const next = stepNext(v, itemCarrySetting(getPrefs().vars), ITEM_CARRY_MIN, ITEM_CARRY_MAX);
+        if (next === null) return true;
         await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), [ITEM_CARRY_VAR]: String(next) } }));
         return true;
       }
@@ -1182,8 +1177,8 @@ export async function handleSettings(action: string, value: string | undefined, 
         await saveDefaults(env, (p) => ({ ...p, vars: { ...(p.vars ?? {}), [ITEM_LIMIT_VAR]: v.replace(/\s+/g, ' ').trim().slice(0, 60) } }));
         return true;
       case 'set-agent': {
-        const next = Math.min(AGENT_MAX, Math.max(0, d.basic.agentLimit + (v.endsWith('+') ? 1 : -1)));
-        if (next !== d.basic.agentLimit) await basicPatch(env, { agentLimit: next });
+        const next = stepNext(v, d.basic.agentLimit, 0, AGENT_MAX);
+        if (next !== null && next !== d.basic.agentLimit) await basicPatch(env, { agentLimit: next });
         return true;
       }
       case 'set-theme':
@@ -1313,15 +1308,15 @@ export async function handleSettings(action: string, value: string | undefined, 
     case 'set-items-slots':
       await save(ctx, env, (chat) => {
         const cur = itemSlots(chat.scriptstate);
-        const next = Math.min(ITEM_SLOTS_MAX, Math.max(ITEM_SLOTS_MIN, cur + (v.endsWith('+') ? 1 : -1)));
-        return next === cur ? null : { [ITEM_SLOTS_VAR]: String(next) };
+        const next = stepNext(v, cur, ITEM_SLOTS_MIN, ITEM_SLOTS_MAX);
+        return next === null || next === cur ? null : { [ITEM_SLOTS_VAR]: String(next) };
       });
       return true;
     case 'set-items-carry':
       await save(ctx, env, (chat) => {
         const cur = itemCarrySetting(chat.scriptstate);
-        const next = Math.min(ITEM_CARRY_MAX, Math.max(ITEM_CARRY_MIN, cur + (v.endsWith('+') ? 1 : -1)));
-        return next === cur ? null : { [ITEM_CARRY_VAR]: String(next) };
+        const next = stepNext(v, cur, ITEM_CARRY_MIN, ITEM_CARRY_MAX);
+        return next === null || next === cur ? null : { [ITEM_CARRY_VAR]: String(next) };
       });
       return true;
     case 'set-items-skip':
@@ -1384,8 +1379,8 @@ export async function handleSettings(action: string, value: string | undefined, 
     case 'set-agent':
       await save(ctx, env, (chat) => {
         const cur = basicSettings(lore, chat.scriptstate).agentLimit;
-        const next = Math.min(AGENT_MAX, Math.max(0, cur + (v.endsWith('+') ? 1 : -1)));
-        if (next === cur) return null;
+        const next = stepNext(v, cur, 0, AGENT_MAX);
+        if (next === null || next === cur) return null;
         const vars = withBasic(ctx, chat, { agentLimit: next });
         // 요원 보고(로어북이 읽는 $ag_report)도 새 인원으로 다시 만든다
         if (worldOn(chat)) {
