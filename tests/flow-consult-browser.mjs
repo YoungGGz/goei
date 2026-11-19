@@ -61,7 +61,7 @@ if (!process.env.CONSULT_ONLY) {
   await openWin(page);
   await openEditor(page, 'manage:flow');
   await sleep(900);
-  eq(await bar(page), '턴마다 보조 호출 2회 (조건에 따라 최대 3회) · 메인 1회', '맨 위 띠 (기본 설정)');
+  eq(await bar(page), '턴마다 보조 호출 3회 (조건에 따라 최대 4회) · 메인 1회', '맨 위 띠 (기본 설정: Router 가 기본 켜짐)');
   const n = await clickAll(page, () => 'chat');
   ok(n >= 85, `조작 ${n}개를 눌렀다`);
   // 맨 위 띠와 줄의 호출 글이 바로 바뀐다

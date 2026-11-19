@@ -9,7 +9,7 @@ const fx = loadFixture(new URL('../.scratch/fixture/fixture.json', import.meta.u
 const browser = await launch();
 const REPLY = '첫 답.\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국|QC 괴이]';
 const items0 = { list: [{ id: 'i_old', name: '낡은 손전등', desc: '', effect: '', use: false, state: 'ok', from: 'manual', anchor: '', at: '2025-01-01T00:00:00Z' }], log: [] };
-const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify(items0) } };
+const chat = { message: [{ role: 'user', data: '출동', chatId: 'u1' }, { role: 'char', data: REPLY, chatId: 'c1' }], scriptstate: { $hs_net: '1', $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2', $st_fixed_theme: 'dark', $st_anomaly_on: '1', $pp_on: '0', $st_items: JSON.stringify(items0) } };
 const { page, errors } = await boot(browser, fx, chat, { width: 1280, height: 800, touch: false }, { store: { 'p:goei:data-homeshop': distPack('goei-data-homeshop'), 'p:goei:data-items': distPack('goei-data-items') } });
 const click = (sel) => page.evaluate((s) => { const els = [...document.querySelectorAll(s)]; const el = els.find((e) => e.getBoundingClientRect().width > 0) || els[0]; if (!el) return false; el.click(); return true; }, sel);
 const ss = () => page.evaluate(() => window.__chat.scriptstate);
@@ -55,7 +55,7 @@ assert.equal(await page.locator('[data-action="hs-order"][disabled]').count(), 1
 await click('[data-action="hs-offer"][data-value="i_old"]'); await page.waitForTimeout(200);
 await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<operator>그거면 됩니다, 고객님.</operator>\n<terms>\nitems|낡은 손전등\n</terms>' }]; });
 await click('[data-action="hs-appraise"]');
-await page.waitForSelector('.hs-terms', { timeout: 15000 });
+await page.waitForFunction(() => !(document.querySelector('.hs-terms')?.textContent || '').includes('아직 없음') && !!document.querySelector('[data-action="hs-order"]:not([disabled])'), null, { timeout: 15000 });
 await click('[data-action="hs-order"]');
 await page.waitForFunction(() => JSON.parse(window.__chat.scriptstate.$hs_orders || '[]').some((o) => o.pay === 'barter')); await page.waitForTimeout(400);
 st = await ss();
