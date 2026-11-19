@@ -13,9 +13,8 @@ const viewName = (p: ViewPreset): string => guideTxt('Phone', `VIEW.NAME.${p.toU
 export const VIEW_PRESETS: Record<ViewPreset, string> = { get side() { return viewName('side'); }, get mono() { return viewName('mono'); }, get multi() { return viewName('multi'); } };
 export const PH_VIEWS = PH('views');
 export const PH_VIEW_LAST = PH('view_last');
-export const VIEW_KEEP = 30;
-/** 한 방에 쌓아 두는 말풍선 수 (같은 인물들의 방에 이어 쓰므로)*/
-export const VIEW_HISTORY = 300;
+/** 보관: rooms 남겨 두는 방 수, history 한 방에 쌓아 두는 말풍선 수 (같은 인물들의 방에 이어 쓰므로). 고급 설정 값으로 맞춰 둔다 (core/advanced.ts applyAdvanced) */
+export const VIEW_STORE = { rooms: 30, history: 300 };
 export const VIEW_LIMITS = { messages: 30, text: 600, name: 60, people: 10 };
 
 export interface ViewPerson { id: string; name: string }
@@ -71,7 +70,7 @@ export function readViews(state: Record<string, unknown> | undefined): ViewRoom[
   }
 }
 
-export const writeViews = (list: ViewRoom[]): Record<string, string> => ({ [PH_VIEWS]: JSON.stringify(list.slice(-VIEW_KEEP)) });
+export const writeViews = (list: ViewRoom[]): Record<string, string> => ({ [PH_VIEWS]: JSON.stringify(list.slice(-VIEW_STORE.rooms)) });
 export const viewUnread = (list: ViewRoom[]) => list.filter((r) => r.unread).length;
 
 // ── 방은 참여 인물로 가른다 (11-15 사용자: 「같은 인물들이 매번 새 방을 파니까」 이어 쓰라고 한 것 — 인물이 다르면 다른 방) ──

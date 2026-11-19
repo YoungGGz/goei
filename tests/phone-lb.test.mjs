@@ -124,3 +124,35 @@ test('괴담톡: 보기 전용 방 요청·응답 (사이드스토리·혼잣말
   assert.deepEqual(V.viewRooms(two, 'mono', 6), []);
   assert.equal(V.viewSettings({}).auto, 'manual');
 });
+
+test('괴담톡: 말버릇·보기 전용 방 보관 수와 늘 넣을 최근 말풍선은 고급 설정을 따른다', async () => {
+  const { phoneView: V, advanced: A } = await import('../dist-test/core.mjs');
+  const habits = (state, n) => {
+    A.applyAdvanced(state);
+    const ids = new Map(Array.from({ length: n }, (_, i) => [`c_${i}`, `이름${i}`]));
+    return P.readHabits(P.mergeHabits({}, [...ids.keys()].map((id) => ({ sender: id, note: '짧게' })), ids));
+  };
+  const rooms = (n) => Array.from({ length: n }, (_, i) => ({ id: `v_${i}`, preset: 'side', name: '', pov: 'p1', people: [], messages: [], time: '', unread: false }));
+  try {
+    // 기본값 = 전에 코드에 있던 값
+    assert.equal(A.advValue({}, 'ph', 'ctx_recent'), '8');
+    assert.equal(A.advValue({}, 'ph', 'habit_keep'), '80');
+    assert.equal(A.advValue({}, 'ph', 'view_rooms'), '30');
+    assert.equal(A.advValue({}, 'ph', 'view_history'), '300');
+    assert.equal(habits({}, 90).length, 80);
+    assert.deepEqual([P.HISTORY.contextRecent, V.VIEW_STORE.rooms, V.VIEW_STORE.history], [8, 30, 300]);
+    assert.equal(V.readViews(V.writeViews(rooms(40))).length, 30);
+    // 설정을 바꾸면 따라간다
+    const got = habits({ '$ph_adv_habit_keep': '10', '$ph_adv_view_rooms': '5', '$ph_adv_view_history': '50', '$ph_adv_ctx_recent': '0' }, 90);
+    assert.equal(got.length, 10);
+    assert.equal(got.at(-1).id, 'c_89', '최근 것이 남는다');
+    assert.deepEqual([P.HISTORY.contextRecent, V.VIEW_STORE.rooms, V.VIEW_STORE.history], [0, 5, 50]);
+    const kept = V.readViews(V.writeViews(rooms(40)));
+    assert.deepEqual([kept.length, kept.at(-1).id], [5, 'v_39']);
+    // 틀린 값은 기본값
+    assert.equal(habits({ '$ph_adv_habit_keep': '0', '$ph_adv_view_rooms': '-3', '$ph_adv_view_history': '1.5', '$ph_adv_ctx_recent': '999' }, 90).length, 80);
+    assert.deepEqual([P.HISTORY.contextRecent, V.VIEW_STORE.rooms, V.VIEW_STORE.history], [8, 30, 300]);
+  } finally {
+    A.applyAdvanced({});
+  }
+});

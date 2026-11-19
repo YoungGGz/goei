@@ -15,7 +15,7 @@ import {
   BANTER_ROWS,
 } from '../core/phone';
 import { refreshPrompt, refreshRetry, replyPrompt, viewPrompt } from '../core/phonePrompt';
-import { matchView, parseView, PH_VIEW_LAST, readViews, VIEW_HISTORY, VIEW_PRESETS, viewSettings, viewUnread, writeViews, type ViewRoom } from '../core/phoneView';
+import { matchView, parseView, PH_VIEW_LAST, readViews, VIEW_STORE, VIEW_PRESETS, viewSettings, viewUnread, writeViews, type ViewRoom } from '../core/phoneView';
 import { agentFace, imageUrl, stChip } from './images';
 import { readWorld, worldOn } from '../core/world/output';
 import { ICONS } from './icons';
@@ -887,7 +887,7 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false) {
         cur.time = time;
         cur.unread = !seen;
         cur.messages.push({ sender: '-', type: 'time', text: time }, ...value.messages);
-        if (cur.messages.length > VIEW_HISTORY) cur.messages.splice(0, cur.messages.length - VIEW_HISTORY);
+        if (cur.messages.length > VIEW_STORE.history) cur.messages.splice(0, cur.messages.length - VIEW_STORE.history);
         // 방금 이어 쓴 방이 목록 맨 위로 (목록은 뒤에서부터 보인다)
         list.splice(list.indexOf(cur), 1);
         list.push(cur);

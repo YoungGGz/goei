@@ -50,7 +50,7 @@ export const LIMITS = {
   events: 12, reply_tokens: 1500, input_tokens: 4000, pause_tokens: 200, topic_tokens: 2000, memo_tokens: 2000, notices: 1, invitations: 1,
   members: 9, room_name: 60, notice_title: 80, notice_issuer: 60, notice_tokens: 1200,
 };
-export const HISTORY = { room: 100, announcement: 10, context: 200, contextNotices: 1, contextTokens: 4000, turns: 8, focus: true, contextRecent: 8, contextViews: false, contextReactions: false, contextHabits: false };
+export const HISTORY = { room: 100, announcement: 10, context: 200, contextNotices: 1, contextTokens: 4000, turns: 8, focus: true, contextRecent: 8, contextViews: false, contextReactions: false, contextHabits: false, habits: 80 };
 // dm·group = 방마다 남길 말풍선, notice = 남길 공지, invited = 남길 초대받은 단톡방 수 (사용자 2026-11-17: 1:1 도 100, 초대받은 단톡방 20)
 export const STORAGE = { dm: 100, group: 100, notice: 20, invited: 20 };
 export const STORAGE_MAX = 20000;
@@ -685,7 +685,7 @@ export function mergeHabits(state: Record<string, unknown> | undefined, rows: un
     list.push(row);
     changed = true;
   }
-  return changed ? { [PH_HABITS]: JSON.stringify(list.slice(-80)) } : null;
+  return changed ? { [PH_HABITS]: JSON.stringify(list.slice(-HISTORY.habits)) } : null;
 }
 
 // ── 이모지 반응 (라이트보드 미니톡 parseReactions, 2026-11-06) ──

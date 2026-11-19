@@ -5,6 +5,7 @@ import { CONTEXT as GN_CONTEXT, HISTORY as GN_HISTORY, LIMITS as GN_LIMITS } fro
 import { ATTACH_LIMITS } from './attach';
 import { guideTxt } from './guides';
 import { COOLDOWN as PH_COOLDOWN, HISTORY as PH_HISTORY, LIMITS as PH_LIMITS } from './phone';
+import { VIEW_STORE as PH_VIEW_STORE } from './phoneView';
 
 export type AdvFeature = 'gn' | 'ph' | 'nw' | 'gen';
 
@@ -165,6 +166,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
       ],
       items: [
         num('ctx_history', '넣을 말풍선', 200, 1, 1000, '개'),
+        num('ctx_recent', '늘 넣을 최근 말풍선', 8, 0, 100, '개', { zero: '안 넣음', hint: '「장면에 나온 것만」을 켰을 때, 장면과 관련이 없어도 넣는 가장 최근 말풍선 수예요.' }),
         num('ctx_notices', '넣을 공지', 1, 0, 50, '개'),
         num('ctx_tokens', '컨텍스트 토큰 상한', 4000, 0, 200000, TOK, { zero: '제한 없음' }),
       ],
@@ -190,6 +192,9 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('notice_title', '공지 제목', 80, 10, 300, '자'),
         num('notice_issuer', '공지 발신처', 60, 5, 200, '자'),
         num('invitations', '한 번에 받을 초대', 1, 1, 10, '개'),
+        num('habit_keep', '말버릇 보관', 80, 10, 1000, '명', { hint: '말버릇을 적어 두는 연락처 수예요. 넘으면 오래된 것부터 지워요.' }),
+        num('view_rooms', '보기 전용 방 보관', 30, 1, 200, '개', { hint: '넘으면 오래된 방부터 지워요.' }),
+        num('view_history', '보기 전용 방 말풍선 보관', 300, 10, 2000, '개', { hint: '한 방에 남겨 두는 말풍선 수예요. 넘으면 오래된 것부터 지워요.' }),
       ],
     },
   ],
@@ -349,6 +354,10 @@ export function applyAdvanced(state: State): void {
   PH_HISTORY.context = p('ctx_history');
   PH_HISTORY.contextNotices = p('ctx_notices');
   PH_HISTORY.contextTokens = p('ctx_tokens');
+  PH_HISTORY.contextRecent = p('ctx_recent');
+  PH_HISTORY.habits = p('habit_keep');
+  PH_VIEW_STORE.rooms = p('view_rooms');
+  PH_VIEW_STORE.history = p('view_history');
   PH_HISTORY.focus = advOn(state, 'ph', 'ctx_focus');
   PH_HISTORY.contextViews = advOn(state, 'ph', 'ctx_views');
   PH_HISTORY.contextReactions = advOn(state, 'ph', 'ctx_reactions');
