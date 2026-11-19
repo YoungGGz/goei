@@ -45,6 +45,8 @@ export function lookSprite(look: IdleLook, cls = ''): string {
 /** 내 아바타 칸: 동작을 끼울 수 있게 모습 번호를 달아 둔다 */
 export function avatarSprite(look: IdleLook): string {
   const html = lookSprite(look, 'it-look');
+  // 동작 그림을 미리 받아 둔다 (첫 차례에 바로 나오게)
+  if (look.acts) void lookActs(look.id);
   return look.acts ? html.replace('<span ', `<span data-look="${esc(look.id)}" `) : html;
 }
 
@@ -73,24 +75,39 @@ function playAct(el: HTMLElement, a: ActLook): void {
   el.addEventListener('animationend', back);
 }
 
+const avatarEl = () => document.querySelector<HTMLElement>('.gx-look.it-look[data-look]:not(.act)');
+
+/** 대기 한 바퀴가 끝날 때 동작으로 바꾼다. 그 사이 화면이 다시 그려져 칸이 바뀌었으면 새 칸에서 다시 기다린다 (tries 번까지) */
+function armAct(id: string, a: ActLook, tries: number): void {
+  const el = avatarEl();
+  if (!el || el.dataset.look !== id) return;
+  let done = false;
+  const go = () => {
+    done = true;
+    if (el.isConnected && !el.classList.contains('act')) playAct(el, a);
+  };
+  el.addEventListener('animationiteration', go, { once: true });
+  const wait = (parseFloat(el.style.getPropertyValue('--ld')) || 2) * 1000 + 300;
+  setTimeout(() => {
+    if (done) return;
+    el.removeEventListener('animationiteration', go);
+    if (tries > 0) armAct(id, a, tries - 1);
+  }, wait);
+}
+
 function actTick(): void {
   actTimer = setTimeout(actTick, actGapMs());
   if (stillMotion() || document.hidden) return;
-  const el = document.querySelector<HTMLElement>('.gx-look.it-look[data-look]:not(.act)');
+  const el = avatarEl();
   if (!el || !el.getClientRects().length) return;
-  const acts = lookActs(el.dataset.look ?? '');
+  const id = el.dataset.look ?? '';
+  const acts = lookActs(id);
   const a = acts && pickLookAct(acts, lastAct, Math.random());
   if (!a) return;
   lastAct = a.k;
-  // 그림을 먼저 읽어 두고(안 읽힌 채 바꾸면 빈 장이 보인다), 대기 한 바퀴가 끝날 때 바꾼다
+  // 그림을 먼저 읽어 둔다 (안 읽힌 채 바꾸면 빈 장이 보인다)
   const img = new Image();
-  img.onload = () => {
-    const go = () => {
-      el.removeEventListener('animationiteration', go);
-      if (el.isConnected && !el.classList.contains('act')) playAct(el, a);
-    };
-    el.addEventListener('animationiteration', go);
-  };
+  img.onload = () => armAct(id, a, 2);
   img.src = a.url;
 }
 
