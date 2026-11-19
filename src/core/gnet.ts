@@ -107,8 +107,8 @@ export function gnetRetention(state: Record<string, unknown> | undefined): { aut
   return { auto: flag !== '0', limit };
 }
 export const LIMITS = { replies_min: 0, replies: 4, post_tokens: 4000, title_tokens: 80, dm_tokens: 1500, comment_tokens: 1000, origin_tokens: 2000, quote_tokens: 1000, history_tokens: 1500 };
-/** dmPublic: 쪽지 답장에 같이 넘기는 공개 글 수 (0 = 안 넘김). incomingPrev: 선쪽지 겹침 확인용으로 넘기는 받은 쪽지 수 (0 = 전부). activity: 글 쓰기·댓글·글 하나 새로고침에 「다른 글 활동」을 넣는지 */
-export const HISTORY = { refresh: 10, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2, dmPublic: 8, incomingPrev: 50, activity: true };
+/** dmPublic: 쪽지 답장에 같이 넘기는 공개 글 수 (0 = 안 넘김). dmPublicComments: 그 글마다 넘기는 최근 댓글 수 (0 = 안 넘김). dmPublicChars: 공개 글 참고 전체의 글자 상한. keyFigures: 기억해 두는 주요 인물 닉네임 수. incomingPrev: 선쪽지 겹침 확인용으로 넘기는 받은 쪽지 수 (0 = 전부). activity: 글 쓰기·댓글·글 하나 새로고침에 「다른 글 활동」을 넣는지 */
+export const HISTORY = { refresh: 10, comment: 30, dmHistory: 50, turns: 8, dmKeep: 40, cooldown: 2, dmPublic: 8, dmPublicComments: 12, dmPublicChars: 12000, keyFigures: 60, incomingPrev: 50, activity: true };
 export const CONTEXT = { posts: 5, comments: 10, dms: 30, tokens: 3000, includePosts: true, includeDms: true, ownOnly: false, focus: true, recentPosts: 1, recentDms: 5 };
 /** 개수 설정 (2026-11-08 사용자: 단계 고르기 대신 최소·최대 직접). 새로고침 글 수, 새 글마다 댓글 수, 지난 글에 새로 붙는 활동 댓글 수. 내 글·댓글에 달릴 새 답글 수는 고급 설정(replies_min·replies) */
 export const COUNT_RANGE = { post: [1, 20], cmt: [0, 20], act: [0, 20] } as const;
@@ -212,7 +212,7 @@ export function mergeKeyFigures(state: Record<string, unknown> | undefined, rows
     else continue;
     changed = true;
   }
-  return changed ? { [GN_KEYFIG]: JSON.stringify(list.slice(-60)) } : null;
+  return changed ? { [GN_KEYFIG]: JSON.stringify(list.slice(-HISTORY.keyFigures)) } : null;
 }
 
 /** 글쓴이를 비운 글의 익명 닉 (저장되어 다시 모델에 가고, 화면이 익명 글쓴이를 알아보는 데도 쓴다): 지침 「요청 공통」 GNET.ANON_AUTHOR 절 */

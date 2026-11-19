@@ -280,10 +280,12 @@ export function publicBoard(st: GState, query: string, access: string, max = 8, 
   ranked.sort((a, b) => (a.hit !== b.hit ? (a.hit ? -1 : 1) : a.i - b.i));
   const rows: unknown[] = [];
   let used = 0;
-  const cap = 6000;
+  // 상한은 글자 수로 받고, 아래 셈은 전처럼 글자 수의 절반으로 한다
+  const cap = HISTORY.dmPublicChars / 2;
+  const keep = HISTORY.dmPublicComments;
   for (const { p } of ranked) {
     if (rows.length >= max) break;
-    const comments = p.comments.slice(-12).map((c, j, arr) => ({ id: p.comments.length - arr.length + j + 1, parent: c.parent, author: c.nick, ...whenField(p, c), content: trimTokens(c.body, LIMITS.quote_tokens) }));
+    const comments = (keep > 0 ? p.comments.slice(-keep) : []).map((c, j, arr) => ({ id: p.comments.length - arr.length + j + 1, parent: c.parent, author: c.nick, ...whenField(p, c), content: trimTokens(c.body, LIMITS.quote_tokens) }));
     const content = trimTokens(p.body, LIMITS.origin_tokens);
     const row = { id: p.id, title: p.title, author: p.nick, date: p.date, ...(origin && origin.postid === p.id && origin.body === content ? {} : { content }), comments };
     while (JSON.stringify(row).length > (cap - used) * 2 && row.comments.length) row.comments.shift();

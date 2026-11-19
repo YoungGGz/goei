@@ -99,6 +99,8 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('comments', '답글에 참조할 댓글', 30, 1, 1000, '개'),
         num('dm_history', '답장에 참조할 쪽지', 50, 1, 1000, '통'),
         num('dm_public', '답장에 참조할 공개 글', 8, 0, 50, '개', { zero: '안 넣음' }),
+        num('dm_public_comments', '공개 글마다 댓글', 12, 0, 200, '개', { zero: '안 넣음', hint: '답장에 참조할 공개 글마다 같이 넘기는 최근 댓글의 수예요.' }),
+        num('dm_public_chars', '공개 글 전체 길이', 12000, 1000, 200000, '자', { hint: '답장에 참조할 공개 글과 댓글을 모두 합친 길이의 상한이에요. 넘으면 오래된 댓글부터 빼고, 그래도 넘는 글은 넣지 않아요.' }),
         { key: 'activity', label: '지난 글 활동', type: 'pick', def: '1', opts: [['0', '끔'], ['1', '켬']], hint: '켜면 글 쓰기·댓글·글 하나 새로고침 요청에 게시판의 지난 글을 같이 넘겨 새 댓글과 조회·추천을 받아요. 끄면 넘기지 않아 토큰을 덜 써요.' },
         budget,
       ],
@@ -136,6 +138,7 @@ export const ADV: Record<AdvFeature, AdvGroup[]> = {
         num('origin_tokens', '쪽지에 붙는 글', 2000, 50, 20000, TOK),
         num('quote_tokens', '쪽지에 붙는 댓글', 1000, 50, 20000, TOK),
         num('history_tokens', '이전 쪽지 한 통', 1500, 50, 20000, TOK),
+        num('keyfig_keep', '보존할 주요 인물 닉네임', 60, 1, 500, '명', { hint: '주요 인물 닉네임을 이 수만큼 기억해요. 넘으면 오래된 것부터 지워요.' }),
       ],
     },
   ],
@@ -325,6 +328,9 @@ export function applyAdvanced(state: State): void {
   GN_HISTORY.turns = g('turns');
   GN_HISTORY.cooldown = g('cooldown');
   GN_HISTORY.dmPublic = g('dm_public');
+  GN_HISTORY.dmPublicComments = g('dm_public_comments');
+  GN_HISTORY.dmPublicChars = g('dm_public_chars');
+  GN_HISTORY.keyFigures = g('keyfig_keep');
   GN_HISTORY.incomingPrev = g('incoming_prev');
   GN_HISTORY.activity = advOn(state, 'gn', 'activity');
   GN_CONTEXT.posts = g('ctx_post_count');

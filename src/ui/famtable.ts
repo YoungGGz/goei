@@ -137,10 +137,14 @@ export function boardTable(state: State, busy = false): string {
   const limit = setGroup('길이 상한', [
     R('모델이 쓰는 글', set([['글 본문', N('post_tokens')], ['글 제목', N('title_tokens')], ['댓글', N('comment_tokens')], ['쪽지', N('dm_tokens')]])),
     R('쪽지에 같이 넘기는 글', set([['붙는 글', N('origin_tokens')], ['붙는 댓글', N('quote_tokens')], ['이전 쪽지 한 통', N('history_tokens')]]), '글이나 댓글을 보고 쪽지를 보낼 때 같이 넘기는 글 하나의 길이 상한이에요.'),
-    R('답장에 참조할 공개 글', N('dm_public'), '쪽지 답장 요청에 참고로 같이 넘기는 게시판 글의 수예요. 0이면 넘기지 않아요.'),
+    R('답장에 참조할 공개 글', set([['글', N('dm_public')], ['글마다 댓글', N('dm_public_comments')], ['전체 길이', N('dm_public_chars')]]), '쪽지 답장 요청에 참고로 같이 넘기는 게시판 글의 수예요. 0이면 넘기지 않아요.', [
+      ['글마다 댓글', '글마다 같이 넘기는 최근 댓글의 수예요. 0이면 댓글은 넘기지 않아요.'],
+      ['전체 길이', '글과 댓글을 모두 합친 길이의 상한이에요. 넘으면 오래된 댓글부터 빼고, 그래도 넘는 글은 넣지 않아요. 괴담톡 답장에 넣는 괴담넷 글에도 같이 적용돼요.'],
+    ]),
   ].join(''));
   const keep = setGroup('게시판에 남기는 것', [
     R('주요 인물 닉네임 보존', C('keyfigures', s0.keyFigures), '켜면 주요 인물이 쓰던 닉네임을 다음 새로고침에도 그대로 써요.'),
+    R('보존할 닉네임 수', N('keyfig_keep'), '주요 인물 닉네임을 이 수만큼 기억해요. 넘으면 오래된 것부터 지워요.'),
     R('새로고침 때 내 글 유지', C('keepown', s0.keepOwn), '켜면 새로고침으로 글이 바뀔 때 내가 쓴 글은 남겨요.'),
     R('내 댓글 있는 글 유지', C('keepreplied', s0.keepReplied), '켜면 내가 댓글을 단 남의 글도 남겨요.'),
     R('쪽지 자동 정리', `${setSeg('fam-set', 'b:gn:storage', ret.auto ? '1' : '0', ONOFF, busy)}${ret.auto ? numCtl('b:gn:dmkeep', { n: ret.limit, lo: 1, hi: STORAGE_MAX, step: 5 }, '남길 쪽지', '통', busy) : ''}`, '켜면 상대마다 최근 쪽지를 이 수만큼만 남기고 오래된 것은 지워요.'),

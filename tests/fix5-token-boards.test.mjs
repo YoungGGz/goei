@@ -418,3 +418,49 @@ test('쪽지 원글: 글이 살아 있으면 본문을 상대마다 또 적지 �
   arch.archive.push(...arch.posts.splice(2, 1));
   assert.deepEqual(C.decode(C.encode(arch)).sources, st.sources);
 });
+
+test('공개 글 참고의 댓글 수·전체 길이, 주요 인물 닉네임 수: 기본값은 전과 같고 설정으로 바뀐다', () => {
+  const v = (k) => C.advanced.advValue({}, 'gn', k);
+  assert.deepEqual(['dm_public_comments', 'dm_public_chars', 'keyfig_keep'].map(v), ['12', '12000', '60']);
+  C.advanced.applyAdvanced({});
+  assert.deepEqual([C.HISTORY.dmPublicComments, C.HISTORY.dmPublicChars, C.HISTORY.keyFigures], [12, 12000, 60]);
+
+  const many = () => ({ posts: [post(100001, { comments: Array.from({ length: 20 }, (_, i) => cm(`c${i + 1}`, `댓글 ${i + 1}`)) })], archive: [], dms: [], sources: {}, seq: 100001 });
+  const ids = (st) => C.publicBoard(st, '', 'A').posts[0].comments.map((c) => c.id);
+  assert.deepEqual(ids(many()), Array.from({ length: 12 }, (_, i) => i + 9), '기본: 최근 12개');
+  C.advanced.applyAdvanced({ [ADV('dm_public_comments')]: '3' });
+  assert.deepEqual(ids(many()), [18, 19, 20]);
+  C.advanced.applyAdvanced({ [ADV('dm_public_comments')]: '0' });
+  assert.deepEqual(ids(many()), [], '0이면 댓글은 안 넣음');
+  for (const bad of ['-1', '201', '1.5', 'x', '']) {
+    C.advanced.applyAdvanced({ [ADV('dm_public_comments')]: bad });
+    assert.equal(C.HISTORY.dmPublicComments, 12, `틀린 값 ${bad}`);
+  }
+
+  // 전체 길이: 기본(12000자)에서는 긴 글 셋 가운데 둘만, 줄이면 하나, 늘리면 다 들어간다
+  const long = () => ({ posts: [1, 2, 3].map((i) => post(100000 + i, { body: 'abcd '.repeat(900) })), archive: [], dms: [], sources: {}, seq: 100003 });
+  C.advanced.applyAdvanced({});
+  assert.equal(C.publicBoard(long(), '', 'A').posts.length, 2);
+  C.advanced.applyAdvanced({ [ADV('dm_public_chars')]: '5000' });
+  assert.equal(C.publicBoard(long(), '', 'A').posts.length, 1);
+  C.advanced.applyAdvanced({ [ADV('dm_public_chars')]: '50000' });
+  assert.equal(C.publicBoard(long(), '', 'A').posts.length, 3);
+  for (const bad of ['0', '999', '200001', 'x']) {
+    C.advanced.applyAdvanced({ [ADV('dm_public_chars')]: bad });
+    assert.equal(C.HISTORY.dmPublicChars, 12000, `틀린 값 ${bad}`);
+  }
+
+  // 주요 인물 닉네임 수
+  const rows = Array.from({ length: 70 }, (_, i) => ({ keyFigure: `인물${i + 1}`, nickname: `닉${i + 1}`, note: '' }));
+  C.advanced.applyAdvanced({});
+  const kept = C.keyFigures(C.mergeKeyFigures({}, rows));
+  assert.equal(kept.length, 60);
+  assert.equal(kept[0].keyFigure, '인물11');
+  C.advanced.applyAdvanced({ [ADV('keyfig_keep')]: '5' });
+  assert.deepEqual(C.keyFigures(C.mergeKeyFigures({}, rows)).map((x) => x.keyFigure), ['인물66', '인물67', '인물68', '인물69', '인물70']);
+  for (const bad of ['0', '501', 'x']) {
+    C.advanced.applyAdvanced({ [ADV('keyfig_keep')]: bad });
+    assert.equal(C.HISTORY.keyFigures, 60, `틀린 값 ${bad}`);
+  }
+  C.advanced.applyAdvanced({});
+});
