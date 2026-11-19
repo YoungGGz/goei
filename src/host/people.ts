@@ -319,6 +319,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const pointsUse = pointsOn(fresh.chat);
       const pointBal = pointsUse ? walletBalance(readPoints(fresh.chat.scriptstate), aliveAnchors(fresh.chat)) : null;
       const batchKeys = batches[b].map((i) => (fresh.chat.message[i] ? messageKey(fresh.chat.message[i], i) : '')).filter(Boolean);
+      // 치운 물건 기억의 턴을 세는 기준: 이번에 읽는 응답 가운데 가장 뒤의 것 (core/items.ts turnsAfter)
+      const asOfAt = Math.max(...batches[b]);
+      const asOfKey = fresh.chat.message[asOfAt] ? messageKey(fresh.chat.message[asOfAt], asOfAt) : undefined;
       // 소지품 (core/items.ts): 설정 「보조 모델이 읽기」가 켜져 있으면 지금 목록을 자료에 넣고 소지품 절을 켠다
       const itemsOn = itemAutoOn(fresh.chat.scriptstate);
       const itemsNow = itemsOn ? itemsNowOf(fresh.chat, itemPictures) : null;
@@ -334,7 +337,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const prevChar = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' && i < lastChar ? i : a), -1);
       const prevKey = prevChar >= 0 ? messageKey(fresh.chat.message[prevChar], prevChar) : '';
       const pickNames = !o.scope?.only && lastChar >= 0 && batches[b].includes(lastChar) && bmPickupConfirm(fresh.chat.scriptstate) ? bmAsked(liveBmOrders(fresh.chat.scriptstate, aliveAnchors(fresh.chat)), prevKey).map((x) => x.item.name) : [];
-      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat) : [] });
+      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat, asOfKey) : [] });
       // 지침은 자료를 본 뒤 조립한다 (저장 상한을 넘긴 인물이 있으면 정리 절을 켠다)
       const sections = enabledSections(settings);
       if (input.tidy.length) sections.add('tidy');
@@ -451,12 +454,6 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           itemChanges = done.changes;
           if (done.got.length) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(done.it), ...bmOrdersVars(done.orders) } };
         }
-        // 치운 지 오래된 물건 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway). 이번 요청의 items_away 도 같은 기준으로 걸렀다
-        if (itemsOn) {
-          const it0 = readItems(next.scriptstate);
-          const it1 = forgetAway(it0, next);
-          if (it1 !== it0) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it1) } };
-        }
         if (itemChanges.length) {
           // 판정 표·「두고 옴」 말은 이 채팅의 설정으로 (core/itemrules.ts). order = 메시지 차례 (사용자가 버린 물건은 버린 뒤의 메시지가 근거일 때만 되살린다)
           setItemRules(next.scriptstate);
@@ -465,6 +462,13 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           if (bm.settled) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...bmOrdersVars(bm.orders) } };
           const it = applyItemChanges(bm.it, aliveAnchors(next), bm.changes, { state: itemStateOn(next.scriptstate), skipKinds: ITEM_SCOPE_SKIP[itemScope(next.scriptstate)], order: (next.message ?? []).map((m, i) => messageKey(m, i)) });
           next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it) } };
+        }
+        // 치운 지 오래된 물건 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway). 변화를 적용한 뒤에 (이번에 되찾은 줄은 남게),
+        // 턴은 요청의 items_away 와 같이 이번에 읽은 마지막 응답에서 센다 (밀린 응답·지난 응답을 읽을 때 채팅 끝에서 세지 않게)
+        if (itemsOn) {
+          const it0 = readItems(next.scriptstate);
+          const it1 = forgetAway(it0, next, asOfKey);
+          if (it1 !== it0) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it1) } };
         }
         // 상점 판단 (11-09): 판단한 응답 끝의 표식을 갱신기 판단대로 바꾸고(있으면 붙이고 없으면 지움) 본편과 같은 정리(settleShop)를 돌린다.
         // 화면의 「상점 열기」 카드는 표식에서 그려지니 본편이 판단할 때와 같은 길로 뜬다

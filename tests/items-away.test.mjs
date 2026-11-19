@@ -104,3 +104,34 @@ test('물건 줄 상한: 설정한 수를 넘으면 사라진 응답의 줄부�
   for (let i = 0; i < 60; i++) it = addItem(it, alive, { name: `또 낡은 것 ${i}`, from: 'story', anchor: `y${i}`, quote: 'q' });
   assert.equal(it.list.length, 110);
 });
+
+test('밀린 응답을 읽을 때: 턴은 지금 읽는 응답에서 센다 (채팅 끝이 아니라)', () => {
+  setItemRules(undefined);
+  // c2 에 치움, 채팅은 응답 40개. c4 를 읽는 중이면 치운 뒤 2턴
+  const it = base(40);
+  const chat = chatOf(it, 40, T(3));
+  assert.deepEqual(itemsAwayOf(chat), []);
+  assert.deepEqual(itemsAwayOf(chat, 'c4').map((x) => x.name), ['손전등', '우산']);
+  assert.equal(forgetAway(it, chat, 'c4'), it);
+  assert.deepEqual(forgetAway(it, chat, 'c6').list.map((e) => e.name), ['수첩']);
+  // 기준보다 뒤에 치운 것은 지우지 않는다
+  assert.equal(forgetAway(it, chat, 'c1'), it);
+});
+
+test('잊은 뒤에도: 버린 물건·파괴된 물건은 그 전의 응답을 다시 읽어도 도로 생기지 않는다. 뒤의 응답에서 얻으면 생긴다', () => {
+  setItemRules(undefined);
+  const order = keysOf(8);
+  const alive = new Set(order);
+  let it = base(8);
+  it = addItem(it, alive, { name: '깡통', from: 'manual', anchor: '' });
+  it = removeItem(it, it.list.find((e) => e.name === '깡통').id, 'drop', 'manual', '', { key: 'u3' });
+  it = forgetAway(it, chatOf(it, 8, T(3)));
+  assert.deepEqual(it.list.map((e) => e.name), ['수첩']);
+  const names = (x) => liveItems(x, alive).map((e) => e.name).sort();
+  // 유리병: c1 에서 얻어 c2 에서 부서짐. c1 을 다시 읽어 new 가 와도 안 생긴다
+  assert.deepEqual(names(applyItemChanges(it, alive, [ch({ anchor: 'c1', name: '유리병', action: 'new', quote: 'q' })], { order })), ['수첩']);
+  // 깡통: u3 때 버림. 그 앞 응답(c2)이 근거면 안 생기고, 뒤 응답(c5)이 근거면 생긴다
+  assert.deepEqual(names(applyItemChanges(it, alive, [ch({ anchor: 'c2', name: '깡통', action: 'new', quote: 'q' })], { order })), ['수첩']);
+  assert.deepEqual(names(applyItemChanges(it, alive, [ch({ anchor: 'c5', name: '깡통', action: 'new', quote: 'q' })], { order })), ['깡통', '수첩']);
+  assert.deepEqual(names(applyItemChanges(it, alive, [ch({ anchor: 'c5', name: '유리병', action: 'new', quote: 'q' })], { order })), ['수첩', '유리병']);
+});

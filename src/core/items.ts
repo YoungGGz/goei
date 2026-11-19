@@ -136,6 +136,8 @@ export interface ItemLog {
   icon?: string;
   /** off 줄: 손 칸에서 넣은 것 (없으면 장비 칸에서 해제). 본편 말·기록 탭 말을 나눈다 (사용자 2026-11-14 C-10·C-11) */
   hand?: boolean;
+  /** drop 줄: 사용자가 버린 때의 마지막 메시지 키 (물건 줄의 outKey 와 같은 값). 줄을 잊은 뒤에도 그 앞 응답을 근거로 도로 생기지 않게 본다 (forgottenBefore) */
+  key?: string;
   at: string;
 }
 
@@ -530,16 +532,18 @@ export const itemAwayTurns = (vars: Record<string, unknown> | undefined): number
   const n = Number(raw);
   return Number.isInteger(n) && n >= 0 ? Math.min(ITEM_AWAY_TURNS_MAX, n) : ITEM_AWAY_TURNS_DEFAULT;
 };
-/** 그 메시지 뒤에 온 봇 응답 수 (턴 세기는 recentItemLog 와 같이 봇 응답 하나 = 1턴). 채팅에 없는 키는 undefined */
-function turnsAfter(chat: Chat): (key: string) => number | undefined {
+/** 그 메시지 뒤로 기준 메시지(asOf, 없으면 채팅 끝)까지 온 봇 응답 수 (턴 세기는 recentItemLog 와 같이 봇 응답 하나 = 1턴). 채팅에 없는 키는 undefined.
+ *  기준을 받는 까닭: 갱신기가 밀린 응답·지난 응답을 읽을 때는 「지금 읽는 응답」에서 세야 한다 (채팅 끝에서 세면 몇 턴 만에 되찾은 것도 잊은 것이 된다) */
+function turnsAfter(chat: Chat, asOf?: string): (key: string) => number | undefined {
   const list = chat.message ?? [];
-  const at = new Map<string, number>();
-  let later = 0;
-  for (let i = list.length - 1; i >= 0; i--) {
-    at.set(messageKey(list[i], i), later);
-    if (list[i].role === 'char') later++;
+  const upTo = new Map<string, number>();
+  let n = 0;
+  for (let i = 0; i < list.length; i++) {
+    if (list[i].role === 'char') n++;
+    upTo.set(messageKey(list[i], i), n);
   }
-  return (key) => at.get(key);
+  const end = (asOf ? upTo.get(asOf) : undefined) ?? n;
+  return (key) => { const k = upTo.get(key); return k === undefined ? undefined : Math.max(0, end - k); };
 }
 /** 치운 물건을 아직 기억하는가: 치운 때(치운 응답, 사용자가 버린 것은 그때의 마지막 메시지)에서 turns 턴 안이면 기억한다.
  *  치운 때를 모르는 줄(키가 없거나 그 메시지가 사라짐)은 나이를 모르니 기억한다. 저장 정리(forgetAway)와 자료 items_away(itemsAwayOf)가 같이 쓴다 */
@@ -550,13 +554,28 @@ function awayKept(e: Item, after: (key: string) => number | undefined, turns: nu
   return n === undefined || n <= turns;
 }
 /** 치운 지 설정 「치운 물건 기억」 턴이 지난 줄을 목록에서 지운다. 기록 줄(log)과 갖고 있는 물건은 건드리지 않는다 */
-export function forgetAway(it: Items, chat: Chat): Items {
+export function forgetAway(it: Items, chat: Chat, asOf?: string): Items {
   const turns = itemAwayTurns(chat.scriptstate);
   if (turns <= 0 || !it.list.some((e) => e.outHow)) return it;
   const alive = aliveAnchors(chat);
-  const after = turnsAfter(chat);
+  const after = turnsAfter(chat, asOf);
   const list = it.list.filter((e) => !isOut(e, alive) || awayKept(e, after, turns));
   return list.length === it.list.length ? it : { ...it, list };
+}
+
+/** 줄을 잊은 뒤(forgetAway)에도 지키는 것: 사용자가 버린 물건·파괴된 물건은 그 전의 응답을 근거로 다시 생기지 않는다.
+ *  줄이 남아 있을 때는 줄이 막는다(applyItemChanges 의 버린 때 검사·addItem 의 같은 id 검사). 줄이 없으면 살아 있는 기록 줄(drop·destroy)로 같은 것을 본다:
+ *  그 물건을 얻은 바로 그 응답이거나, 버린 때(key)·부서진 응답(anchor)보다 앞의 응답이 근거면 새로 만들지 않는다 */
+function forgottenBefore(it: Items, alive: Set<string>, order: string[], c: { name: string; anchor: string }): boolean {
+  if (it.list.some((e) => e.outHow && sameItemName(e.name, c.name))) return false;
+  const at = order.indexOf(c.anchor);
+  const id = itemId(c.anchor, c.name);
+  return it.log.some((l) => {
+    if ((l.what !== 'drop' && l.what !== 'destroy') || (l.anchor && !alive.has(l.anchor)) || !sameItemName(l.name, c.name)) return false;
+    if (l.item === id) return true;
+    const when = order.indexOf(l.what === 'drop' ? l.key ?? '' : l.anchor);
+    return at >= 0 && when >= 0 && (l.what === 'drop' ? at <= when : at < when);
+  });
 }
 
 /** 물건 빼기 → 기록에 한 줄. what: drop(버림)·gone(본문에서 없어짐)·destroy(파괴)·sell(상점에 팖) */
@@ -570,7 +589,7 @@ export function removeItem(it: Items, id: string, what: ItemLogWhat, by: ItemLog
   const place = p0 ? clean(p0, 30) : '';
   const how: ItemOut | '' = hard ? '' : what === 'left' ? 'left' : what === 'gone' ? 'gone' : what === 'drop' ? 'drop' : what === 'destroy' ? 'destroy' : '';
   const note = what === 'left' ? [`두고 옴${place ? `: ${place}` : ''}`, logExtra.note].filter(Boolean).join(' · ') : logExtra.note;
-  const log = { name: cur.name, item: id, ...(cur.icon ? { icon: cur.icon } : {}), what, by, anchor, ...(logExtra.quote ? { quote: logExtra.quote } : {}), ...(note ? { note } : {}) };
+  const log = { name: cur.name, item: id, ...(cur.icon ? { icon: cur.icon } : {}), what, by, anchor, ...(logExtra.quote ? { quote: logExtra.quote } : {}), ...(note ? { note } : {}), ...(how === 'drop' && key ? { key } : {}) };
   if (!how) return addItemLog({ ...it, list: it.list.filter((x) => x.id !== id) }, log);
   const { slot: _s, held: _h, backAt: _b, place: _p, outKey: _k, ...rest } = cur;
   const out: Item = { ...rest, outHow: how, outAt: anchor, ...(place ? { place } : {}), ...(key ? { outKey: key } : {}) };
@@ -1259,11 +1278,11 @@ export function itemsNowOf(chat: Chat, pictures?: (name: string, icon?: string) 
 }
 
 /** 자료 items_away: 치워 둔 물건(되살릴 수 있는 것)의 이름·자리. 되찾으면 갱신기가 이 이름 그대로 new 를 쓴다 */
-export function itemsAwayOf(chat: Chat): { name: string; place?: string }[] {
+export function itemsAwayOf(chat: Chat, asOf?: string): { name: string; place?: string }[] {
   const it = readItems(chat.scriptstate);
   const alive = aliveAnchors(chat);
   const turns = itemAwayTurns(chat.scriptstate);
-  const after = turnsAfter(chat);
+  const after = turnsAfter(chat, asOf);
   return outItems(it, alive)
     .filter((e) => outItemOf(it, alive, e.name) === e && awayKept(e, after, turns))
     .map((e) => ({ name: e.name, ...(e.place ? { place: e.place } : {}) }));
@@ -1330,6 +1349,8 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
       // 사용자가 버린 물건: 버린 때보다 뒤의 메시지가 근거일 때만 되살린다 (같은 응답·앞 응답을 근거로 도로 생기지 않게)
       const back = outItemOf(it, alive, c.name);
       if (back?.outHow === 'drop' && !(order.indexOf(c.anchor) > (back.outKey ? order.indexOf(back.outKey) : -1) && order.includes(c.anchor))) continue;
+      // 잊은 물건(설정 「치운 물건 기억」이 지나 줄을 지운 것): 버리거나 부서지기 전의 응답을 근거로 도로 생기지 않게 기록으로 본다
+      if (!back && !cur && forgottenBefore(it, alive, order, c)) continue;
       // 범위 설정에서 뺀 종류는 새로 만들지 않는다 (갖고 있던 것을 되찾는 것은 받는다)
       if (!back && !cur && opts.skipKinds?.length && opts.skipKinds.includes(kindOfIcon(c.icon))) continue;
       // 「빈 X」를 지닌 채 「… X」를 새로 얻었다고 오면(찬 수집기) 같은 물건이 찬 것 — 줄을 둘로 두지 않고 그 줄을 바꾼다
