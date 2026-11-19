@@ -14,5 +14,106 @@
  "oy": 14,
  "sec": 0.2,
  "file": "idle_south.webp",
- "note": "사용자가 PixelLab에서 만든 페르소나 아바타 (2026-11-08 받음). 프레임 캔버스 256×256 → 128 칸 기준 ox 는 -64"
+ "note": "사용자가 PixelLab에서 만든 페르소나 아바타 (2026-11-08 받음). 프레임 캔버스 256×256 → 128 칸 기준 ox 는 -64",
+ "acts": {
+  "143": {
+   "name": "스트레칭·기지개",
+   "file": "act_143.webp",
+   "n": 8,
+   "cw": 117,
+   "ch": 242,
+   "dx": 26,
+   "dy": 8,
+   "sec": 0.167,
+   "pixellab_group": "0964b824-0264-4fe0-9646-a3543a1b4fb4"
+  },
+  "147": {
+   "name": "서서 폰 보기",
+   "file": "act_147.webp",
+   "n": 9,
+   "cw": 62,
+   "ch": 234,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.2,
+   "pixellab_group": "0a496175-58cb-4605-9372-1770a371d2b3"
+  },
+  "145": {
+   "name": "정면 흡연",
+   "file": "act_145.webp",
+   "n": 8,
+   "cw": 88,
+   "ch": 234,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.2,
+   "pixellab_group": "259066e5-e8fd-43f1-be8d-8a08b3e84bd2"
+  },
+  "147_2": {
+   "name": "서서 폰 보기",
+   "file": "act_147_2.webp",
+   "n": 9,
+   "cw": 65,
+   "ch": 234,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.2,
+   "pixellab_group": "2b66ca67-3e43-474f-8d10-b6efab73362f"
+  },
+  "142": {
+   "name": "서서 커피 마시기",
+   "file": "act_142.webp",
+   "n": 8,
+   "cw": 61,
+   "ch": 234,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.2,
+   "pixellab_group": "2ee49204-6bba-4a23-93e3-716845ea6098"
+  },
+  "157": {
+   "name": "서서 간식 먹기",
+   "file": "act_157.webp",
+   "n": 8,
+   "cw": 61,
+   "ch": 234,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.167,
+   "pixellab_group": "3de4e97f-53a4-4264-867f-29d8704a3e54"
+  },
+  "168": {
+   "name": "뒷짐 지고 서서 구경",
+   "file": "act_168.webp",
+   "n": 8,
+   "cw": 61,
+   "ch": 234,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.25,
+   "pixellab_group": "4581b3de-c838-42fc-a9b0-131a91dbdee7"
+  },
+  "116": {
+   "name": "서서 통화",
+   "file": "act_116.webp",
+   "n": 8,
+   "cw": 68,
+   "ch": 234,
+   "dx": 1,
+   "dy": 0,
+   "sec": 0.2,
+   "pixellab_group": "7aebe308-f66d-4465-9cff-d21532023477"
+  },
+  "143_2": {
+   "name": "스트레칭·기지개",
+   "file": "act_143_2.webp",
+   "n": 8,
+   "cw": 128,
+   "ch": 248,
+   "dx": 31,
+   "dy": 14,
+   "sec": 0.167,
+   "pixellab_group": "993bdf5a-114c-4f24-8e51-dbe063e04f69"
+  }
+ }
 }

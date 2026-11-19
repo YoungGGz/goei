@@ -14,5 +14,84 @@
  "oy": 8,
  "sec": 0.2,
  "file": "idle_south.webp",
- "note": "사용자가 PixelLab에서 만든 페르소나 아바타 (2026-11-08 받음). 프레임 캔버스 256×256 → 128 칸 기준 ox 는 -64"
+ "note": "사용자가 PixelLab에서 만든 페르소나 아바타 (2026-11-08 받음). 프레임 캔버스 256×256 → 128 칸 기준 ox 는 -64",
+ "acts": {
+  "142": {
+   "name": "서서 커피 마시기",
+   "file": "act_142.webp",
+   "n": 8,
+   "cw": 75,
+   "ch": 244,
+   "dx": 1,
+   "dy": 2,
+   "sec": 0.2,
+   "pixellab_group": "1c293906-8d17-4512-b6db-c8cfbc9b6640"
+  },
+  "116": {
+   "name": "서서 통화",
+   "file": "act_116.webp",
+   "n": 8,
+   "cw": 81,
+   "ch": 243,
+   "dx": 4,
+   "dy": 1,
+   "sec": 0.2,
+   "pixellab_group": "788317a9-16a9-4936-a40f-cd3563617af6"
+  },
+  "147": {
+   "name": "서서 폰 보기",
+   "file": "act_147.webp",
+   "n": 9,
+   "cw": 75,
+   "ch": 242,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.2,
+   "pixellab_group": "9f2b7ded-0476-4ae9-9723-8057c17e8433"
+  },
+  "157": {
+   "name": "서서 간식 먹기",
+   "file": "act_157.webp",
+   "n": 8,
+   "cw": 76,
+   "ch": 242,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.167,
+   "pixellab_group": "a9e2038e-6297-4a02-a719-bd2333a48c49"
+  },
+  "145": {
+   "name": "정면 흡연",
+   "file": "act_145.webp",
+   "n": 8,
+   "cw": 94,
+   "ch": 242,
+   "dx": 0,
+   "dy": 0,
+   "sec": 0.2,
+   "pixellab_group": "b1dcc074-7a13-40e8-a345-22c5a268504d"
+  },
+  "168": {
+   "name": "뒷짐 지고 서서 구경",
+   "file": "act_168.webp",
+   "n": 8,
+   "cw": 79,
+   "ch": 242,
+   "dx": 3,
+   "dy": 0,
+   "sec": 0.25,
+   "pixellab_group": "bd7f9fb4-88a3-44a6-9b4e-31f6af6ba5c6"
+  },
+  "143": {
+   "name": "스트레칭·기지개",
+   "file": "act_143.webp",
+   "n": 8,
+   "cw": 124,
+   "ch": 245,
+   "dx": 25,
+   "dy": 3,
+   "sec": 0.167,
+   "pixellab_group": "c4d6d690-64ea-47ed-a3f4-c6cc4e9a547b"
+  }
+ }
 }
