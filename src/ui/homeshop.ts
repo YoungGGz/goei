@@ -917,6 +917,8 @@ async function homeshopSettingsAction(action: string, value: string | undefined,
   if (!m) return true;
   const [, k, v] = m;
   if (action === 'hs-cfg') {
+    // 상시 노출만 기본이 꺼짐이라 켠 값을 적는다 (나머지는 기본이 켜짐: 끈 값만 적는다)
+    if (k === 'net') return set({ [HS_KEY.net]: v === '0' ? '' : '1' });
     if (HS_FLAG[k]) return set({ [HS_FLAG[k]]: v === '0' ? '0' : '' });
     if (k === 'scalePc' || k === 'scalePh') return ['auto', 'fit', '0.5', '1', '2'].includes(v) ? set({ [k === 'scalePc' ? HS_KEY.scalePc : HS_KEY.scalePhone]: v }) : true;
     return true;
