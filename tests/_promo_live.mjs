@@ -10,10 +10,12 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const fx = H.loadFixture(args[0]);
 const base = resolve('.scratch/promo');
 const vpName = opt('--vp', 'pc');
-const vp = vpName === 'phone' ? { width: 412, height: 915, touch: true, scale: 2 } : { width: 2560, height: 1440, touch: false };
+const vp = vpName === 'phone' ? { width: 412, height: 915, touch: true, scale: 2 } : { width: 2560, height: 1440, touch: false, scale: 2 };
 const inFile = opt('--in');
 const st = inFile && existsSync(inFile) ? JSON.parse(readFileSync(inFile, 'utf8')) : { chat: { message: [], scriptstate: {} }, store: {}, char: null };
 if (st.char) fx.fixture = st.char;
+// 테마: 기본 라이트 (THEME=dark|paper 로 바꿈)
+if (st.chat.scriptstate?.$st_fixed_theme) st.chat.scriptstate.$st_fixed_theme = process.env.THEME || 'light';
 const browser = await H.launch();
 const { page, errors } = await H.boot(browser, fx, st.chat, vp, { store: st.store });
 // 받기 흉내: release/ 폴더의 파일을 그대로 돌려준다
@@ -32,10 +34,15 @@ const shot = async (name, sel) => {
 // 창 프레임만: 뒤 배경·그림자를 지우고 프레임 바깥은 투명으로 찍는다
 const frameShot = async (name, sel = '.gx-frame') => {
   mkdirSync(`${base}/out`, { recursive: true });
-  const st = await page.addStyleTag({ content: `html,body,.default-chat-screen{background:transparent!important}.default-chat-screen>*{visibility:hidden!important}.gx,.gx::before,.gx::after,.gw,.gw::before{background:transparent!important;backdrop-filter:none!important}${sel}{box-shadow:none!important;filter:none!important}[x-goei-prog],.gx-fab,[x-goei-fab]{visibility:hidden!important}` });
+  // 뒤 배경만 투명으로. 프레임의 테두리 선(번짐 없는 그림자 겹)은 남기고 바닥에 깔리는 번진 그림자만 뺀다
+  const st = await page.addStyleTag({ content: `html,body,.default-chat-screen{background:transparent!important}.default-chat-screen>*{visibility:hidden!important}.gx,.gx::before,.gx::after,.gw,.gw::before{background:transparent!important;backdrop-filter:none!important}[x-goei-prog],.gx-fab,[x-goei-fab]{visibility:hidden!important}` });
+  const old = await page.evaluate((sel) => { const f = document.querySelector(sel); const prev = f.style.boxShadow; const layers = getComputedStyle(f).boxShadow.split(/,(?![^(]*\))/).map((x) => x.trim()); const keep = layers.filter((l) => { const n = l.replace(/rgba?\([^)]*\)/, '').trim().split(/\s+/).filter((t) => /px$/.test(t)); return l.includes('inset') || parseFloat(n[2] || '0') === 0; }); f.style.boxShadow = keep.length ? keep.join(', ') : 'none'; return prev; }, sel);
   await page.waitForTimeout(250);
   const path = `${base}/out/${name}.png`;
-  await page.locator(sel).first().screenshot({ path, omitBackground: true });
+  const b = await page.locator(sel).first().boundingBox();
+  const m = 40;
+  await page.screenshot({ path, omitBackground: true, clip: { x: Math.max(0, b.x - m), y: Math.max(0, b.y - m), width: b.width + m * 2, height: b.height + m * 2 } });
+  await page.evaluate(([sel, v]) => { document.querySelector(sel).style.boxShadow = v; }, [sel, old]);
   await st.evaluate((e) => e.remove());
   return path;
 };
