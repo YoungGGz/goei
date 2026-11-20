@@ -365,6 +365,7 @@ function entries(ctx: ChatContext): Entry[] {
   const lore = ctx.char.globalLore ?? [];
   const facs = factionList(lore);
   const hasLore = new Set(lore.map((e) => String(e.comment ?? '').trim()));
+  const docTitles = listDocs(ctx.chat, lore).map((d) => d.title);
   for (const o of dir.orgs) {
     const f = o.faction ? facs.find((x) => x.code === o.faction) : facs.find((x) => !x.builtin && x.affiliation === o.name);
     if (f?.hidden) continue;
@@ -372,7 +373,8 @@ function entries(ctx: ChatContext): Entry[] {
     if (!f && !hasLore.has(doc)) continue; // 요원 소속에만 있는 이름(미분류 등)
     const name = f?.name ?? o.name;
     // 문서 제목: 로어북 이름(이슬람 서울중앙성원)과 기본 문서 제목(이슬람)이 다를 수 있어 문서가 있는 쪽 (2026-10-21)
-    const title = [c(doc), c(o.name), c(name)].find((t) => findDoc(ctx.chat, t, lore)) ?? c(doc);
+    // 그래도 없으면 조직 이름 뒤에 말을 붙인 정식 이름 문서 (조직 「발푸르기스」 ↔ 문서 「발푸르기스 협회」, 11-20 사용자: 그림이 안 붙음)
+    const title = [c(doc), c(o.name), c(name)].find((t) => findDoc(ctx.chat, t, lore)) ?? docTitles.find((t) => [o.name, name].some((n) => n && t.startsWith(`${n} `))) ?? c(doc);
     list.push({ cat: 'org', name, title, sub: o.name !== name ? o.name : '', photo: mainPic(ctx.char, { ...o.spec, shared: o.shared }), face: facePic(ctx.char, { ...o.spec, shared: o.shared }), terms: [name, o.name, doc, o.spec.english ?? ''] });
   }
   // 같은 문서로 이어지는 항목은 하나만
@@ -531,6 +533,12 @@ function searchRows(ctx: ChatContext, q: string): string {
 /** 대문 검색칸 아래 결과: 입력하는 대로 바뀐다 */
 export function wikiHomeResults(ctx: ChatContext): string {
   const q = wiki.homeQuery.trim();
+  return q ? `<div class="wls">${searchRows(ctx, q)}</div>` : '';
+}
+
+/** 머리줄 검색칸 아래 결과: 서랍 검색처럼 글자마다 바뀐다 (11-20 사용자). 검색칸에 포커스가 있을 때만 보인다 (CSS) */
+export function wikiTopResults(ctx: ChatContext): string {
+  const q = wiki.query.trim();
   return q ? `<div class="wls">${searchRows(ctx, q)}</div>` : '';
 }
 
@@ -782,7 +790,7 @@ export function wikiTab(ctx: ChatContext, env?: WikiEnv): string {
   const grab = `<button type="button" class="wgrab" data-action="wiki-list" data-value="open" aria-label="목록 펼치기">‹<span>목록</span></button>`;
   const scrim = open ? '<button type="button" class="wscrim" data-action="wiki-list" data-value="close" aria-label="목록 접기" tabindex="-1"></button>' : '';
   return `<main class="gx-body wk hasdr${main ? ' nm' : ''}${open ? ' dr-open' : ''}">
-    ${topBar(main)}
+    ${topBar(main)}<div class="wtres">${wikiTopResults(ctx)}</div>
     <div class="wsc">${status ? `<div class="wst nw-status">${status}</div>` : ''}${paneHtml(ctx)}</div>
     ${grab}${drawer}${scrim}
     ${note}
@@ -1013,6 +1021,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
       }
       wiki.history = [];
       wiki.homeQuery = '';
+      wiki.query = '';
       openTitle(ctx, v, 'search');
       // 고르면 목록을 접어 문서를 넓게
       if (wiki.view !== 'home') wiki.listOpen = false;
@@ -1024,6 +1033,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
     case 'wiki-write':
       if (!v.trim()) break;
       wiki.newTitle = '';
+      wiki.query = '';
       openTitle(ctx, v, 'direct');
       if (wiki.view === 'compose' || wiki.view === 'doc') wiki.listOpen = false;
       break;

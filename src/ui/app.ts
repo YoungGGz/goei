@@ -39,7 +39,7 @@ import { setItemIconRedraw } from '../host/itemicons';
 import { BRAND } from './brand';
 import { checkLatest, handleUpdate, hasUpdate, updateBanner } from './update';
 import { currentTheme, setCurrentTheme, themeName } from './theme';
-import { bindFootnotes, bindWikiSide, handleWiki, resetWiki, wiki, wikiHomeResults, wikiInput, wikiList, wikiOpenCheck, wikiTab, type WikiEnv } from './wiki';
+import { bindFootnotes, bindWikiSide, handleWiki, resetWiki, wiki, wikiHomeResults, wikiInput, wikiList, wikiTopResults, wikiOpenCheck, wikiTab, type WikiEnv } from './wiki';
 import { bmDeskWinSpec, mallWinSpec, mallAction, mallAskOpen, mallInput, mallOpenCheck, mallSettingsAction, mallTab, resetMalls } from './malls';
 import { isMallSite } from '../core/malls';
 import { homeshopAction, homeshopInput, homeshopMounted, homeshopOpenCheck, homeshopTab, resetHomeshop } from './homeshop';
@@ -344,6 +344,10 @@ function ensureRoot(): HTMLElement {
       void run(g === 'DR' ? 'br-close' : 'br-reopen', String(br.cur));
     },
   });
+  // 위키 머리줄 검색 결과를 누를 때 검색칸 포커스를 뺏지 않는다 (포커스가 빠지면 결과 칸이 먼저 닫혀 누른 것이 안 먹음)
+  root.addEventListener('pointerdown', (ev) => {
+    if ((ev.target as HTMLElement).closest?.('.wk .wtres')) ev.preventDefault();
+  });
   // 명부 요원 순서 (PC): 손잡이를 끌어 같은 소속 요원 위·아래에 놓는다. 놓으면 dir-move before/after
   root.addEventListener('pointerdown', (ev) => {
     const grip = (ev.target as HTMLElement).closest?.<HTMLElement>('[data-drag-agent]');
@@ -639,7 +643,10 @@ function panelInput(el: HTMLInputElement): void {
     return;
   }
   if (el?.dataset?.input === 'wiki-query' && view.kind === 'started') {
+    // 머리줄 검색칸: 아래 결과만 다시 그린다 (입력칸 포커스 유지, 서랍 검색과 같이 글자마다)
     wiki.query = el.value;
+    const box = root?.querySelector('.wk .wtres');
+    if (box) box.innerHTML = wikiTopResults(view.ctx);
     return;
   }
   if (el?.dataset?.input === 'wiki-filter' && view.kind === 'started') {

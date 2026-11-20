@@ -4604,6 +4604,10 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk.nm .top .rnd { flex: none; width: 34px; height: 32px; background: #fff; color: #00a495; border-radius: 4px 0 0 4px; display: grid; place-items: center; font-weight: 900; border-right: 1px solid #ddd; }
 .wk.nm .top .wlb + .rnd { margin-left: -8px; }
 .wk.nm .top .rnd + .sr { margin-left: -18px; border-radius: 0 4px 4px 0; }
+/* 머리줄 검색 결과 (11-20): 검색칸에 포커스가 있고 글이 있을 때만. PC는 검색칸 바로 아래 같은 폭, 폰은 머리줄 폭 전체 */
+.wk .wtres { display: none; position: absolute; top: 52px; right: 24px; width: 300px; z-index: 20; }
+.wk .top:focus-within + .wtres:not(:empty) { display: block; }
+.wk .wtres .wls { max-height: 360px; background: #fff; border: 1px solid #ddd; border-top: 0; border-radius: 0 0 4px 4px; box-shadow: 0 6px 16px rgba(0, 0, 0, .12); }
 .wk .wsc { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .wk .wst { max-width: 1200px; margin: 0 auto; padding: 12px 24px 0; display: flex; flex-direction: column; gap: 8px; }
 .wk .wst .nw-busy, .wk .wst .gx-err { margin: 0; }
@@ -4761,6 +4765,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .top { padding: 0 12px; }
   .wk .top nav, .wk .wlb { display: none; }
   .wk .top .sr { flex: 1; }
+  .wk .wtres { left: 0; right: 0; width: auto; }
+  .wk .wtres .wls { max-height: 55vh; border-radius: 0; }
   .wk.nm .top .rnd { margin-left: auto; }
   .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 8px; }
   .wk .side { display: none; }
