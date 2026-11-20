@@ -40,13 +40,14 @@ test('이름에서 뒤에 나온 낱말(더 좁은 자리)을 따르고, 안·�
   assert.equal(top('신축 아파트 공사 현장').replace(/ \d$/, ''), 'ConstructionSite');
   assert.equal(top('모텔 3층'), 'Lodging 2');
   assert.equal(top('목욕탕 앞'), 'Bathhouse 1');
-  // 복도 그림이 아직 없으면 그 건물의 안쪽 그림
-  assert.equal(now('강서대학병원 3층 복도'), 'Hospital 2');
+  assert.equal(now('강서대학병원 3층 복도'), 'Hallway');
+  assert.equal(top('한빛동 산책로'), 'UrbanPark');
+  assert.equal(top('중랑천변 산책로'), 'RiversidePark');
   assert.match(top('충장로 구시가지 영화관', '낡은 상영관에서 사람이 사라진다', '광주광역시 동구'), /^Theater [12]$/);
 });
 
 test('끝말: 세 글자 이상인 낱말 끝에서만, 같은 글자로 끝나는 다른 낱말과 행정구역은 뺀다', () => {
-  // 2026-11-19 사용자 스샷: 옥정호 수변 산책로에 상가 복도 그림. 새 그림이 오기 전에도 저수지 그림
+  // 2026-11-19 사용자 스샷: 옥정호 수변 산책로에 상가 복도 그림. 산책로는 딸린 길이라 호수가 먼저
   assert.equal(now('옥정호 수변 산책로 안개 구역', '안개 속에서 낚시객 두 명이 같은 자리를 맴돎', '전북특별자치도 임실군'), 'Lake 1');
   assert.equal(top('중랑천변 자전거 보관소').replace(/ \d$/, ''), 'RiversidePark');
   assert.match(top('북한산 둘레길'), /^Forest/);
@@ -99,13 +100,13 @@ test('상황 글은 이름에서 못 고를 때만, 다른 곳을 가리키는 �
 test('새 그림은 숫자 없는 이름 한 장, 그림이 아직 없으면 가까운 기존 그림 (2026-11-19 사용자)', () => {
   assert.equal(situationShared('an', '한빛동 셀프세차장')[0], 'Situation Anomaly CarWash');
   assert.equal(situationShared('an', '국도변 주유소')[0], 'Situation Anomaly GasStation');
-  // 옛 GasStation 2 는 세차장 그림이라 세차장 후보 (대조표 되살림). 주유소 그림은 끼지 않는다
+  // 세차장 후보에 주유소 그림은 끼지 않는다
   assert.ok(!situationShared('an', '한빛동 셀프세차장').some((n) => /GasStation( 1)?$/.test(n)));
   assert.equal(now('한빛동 셀프세차장'), have.has('Situation Anomaly CarWash') ? 'CarWash' : 'Store 1');
   assert.ok(situationShared('an', '이름 모를 곳', '', '서울특별시 강남구').includes('Situation Anomaly Generic City Skyline'));
   assert.ok(situationShared('an', '이름 모를 곳', '실내에서 소리가 남').includes('Situation Anomaly Generic Indoor EmptyHall'));
-  assert.equal(situationShared('in', '시청 앞 광장', '집회 중 압사')[0], 'Situation Incident CityHallPlaza');
-  assert.equal(situationShared('in', '울산 석유화학단지', '폭발')[0], 'Situation Incident PetrochemicalComplex');
+  assert.equal(situationShared('in', '시청 앞 광장', '집회 중 압사')[0], 'Situation Incident CityHall');
+  assert.equal(situationShared('in', '울산 석유화학단지', '폭발')[0], 'Situation Incident Plant');
   // 숫자 있는 기존 그림은 그대로
   assert.equal(top('모텔 3층'), 'Lodging 2');
   // 그림 한 장 항목의 「가까운 그림」은 지금 있는 그림이어야 한다
@@ -114,30 +115,6 @@ test('새 그림은 숫자 없는 이름 한 장, 그림이 아직 없으면 가
   assert.deepEqual(bad, []);
   // 새 그림 이름에 숫자가 붙지 않는다
   assert.deepEqual(places.filter((p) => !p.pics && /\d$/.test(p.k)).map((p) => p.k), []);
-});
-
-test('옛 이름으로 뽑아 둔 같은 장소 그림: 새 이름 그림이 없으면 옛 그림, 둘 다 있으면 새 그림 (2026-11-19 사용자)', () => {
-  const first = (names, files) => names.find((n) => files.has(n));
-  const wash = situationShared('an', '한빛동 셀프세차장');
-  const near = ['Situation Anomaly Store 1'];
-  assert.equal(first(wash, new Set([...near, 'Situation Anomaly GasStation 2'])), 'Situation Anomaly GasStation 2');
-  assert.equal(first(wash, new Set([...near, 'Situation Anomaly GasStation 2', 'Situation Anomaly CarWash'])), 'Situation Anomaly CarWash');
-  assert.equal(first(wash, new Set(near)), 'Situation Anomaly Store 1');
-  // 두 장을 한 항목으로 되살린 은행은 옛 1·2 순
-  const bank = situationShared('an', '중앙은행 본점');
-  assert.deepEqual(bank.slice(0, 3), ['Situation Anomaly Bank', 'Situation Anomaly Bank 1', 'Situation Anomaly Bank 2']);
-  // 합침·뺌인 옛 그림은 후보에 없다
-  assert.ok(!situationShared('an', '언덕 골목').includes('Situation Anomaly Alley 2'));
-  assert.equal(situationShared('an', '언덕 골목')[1], 'Situation Anomaly Alley 1');
-  // 표: 옛 이름은 숫자 붙은 이름, 한 번씩만, 숫자 있는 기존 그림 이름과 겹치지 않음
-  const places = JSON.parse(readFileSync('src/data/picwords.json', 'utf8')).places;
-  const olds = places.flatMap((p) => p.old ?? []);
-  assert.equal(olds.length, 47);
-  assert.equal(new Set(olds).size, olds.length);
-  assert.deepEqual(olds.filter((o) => !/ \d$/.test(o)), []);
-  const kept = new Set(places.filter((p) => p.pics).flatMap((p) => p.pics.map((x) => `${p.k} ${x.n}`)));
-  assert.deepEqual(olds.filter((o) => kept.has(o)), []);
-  assert.deepEqual(places.filter((p) => p.old && p.pics).map((p) => p.k), []);
 });
 
 test('bases and orgs pick by name words', () => {

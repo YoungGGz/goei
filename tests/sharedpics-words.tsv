@@ -35,7 +35,7 @@
 주택가	Alley	
 뒷골목	Alley	
 막다른길	Alley	
-달동네	Alley	
+달동네	HillsideStairs	
 판자촌	Alley	
 쪽방촌	Alley	
 빌라촌	Alley	
@@ -172,8 +172,8 @@
 재	Road	1
 고속도로	Expressway	
 고가도로	ElevatedRoad	
-톨게이트	Expressway	
-요금소	Expressway	
+톨게이트	TollGate	
+요금소	TollGate	
 나들목	Expressway	
 분기점	Expressway	
 고가차도	ElevatedRoad	
@@ -994,7 +994,7 @@ KTX	Subway	2
 수로	RiversidePark	
 천	RiversidePark	
 계곡	MountainValley	
-폭포	MountainValley	
+폭포	Waterfall	
 소	MountainValley	
 계류	MountainValley	
 물놀이계곡	MountainValley	
@@ -1254,9 +1254,9 @@ KTX	Subway	2
 단칸방	StudioFlat	
 원룸텔	StudioFlat	
 자취집	StudioFlat	
-계단길	Alley	
-산동네	Alley	
-언덕동네	Alley	
+계단길	HillsideStairs	
+산동네	HillsideStairs	
+언덕동네	HillsideStairs	
 양옥집	House	
 이층집	House	
 2층집	House	
@@ -1618,3 +1618,10 @@ KTX역	TrainStation
 지하 하수도	Sewer	
 쓰레기 매립지	Landfill	
 골목 공터	Generic EmptyLot	
+언덕길	HillsideStairs	
+비탈길	HillsideStairs	
+계단골목	HillsideStairs	
+하이패스	TollGate	
+영업소	TollGate	
+폭포수	Waterfall	
+용소	Waterfall	

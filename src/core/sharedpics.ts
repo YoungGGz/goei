@@ -63,8 +63,8 @@ function rank(table: Table, name: string, text: string, seed: string): string[] 
 
 // ── 괴이·사건: 그림 한 장마다 낱말 ──
 interface Pic { n: number; w: string[]; in?: boolean; inc?: string[] }
-/** pics 가 없으면 그림 한 장(이름 = k, 숫자 없음). old: 같은 장소를 옛 이름으로 이미 뽑은 그림 (k 그림이 없을 때 그다음 후보, 11-19 대조표의 같은 장소·되살림) */
-interface Place { k: string; old?: string[]; w?: string[]; pics?: Pic[]; g?: { w: string[]; p: number[] }; near?: string; inc?: string[]; base?: boolean }
+/** pics 가 없으면 그림 한 장(이름 = k, 숫자 없음). s: 어느 장소에나 딸린 길 낱말(산책로): 이름에 다른 장소 낱말이 있으면 그 뒤로 간다 */
+interface Place { k: string; w?: string[]; s?: string[]; pics?: Pic[]; g?: { w: string[]; p: number[] }; near?: string; inc?: string[]; base?: boolean }
 const PLACES = (pw as { places: Place[] }).places;
 
 /** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고, 같은 글자로 끝나는 다른 낱말은 뺀다 */
@@ -105,7 +105,7 @@ for (const n of [...Object.values(SIDO_NAME), ...Object.values(SIGUN).flat()]) {
   if (short.length >= 2) REGION.add(short);
 }
 // 장소 낱말과 같은 지역 줄임말(광산구의 광산)은 장소로 본다
-for (const p of PLACES) for (const w of [...(p.w ?? []), ...(p.g?.w ?? []), ...(p.pics ?? []).flatMap((x) => x.w)]) REGION.delete(w);
+for (const p of PLACES) for (const w of [...(p.w ?? []), ...(p.s ?? []), ...(p.g?.w ?? []), ...(p.pics ?? []).flatMap((x) => x.w)]) REGION.delete(w);
 /** 낱말 뒤에 붙은 조사·자리 말 (중랑천변, 옥정호에서) */
 const TAIL = /(에서|에|의|변|가|길|앞|뒤|옆|쪽|인근|근처|부근|일대|주변|방면)$/;
 const IN_CUE = /\d\s?층|지하\s?\d|[가-힣]실(\s|$)|복도|내부|실내|로비|호실|\d\s?호(\s|$)|객실|병동|안쪽/;
@@ -113,7 +113,7 @@ const OUT_CUE = /앞|입구|정문|후문|마당|옥외|외벽|담장|운동장|
 /** 상황 글에서 발생지점이 아닌 곳을 가리키는 꼴 (인근 병원으로 이송, 경찰서에서 출동) */
 const ELSEWHERE = /[가-힣]+\s?(으로|로|에서)\s?(긴급\s?)?(이송|후송|옮겨|출동|대피|향하|연행|호송|파견)[가-힣]*/g;
 
-interface Hit { place: Place; pic?: number; general?: boolean; end: number; len: number }
+interface Hit { place: Place; pic?: number; general?: boolean; soft?: boolean; end: number; len: number }
 
 /** 이름에서 장소 낱말 찾기: 뒤에 나온 낱말이 먼저 (우리말은 뒤 낱말이 더 좁은 자리), 같은 자리면 긴 낱말 */
 function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
@@ -142,13 +142,14 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
     }
     return -1;
   };
-  const add = (place: Place, w: string, pic?: number, general?: boolean) => {
+  const add = (place: Place, w: string, pic?: number, general?: boolean, soft?: boolean) => {
     // 한 글자 낱말(산·섬·절)은 이름에서만: 상황 글에서는 「멈춰 섬」 같은 말에 걸린다
     const end = w.length === 1 ? (byPosition ? one(w) : -1) : w.length >= 4 ? (flat.lastIndexOf(w) < 0 ? -1 : flat.lastIndexOf(w) + w.length) : inToken(w);
-    if (end >= 0) hits.push({ place, pic, general, end, len: w.length });
+    if (end >= 0) hits.push({ place, pic, general, soft, end, len: w.length });
   };
   for (const p of PLACES) {
     for (const w of p.w ?? []) add(p, w);
+    for (const w of p.s ?? []) add(p, w, undefined, undefined, true);
     for (const w of p.g?.w ?? []) add(p, w, undefined, true);
     for (const pic of p.pics ?? []) for (const w of pic.w) add(p, w, pic.n);
   }
@@ -190,14 +191,15 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
       put(rule.to, end, rule.n);
     }
   }
-  return hits.sort((a, b) => (byPosition ? b.end - a.end || b.len - a.len : b.len - a.len || a.end - b.end));
+  hits.sort((a, b) => (byPosition ? b.end - a.end || b.len - a.len : b.len - a.len || a.end - b.end));
+  return [...hits.filter((h) => !h.soft), ...hits.filter((h) => h.soft)];
 }
 
 /** 한 장소의 그림 순서: 그 그림의 낱말이면 그 그림 먼저, 장소 이름뿐이면 안/바깥 단서 → 이름으로 돌린 순서 */
 function picsOf(h: Hit, cue: 'in' | 'out' | '', seed: string): string[] {
   const p = h.place;
   if (p.base) return ['@'];
-  if (!p.pics) return [p.k, ...(p.old ?? [])];
+  if (!p.pics) return [p.k];
   const all = p.pics.map((x) => x.n);
   const pool = h.pic ? [h.pic] : (p.g?.p ?? all);
   const start = pick(seed, pool.length);
@@ -218,9 +220,16 @@ function broad(name: string, text: string, loc: string): string {
   if (/[시구](\s|$)/.test(loc) || /행인|시민|차량|도심|시내/.test(all)) return 'City';
   return 'Night';
 }
-/** 넓은 갈래마다 한 장 (숫자 없음) */
-const BROAD_AN: Record<string, string> = { Indoor: 'Generic Indoor EmptyHall', Water: 'Generic Waterside', Mountain: 'Generic Mountain Ridge', Country: 'Generic Country Lane', City: 'Generic City Skyline', Night: 'Generic EmptyLot' };
-const BROAD_IN: Record<string, string[]> = { Indoor: ['Street'], Water: ['River'], Mountain: ['Mountain'], Country: ['CountryFarmland', 'Mountain'], City: ['Street'], Night: ['Street'] };
+/** 넓은 갈래의 그림 (숫자 없음). 두 장인 갈래는 이름으로 돌린 순서 */
+const BROAD_AN: Record<string, string[]> = {
+  Indoor: ['Generic Indoor EmptyHall', 'Generic Indoor Lobby'],
+  Water: ['Generic Waterside Reeds', 'Generic Waterside NightLights'],
+  Mountain: ['Generic Mountain Ridge'],
+  Country: ['Generic Country Lane', 'Generic Country Hillside'],
+  City: ['Generic City SideStreet', 'Generic City Skyline'],
+  Night: ['Generic EmptyLot'],
+};
+const BROAD_IN: Record<string, string[]> = { Indoor: ['Street'], Water: ['River'], Mountain: ['Mountain'], Country: ['Farm', 'Mountain'], City: ['Street'], Night: ['Street'] };
 
 const SIT: Record<string, string> = { an: 'Anomaly', in: 'Incident', ms: 'Mystic' };
 
@@ -245,7 +254,9 @@ export function situationShared(kind: string, name: string, text = '', loc = '')
     const cue = IN_CUE.test(name) ? 'in' : OUT_CUE.test(name) ? 'out' : '';
     for (const h of places) out.push(...picsOf(h, cue, name));
     for (const h of places) if (h.place.near) out.push(h.place.near);
-    out.push(BROAD_AN[group]);
+    const wide = BROAD_AN[group];
+    const start = pick(name, wide.length);
+    out.push(...wide.map((_, i) => wide[(start + i) % wide.length]));
   } else {
     for (const h of places) out.push(...(h.place.pics?.find((x) => x.n === h.pic)?.inc ?? []), ...(h.place.inc ?? []));
     out.push(...BROAD_IN[group]);

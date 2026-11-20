@@ -44,9 +44,6 @@
 },
 {
 "k": "Home",
-"old": [
-"Home 2"
-],
 "w": [
 "거실",
 "안방",
@@ -76,9 +73,6 @@
 },
 {
 "k": "StudioFlat",
-"old": [
-"Home 1"
-],
 "w": [
 "자취방",
 "원룸",
@@ -99,25 +93,34 @@
 },
 {
 "k": "Alley",
-"old": [
-"Alley 1"
-],
 "w": [
 "골목",
 "골목길",
 "주택가",
 "뒷골목",
 "막다른길",
-"달동네",
 "판자촌",
 "쪽방촌",
 "빌라촌",
 "원룸촌",
 "담벼락",
-"전봇대",
+"전봇대"
+],
+"near": "Village 1",
+"inc": [
+"Residential"
+]
+},
+{
+"k": "HillsideStairs",
+"w": [
+"달동네",
 "계단길",
 "산동네",
-"언덕동네"
+"언덕동네",
+"언덕길",
+"비탈길",
+"계단골목"
 ],
 "near": "Village 1",
 "inc": [
@@ -126,9 +129,6 @@
 },
 {
 "k": "House",
-"old": [
-"House 1"
-],
 "w": [
 "단독주택",
 "주택",
@@ -149,9 +149,6 @@
 },
 {
 "k": "Hanok",
-"old": [
-"House 2"
-],
 "w": [
 "고택",
 "한옥",
@@ -213,15 +210,12 @@
 ]
 },
 "inc": [
-"CountryFarmland",
+"Farm",
 "Residential"
 ]
 },
 {
 "k": "Stairwell",
-"old": [
-"Stairwell 1"
-],
 "w": [
 "계단",
 "계단실",
@@ -239,9 +233,6 @@
 },
 {
 "k": "Basement",
-"old": [
-"Basement 1"
-],
 "w": [
 "지하실",
 "보일러실",
@@ -312,34 +303,30 @@
 },
 {
 "k": "UrbanPark",
-"old": [
-"Park 2"
-],
 "w": [
-"산책로",
 "호수공원",
 "체육공원",
 "수변공원",
 "생태공원",
 "잔디밭",
-"산책길",
-"자전거도로",
-"조깅코스",
 "유원지",
 "시민공원",
 "도시공원",
-"중앙공원"
+"중앙공원",
+"자전거도로"
+],
+"s": [
+"산책로",
+"산책길",
+"조깅코스"
 ],
 "near": "Forest 2",
 "inc": [
-"CityPark"
+"Park"
 ]
 },
 {
 "k": "Redevelopment",
-"old": [
-"Demolition 1"
-],
 "w": [
 "재개발구역",
 "철거촌",
@@ -400,9 +387,6 @@
 },
 {
 "k": "NightlifeStreet",
-"old": [
-"Downtown 1"
-],
 "w": [
 "번화가",
 "유흥가",
@@ -491,13 +475,8 @@
 },
 {
 "k": "Expressway",
-"old": [
-"Highway 1"
-],
 "w": [
 "고속도로",
-"톨게이트",
-"요금소",
 "나들목",
 "분기점",
 "자동차전용도로",
@@ -511,10 +490,20 @@
 ]
 },
 {
-"k": "RestArea",
-"old": [
-"RestArea 1"
+"k": "TollGate",
+"w": [
+"톨게이트",
+"요금소",
+"하이패스",
+"영업소"
 ],
+"near": "Road 1",
+"inc": [
+"Highway"
+]
+},
+{
+"k": "RestArea",
 "w": [
 "휴게소",
 "졸음쉼터",
@@ -530,9 +519,6 @@
 },
 {
 "k": "ElevatedRoad",
-"old": [
-"Underpass 1"
-],
 "w": [
 "고가밑",
 "고가아래",
@@ -551,9 +537,6 @@
 },
 {
 "k": "RailUnderpass",
-"old": [
-"Underpass 2"
-],
 "w": [
 "굴다리",
 "철교밑",
@@ -594,15 +577,12 @@
 }
 ],
 "inc": [
-"TunnelMouth",
+"Tunnel",
 "Highway"
 ]
 },
 {
 "k": "Cave",
-"old": [
-"Cave 1"
-],
 "w": [
 "동굴",
 "석회동굴",
@@ -621,9 +601,6 @@
 },
 {
 "k": "SeaCave",
-"old": [
-"Cave 2"
-],
 "w": [
 "해식동굴",
 "해안동굴",
@@ -632,14 +609,11 @@
 ],
 "near": "Sea 1",
 "inc": [
-"FishingHarbor"
+"Sea"
 ]
 },
 {
 "k": "CityPlaza",
-"old": [
-"Plaza 1"
-],
 "w": [
 "광장",
 "분수대",
@@ -652,15 +626,12 @@
 ],
 "near": "Road 2",
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
 {
 "k": "StationPlaza",
-"old": [
-"Plaza 2"
-],
 "w": [
 "역전광장",
 "역광장",
@@ -670,15 +641,12 @@
 ],
 "near": "Subway 1",
 "inc": [
-"RailPlatform",
+"Station",
 "Street"
 ]
 },
 {
 "k": "ObservationTower",
-"old": [
-"Tower 1"
-],
 "w": [
 "전망대",
 "타워",
@@ -690,7 +658,7 @@
 ],
 "near": "Rooftop 2",
 "inc": [
-"OfficeTower",
+"Tower",
 "Street"
 ]
 },
@@ -727,14 +695,11 @@
 ],
 "inc": [
 "Stadium",
-"CityPark"
+"Park"
 ]
 },
 {
 "k": "Zoo",
-"old": [
-"Zoo 1"
-],
 "w": [
 "동물원",
 "사파리",
@@ -745,14 +710,11 @@
 ],
 "near": "Amusement 1",
 "inc": [
-"CityPark"
+"Park"
 ]
 },
 {
 "k": "Aquarium",
-"old": [
-"Zoo 2"
-],
 "w": [
 "수족관",
 "아쿠아리움",
@@ -766,9 +728,6 @@
 },
 {
 "k": "BotanicalGlasshouse",
-"old": [
-"Garden 1"
-],
 "w": [
 "식물원",
 "온실",
@@ -778,14 +737,11 @@
 ],
 "near": "Forest 2",
 "inc": [
-"CityPark"
+"Park"
 ]
 },
 {
 "k": "FormalGarden",
-"old": [
-"Garden 2"
-],
 "w": [
 "수목원",
 "화원",
@@ -798,14 +754,11 @@
 ],
 "near": "Forest 2",
 "inc": [
-"CityPark"
+"Park"
 ]
 },
 {
 "k": "TraditionalMarket",
-"old": [
-"Market 1"
-],
 "w": [
 "시장",
 "재래시장",
@@ -828,9 +781,6 @@
 },
 {
 "k": "FishMarket",
-"old": [
-"Market 2"
-],
 "w": [
 "수산시장",
 "어시장",
@@ -843,7 +793,7 @@
 "near": "Restaurant 1",
 "inc": [
 "Market",
-"FishingHarbor"
+"Sea"
 ]
 },
 {
@@ -879,7 +829,7 @@
 }
 ],
 "inc": [
-"MallAtrium",
+"Mall",
 "Market"
 ]
 },
@@ -924,9 +874,6 @@
 },
 {
 "k": "Laundromat",
-"old": [
-"Unmanned 1"
-],
 "w": [
 "빨래방",
 "코인빨래방",
@@ -943,9 +890,6 @@
 },
 {
 "k": "VendingCorner",
-"old": [
-"Unmanned 2"
-],
 "w": [
 "무인점포",
 "무인가게",
@@ -964,9 +908,6 @@
 },
 {
 "k": "Cafe",
-"old": [
-"Cafe 1"
-],
 "w": [
 "카페",
 "커피숍",
@@ -986,9 +927,6 @@
 },
 {
 "k": "EscapeRoom",
-"old": [
-"Cafe 2"
-],
 "w": [
 "방탈출카페",
 "방탈출",
@@ -1041,9 +979,6 @@
 },
 {
 "k": "BasementBar",
-"old": [
-"Bar 1"
-],
 "w": [
 "술집",
 "주점",
@@ -1065,9 +1000,6 @@
 },
 {
 "k": "Nightclub",
-"old": [
-"Bar 2"
-],
 "w": [
 "클럽",
 "나이트클럽",
@@ -1109,9 +1041,6 @@
 },
 {
 "k": "PCBang",
-"old": [
-"PCroom 1"
-],
 "w": [
 "PC방",
 "피시방",
@@ -1128,9 +1057,6 @@
 },
 {
 "k": "BilliardHall",
-"old": [
-"PCroom 2"
-],
 "w": [
 "당구장",
 "볼링장",
@@ -1147,10 +1073,6 @@
 },
 {
 "k": "Bank",
-"old": [
-"Bank 1",
-"Bank 2"
-],
 "w": [
 "은행",
 "금고",
@@ -1167,15 +1089,12 @@
 ],
 "near": "Office 1",
 "inc": [
-"BankCorner",
+"Bank",
 "Street"
 ]
 },
 {
 "k": "HairSalon",
-"old": [
-"Salon 1"
-],
 "w": [
 "미용실",
 "이발소",
@@ -1197,9 +1116,6 @@
 },
 {
 "k": "PhotoStudio",
-"old": [
-"Salon 2"
-],
 "w": [
 "사진관",
 "사진스튜디오",
@@ -1213,9 +1129,6 @@
 },
 {
 "k": "Pawnshop",
-"old": [
-"Pawn 1"
-],
 "w": [
 "전당포",
 "골동품점",
@@ -1235,9 +1148,6 @@
 },
 {
 "k": "Scrapyard",
-"old": [
-"Pawn 2"
-],
 "w": [
 "고물상",
 "폐지수집소",
@@ -1253,9 +1163,6 @@
 },
 {
 "k": "GasStation",
-"old": [
-"GasStation 1"
-],
 "w": [
 "주유소",
 "충전소",
@@ -1272,9 +1179,6 @@
 },
 {
 "k": "CarWash",
-"old": [
-"GasStation 2"
-],
 "w": [
 "세차장",
 "자동세차",
@@ -1294,9 +1198,6 @@
 },
 {
 "k": "WeddingHall",
-"old": [
-"Wedding 1"
-],
 "w": [
 "예식장",
 "웨딩홀",
@@ -1403,9 +1304,6 @@
 },
 {
 "k": "IndoorPool",
-"old": [
-"Pool 1"
-],
 "w": [
 "수영장",
 "실내수영장",
@@ -1421,9 +1319,6 @@
 },
 {
 "k": "WaterPark",
-"old": [
-"Pool 2"
-],
 "w": [
 "워터파크",
 "물놀이장",
@@ -1434,14 +1329,11 @@
 ],
 "near": "Amusement 1",
 "inc": [
-"CityPark"
+"Park"
 ]
 },
 {
 "k": "SchoolGymnasium",
-"old": [
-"Gym 1"
-],
 "w": [
 "체육관",
 "강당",
@@ -1457,9 +1349,6 @@
 },
 {
 "k": "FitnessGym",
-"old": [
-"Gym 2"
-],
 "w": [
 "헬스장",
 "체육시설",
@@ -1483,9 +1372,6 @@
 },
 {
 "k": "Stadium",
-"old": [
-"Stadium 1"
-],
 "w": [
 "경기장",
 "야구장",
@@ -1584,7 +1470,7 @@
 ]
 },
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -1602,7 +1488,7 @@
 ],
 "near": "Library 1",
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -1621,7 +1507,7 @@
 ],
 "near": "Library 1",
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -1690,7 +1576,7 @@
 ],
 "near": "School 1",
 "inc": [
-"UniversityCampus",
+"Campus",
 "School"
 ]
 },
@@ -1707,7 +1593,7 @@
 ],
 "near": "Lodging 2",
 "inc": [
-"UniversityCampus",
+"Campus",
 "School"
 ]
 },
@@ -2069,7 +1955,7 @@
 ]
 },
 "inc": [
-"OfficeTower",
+"Tower",
 "Street"
 ]
 },
@@ -2102,7 +1988,7 @@
 ],
 "near": "Office 2",
 "inc": [
-"OfficeTower",
+"Tower",
 "Street"
 ]
 },
@@ -2124,7 +2010,7 @@
 ],
 "near": "Office 2",
 "inc": [
-"OfficeTower",
+"Tower",
 "Street"
 ]
 },
@@ -2143,7 +2029,7 @@
 ],
 "near": "Theater 2",
 "inc": [
-"OfficeTower",
+"Tower",
 "Street"
 ]
 },
@@ -2158,7 +2044,7 @@
 ],
 "near": "Office 2",
 "inc": [
-"OfficeTower",
+"Tower",
 "Street"
 ]
 },
@@ -2182,7 +2068,7 @@
 ],
 "near": "Office 1",
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -2201,7 +2087,7 @@
 ],
 "near": "Office 1",
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -2216,7 +2102,7 @@
 ],
 "near": "Office 1",
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -2246,7 +2132,7 @@
 ],
 "near": "Police 1",
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -2280,7 +2166,7 @@
 }
 ],
 "inc": [
-"CityHallPlaza",
+"CityHall",
 "Street"
 ]
 },
@@ -2318,7 +2204,7 @@
 }
 ],
 "inc": [
-"ArmyCheckpoint"
+"Military"
 ]
 },
 {
@@ -2355,7 +2241,7 @@
 },
 "inc": [
 "Apartment",
-"OfficeTower"
+"Tower"
 ]
 },
 {
@@ -2444,7 +2330,7 @@
 ],
 "near": "Lodging 2",
 "inc": [
-"OfficeTower",
+"Tower",
 "Street"
 ]
 },
@@ -2463,7 +2349,7 @@
 ],
 "near": "Ruin 1",
 "inc": [
-"LogisticsYard",
+"Warehouse",
 "Factory"
 ]
 },
@@ -2480,7 +2366,7 @@
 ],
 "near": "Ruin 1",
 "inc": [
-"LogisticsYard",
+"Warehouse",
 "Factory"
 ]
 },
@@ -2511,7 +2397,7 @@
 }
 ],
 "inc": [
-"CityPark",
+"Park",
 "Street"
 ]
 },
@@ -2578,7 +2464,7 @@
 ],
 "near": "Subway 1",
 "inc": [
-"RailPlatform",
+"Station",
 "Subway"
 ]
 },
@@ -2596,7 +2482,7 @@
 ],
 "near": "Subway 1",
 "inc": [
-"RailPlatform",
+"Station",
 "Subway"
 ]
 },
@@ -2612,7 +2498,7 @@
 "폐선"
 ],
 "inc": [
-"RailPlatform"
+"Station"
 ]
 },
 {
@@ -2645,7 +2531,7 @@
 }
 ],
 "inc": [
-"IntercityBusBays",
+"Terminal",
 "Street"
 ]
 },
@@ -2663,7 +2549,7 @@
 ],
 "near": "Bus 1",
 "inc": [
-"IntercityBusBays",
+"Terminal",
 "Street"
 ]
 },
@@ -2745,7 +2631,7 @@
 }
 ],
 "inc": [
-"FishingHarbor",
+"Sea",
 "Port"
 ]
 },
@@ -2762,7 +2648,7 @@
 ],
 "near": "Sea 1",
 "inc": [
-"FishingHarbor",
+"Sea",
 "Port"
 ]
 },
@@ -2779,7 +2665,7 @@
 ],
 "near": "Sea 1",
 "inc": [
-"FishingHarbor",
+"Sea",
 "Port"
 ]
 },
@@ -2793,7 +2679,7 @@
 ],
 "near": "Sea 1",
 "inc": [
-"FishingHarbor",
+"Sea",
 "Port"
 ]
 },
@@ -2810,7 +2696,7 @@
 ],
 "near": "Sea 1",
 "inc": [
-"FishingHarbor",
+"Sea",
 "Port"
 ]
 },
@@ -2844,7 +2730,7 @@
 ],
 "near": "Sea 2",
 "inc": [
-"FishingHarbor",
+"Sea",
 "Port"
 ]
 },
@@ -2896,7 +2782,7 @@
 }
 ],
 "inc": [
-"RiverBridge",
+"Bridge",
 "River"
 ]
 },
@@ -3017,7 +2903,7 @@
 }
 ],
 "inc": [
-"ReservoirDam",
+"Dam",
 "River"
 ]
 },
@@ -3030,7 +2916,6 @@
 "강변",
 "천변",
 "둔치",
-"수변",
 "제방",
 "둑",
 "둑길",
@@ -3051,13 +2936,15 @@
 "near": "Lake 1",
 "inc": [
 "River"
+],
+"s": [
+"수변"
 ]
 },
 {
 "k": "MountainValley",
 "w": [
 "계곡",
-"폭포",
 "소",
 "계류",
 "물놀이계곡",
@@ -3065,6 +2952,19 @@
 "골짜기",
 "계곡물",
 "산골짜기"
+],
+"near": "Forest 1",
+"inc": [
+"Mountain",
+"River"
+]
+},
+{
+"k": "Waterfall",
+"w": [
+"폭포",
+"폭포수",
+"용소"
 ],
 "near": "Forest 1",
 "inc": [
@@ -3162,7 +3062,7 @@
 ],
 "near": "Lake 1",
 "inc": [
-"ReservoirDam",
+"Dam",
 "River"
 ]
 },
@@ -3203,7 +3103,7 @@
 ],
 "near": "Bus 1",
 "inc": [
-"CountryFarmland"
+"Farm"
 ]
 },
 {
@@ -3219,7 +3119,7 @@
 ],
 "near": "Village 2",
 "inc": [
-"CountryFarmland"
+"Farm"
 ]
 },
 {
@@ -3235,7 +3135,7 @@
 ],
 "near": "Village 2",
 "inc": [
-"CountryFarmland"
+"Farm"
 ]
 },
 {
@@ -3257,7 +3157,7 @@
 ],
 "near": "Village 1",
 "inc": [
-"CountryFarmland"
+"Farm"
 ]
 },
 {
@@ -3272,7 +3172,7 @@
 ],
 "near": "Village 1",
 "inc": [
-"CountryFarmland"
+"Farm"
 ]
 },
 {
@@ -3293,7 +3193,7 @@
 ],
 "near": "Ruin 1",
 "inc": [
-"ConstructionSite"
+"Construction"
 ]
 },
 {
@@ -3331,7 +3231,7 @@
 ],
 "near": "Ruin 1",
 "inc": [
-"PetrochemicalComplex",
+"Plant",
 "Factory"
 ]
 },
@@ -3348,7 +3248,7 @@
 ],
 "near": "Ruin 1",
 "inc": [
-"LogisticsYard",
+"Warehouse",
 "Factory"
 ]
 },
@@ -3363,7 +3263,7 @@
 ],
 "near": "Ruin 1",
 "inc": [
-"LogisticsYard",
+"Warehouse",
 "Factory"
 ]
 },
@@ -3381,7 +3281,7 @@
 ],
 "near": "Road 1",
 "inc": [
-"PetrochemicalComplex",
+"Plant",
 "Factory"
 ]
 },
@@ -3400,7 +3300,7 @@
 ],
 "near": "Ruin 1",
 "inc": [
-"PetrochemicalComplex",
+"Plant",
 "Factory"
 ]
 },
