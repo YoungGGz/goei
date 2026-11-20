@@ -742,7 +742,7 @@ export function termsText(t: HsTerms, money = true): string {
 }
 /** 상담원 응답: <operator> 말 + <terms> 조건 (「none」이면 조건 없음). 물건 이름은 내민 물건 가운데서만 찾는다 (모르는 이름은 버림). 값의 크기는 거르지 않는다 — 판단은 상담원(모델) 몫 */
 export function parseOperator(raw: string, offered: { id: string; name: string }[]): { line: string; terms: HsTerms | null } {
-  const line = clean(block(raw, 'operator'), 300);
+  const line = clean(block(raw, 'operator'), 1000);
   if (!line) throw new HsError(guideTxt('Hs', 'ERR_NO_OPERATOR'));
   const body = block(raw, 'terms');
   if (!body || /^\s*(none|없음|-)\s*$/i.test(body)) return { line, terms: null };
