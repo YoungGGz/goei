@@ -17,6 +17,7 @@ if (st.char) fx.fixture = st.char;
 // 테마: 기본 라이트 (THEME=dark|paper 로 바꿈)
 if (st.chat) { st.chat.scriptstate = st.chat.scriptstate || {}; st.chat.scriptstate.$st_fixed_theme = process.env.THEME || 'light'; }
 const browser = await H.launch();
+if (process.env.HS) { const { distPack } = await import('./data-init.mjs'); st.store['p:goei:data-homeshop'] = distPack('goei-data-homeshop'); }
 const { page, errors } = await H.boot(browser, fx, st.chat, vp, { store: st.store });
 // 받기 흉내: release/ 폴더의 파일을 그대로 돌려준다
 await page.exposeFunction('__readRelease', (u) => { const rel = String(u).split('?')[0].split('/release/').pop().split('/').slice(-1)[0]; const f = resolve('release', decodeURIComponent(rel)); return existsSync(f) ? readFileSync(f).toString('base64') : null; });
