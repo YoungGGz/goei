@@ -301,7 +301,7 @@ function eventRow(e: WorldEvent, x: Ctx, agents: Map<string, { english?: string 
     kind: e.kind, name: e.name, grade: e.grade,
     loc: `${esc(locName(e.loc))}${since ? ` · ${since}` : ''}`, badge, chips: peopleChips(x.char, names, agents, factionNames(x.catalog, x.faction)[x.faction] ?? ''),
     extra: e.report ? `<span class="gx-evc-sit" title="${esc(e.report)}">${esc(e.report)}</span>` : '',
-    key: e.key, open: 'pick-event', art: artCtx ? evArt(artCtx, e.name, e.kind, `${locName(e.loc)} ${e.report ?? ''}`) : undefined, pop: e.key, locCode: e.loc,
+    key: e.key, open: 'pick-event', art: artCtx ? evArt(artCtx, e.name, e.kind, e.art) : undefined, pop: e.key, locCode: e.loc,
     selected: field.target?.type === 'event' && field.target.key === e.key, confirmEnd: field.confirmEnd === e.key,
   });
 }
@@ -342,7 +342,7 @@ function situations(x: Ctx, events: WorldEvent[]): string {
   const place = field.place ? placeCard(field.place, x.catalog, sameTarget(field.target, field.place)) : '';
   const cancel = cancelChip('map-unplace', !!(field.place || field.target));
   // 막 끝난 상황 (상황판과 같이 맨 아래 흐리게). 장소를 골랐을 때는 그 장소 것만 보이니 뺀다
-  const gone = field.place ? '' : endedShown(x.world).filter((e) => field.filter === 'all' || e.kind === field.filter).map((e) => endedCard(e, (n, k) => (artCtx ? evArt(artCtx, n, k) : undefined))).join('');
+  const gone = field.place ? '' : endedShown(x.world).filter((e) => field.filter === 'all' || e.kind === field.filter).map((e) => endedCard(e, (n, k) => (artCtx ? evArt(artCtx, n, k, e.art) : undefined))).join('');
   const empty = !x.on
     ? '상황판이 꺼져 있어 발생한 상황이 없어요. 지도에서 장소를 골라 이동할 수 있어요.'
     : field.place || field.filter !== 'all'
