@@ -844,5 +844,11 @@
   "title": "프리랜서",
   "cat": "조직",
   "kind": "place"
+ },
+ {
+  "no": 142,
+  "title": "망상홈쇼핑",
+  "cat": "특수",
+  "kind": "rumor"
  }
 ]

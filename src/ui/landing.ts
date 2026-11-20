@@ -11,7 +11,8 @@ const MONO = "'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
 /** 제목 「괴이 ː ANOMALY」와 아래로 비친 반사(이면). 반사는 물결처럼 일렁인다 */
 function title(p: Palette): string {
   const line = brandHtml(p.text, p.signal);
-  const font = 'font-size:2.1em;font-weight:800;letter-spacing:.08em;line-height:1.15;white-space:nowrap';
+  // 좁은 카드에서는 카드 안쪽 폭에 맞춰 줄어든다 (제목 한 줄 폭 ≈ 글자 크기의 8.6배). cqw 를 모르는 화면은 앞의 2.1em 그대로
+  const font = 'font-size:2.1em;font-size:min(2.1em,11.2cqw);font-weight:800;letter-spacing:.08em;line-height:1.15;white-space:nowrap';
   return `<div style="margin:6px 0 0;${font}">${line}</div>`
     + `<div aria-hidden="true" style="${font};line-height:1;margin:-.06em 0 .02em;`
     + `-webkit-mask-image:linear-gradient(to bottom,#000,transparent 60%);mask-image:linear-gradient(to bottom,#000,transparent 60%)">`
@@ -28,7 +29,7 @@ function corner(pos: string, p: Palette): string {
 // 유령 위, 글 아래로 가운데 정렬한 세로 카드 (PC도 모바일과 같은 폭·모양, 사용자 2026-10-19: 유령이 옆에 있으면 균형이 깨지고 PC는 넓기만 함)
 export function landingHtml(p: Palette): string {
   const ghost = GHOST_ICON.replace('width="24" height="24"', 'width="92" height="92"');
-  return `<div data-goei-card="landing" style="position:relative;overflow:hidden;box-sizing:border-box;max-width:23em;margin:18px auto;padding:30px 30px 22px;border-radius:20px;`
+  return `<div data-goei-card="landing" style="container-type:inline-size;position:relative;overflow:hidden;box-sizing:border-box;max-width:23em;margin:18px auto;padding:30px 30px 22px;border-radius:20px;`
     + `background:${p.void};border:1px solid ${p.line};color:${p.text};line-height:1.6;font-size:15px;text-align:center;box-shadow:0 20px 40px -24px rgba(0,0,0,.45)">`
     + `<span aria-hidden="true" data-goei-part="scan" style="position:absolute;left:0;right:0;top:0;height:40%;pointer-events:none;opacity:0;`
     + `background:linear-gradient(to bottom,transparent,${p.accentBg} 70%,transparent)"></span>`
@@ -43,7 +44,7 @@ export function landingHtml(p: Palette): string {
     + `<div data-goei-part="text" style="width:100%;min-width:0">`
     // 위의 「ANOMALY SIMULATION」 줄은 뺐다: 이름에 ANOMALY가 들어가서 (사용자 2026-10-23)
     + title(p)
-    + `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;padding-top:12px;border-top:1px dashed ${p.line};color:${p.sub}">`
+    + `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:4px;padding-top:12px;border-top:1px dashed ${p.line};color:${p.sub};white-space:nowrap;font-size:min(1em,7cqw)">`
     + `<span style="font-family:${MONO};color:${p.signal}">▸</span><span data-goei-part="hint">유령 버튼을 눌러 시작하세요</span></div>`
     + `</div></div></div>`;
 }

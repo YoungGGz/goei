@@ -226,9 +226,36 @@ test('시작 묶음 「중립」「다른 세력」(판 5 이하)은 읽을 때 
   assert.equal(d2.startGroups.find((x) => x.code === g.code).blurb, '내 글');
 });
 
+test('명부 판 8: 괴담톡 「중립」 탭이 옛 기본값(다섯 세력)이면 민간인에게 닫는다 (2026-11-20 사용자: 민간인 연락처는 비워 둔다)', async () => {
+  const { migrateRoster } = await import('../dist-test/core.mjs');
+  const old = () => {
+    const d = JSON.parse(readFileSync(new URL('../src/data/install/directory.json', import.meta.url), 'utf8'));
+    d['괴담톡 탭'].tabs.find((t) => t.id === 'T04').visible_for = ['A00', 'B00', 'C00', 'D00', 'E00'];
+    d.roster_v = 7;
+    return d;
+  };
+  const now = JSON.parse(readFileSync(new URL('../src/data/install/directory.json', import.meta.url), 'utf8'));
+  const t04 = (d) => d['괴담톡 탭'].tabs.find((t) => t.id === 'T04').visible_for;
+  const a = migrateRoster(old());
+  assert.deepEqual(t04(a), ['A00', 'B00', 'C00', 'E00']);
+  assert.deepEqual({ ...a, roster_v: 0 }, { ...now, roster_v: 0 }, '그 탭 말고는 안 바뀜');
+  assert.equal(j(migrateRoster(a)), j(a));
+  // 기타·괴이 탭은 민간인에게 그대로 열려 있다
+  assert.ok(a['괴담톡 탭'].tabs.filter((t) => t.id !== 'T04' && t.visible_for.includes('D00')).length >= 1);
+  // 사용자가 고친 공개 범위는 그대로
+  const mine = old();
+  t04(mine).push('F00');
+  assert.deepEqual(t04(migrateRoster(mine)), ['A00', 'B00', 'C00', 'D00', 'E00', 'F00']);
+  const only = old();
+  only['괴담톡 탭'].tabs.find((t) => t.id === 'T04').visible_for = ['D00'];
+  assert.deepEqual(t04(migrateRoster(only)), ['D00']);
+  // 탭 칸이 없는 명부도 그대로 읽힘
+  assert.equal(migrateRoster({ schema: 1, roster_v: 7, 요원: {}, 조직: {} }).roster_v, 8);
+});
+
 test('명부 판 7: 옛 기본값 그대로인 칸만 새 기본값으로 (협회 기록 이름 2곳·선임 요원 4명, 2026-11-14 사용자)', async () => {
   const { migrateRoster, ROSTER_V } = await import('../dist-test/core.mjs');
-  assert.equal(ROSTER_V, 7);
+  assert.equal(ROSTER_V, 8);
   const SENIOR = ['스팡달', '잼트리', '고르고디오', '큐라스'];
   // 11-13 고침(패치 01) 앞의 기본 명부: 지금 기본 명부에서 여섯 칸만 옛 값으로 되돌린 것
   const old = () => {
@@ -245,7 +272,7 @@ test('명부 판 7: 옛 기본값 그대로인 칸만 새 기본값으로 (협�
   assert.deepEqual(SENIOR.map((n) => a.요원[n].rank), ['선임 요원', '선임 요원', '선임 요원', '선임 요원']);
   assert.equal(a.거점.특수재난대응협회.lore, '특수재난대응협회');
   assert.deepEqual(a['시작 로어북']['E00-1'], ['특수재난대응협회', '차여진', '서윤지']);
-  assert.equal(a.roster_v, 7);
+  assert.equal(a.roster_v, 8);
   assert.deepEqual({ ...a, roster_v: 0 }, { ...now, roster_v: 0 }, '여섯 칸 말고는 안 바뀜');
   // 두 번 돌려도 같음 (판을 되돌려 다시 돌려도)
   const once = j(a);
@@ -266,13 +293,13 @@ test('명부 판 7: 옛 기본값 그대로인 칸만 새 기본값으로 (협�
   const other = old();
   const plain = Object.keys(other.요원).find((n) => !SENIOR.includes(n) && other.요원[n].rank === '요원');
   if (plain) assert.equal(migrateRoster(other).요원[plain].rank, '요원');
-  // 이미 판 7 → 안 건드림 (판 7에서 사용자가 일부러 옛 값으로 적은 것)
+  // 이미 판 7 → 이 칸들은 안 건드림 (판 7에서 사용자가 일부러 옛 값으로 적은 것). 판 번호만 오른다
   const v7 = old();
   v7.roster_v = 7;
-  const before = j(v7);
+  const before = j({ ...v7, roster_v: 8 });
   assert.equal(j(migrateRoster(v7)), before);
   // 거점·시작 로어북·요원 칸이 없는 명부도 그대로 읽힘
-  assert.deepEqual(migrateRoster({ schema: 1, roster_v: 6, 요원: {}, 조직: {} }).roster_v, 7);
+  assert.deepEqual(migrateRoster({ schema: 1, roster_v: 6, 요원: {}, 조직: {} }).roster_v, 8);
   // 읽기 경로(readDirectory)로도 옮겨짐
   const base = small();
   const data = directoryData(readDirectory(base));

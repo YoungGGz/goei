@@ -132,13 +132,15 @@ const inBrowser = () => BR_TABS.includes(tab);
 let tabsSaved = '';
 let tabsTimer: ReturnType<typeof setTimeout> | null = null;
 function saveTabsSoon(): void {
+  // 카드로 연 단독 창은 인터넷 탭에 남기지 않는다
+  if (netSolo) return;
   if (view.kind !== 'started' || tabsJson() === tabsSaved) return;
   if (tabsTimer) clearTimeout(tabsTimer);
   const { charIndex, chatIndex } = view.ctx;
   tabsTimer = setTimeout(() => {
     tabsTimer = null;
     const json = tabsJson();
-    if (json === tabsSaved || view.kind !== 'started' || view.ctx.charIndex !== charIndex || view.ctx.chatIndex !== chatIndex) return;
+    if (netSolo || json === tabsSaved || view.kind !== 'started' || view.ctx.charIndex !== charIndex || view.ctx.chatIndex !== chatIndex) return;
     tabsSaved = json;
     void updateChat(charIndex, chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [BR_TABS_VAR]: json } })).catch(() => {});
   }, 1500);
@@ -167,6 +169,16 @@ let lastForm: HTMLFormElement | null = null;
 let tab: Tab = 'board';
 /** 카드에서 고유 상점 사이트로 접속: 인터넷 창만 (닫으면 풀린다) */
 let netSolo = false;
+/** 단독 창을 열기 전의 인터넷 탭·화면 탭. 단독 창이 끝나면 그대로 되돌린다 (11-20 사용자: 카드로 본 망상홈쇼핑이 상황판 인터넷 창에 남아 있다) */
+let soloBack: { tabs: string; tab: Tab } | null = null;
+function endSolo(): void {
+  if (netSolo && soloBack) {
+    restoreTabs(soloBack.tabs);
+    tab = soloBack.tab;
+  }
+  netSolo = false;
+  soloBack = null;
+}
 /** 커스텀 임무 시작 화면에서 "다시 고르기"를 눌렀을 때 */
 let repick = false;
 /** 시작 화면에서 연 새 채팅 기본 설정 */
@@ -818,6 +830,7 @@ export async function openShop(site = ''): Promise<void> {
   await openApp({ quietIfNotLite: true, check: false });
   // 고유 상점에 인터넷으로 접속한 카드(11-09 사용자): 상황판 없이 인터넷 창만 그 사이트로. 사고판 것은 상황판 인터넷 탭과 같은 저장소
   if (site && view.kind === 'started' && isSite(site)) {
+    if (!netSolo) soloBack = { tabs: tabsJson(), tab };
     netSolo = true;
     tab = 'net';
     openSite(site);
@@ -825,7 +838,7 @@ export async function openShop(site = ''): Promise<void> {
     render();
     return;
   }
-  netSolo = false;
+  endSolo();
   // 카드에서 열면 상점만 (2026-11-07 사용자: 상황판이 배경으로 뜨면 안 됨)
   shopUi.solo = true;
   if (view.kind === 'started') await handle('shop-open');
@@ -862,6 +875,7 @@ async function refresh(): Promise<void> {
         resetGnet();
         resetMalls();
         resetHomeshop();
+        soloBack = null;
         restoreTabs(ctx.chat.scriptstate?.[BR_TABS_VAR]);
         tabsSaved = tabsJson();
         // 인터넷 안이면 화면 탭·위키·괴담넷 상태를 새 채팅의 지금 탭에 맞춘다 (앞 채팅 것이 남던 문제, 전수검사 11-13)
@@ -902,7 +916,7 @@ async function refresh(): Promise<void> {
 async function close(): Promise<void> {
   setShown(false);
   resetMore();
-  netSolo = false;
+  endSolo();
   stopCctvFx();
   await risuai.hideContainer();
 }
@@ -1876,7 +1890,7 @@ function body(): string {
     case 'started':
       evSeenReset();
       if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}`;
-      if (netSolo && inBrowser()) return `${header(TAB_TITLE.net)}<div class="gx-content gx-netsolo">${browserBody(view.ctx)}</div>${closeToastHtml()}`;
+      if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
       return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
     case 'opening':
       return `${header('커스텀 임무 · 첫 장면 고르기', '<button class="gx-x" data-action="repick" aria-label="시작 설정 다시 고르기">' + ICONS.back + '</button>')}<div class="gx-content">${missionTab(view.ctx, true, notice, busy)}</div>`;
@@ -2068,7 +2082,8 @@ function chromeOpts(ctx: ChatContext): ChromeOpts {
 }
 
 /** 인터넷 화면: 크롬 틀 + 지금 탭의 사이트 */
-function browserBody(ctx: ChatContext): string {
+/** solo = 본편 카드로 연 사이트 창: 탭·주소줄·즐겨찾기 없이 그 사이트 화면만 (11-20 사용자: 인터넷 창을 통째로 띄우지 않는다) */
+function browserBody(ctx: ChatContext, solo = false): string {
   const t = curTab();
   const o = chromeOpts(ctx);
   const page = br.list && isPhone() ? tabListHtml(o)
@@ -2078,7 +2093,7 @@ function browserBody(ctx: ChatContext): string {
     : t.site === 'hs' ? homeshopTab(ctx, wikiEnv)
     : t.site === 'wk' ? wikiTab(ctx, wikiEnv)
     : soonHtml(t.site);
-  return `<div class="br">${chromeHtml(o)}<div class="br-page br-p-${t.site || 'home'}">${page}</div>${loginHtml(o)}</div>`;
+  return `<div class="br${solo ? ' br-solo' : ''}">${solo ? '' : chromeHtml(o)}<div class="br-page br-p-${t.site || 'home'}">${page}</div>${loginHtml(o)}</div>`;
 }
 
 /** 지금 브라우저 탭이 보던 화면으로 (기록이 없으면 그 사이트 첫 화면) */
@@ -2227,7 +2242,7 @@ function board(ctx: ChatContext): string {
   const add = (kind: EvKind, i: number, locCode: string, c: Omit<EvCard, 'kind' | 'key'>) => {
     const key = keys.get(`${kind}${i}`);
     if (!key) return;
-    cards.push({ ...c, kind, key, id: key, locCode, open: 'board-map', confirmEnd: field.confirmEnd === key, selected: field.target?.type === 'event' && field.target.key === key, art: evArt(ctx, c.name, kind, `${locName(locCode)} ${String(c.extra ?? '').replace(/<[^>]*>/g, ' ')}`) });
+    cards.push({ ...c, kind, key, id: key, locCode, open: 'board-map', confirmEnd: field.confirmEnd === key, selected: field.target?.type === 'event' && field.target.key === key, art: evArt(ctx, c.name, kind, (kind === 'an' ? w.an : kind === 'in' ? w.inc : w.ms)[i]?.art?.pics) });
   };
   const since = (m: number | null) => elapsedText(w.minute, m);
   // 상황 글: 바깥 띠엔 상황 글(없으면 위키 요약), 상세 창·CCTV엔 상황 글과 위키 요약을 함께 (2026-10-21 사용자)
@@ -2241,7 +2256,7 @@ function board(ctx: ChatContext): string {
     const name = e.name || '이름 미확인';
     // 종료 줄 → 보고서 지름길 (기록 메뉴, 2026-10-29): 같은 종류·이름·장소의 일지 줄이 가리키는 보고서
     const rp = endedReport(ctx.chat, e.kind, e.name, e.loc);
-    cards.push({ kind: e.kind, name, grade: e.grade, loc: esc(locName(e.loc)), badge: '<span class="gx-badge end">종료</span>', ended: true, id: `end:${e.kind}:${e.name}:${e.loc}`, locCode: e.loc, art: evArt(ctx, name, e.kind), ...(rp?.rpt ? { rpt: rp.rpt } : {}), ...(rp?.mine ? { mine: true } : {}) });
+    cards.push({ kind: e.kind, name, grade: e.grade, loc: esc(locName(e.loc)), badge: '<span class="gx-badge end">종료</span>', ended: true, id: `end:${e.kind}:${e.name}:${e.loc}`, locCode: e.loc, art: evArt(ctx, name, e.kind, e.art), ...(rp?.rpt ? { rpt: rp.rpt } : {}), ...(rp?.mine ? { mine: true } : {}) });
   }
   // 요원 칸 (2026-10-20 사용자): 모니터 벽 또는 근무 현황 목록. 편성 기준으로 밝기를 나눈다
   // 괴이와 사건(2026-10-21 배치 칸 추가)에서 찾는다

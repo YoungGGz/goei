@@ -7,7 +7,7 @@ import { BUILTIN, OPEN_TO, extraFactions, extraNames, extraTabId, extraTabs, typ
 import { DIRECTORY_COMMENT, directoryEntries, isDirectory, LEGACY_DATA, parseSeedManifest } from '../lorebooks';
 import { agentShared, orgShared } from '../sharedpics';
 import { pickScenes, type ScenesData } from '../scenes';
-import { freeGroupCode, migrateRoster, NEUTRAL_BLURB, NEUTRAL_ENGLISH, NEUTRAL_GROUP, NEUTRAL_IDS, ROSTER_V } from './roster-v';
+import { closeNeutralTab, freeGroupCode, migrateRoster, NEUTRAL_BLURB, NEUTRAL_ENGLISH, NEUTRAL_GROUP, NEUTRAL_IDS, ROSTER_V } from './roster-v';
 import type { LoreEntry } from '../types';
 import { readStartItems, type StartItem } from '../startitems';
 import { itemWeight } from '../itemtraits';
@@ -334,6 +334,8 @@ export function phoneTabsSection(lore: LoreEntry[]): PhoneTabsData {
   const saved = readDirectoryData(lore)?.['괴담톡 탭'];
   const fromBook = obj(book(lore, 'Phone tabs'));
   const picked = saved && typeof saved === 'object' ? obj(saved) : fromBook;
+  // 명부가 없는 원본 카드의 탭 글도 저장된 명부와 같은 기본값으로 읽는다 (roster-v.ts 판 8). 읽은 사본만 고친다
+  if (picked === fromBook && Array.isArray(fromBook.tabs)) { fromBook.tabs = (fromBook.tabs as unknown[]).map((t) => ({ ...obj(t) })); closeNeutralTab(fromBook.tabs); }
   const d = Array.isArray(picked.tabs) && (picked.tabs as unknown[]).length ? picked : obj(DEFAULT_PHONE_TABS);
   const tabs = (Array.isArray(d.tabs) ? (d.tabs as unknown[]) : []).map(obj).map((t) => {
     const tab: PhoneTabData = { id: s(t.id), name: s(t.name), visible_for: list(t.visible_for) };

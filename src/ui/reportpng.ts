@@ -49,7 +49,7 @@ export interface ReportPng { blob: Blob; url: string; name: string }
 /** 보고서 → PNG blob + 미리보기 URL + 파일 이름 */
 export async function reportPng(ctx: ChatContext, r: Report, root: Element | null, org = ''): Promise<ReportPng> {
   await waitFonts();
-  const art = await loadArt(r.kind === 'fd' ? null : evArt(ctx, r.head.name, r.kind).pic);
+  const art = await loadArt(r.kind === 'fd' ? null : evArt(ctx, r.head.name, r.kind, r.head.art).pic);
   const canvas = document.createElement('canvas');
   canvas.width = PNG_W;
   canvas.height = PNG_H;

@@ -3713,6 +3713,12 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .br { --cf: #202124; --ct: #35363a; --cbox: #202124; --ctx: #e8eaed; --cic: #c4c7c5; --cdim: #9aa0a6;
   flex: 1; min-height: 0; position: relative; display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr);
   background: var(--cf); font-family: 'Segoe UI', 'Noto Sans KR', system-ui, sans-serif; color: var(--ctx); }
+/* 본편 카드로 연 사이트 창: 탭·주소줄·즐겨찾기 없이 사이트 화면만 */
+.br.br-solo { grid-template-rows: minmax(0, 1fr); }
+/* 단독 창에는 창 머리 줄이 없다 (11-20 사용자): 닫기 단추만 사이트 머리 오른쪽 끝에 얹는다 */
+.gx-netsolo { position: relative; }
+.gx-netsolo .br-solox { position: absolute; top: 10px; right: 10px; z-index: 5; }
+.br.br-solo .hs .hs-gnb, .br.br-solo .hs.hs-m .hs-gnb { padding-right: 62px; }
 .br button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .br .br-i { width: 20px; height: 20px; fill: var(--cic); flex: none; }
 .br .br-i.s { width: 16px; height: 16px; }
@@ -5281,32 +5287,28 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs .hs-ok { margin: 0; text-align: center; font-weight: 700; color: var(--y); }
 .hs .hs-no { margin: 0; text-align: center; color: var(--sub); }
 .hs .hs-no b { display: block; font: 900 30px ui-monospace, monospace; color: #fff; letter-spacing: 3px; }
-/* 상품 스티커: 노란 앞면 + 모서리를 들추면 밑에 찍힌 원래 용도 몇 글자 (11-15 사용자: 정말 들추는 느낌으로). --peel 0~1 = 젖힌 정도 */
+/* 상품 스티커 (11-20 사용자): 노란 앞면 밑 바닥에 숨은 효과 글 전체가 찍혀 있고, 모서리가 조금 들린 자리만큼만 보인다. --peel 0~1 = 젖힌 정도, --rx·--ry = 접는 선의 가로·세로 비(상품마다 다름) */
 @property --peel { syntax: '<number>'; inherits: true; initial-value: 0.12; }
-.hs .hs-sticker { position: relative; --peel: .12; --pmax: 132px; --p: calc(var(--peel) * var(--pmax) * var(--lim, 1)); transform: rotate(var(--tilt, -1.2deg)); filter: drop-shadow(0 4px 0 #b99a00) drop-shadow(0 10px 20px #0006); }
-.hs.hs-m .hs-sticker { --pmax: 124px; }
+.hs .hs-sticker { position: relative; --peel: .12; --pmax: 96px; --p: calc(var(--peel) * var(--pmax) * var(--lim, 1)); --px: calc(var(--p) * var(--rx, 1)); --py: calc(var(--p) * var(--ry, 1)); transform: rotate(var(--tilt, -1.2deg)); filter: drop-shadow(0 4px 0 #b99a00) drop-shadow(0 10px 20px #0006); }
+.hs.hs-m .hs-sticker { --pmax: 88px; }
 .hs .hs-sticker.lifted { --peel: 1; }
 .hs .hs-sticker.anim { animation: hs-peel .45s cubic-bezier(.2,.8,.25,1.15); }
 @keyframes hs-peel { from { --peel: var(--from, .12); } to { --peel: 1; } }
-.hs .hs-sticker .face { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 16px 22px; border-radius: 4px; background: #ffe45c; color: #2a1a00; text-align: center; clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--p)), calc(100% - var(--p)) 100%, 0 100%); }
+.hs .hs-sticker .face { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 16px 22px; border-radius: 4px; background: #ffe45c; color: #2a1a00; text-align: center; clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--py)), calc(100% - var(--px)) 100%, 0 100%); }
 .hs .hs-sticker .pic { width: 72px; height: 72px; background: #fff7c2; }
 .hs .hs-sticker .pic img { max-width: 64px; max-height: 64px; }
 .hs .hs-sticker .face b { font-size: 17px; font-weight: 900; }
 .hs .hs-sticker .face p { margin: 0; font-size: 13.5px; font-weight: 500; }
 .hs .hs-sticker .face .ef { font-weight: 800; color: #b00020; }
-.hs .hs-und { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; background: radial-gradient(120% 90% at 100% 100%, #3b1219 0, #24090e 60%, #1a0609 100%); }
+.hs .hs-und { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; background: radial-gradient(120% 90% at 100% 100%, #3b1219 0, #24090e 60%, #1a0609 100%); user-select: none; }
 .hs .hs-und::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, #ffffff06 0 2px, transparent 2px 5px); }
-/* 밑에 찍힌 원래 글 한 줄: 조각(b)이 들리는 모서리에 붙고, 앞뒤 글은 스티커 밑으로 이어진다 (젖힌 세모 안에 걸친 만큼만 보인다) */
-.hs .hs-und .emb { position: absolute; white-space: pre; font-size: 14px; line-height: 18px; font-weight: 800; letter-spacing: .4px; color: #e3b96b; text-shadow: 0 1px 0 #000, 0 -1px 0 #fff3, 0 0 6px #e3b96b33; }
-.hs .hs-und .emb b { font-weight: 800; }
-.hs .hs-und .emb .pre, .hs .hs-und .emb .post { position: absolute; top: 0; }
-.hs .hs-und .emb .pre { right: 100%; }
-.hs .hs-und .emb .post { left: 100%; }
-.hs .hs-sticker.c-br .hs-und .emb, .hs .hs-sticker.c-tr .hs-und .emb { right: 8px; }
-.hs .hs-sticker.c-bl .hs-und .emb, .hs .hs-sticker.c-tl .hs-und .emb { left: 8px; }
-.hs .hs-sticker.c-br .hs-und .emb, .hs .hs-sticker.c-bl .hs-und .emb { bottom: 6px; }
-.hs .hs-sticker.c-tr .hs-und .emb, .hs .hs-sticker.c-tl .hs-und .emb { top: 6px; }
-.hs .hs-sticker .flapw { position: absolute; width: var(--p); height: var(--p); pointer-events: none; }
+/* 바닥에 찍힌 원래 글 전체: 스티커 넓이에 꽉 차게 (글자 크기는 ui/homeshop.ts fitUnder 가 맞춘다). 스티커가 덮고 있어 젖힌 자리만 보인다 */
+.hs .hs-und .emb { position: absolute; inset: 6px 8px; margin: 0; overflow: hidden; font-size: 20px; line-height: 1.4; font-weight: 800; letter-spacing: .4px; word-break: break-all; text-align: justify; color: #e3b96b; text-shadow: 0 1px 0 #000, 0 -1px 0 #fff3, 0 0 6px #e3b96b33; }
+.hs .hs-und .emb i { font-style: normal; white-space: pre; }
+.hs .hs-sticker.c-br .hs-und .emb, .hs .hs-sticker.c-bl .hs-und .emb { display: flex; flex-wrap: wrap; align-content: flex-end; }
+.hs .hs-sticker.c-br .hs-und .emb { justify-content: flex-end; }
+.hs .hs-sticker.c-tr .hs-und .emb { text-align: right; }
+.hs .hs-sticker .flapw { position: absolute; width: calc(var(--px) * 2); height: calc(var(--py) * 2); pointer-events: none; }
 .hs .hs-sticker .flap { position: absolute; inset: 0; }
 .hs .hs-sticker .corner { position: absolute; width: 48px; height: 48px; cursor: grab; touch-action: none; }
 /* 들리는 모서리마다: 앞면이 잘리는 자리 · 접힌 종이 · 잡는 자리 */
@@ -5318,13 +5320,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs .hs-sticker.c-bl .flapw { filter: drop-shadow(3px -3px 3px #0008); }
 .hs .hs-sticker.c-tr .flapw { filter: drop-shadow(-3px 3px 3px #0008); }
 .hs .hs-sticker.c-tl .flapw { filter: drop-shadow(3px 3px 3px #0008); }
-.hs .hs-sticker.c-br .flap { clip-path: polygon(0 0, 100% 0, 0 100%); border-top-left-radius: 6px; background: linear-gradient(315deg, #000 0 50%, #b6a75c 50%, #efe5b0 56%, #fffbe6 66%, #f4ecc2 82%, #d9cd8f 100%); }
-.hs .hs-sticker.c-bl .flap { clip-path: polygon(0 0, 100% 0, 100% 100%); border-top-right-radius: 6px; background: linear-gradient(45deg, #000 0 50%, #b6a75c 50%, #efe5b0 56%, #fffbe6 66%, #f4ecc2 82%, #d9cd8f 100%); }
-.hs .hs-sticker.c-tr .flap { clip-path: polygon(0 0, 0 100%, 100% 100%); border-bottom-left-radius: 6px; background: linear-gradient(225deg, #000 0 50%, #b6a75c 50%, #efe5b0 56%, #fffbe6 66%, #f4ecc2 82%, #d9cd8f 100%); }
-.hs .hs-sticker.c-tl .flap { clip-path: polygon(100% 0, 100% 100%, 0 100%); border-bottom-right-radius: 6px; background: linear-gradient(135deg, #000 0 50%, #b6a75c 50%, #efe5b0 56%, #fffbe6 66%, #f4ecc2 82%, #d9cd8f 100%); }
-.hs .hs-sticker.c-bl .face { clip-path: polygon(0 0, 100% 0, 100% 100%, var(--p) 100%, 0 calc(100% - var(--p))); }
-.hs .hs-sticker.c-tr .face { clip-path: polygon(0 0, calc(100% - var(--p)) 0, 100% var(--p), 100% 100%, 0 100%); }
-.hs .hs-sticker.c-tl .face { clip-path: polygon(var(--p) 0, 100% 0, 100% 100%, 0 100%, 0 var(--p)); }
+.hs .hs-sticker.c-bl .face { clip-path: polygon(0 0, 100% 0, 100% 100%, var(--px) 100%, 0 calc(100% - var(--py))); }
+.hs .hs-sticker.c-tr .face { clip-path: polygon(0 0, calc(100% - var(--px)) 0, 100% var(--py), 100% 100%, 0 100%); }
+.hs .hs-sticker.c-tl .face { clip-path: polygon(var(--px) 0, 100% 0, 100% 100%, 0 100%, 0 var(--py)); }
 .hs .hs-sticker.drag .corner { cursor: grabbing; }
 .hs .hs-sticker .corner:disabled { cursor: default; }
 .hs.hs-m .hs-sticker .corner { width: 64px; height: 64px; }

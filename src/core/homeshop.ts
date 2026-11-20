@@ -551,24 +551,12 @@ function fnv(t: string): number {
   for (const ch of t) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
   return h;
 }
-/** 상품마다 다른 스티커 (11-15 사용자: 전부 같은 방향으로만 모서리가 들린다): 들리는 모서리 · 젖혀지는 정도(1 = 가장 많이) · 붙인 기울기(도). seed = 상품 id (다시 열어도 같다) */
+/** 상품마다 다른 스티커 (11-15 사용자: 전부 같은 방향으로만 모서리가 들린다 · 11-20: 늘 같은 각도로 접히지 않게): 들리는 모서리 · 젖혀지는 정도(1 = 가장 많이) · 붙인 기울기(도) · 접히는 선의 가로·세로 비(rx·ry). seed = 상품 id (다시 열어도 같다) */
 export type StickerCorner = 'br' | 'bl' | 'tr' | 'tl';
-export function stickerLook(id: string): { corner: StickerCorner; lim: number; tilt: number } {
+export function stickerLook(id: string): { corner: StickerCorner; lim: number; tilt: number; rx: number; ry: number } {
   const h = fnv(`stk:${id}`);
-  return { corner: (['br', 'bl', 'tr', 'tl'] as const)[h % 4], lim: [0.66, 0.78, 0.9, 1][(h >>> 3) % 4], tilt: (((h >>> 6) % 9) - 4) * 0.5 };
-}
-/** 스티커를 들추면 보이는 숨은 효과(진실) 몇 글자 (11-15 사용자: 원래 효과의 일부 문자만 살짝).
- *  어절 하나에서 시작해 cap 글자 안에서 이웃 어절을 붙인다. 진실이 없거나 아무도 모르면(?) 빈 글. seed = 상품 id (다시 열어도 같은 조각) */
-export function peelFragment(truth: string | undefined, seed: string, cap: number): string {
-  const t = String(truth ?? '').replace(/\s+/g, ' ').trim();
-  if (!t || t === '?' || cap <= 0) return '';
-  const words = t.split(' ');
-  const cand = words.map((w, k) => (Array.from(w).length >= 2 ? k : -1)).filter((k) => k >= 0);
-  const pool = cand.length ? cand : words.map((_, k) => k);
-  const i = pool[fnv(seed) % pool.length];
-  let j = i + 1;
-  while (j < words.length && Array.from(words.slice(i, j + 1).join(' ')).length <= cap) j++;
-  return Array.from(words.slice(i, j).join(' ')).slice(0, cap).join('');
+  const [rx, ry] = ([[1.35, 0.7], [1.15, 0.85], [0.95, 1.05], [1.5, 0.6], [0.8, 1.2]] as const)[(h >>> 10) % 5];
+  return { corner: (['br', 'bl', 'tr', 'tl'] as const)[h % 4], lim: [0.66, 0.78, 0.9, 1][(h >>> 3) % 4], tilt: (((h >>> 6) % 9) - 4) * 0.5, rx, ry };
 }
 
 // ── 동작 고르기 (재생 규칙. 기본값은 그림/홈쇼핑/homeshop.json 과 HS_NUM, 전부 설정에서 고친다) ──
@@ -686,6 +674,8 @@ export interface HsOrder {
   turn: number;
   /** 불려 가는 턴들 (n 개, 오름차순). 상자를 열 때 뽑는다 — 열기 전에는 빈 목록 */
   dues: number[];
+  /** 돈·물건·시연이 아닌 약조(terms.other)를 채널이 받으러 오는 턴 (11-20 사용자). 상자를 열 때 뽑는다 — 약조가 없거나 열기 전이면 없음 */
+  owe?: number;
   /** 상담원과 맺은 조건 (상자·물건의 결제 글을 만들 때 쓴다) */
   terms?: HsTerms;
   /** 소지품의 택배 상자 id · 연 응답 키 */
@@ -706,7 +696,7 @@ export function readOrders(vars: Vars): HsOrder[] {
  *  now: 살아 있는 응답 키 · 지금 턴 · 마지막 응답 키 */
 export function pruneOrders(list: HsOrder[], max: number, now: { alive: Set<string>; turn: number; last: string }): HsOrder[] {
   const out = [...list];
-  const keep = (o: HsOrder): boolean => (!o.anchor || now.alive.has(o.anchor)) && (!orderOpened(o, now.alive) || o.dues.some((d) => d >= now.turn) || (!!o.openKey && o.openKey === now.last));
+  const keep = (o: HsOrder): boolean => (!o.anchor || now.alive.has(o.anchor)) && (!orderOpened(o, now.alive) || o.dues.some((d) => d >= now.turn) || (o.owe ?? 0) >= now.turn || (!!o.openKey && o.openKey === now.last));
   while (out.length > Math.max(1, max)) {
     const i = out.findIndex((o) => !keep(o));
     if (i < 0) break;
@@ -752,7 +742,7 @@ export function termsText(t: HsTerms, money = true): string {
 }
 /** 상담원 응답: <operator> 말 + <terms> 조건 (「none」이면 조건 없음). 물건 이름은 내민 물건 가운데서만 찾는다 (모르는 이름은 버림). 값의 크기는 거르지 않는다 — 판단은 상담원(모델) 몫 */
 export function parseOperator(raw: string, offered: { id: string; name: string }[]): { line: string; terms: HsTerms | null } {
-  const line = clean(block(raw, 'operator'), 300);
+  const line = clean(block(raw, 'operator'), 1000);
   if (!line) throw new HsError(guideTxt('Hs', 'ERR_NO_OPERATOR'));
   const body = block(raw, 'terms');
   if (!body || /^\s*(none|없음|-)\s*$/i.test(body)) return { line, terms: null };
@@ -765,7 +755,7 @@ export function parseOperator(raw: string, offered: { id: string; name: string }
     const v = m[2].trim();
     if (/^(money|돈|원)$/.test(k)) t.money = costOf(v)?.price ?? 0;
     else if (/^(demo|시연|appear|출연)$/.test(k)) t.appear = /^(no|none|x|0|-|없음)$/i.test(v) ? 0 : 1;
-    else if (/^(other|기타)$/.test(k)) t.other = clean(v, 60);
+    else if (/^(other|기타)$/.test(k)) t.other = clean(v, 200);
     else for (const n of v.split(/[;；,、]/)) {
       const hit = offered.find((o) => key(o.name) === key(n.replace(/[「」『』"']/g, '')));
       if (hit && !t.items.some((x) => x.id === hit.id)) t.items.push(hit);
@@ -782,8 +772,11 @@ export function newOrder(chat: Chat, item: ShopItem, pay: HsPay, terms: HsTerms)
 /** 상자를 연 주문: 연 응답 키를 적고, 출연이 걸렸으면 이제 호출 턴을 뽑는다 (다른 연 주문의 호출 턴과 겹치지 않게) */
 export function openOrder(chat: Chat, o: HsOrder, s: Pick<HsSettings, 'call'>, openKey: string, rnd: () => number = Math.random): HsOrder {
   const alive = aliveAnchors(chat);
-  const taken = liveOrders(chat.scriptstate, alive).filter((x) => x.id !== o.id && orderOpened(x, alive)).flatMap((x) => x.dues);
-  return { ...o, openKey, dues: scheduleDues(taken, userTurns(chat), o.n, s.call, rnd) };
+  const taken = liveOrders(chat.scriptstate, alive).filter((x) => x.id !== o.id && orderOpened(x, alive)).flatMap((x) => (x.owe ? [...x.dues, x.owe] : x.dues));
+  const dues = scheduleDues(taken, userTurns(chat), o.n, s.call, rnd);
+  // 약조도 시연처럼 연 때부터 걸린다: 한 턴에 하나만 걸리게 시연 호출 턴을 피해 뽑는다
+  const owe = o.terms?.other ? scheduleDues([...taken, ...dues], userTurns(chat), 1, s.call, rnd)[0] : undefined;
+  return { ...o, openKey, dues, ...(owe ? { owe } : {}) };
 }
 /** 상자에 적는 결제 글 (출연은 뺀다: 상자를 열기 전에는 걸리지 않는다) · 연 물건에 적는 결제 글 (전부) */
 export function orderPaid(o: HsOrder, opened: boolean): string {
@@ -823,7 +816,13 @@ export function callNow(chat: Chat): { order: HsOrder; nth: number } | null {
   }
   return null;
 }
-/** 본편에 이번 턴에만 넘길 글: 할부 호출 지시 · 방청 신청 한 줄. 없으면 빈 글 (평소엔 아무것도 안 보낸다, 설계 8-8) */
+/** 지금 턴에 채널이 약조를 받으러 오는 주문 (상자를 연 주문만) */
+export function promiseNow(chat: Chat): HsOrder | null {
+  const t = userTurns(chat);
+  const alive = aliveAnchors(chat);
+  return liveOrders(chat.scriptstate, alive).find((o) => orderOpened(o, alive) && o.owe === t && !!o.terms?.other) ?? null;
+}
+/** 본편에 이번 턴에만 넘길 글: 할부 호출 지시 · 약조 받으러 옴 · 방청 신청 한 줄. 없으면 빈 글 (평소엔 아무것도 안 보낸다, 설계 8-8) */
 export function homeshopBlock(chat: Chat): string {
   const s = hsSettings(chat.scriptstate);
   if (!s.on) return '';
@@ -833,6 +832,8 @@ export function homeshopBlock(chat: Chat): string {
   if (call && g.CALL) {
     lines.push(fillGuide(g.CALL, { item: call.order.item.name }));
   }
+  const owed = promiseNow(chat);
+  if (owed && g.PROMISE) lines.push(fillGuide(g.PROMISE, { item: owed.item.name, promise: owed.terms?.other ?? '' }));
   const aud = readAudience(chat.scriptstate);
   if (aud && s.aud && g.AUDIENCE && aud.anchor === (lastBot(chat)?.key ?? '')) lines.push(fillGuide(g.AUDIENCE, { no: aud.no, name: aud.name }));
   return lines.length ? `${blockHead()}\n${lines.join('\n')}` : '';

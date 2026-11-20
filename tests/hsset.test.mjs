@@ -94,11 +94,11 @@ test('망상홈쇼핑 설정: 모든 설정 변수는 「기본값으로 저장�
 
 test('망상홈쇼핑: 메인 요청에 붙이는 값($hs_main·$hs_main_kinds·$hs_main_tokens)을 읽는 뜻', () => {
   const m = hslog.hsMainSettings;
-  assert.deepEqual(m({}), { on: true, kinds: ['show', 'chat', 'say', 'buy'], tokens: 3000, turns: 0 });
+  assert.deepEqual(m({}), { on: true, kinds: ['show', 'chat', 'say', 'buy', 'aside'], tokens: 3000, turns: 0 });
   assert.equal(m({ $hs_main: '0' }).on, false);
   assert.equal(m({ $hs_main: '' }).on, true);
   assert.deepEqual(m({ $hs_main_kinds: 'buy, show' }).kinds, ['show', 'buy']);
-  assert.deepEqual(m({ $hs_main_kinds: '' }).kinds, ['show', 'chat', 'say', 'buy'], '빈 글 = 전부');
+  assert.deepEqual(m({ $hs_main_kinds: '' }).kinds, ['show', 'chat', 'say', 'buy', 'aside'], '빈 글 = 전부');
   assert.deepEqual(m({ $hs_main_kinds: 'none' }).kinds, [], '아는 종류가 없는 글 = 아무것도 안 넘김');
   assert.equal(m({ $hs_main_tokens: '0' }).tokens, 0);
   assert.equal(m({ $hs_main_tokens: '999999' }).tokens, 200000);
