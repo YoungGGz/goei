@@ -3715,6 +3715,10 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   background: var(--cf); font-family: 'Segoe UI', 'Noto Sans KR', system-ui, sans-serif; color: var(--ctx); }
 /* 본편 카드로 연 사이트 창: 탭·주소줄·즐겨찾기 없이 사이트 화면만 */
 .br.br-solo { grid-template-rows: minmax(0, 1fr); }
+/* 단독 창에는 창 머리 줄이 없다 (11-20 사용자): 닫기 단추만 사이트 머리 오른쪽 끝에 얹는다 */
+.gx-netsolo { position: relative; }
+.gx-netsolo .br-solox { position: absolute; top: 10px; right: 10px; z-index: 5; }
+.br.br-solo .hs .hs-gnb, .br.br-solo .hs.hs-m .hs-gnb { padding-right: 62px; }
 .br button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 .br .br-i { width: 20px; height: 20px; fill: var(--cic); flex: none; }
 .br .br-i.s { width: 16px; height: 16px; }

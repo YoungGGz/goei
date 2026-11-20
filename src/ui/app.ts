@@ -52,7 +52,7 @@ import { addPhoto, attachInput, hydratePhotos, zoomPhoto } from './attach';
 import { ATTACH_MAX } from '../core/attach';
 import { readPhone } from '../core/phone';
 import { GN_NICK } from '../core/gnet';
-import { br, BR_TABS_VAR, chromeHtml, closeTab, curTab, focusSite, openSite, reopenTab, restoreTabs, tabsJson, homeHtml, isSite, loginHtml, newTab, recordTab, siteLogo, siteOf, SITES, soonHtml, tabCan, tabGo, tabListHtml, tabState, type ChromeOpts, type SiteId } from './browser';
+import { br, BR_TABS_VAR, chromeHtml, closeTab, curTab, focusSite, openSite, reopenTab, restoreTabs, tabsJson, homeHtml, isSite, loginHtml, newTab, recordTab, siteLogo, SITES, soonHtml, tabCan, tabGo, tabListHtml, tabState, type ChromeOpts, type SiteId } from './browser';
 import { savePhoto } from '../host/photo';
 import { readPersona, readUser, userInfo } from '../host/user';
 import { applyAdvanced } from '../core/advanced';
@@ -1890,7 +1890,7 @@ function body(): string {
     case 'started':
       evSeenReset();
       if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}`;
-      if (netSolo && inBrowser()) return `${header(siteOf(curTab().site)?.name || TAB_TITLE.net)}<div class="gx-content gx-netsolo">${browserBody(view.ctx, true)}</div>${closeToastHtml()}`;
+      if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
       return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
     case 'opening':
       return `${header('커스텀 임무 · 첫 장면 고르기', '<button class="gx-x" data-action="repick" aria-label="시작 설정 다시 고르기">' + ICONS.back + '</button>')}<div class="gx-content">${missionTab(view.ctx, true, notice, busy)}</div>`;
