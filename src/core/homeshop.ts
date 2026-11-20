@@ -755,7 +755,7 @@ export function parseOperator(raw: string, offered: { id: string; name: string }
     const v = m[2].trim();
     if (/^(money|돈|원)$/.test(k)) t.money = costOf(v)?.price ?? 0;
     else if (/^(demo|시연|appear|출연)$/.test(k)) t.appear = /^(no|none|x|0|-|없음)$/i.test(v) ? 0 : 1;
-    else if (/^(other|기타)$/.test(k)) t.other = clean(v, 60);
+    else if (/^(other|기타)$/.test(k)) t.other = clean(v, 200);
     else for (const n of v.split(/[;；,、]/)) {
       const hit = offered.find((o) => key(o.name) === key(n.replace(/[「」『』"']/g, '')));
       if (hit && !t.items.some((x) => x.id === hit.id)) t.items.push(hit);
