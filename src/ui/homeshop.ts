@@ -21,9 +21,9 @@ import { userTurns } from '../core/request';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, pruneOrders, parseCue, parseOperator, parseShow, peelFragment, stickerLook, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
+import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, pruneOrders, parseCue, parseOperator, parseShow, stickerLook, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
-import { mountPlayer, playerCut, playerHold, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
+import { mountPlayer, playerCut, playerHold, playerPhone, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
 import { itemPic } from './items';
 import { isPhone } from './media';
@@ -265,9 +265,9 @@ export async function homeshopAction(action: string, value: string | undefined, 
       const from = Number(value);
       ui.peelFrom = Number.isFinite(from) && from > 0 && from < 1 ? from : 0;
       env.render();
-      // 들춰 보인 몇 글자도 시청 기록에 적는다 (스티커 밑에 찍힌 원래 용도의 조각)
+      // 들춰 보인 글자도 시청 기록에 적는다: 젖힌 자리에 실제로 드러난 글자만 (homeshopMounted 가 화면에서 잰다)
       const { show, part } = nowPart(ctx);
-      const frag = part && hsSettings(ctx.chat.scriptstate).peek ? peelFragment(part.item.truth, part.item.id, peelCap(part.item.id)) : '';
+      const frag = part && hsSettings(ctx.chat.scriptstate).peek ? peeked : '';
       if (frag) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogSticker(), text: frag }], show);
       return true;
     }
@@ -628,8 +628,6 @@ function scaleOf(s: HsSettings, phone: boolean): number {
 
 const failBox = () => (ui.notice ? `<div class="hs-err" role="alert"><span>${esc(ui.notice).replace(/\n/g, '<br>')}</span>${ui.failRaw ? '<button data-action="hs-raw">받은 글 보기</button>' : ''}<button data-action="hs-refresh">다시 연결</button></div>` : '');
 /** 스티커 밑에 보이는 글자 수: 젖힌 모서리 크기에 맞춘다 (폰은 모서리가 조금 작다) */
-/** 젖힌 모서리에 들어가는 글자 수: 그 상품 스티커가 젖혀지는 크기에서 나온다 (style.css .hs-sticker 의 --pmax · 글자 크기와 같은 값) */
-const peelCap = (id: string): number => Math.max(3, Math.floor(((isPhone() ? 124 : 132) * stickerLook(id).lim - 32) / 14.5));
 
 /** 편성 카드 줄. 아직 방송 안 한 부는 가린다 (11-09 사용자: 다음 상품은 방송에서 공개) */
 function lineup(show: HsShow, s: HsSettings, col = false): string {
@@ -685,12 +683,18 @@ function ordersPage(ctx: ChatContext): string {
     const left = paidOf(o, turn) < 1;
     return `<li class="${left ? '' : 'done'}"><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(guideTxt('Hs', 'PAY_APPEAR'))}</small></span><span class="st${left ? ' on' : ''}">${left ? '대기' : '다녀옴'}</span></li>`;
   }).join('');
+  // 돈·물건·시연이 아닌 약조: 상자를 열면 걸리고, 채널이 받으러 오는 턴이 지나면 「받아 감」
+  const oweRows = list.filter((o) => !!o.terms?.other && orderOpened(o, alive)).map((o) => {
+    const left = (o.owe ?? 0) > turn;
+    return `<li class="${left ? '' : 'done'}"><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(o.terms?.other ?? '')}</small></span><span class="st${left ? ' on' : ''}">${left ? '대기' : '받아 감'}</span></li>`;
+  }).join('');
   const shipRows = list.map((o) => {
     const opened = orderOpened(o, alive);
     return `<li><span class="pic">${itemPic(o.item)}</span><span class="tx"><b>${esc(o.item.name)}</b><small>${esc(o.how)}</small></span><span class="st${opened ? '' : ' on'}">${opened ? '수령 확인' : '배송 완료 · 미개봉'}</span></li>`;
   }).join('');
   return `<section class="hs-sec"><h4>주문 조회</h4>${audRow}
 <h5>시연 참여 내역</h5>${debtRows ? `<ul class="hs-ol">${debtRows}</ul>` : '<p class="hs-none">시연 참여 내역이 없습니다.</p>'}
+${oweRows ? `<h5>약조 내역</h5><ul class="hs-ol">${oweRows}</ul>` : ''}
 <h5>배송</h5>${shipRows ? `<ul class="hs-ol">${shipRows}</ul><p class="hs-tip">택배 상자는 소지품에서 「열기」로 엽니다.</p>` : '<p class="hs-none">주문 내역이 없습니다.</p>'}</section>`;
 }
 
@@ -759,27 +763,83 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   return popShell(title, `<div class="hs-split">${side}${line}</div>`, '', 'call');
 }
 
-/** 상품 스티커: 모서리를 들추면(PC 끌기·누르기, 폰 누르기) 밑에 찍힌 원래 용도 몇 글자만 보인다 (11-15 사용자). DOM 에는 조각과 고정 무늬(■)만 — 진실 전체는 넣지 않는다 */
+/** 접힌 종이(뒷면) 모양: 들린 세모를 접는 선에 대어 뒤집은 자리. 상자(.flapw)는 가로 2·px, 세로 2·py 이고 좌표는 그 안의 % (젖힌 정도가 바뀌어도 그대로) */
+function flapStyle(look: ReturnType<typeof stickerLook>): string {
+  const { rx, ry } = look;
+  const right = look.corner === 'br' || look.corner === 'tr';
+  const bottom = look.corner === 'br' || look.corner === 'bl';
+  const q = rx * rx + ry * ry;
+  // 모서리에서 잰 자리 (상자 크기에 대한 비): 접는 선의 두 끝 · 뒤집힌 꼭짓점
+  const pts: [number, number][] = [[0.5, 0], [0, 0.5], [(ry * ry) / q, (rx * rx) / q]];
+  const at = ([u, v]: [number, number]): [number, number] => [right ? 1 - u : u, bottom ? 1 - v : v];
+  const poly = pts.map((p) => at(p).map((n) => `${(n * 100).toFixed(2)}%`).join(' ')).join(', ');
+  // 종이 결: 접는 선에서 꼭짓점 쪽으로 밝아졌다 어두워진다
+  const dx = (right ? -1 : 1) * ry;
+  const dy = (bottom ? -1 : 1) * rx;
+  const ang = (Math.atan2(dx, -dy) * 180) / Math.PI;
+  const len = Math.hypot(dx, dy);
+  const ux = dx / len;
+  const uy = dy / len;
+  const L = Math.abs(2 * rx * ux) + Math.abs(2 * ry * uy);
+  const pos = (p: [number, number]) => { const [x, y] = at(p); return 0.5 + ((x - 0.5) * 2 * rx * ux + (y - 0.5) * 2 * ry * uy) / L; };
+  const t0 = pos(pts[0]);
+  const t1 = pos(pts[2]);
+  const st = (k: number) => `${((t0 + (t1 - t0) * k) * 100).toFixed(1)}%`;
+  return `clip-path:polygon(${poly});background:linear-gradient(${ang.toFixed(1)}deg,#a89a52 ${st(0)},#e9dfa8 ${st(0.1)},#fffbe6 ${st(0.32)},#f4ecc2 ${st(0.7)},#d9cd8f ${st(1)})`;
+}
+
+/** 상품 스티커 (11-20 사용자): 스티커 밑 바닥에 숨은 효과 글 전체가 찍혀 있고, 모서리가 조금 들린 자리만큼만 그 글이 보인다 (조각을 골라 따로 쓰지 않는다). PC 끌기·누르기, 폰 누르기. 숨은 효과가 없으면 바닥에 글이 없다 */
 function peekPop(ctx: ChatContext, s: HsSettings): string {
   const { part } = nowPart(ctx);
   if (!part) return '';
   const it = part.item;
   const mobile = isPhone();
   const look = stickerLook(it.id);
-  const frag = s.peek ? peelFragment(it.truth, it.id, peelCap(it.id)) : '';
-  // 스티커 밑에 찍힌 원래 글 한 줄: 조각이 들리는 모서리에 오고, 스티커 안쪽으로 이어지는 이웃 몇 글자가 젖힌 세모에 걸친 만큼만 비친다 (글 전체는 화면에 싣지 않는다). 숨은 효과가 없으면 아무 글도 없다
   const truth = String(it.truth ?? '').replace(/\s+/g, ' ').trim();
-  const at = frag ? truth.indexOf(frag) : -1;
-  const right = look.corner === 'br' || look.corner === 'tr';
-  const near = at < 0 ? '' : right ? truth.slice(Math.max(0, at - 6), at) : truth.slice(at + frag.length, at + frag.length + 6);
-  const emb = at < 0 ? '' : `<div class="emb">${right ? `<span class="pre">${esc(near)}</span>` : ''}<b>${esc(frag)}</b>${right ? '' : `<span class="post">${esc(near)}</span>`}</div>`;
+  const emb = truth && truth !== '?' ? `<p class="emb">${Array.from(truth).map((ch) => `<i>${esc(ch)}</i>`).join('')}</p>` : '';
   const under = s.peek ? `<div class="hs-und" aria-hidden="true">${emb}</div>` : '';
-  const corner = s.peek ? `<span class="flapw" aria-hidden="true"><span class="flap"></span></span><button class="corner" data-action="hs-lift" aria-label="스티커 모서리 들추기"${ui.lifted ? ' disabled' : ''}></button>` : '';
+  const corner = s.peek ? `<span class="flapw" aria-hidden="true"><span class="flap" style="${flapStyle(look)}"></span></span><button class="corner" data-action="hs-lift" aria-label="스티커 모서리 들추기"${ui.lifted ? ' disabled' : ''}></button>` : '';
   const cls = `hs-sticker c-${look.corner}${ui.lifted ? ' lifted anim' : ''}`;
   const hint = s.peek && !ui.lifted ? `<p class="hs-peelhint">${mobile ? '스티커를 <i>눌러</i> 들춰 보세요' : '모서리를 <i>잡아 끌거나 눌러</i> 들춰 보세요'}</p>` : '';
   // 폰은 모서리가 작고 화면 끝이라 스티커 어디를 눌러도 모서리부터 젖힌다
   const tap = mobile && s.peek && !ui.lifted ? ' data-action="hs-lift"' : '';
-  return popShell('상품 스티커', `<div class="${cls}"${tap} style="--from:${ui.peelFrom || 0.12};--lim:${look.lim};--tilt:${look.tilt}deg">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
+  return popShell('상품 스티커', `<div class="${cls}"${tap} style="--from:${ui.peelFrom || 0.12};--lim:${look.lim};--tilt:${look.tilt}deg;--rx:${look.rx};--ry:${look.ry}">${under}<div class="face"><span class="pic">${itemPic(it)}</span><b>${esc(it.name)}</b><p>${esc(it.desc)}</p>${it.effect ? `<p class="ef">${esc(it.effect)}</p>` : ''}</div>${corner}</div>${hint}`);
+}
+
+/** 젖힌 자리에 실제로 드러난 글자 (화면에서 잰 것). 시청 기록에 적는다 */
+let peeked = '';
+/** 바닥 글: 스티커 넓이에 꽉 차게 글자 크기를 맞추고, 다 젖힌 세모 안에 드는 글자를 모은다 (스티커 기울기와 무관한 제자리 좌표) */
+function fitUnder(st: HTMLElement): void {
+  const emb = st.querySelector<HTMLElement>('.hs-und .emb');
+  peeked = '';
+  if (!emb) return;
+  const cells = [...emb.querySelectorAll<HTMLElement>('i')];
+  const W = emb.clientWidth;
+  const H = emb.clientHeight;
+  if (!cells.length || !W || !H) return;
+  let size = Math.max(14, Math.min(22, Math.floor(Math.sqrt((W * H) / (cells.length * 1.45)))));
+  emb.style.fontSize = `${size}px`;
+  while (size > 12 && emb.scrollHeight > H) emb.style.fontSize = `${--size}px`;
+  if (!st.classList.contains('lifted')) return;
+  const cs = getComputedStyle(st);
+  const p = (parseFloat(cs.getPropertyValue('--pmax')) || 96) * (parseFloat(cs.getPropertyValue('--lim')) || 1);
+  const px = p * (parseFloat(cs.getPropertyValue('--rx')) || 1);
+  const py = p * (parseFloat(cs.getPropertyValue('--ry')) || 1);
+  const right = st.classList.contains('c-br') || st.classList.contains('c-tr');
+  const bottom = st.classList.contains('c-br') || st.classList.contains('c-bl');
+  const out: string[] = [];
+  let last = -2;
+  cells.forEach((c, i) => {
+    const x = emb.offsetLeft + c.offsetLeft + c.offsetWidth / 2;
+    const y = emb.offsetTop + c.offsetTop + c.offsetHeight / 2;
+    const dx = right ? st.offsetWidth - x : x;
+    const dy = bottom ? st.offsetHeight - y : y;
+    if (dx / px + dy / py > 0.94 || !(c.textContent ?? '').trim()) return;
+    if (out.length && i !== last + 1) out.push(' … ');
+    out.push(c.textContent ?? '');
+    last = i;
+  });
+  peeked = out.join('').trim();
 }
 
 function audPop(): string {
@@ -803,6 +863,7 @@ export function homeshopTab(ctx: ChatContext, env: HsEnv): string {
   const art = homeshopArt();
   const note = !s.on ? '방송 없음' : !reach ? '신호 없음' : stt.failed ? '신호 없음' : !art ? stt.progress || '방송 준비 중' : ui.loading ? '방송 연결 중' : ui.notice ? '신호 없음' : show.loaded ? '' : '신호 없음';
   setPlayerFeed({ art, show: s.on && !ui.loading ? show : { ...show, loaded: false }, s, note, scale: scaleOf(s, mobile), tel: telOf(ctx) }, { advance, redraw: () => liveEnv?.render(), log: (entries, shown) => saveLog(ctx.charIndex, ctx.chatIndex, entries, shown), soldOut });
+  playerPhone(ui.pop === 'call');
   const pending = liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat)).length;
   const tabs: [View['page'], string][] = [['', 'ON AIR'], ['sched', '편성표'], ['orders', `주문 조회${pending ? ` ${pending}` : ''}`]];
   const menu = `<nav class="hs-menu">${tabs.map(([k, l]) => `<button class="${ui.page === k ? 'on' : ''}" data-action="hs-page" data-value="${k}" aria-pressed="${ui.page === k}">${l}</button>`).join('')}${s.aud ? '<button data-action="hs-pop" data-value="aud">방청 신청</button>' : ''}</nav>`;
@@ -820,6 +881,8 @@ export function homeshopMounted(root: HTMLElement): void {
   // 스티커 모서리 끌기 (PC 만. 폰은 누르기만): 끄는 만큼 젖히고, 절반 넘게 끌고 놓으면 그 자리부터 마저 젖힌다(hs-lift 에 끈 만큼을 넘김). 덜 끌면 도로 붙는다
   // 통화 기록: 다시 그리면 맨 위로 돌아가므로 늘 마지막 말(방금 상담원 답)이 보이게 맨 아래로
   root.querySelectorAll<HTMLElement>('.hs .hs-callog').forEach((el) => { el.scrollTop = el.scrollHeight; });
+  const stk = root.querySelector<HTMLElement>('.hs .hs-sticker');
+  if (stk) fitUnder(stk);
   const corner = root.querySelector<HTMLButtonElement>('.hs .hs-sticker .corner');
   if (corner && !isPhone() && !corner.dataset.drag) peelDrag(corner);
 }
@@ -846,7 +909,7 @@ function peelDrag(corner: HTMLButtonElement): void {
     const d = (sx * (start.x - e.clientX) + sy * (start.y - e.clientY)) / Math.SQRT2;
     if (Math.abs(d) > 4) moved = true;
     const cs = getComputedStyle(st);
-    const max = (parseFloat(cs.getPropertyValue('--pmax')) || 132) * (parseFloat(cs.getPropertyValue('--lim')) || 1);
+    const max = (parseFloat(cs.getPropertyValue('--pmax')) || 96) * (parseFloat(cs.getPropertyValue('--lim')) || 1);
     peel = Math.max(0.12, Math.min(1, 0.12 + d / max));
     st.style.setProperty('--peel', String(peel));
   });

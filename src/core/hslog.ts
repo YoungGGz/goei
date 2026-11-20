@@ -22,8 +22,8 @@ type Vars = Record<string, unknown> | undefined;
 /** show = 진행자 대사(와 편성 제목·상품) · chat = 시청자 채팅 · say = 내 채팅과 그 반응 · buy = 전화 주문·맞교환 · aside = 들춰 본 스티커 밑 한 줄과 전화 주문 상담원의 말 */
 export type HsLogKind = 'show' | 'chat' | 'say' | 'buy' | 'aside';
 export const HS_LOG_KINDS: HsLogKind[] = ['show', 'chat', 'say', 'buy', 'aside'];
-/** 따로 정하지 않았을 때 넘기는 종류: 스티커·상담원 말(aside)은 전에는 메인 요청에 가지 않던 것이라 켠 때만 넘긴다 */
-export const HS_LOG_DEF: HsLogKind[] = ['show', 'chat', 'say', 'buy'];
+/** 따로 정하지 않았을 때 넘기는 종류: 전부 (11-20 사용자: 상담원과 통화한 내용이 다음 본편에 하나도 안 넘어간다 → 스티커·상담원 말도 기본으로 넘긴다) */
+export const HS_LOG_DEF: HsLogKind[] = ['show', 'chat', 'say', 'buy', 'aside'];
 /** aside 줄의 who: 스티커 밑 한 줄은 지침 「망상홈쇼핑」의 LOG_STICKER_NICK 절, 상담원 말은 LOG_OPERATOR_NICK 절 */
 export const hsLogSticker = (): string => guideTxt('Hs', 'LOG_STICKER_NICK');
 export const hsLogOperator = (): string => guideTxt('Hs', 'LOG_OPERATOR_NICK');

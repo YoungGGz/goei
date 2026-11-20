@@ -366,16 +366,29 @@ test('망상홈쇼핑 상담원 요청문: 상담원은 사람이 아니고 후�
   assert.doesNotMatch(talk, /cannot take money/);
 });
 
-test('스티커 들추기: 진실에서 몇 글자만, 같은 상품이면 늘 같은 조각 · 진실이 없거나 ?면 빈 글', () => {
-  const { peelFragment } = homeshop;
-  const t = '셋째 알 뒤 술을 마시면 잠든 몸이 살아있는 악기가 된다';
-  const f = peelFragment(t, 'ms1_0_ab', 8);
-  assert.ok(f.length > 0 && Array.from(f).length <= 8, f);
-  assert.ok(t.includes(f), '조각은 진실 원문의 일부');
-  assert.ok(f.length < t.length, '전체가 아니다');
-  assert.equal(peelFragment(t, 'ms1_0_ab', 8), f, '다시 열어도 같다');
-  assert.equal(peelFragment('?', 'x', 8), '');
-  assert.equal(peelFragment(undefined, 'x', 8), '');
+test('약조(돈·물건·시연이 아닌 대가): 상자를 열 때 받으러 오는 턴이 걸리고, 그 턴에만 본편에 붙는다', () => {
+  const { promiseNow } = homeshop;
+  const c2 = chatOf(2);
+  const o0 = newOrder(c2, ITEM, 'talk', { money: 0, items: [], appear: 1, other: '머리카락 한 줌' });
+  assert.equal(o0.owe, undefined, '열기 전에는 안 걸린다');
+  const c3 = { ...chatOf(3), scriptstate: ordersVars([{ ...o0, boxId: 'b1' }]) };
+  const o = openOrder(c3, { ...o0, boxId: 'b1' }, { call: [3, 3] }, 'c5', () => 0);
+  assert.deepEqual([o.dues, o.owe], [[6], 7], '시연 호출 턴을 피해 다음 턴');
+  const at = (turns, vars) => ({ ...chatOf(turns), message: [...chatOf(turns - 1).message, { role: 'user', data: 'go', chatId: 'u' }], scriptstate: vars });
+  const vars = ordersVars([o]);
+  assert.equal(promiseNow(at(6, vars)), null);
+  assert.equal(promiseNow(at(7, vars))?.id, o.id);
+  assert.match(homeshopBlock(at(7, vars)), /머리카락 한 줌/);
+  assert.doesNotMatch(homeshopBlock(at(8, vars)), /머리카락 한 줌/);
+  // 약조가 없는 주문은 걸리지 않는다
+  assert.equal(openOrder(c3, { ...newOrder(c2, ITEM, 'won', { money: 1000, items: [], appear: 0, other: '' }), boxId: 'b2' }, { call: [3, 3] }, 'c5', () => 0).owe, undefined);
+});
+
+test('스티커 모양: 같은 상품이면 늘 같고, 접는 선의 비가 상품마다 다르다', () => {
+  const { stickerLook } = homeshop;
+  assert.deepEqual(stickerLook('ms1_0_ab'), stickerLook('ms1_0_ab'));
+  const ratios = new Set(Array.from({ length: 60 }, (_, i) => { const l = stickerLook(`p${i}`); return `${l.rx}:${l.ry}`; }));
+  assert.ok(ratios.size > 1, '늘 같은 각도로 접히지 않는다');
 });
 
 test('망상홈쇼핑: 진실 칸(숨은 원래 용도)을 받아 상품에 둔다 · 화면용 기록에는 없다 (11-15 사용자: 쓸 때 숨은 효과가 하나도 안 들어감)', () => {

@@ -344,6 +344,11 @@ function tick(): void {
         reading = true;
         startRead();
       }
+      // 전화 주문 중: 지금 대사까지만 하고 대본을 멈춘다 (통화하는 사이 매진·다음 부로 넘어가지 않는다)
+      else if (phone && r.cue < part.cues.length) {
+        reading = true;
+        startIdle();
+      }
       else if ((r.talking || reading) && r.cue + 1 < part.cues.length) {
         reading = false;
         startCue(r.cue + 1);
@@ -357,7 +362,7 @@ function tick(): void {
         r.flags.look = false;
         if (f.s.fx.cut) r.cut = 'B';
         startIdle();
-      } else if (t >= r.gapUntil && !holding) {
+      } else if (t >= r.gapUntil && !holding && !phone) {
         const next = r.part + 1;
         run = freshRun(next);
         hooks.advance(next);
@@ -389,7 +394,7 @@ function tick(): void {
   }
   // 남은 수량 저절로 줄기 (큐시트가 도는 동안만. 끝 수 아래로는 안 내려가고, 매진은 큐시트의 「매진」만)
   const d = f.s.drop;
-  if (d.on && !r.flags.sold && r.cue >= 0 && r.cue < part.cues.length) {
+  if (d.on && !phone && !r.flags.sold && r.cue >= 0 && r.cue < part.cues.length) {
     const fast = r.flags.price || r.flags.rush;
     if (!r.dropN) {
       const plan = nextDrop(r.left, r.dropEnd, dropRest(part.cues, r.cue, r.cueLen - (t - r.cueAt), fast, f.s), d);
@@ -625,6 +630,9 @@ let holding = false;
 /** 읽느라 대본을 멈춘 상태 · 읽는 동작 차례 */
 let reading = false;
 let readN = 0;
+/** 전화 주문 창이 열려 있는 동안 (11-20 사용자: 상담하는 사이 방송이 흘러 매진이 뜨면 주문을 못 한다): 대본·수량·다음 부를 멈춘다. 시청자 채팅과 대기 동작은 흐른다 */
+let phone = false;
+export const playerPhone = (on: boolean): void => { phone = on; };
 export const playerHold = (on: boolean): void => { holding = on; if (on) readN = 0; };
 /** 방금까지 흐른 채팅 n줄 */
 export const playerRecentChat = (n: number): { nick: string; text: string }[] => shown.slice(-n);

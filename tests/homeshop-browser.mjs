@@ -61,14 +61,15 @@ for (const [vp, size] of VPS) {
   { const lines = await page.evaluate(() => [...document.querySelectorAll('.hs-chlog p')].map((p) => p.textContent));
     assert.ok(!lines.some((t) => t.includes('이부전용') || t.includes('삼부전용')), `다른 부 채팅이 섞임: ${lines.join(' / ')}`);
     assert.equal(new Set(lines).size, lines.length, `채팅 되풀이: ${lines.join(' / ')}`); }
-  // 스티커 들추기: 모서리를 젖히면 숨은 효과 몇 글자만 (진실 전체는 화면 어디에도 없다)
+  // 스티커 들추기: 모서리를 젖히면 바닥 글 가운데 그 자리 글자만 보인다
   await click('[data-action="hs-pop"][data-value="peek"]'); await page.waitForTimeout(300); await shot('peek');
   assert.equal(await page.locator('.hs-sticker .corner').count(), 1, '들출 모서리');
   await click('[data-action="hs-lift"]'); await page.waitForTimeout(900); await shot('peek-lifted');
   assert.equal(await page.locator('.hs-sticker.lifted').count(), 1, '젖혀짐');
-  { const frag = (await page.textContent('.hs-und .emb b')).trim();
-    assert.ok(frag.length > 0 && frag.length <= 8 && TRUTH.replace(/\s/g, '').includes(frag.replace(/\s/g, '')), `진실 조각: ${frag}`);
-    assert.ok(!(await page.evaluate((t) => document.body.innerHTML.includes(t), TRUTH)), '진실 전체는 화면에 없음'); }
+  // 바닥에는 숨은 효과 글 전체가 찍혀 있고(11-20 사용자), 젖힌 세모 밖의 글자는 앞면에 덮여 안 보인다
+  { const st = await page.evaluate(() => { document.querySelector('.hs-sticker .corner').style.pointerEvents = 'none'; const e = document.querySelector('.hs-und .emb'); const cs = [...e.querySelectorAll('i')]; const hit = cs.filter((c) => { const r = c.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return top === c || top === e || top?.classList.contains('hs-und'); }); return { all: e.textContent, n: cs.length, seen: hit.length }; });
+    assert.equal(st.all, TRUTH, '바닥 글은 전체 문장');
+    assert.ok(st.seen > 0 && st.seen < st.n / 2, `드러난 글자 ${st.seen}/${st.n}`); }
   await click('.hs-pop header [data-action="hs-pop"]');
   // 채팅 보내기: 한 번 더 호출 → 진행자 반응이 끼어든다
   await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<cue>\n바스트|웃음|은하제 고객님, 좋은 질문이십니다!|-\n</cue>\n<chat>\n민지맘|ㅋㅋㅋ 읽어줬다\n???|읽지 마세요\n</chat>' }]; });
@@ -85,6 +86,10 @@ for (const [vp, size] of VPS) {
   assert.ok((await page.textContent('.hs-pop')).includes('380,000원'), '원 값');
   assert.ok((await page.textContent('.hs-pop')).includes('시연 참여'), '시연');
   assert.ok((await page.textContent('.hs-op')).includes('주문 도와드리겠습니다'), '상담원 인사');
+  // 통화 중에는 대본이 멈춘다 (11-20 사용자: 상담하는 사이 방송이 흘러 매진이 뜬다): 지금 대사만 마치고 큐가 더 넘어가지 않는다
+  { const cue = () => page.evaluate(() => Number((document.querySelector('.hs-scr')?.dataset.clip ?? '').split(':')[2]));
+    await page.waitForTimeout(4000); const a = await cue(); await page.waitForTimeout(7000); const b = await cue();
+    assert.equal(b, a, `통화 중 큐가 넘어감 ${a} → ${b}`); }
   // 흥정: 상담원(사람이 아닌 채널 직원) 요청 한 번
   await click('[data-action="hs-pay"][data-value="talk"]'); await page.waitForTimeout(200);
   await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<operator>시연에 나와 주시고 머리카락도 조금 보내 주시면 됩니다, 고객님.</operator>\n<terms>\ndemo|yes\nother|머리카락 한 줌\n</terms>' }]; });
@@ -190,10 +195,14 @@ for (const [vp, size] of VPS.filter(([v]) => v !== 'pc')) {
   await page.evaluate(() => { document.getElementById('chat-card').style.visibility = 'hidden'; });
   await page.waitForSelector('.gx-netsolo .hs-l3', { timeout: 15000 });
   await page.waitForTimeout(1500); await shot('2-opened-by-card');
+  // 단독 창: 인터넷 창 틀(탭·주소줄·즐겨찾기)이 없다 (11-20 사용자)
+  assert.equal(await page.locator('.gx-netsolo .br-tabs, .gx-netsolo .br-bm, .gx-netsolo .br-omni').count(), 0, '단독 창에 브라우저 틀 없음');
   assert.equal(await page.evaluate(() => window.__calls.llm.length), 1, '카드로 열면 편성을 한 번 받는다');
   assert.equal(await page.evaluate(() => document.querySelector('.hs-ord .call').disabled), false, '전화 주문 됨');
   // 3) 새 응답에 카드가 없다: 지난 응답의 카드를 눌러 열어도(화면에 남아 있었다 치고) 방송은 「신호 없음」
-  await closeWin(page); await page.waitForTimeout(200);
+  await closeWin(page); await page.waitForTimeout(2000);
+  // 단독 창으로 본 것은 인터넷 탭에 남지 않는다 (11-20 사용자: 상황판 인터넷 창에 망상홈쇼핑이 떠 있다)
+  assert.ok(!String(await page.evaluate(() => window.__chat.scriptstate.$br_tabs ?? '')).includes('"hs"'), '인터넷 탭에 안 남음');
   await page.evaluate(() => { window.__chat.message.push({ role: 'user', data: '집을 나선다', chatId: 'u2' }, { role: 'char', data: '문이 닫힌다.\n[▣|2025.01.01|03:10 AM|☀️|4°C|관리국|QC 괴이]', chatId: 'c2' }); });
   await page.evaluate(() => { document.getElementById('chat-card').style.visibility = 'visible'; });
   await page.click('#chat-card [data-goei-shop]');

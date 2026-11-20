@@ -95,16 +95,16 @@ test('시청 기록: 줄 수 한계는 설정($hs_log_keep)을 따른다 — 기
 });
 
 test('설정: 기본값 · 끄기 · 종류 · 토큰 범위 · 설정 표', () => {
-  assert.deepEqual(hsMainSettings(undefined), { on: true, kinds: ['show', 'chat', 'say', 'buy'], tokens: 3000, turns: 0 });
+  assert.deepEqual(hsMainSettings(undefined), { on: true, kinds: ['show', 'chat', 'say', 'buy', 'aside'], tokens: 3000, turns: 0 });
   assert.equal(hsMainSettings({ $hs_main: '0' }).on, false);
   assert.deepEqual(hsMainSettings({ $hs_main_kinds: 'buy, say' }).kinds, ['say', 'buy']);
-  assert.deepEqual(hsMainSettings({ $hs_main_kinds: '' }).kinds.length, 4, '비우면 기본');
+  assert.deepEqual(hsMainSettings({ $hs_main_kinds: '' }).kinds.length, 5, '비우면 기본');
   assert.deepEqual(hsMainSettings({ $hs_main_kinds: 'none' }).kinds, []);
   assert.equal(hsMainSettings({ $hs_main_tokens: '0' }).tokens, 0);
   assert.equal(hsMainSettings({ $hs_main_tokens: '999999999' }).tokens, HS_MAIN_SET.tokens.hi);
   assert.equal(hsMainSettings({ $hs_main_tokens: 'x' }).tokens, HS_MAIN_SET.tokens.def);
   assert.deepEqual([HS_MAIN_KEY.on, HS_MAIN_KEY.kinds, HS_MAIN_KEY.tokens], ['$hs_main', '$hs_main_kinds', '$hs_main_tokens']);
-  assert.equal(HS_MAIN_SET.kinds.def, 'show,chat,say,buy');
+  assert.equal(HS_MAIN_SET.kinds.def, 'show,chat,say,buy,aside');
   const { vars } = full();
   assert.equal(hsMainOn(vars), true);
   assert.equal(hsMainOn({ ...vars, $hs_main: '0' }), false);
@@ -225,24 +225,24 @@ test('본편 참고 기록: 없던 일이 된 주문은 넘기지 않는다 · f
   assert.ok(tight[0] === '' || body(tight[0]).records.some((r) => r.lines.some((l) => l.type === 'user_chat' || l.type === 'user_order')), '줄여도 내 채팅·주문부터 남는다');
 });
 
-// ── 스티커·상담원 말(aside): 적기는 늘 적고, 메인 요청에는 켠 때만 ──
-test('스티커 밑 글·상담원 말: 기본은 메인 요청에 안 가고, 「스티커·상담원」을 켜면 간다', () => {
+// ── 스티커·상담원 말(aside): 기본으로 메인 요청에 간다 (11-20 사용자), 끄면 안 간다 ──
+test('스티커 밑 글·상담원 말: 기본으로 메인 요청에 가고, 「스티커·상담원」을 끄면 안 간다', () => {
   const show = showOf('k1');
   const aside = (p, who, text) => ({ k: 'aside', p, who, text });
   let vars = appendLog({}, show, [host(0, '첫 줄'), aside(0, hslog.hsLogSticker(), '사실 이건 무전기가 아니다'), aside(0, hslog.hsLogOperator(), '네, 고객님. 망상홈쇼핑입니다.')]);
   // 같은 글을 다시 들춰도 한 번만 적는다
   vars = { ...vars, ...appendLog(vars, show, [aside(0, hslog.hsLogSticker(), '사실 이건 무전기가 아니다')]) };
   assert.equal(readLog(vars).entries.filter((e) => e.k === 'aside').length, 2);
-  assert.deepEqual(hsMainSettings({}).kinds, ['show', 'chat', 'say', 'buy'], '기본 종류에 없다');
-  const off = hsMainContext(chatOf(vars), RULE, null, 0);
+  assert.deepEqual(hsMainSettings({}).kinds, ['show', 'chat', 'say', 'buy', 'aside'], '기본 종류에 있다');
+  const off = hsMainContext(chatOf({ ...vars, $hs_main_kinds: 'show,chat,say,buy' }), RULE, null, 0);
   assert.doesNotMatch(off, /무전기가 아니다|망상홈쇼핑입니다/);
-  const on = hsMainContext(chatOf({ ...vars, $hs_main_kinds: 'show,chat,say,buy,aside' }), RULE, null, 0);
+  const on = hsMainContext(chatOf(vars), RULE, null, 0);
   const lines = body(on).records[0].lines;
   assert.deepEqual(lines.filter((l) => l.type === 'under_the_usage_sticker'), [{ type: 'under_the_usage_sticker', text: '사실 이건 무전기가 아니다' }]);
   assert.deepEqual(lines.filter((l) => l.type === 'phone_order_operator'), [{ type: 'phone_order_operator', text: '네, 고객님. 망상홈쇼핑입니다.' }]);
   // 스티커·상담원 말만 있는 기록은 꺼 두면 아무것도 안 넘긴다
   const only = appendLog({}, show, [aside(0, hslog.hsLogSticker(), '밑글')]);
-  assert.equal(hsMainContext(chatOf(only), RULE, null, 0), '');
+  assert.equal(hsMainContext(chatOf({ ...only, $hs_main_kinds: 'show,chat,say,buy' }), RULE, null, 0), '');
 });
 
 test('넘기는 기간: 기본(0)은 다음 편성까지 계속, N턴이면 마지막으로 본 턴부터 N번만 넘긴다', () => {
