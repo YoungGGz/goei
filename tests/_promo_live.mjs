@@ -29,6 +29,16 @@ const shot = async (name, sel) => {
   else await page.screenshot({ path });
   return path;
 };
+// 창 프레임만: 뒤 배경·그림자를 지우고 프레임 바깥은 투명으로 찍는다
+const frameShot = async (name, sel = '.gx-frame') => {
+  mkdirSync(`${base}/out`, { recursive: true });
+  const st = await page.addStyleTag({ content: `html,body,.default-chat-screen{background:transparent!important}.default-chat-screen>*{visibility:hidden!important}.gx,.gx::before,.gx::after,.gw,.gw::before{background:transparent!important;backdrop-filter:none!important}${sel}{box-shadow:none!important;filter:none!important}[x-goei-prog],.gx-fab,[x-goei-fab]{visibility:hidden!important}` });
+  await page.waitForTimeout(250);
+  const path = `${base}/out/${name}.png`;
+  await page.locator(sel).first().screenshot({ path, omitBackground: true });
+  await st.evaluate((e) => e.remove());
+  return path;
+};
 const dump = async (name) => {
   const calls = await page.evaluate(() => { const c = window.__calls.llm || []; window.__calls.llm = []; return c; });
   mkdirSync(`${base}/req`, { recursive: true });
@@ -37,7 +47,7 @@ const dump = async (name) => {
 };
 const mod = await import(pathToFileURL(resolve(args[1])).href);
 let result;
-try { result = await mod.default({ page, H, llm, shot, dump, errors, vp }); } catch (e) { console.log('STEP FAIL', e?.stack ?? e); await shot('_fail').catch(() => {}); }
+try { result = await mod.default({ page, H, llm, shot, frameShot, dump, errors, vp }); } catch (e) { console.log('STEP FAIL', e?.stack ?? e); await shot('_fail').catch(() => {}); }
 const outFile = opt('--out');
 if (outFile) {
   const s = await page.evaluate(() => { const store = { ...window.__store }; delete store['p:goei:body']; delete store['p:goei:data-world']; return { chat: window.__chat, store, char: window.__char }; });
