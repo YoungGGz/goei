@@ -81,6 +81,10 @@ import { guideTxt } from '../core/guides';
 import { applyRecordsNav, closeToastHtml, endedReport, holdToast, releaseToast, syncCloseToast, handleRecords, journalList, rec, recordsInput, recordsNav, recordsTab, resetRecords, type RecordsEnv } from './records';
 import { PHONE_WATCH, foldStyle, isPhone, syncFoldStyles, zpx, zrect, zrectQ } from './media';
 
+/** 설정 창을 한 번이라도 열었나: 「설정」 단추는 처음엔 화면 페이지로, 그 뒤로는 마지막에 보던 페이지로 연다 (사용자 11-22: 닫았다 열 때마다 화면 설정이 열렸다).
+ *  업데이트 알림처럼 다른 페이지를 짚어 여는 것은 그 페이지로 간다 */
+let edSeen = false;
+
 /** ID카드 잔고 칩 → 장부 창 (열림·입력 알림) */
 
 interface Draft {
@@ -1113,7 +1117,8 @@ async function handle(action: string, value?: string): Promise<void> {
       change: panelChange,
       canChat: () => view.kind === 'started',
       mobileNav: mobileNavHtml,
-    }, (value as EditorNode) || undefined);
+    }, edSeen && value === 'set:screen' ? undefined : (value as EditorNode) || undefined);
+    edSeen = true;
     return;
   }
   if (action === 'install-open') {
@@ -1124,9 +1129,6 @@ async function handle(action: string, value?: string): Promise<void> {
     await savePrefs((p) => ({ ...p, editorWidth: Math.max(50, Math.min(100, Number(value) || 90)) }));
     return render();
   }
-  // 어디서 「설정」을 누르든 설정 창 하나 (2026-10-27 사용자): 괴담넷·괴담톡·위키 판의 설정 단추는 그 기능 페이지로
-  const FEAT_SET: Record<string, string> = { 'gn-settings': 'set:net', 'ph-settings': 'set:phone', 'wiki-settings': 'set:wiki' };
-  if (FEAT_SET[action]) return handle('ed-open', FEAT_SET[action]);
   if (action === 'prefs-open' || action === 'prefs-close') {
     // 시작 전 「새 채팅 기본 설정」: 설정 창을 연다 (패널 안 설정 탭은 없앴다)
     resetSettings();
@@ -1327,10 +1329,6 @@ async function handle(action: string, value?: string): Promise<void> {
       const run = navStep(action === 'nav-back' ? -1 : 1);
       return run ? run() : render();
     }
-    case 'feature-set':
-      // 기능 설정은 설정 창의 그 페이지로 (2026-10-27)
-      if (value === 'phone' || value === 'wiki' || value === 'people' || value === 'image' || (value === 'gnet' && GNET_ON)) return handle('ed-open', `set:${value}`);
-      return;
     case 'ops-sel':
       // 관제실 상황판: 일지 줄·지도 표시 → 왼쪽 큰 보기가 그 상황으로. 보던 화면(CCTV·위성)은 그대로 (2026-10-21 사용자). 모바일은 큰 보기로 올라간다
       opsUi.sel = value ?? '';
@@ -1417,6 +1415,9 @@ async function handle(action: string, value?: string): Promise<void> {
       walletTabUi.edit = false;
       return refresh();
     }
+    case 'menu-fold':
+      await savePrefs((p) => ({ ...p, navFold: getPrefs().navFold === true ? undefined : true }));
+      return render();
     case 'id-fold':
       await savePrefs((p) => ({ ...p, idFold: getPrefs().idFold === true ? undefined : true }));
       return render();
@@ -1874,9 +1875,11 @@ function navState(): NavState {
 
 /** PC 메뉴 맨 아래: ‹ 뒤로 · 앞으로 › (모바일 쓸기와 같은 기록) */
 function navHistBar(): string {
+  const folded = getPrefs().navFold === true;
   return `<div class="gx-navhist">
     <button class="gx-nh" data-action="nav-back" aria-label="뒤로" title="뒤로">${ICONS.back}</button>
-    <button class="gx-nh fwd" data-action="nav-fwd" aria-label="앞으로" title="앞으로">${ICONS.back}</button></div>`;
+    <button class="gx-nh fwd" data-action="nav-fwd" aria-label="앞으로" title="앞으로">${ICONS.back}</button>
+    <button class="gx-nh gx-navfold" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}">${ICONS.side}</button></div>`;
 }
 
 function applyNav(s: NavState): void {
@@ -2095,7 +2098,7 @@ function tabs(): string {
   const item = (id: Tab, label: string, icon: string, cls = '', badge = '') =>
     `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" title="${label}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
   const ctx = view.kind === 'started' ? view.ctx : null;
-  return `<nav class="gx-nav" aria-label="주요 화면">
+  return `<nav class="gx-nav${ctx && getPrefs().navFold === true ? ' folded' : ''}" aria-label="주요 화면">
     ${ctx ? brand(ctx) : ''}
     ${item('board', '상황판', ICONS.board)}
     ${item('map', '임무', ICONS.map, 'desk')}
@@ -2245,6 +2248,12 @@ function mobileNavHtml(): string {
 
 /** 왼쪽 위: 표지 + 세로 ID카드 */
 function brand(ctx: ChatContext): string {
+  // 메뉴를 접으면 카드 대신 얼굴만 작게, 누르면 카드가 작은 창으로 (11-22 사용자)
+  if (getPrefs().navFold === true) {
+    const pa = playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
+    const url = pa ? imageUrl(ctx.char, facePic(ctx.char, pa, true)) : userInfo().photo;
+    return `<div class="gx-nav-brand"><button class="gx-nav-face" data-action="id-card" aria-label="내 ID카드" title="내 ID카드">${url ? `<img src="${esc(url)}" alt="">` : ICONS.idcard}</button></div>`;
+  }
   return `<div class="gx-nav-brand">
       ${idCard(ctx, true)}
     </div>`;

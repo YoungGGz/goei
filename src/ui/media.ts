@@ -25,19 +25,26 @@ export const phoneMq = (): string => (mode() === 'zoom' ? 'not all' : `(max-widt
 export const isPhone = (): boolean => matchMedia(phoneMq()).matches;
 /** 기준이 바뀌는 경계를 다 지켜본다 (설정을 바꿔도 다시 걸 필요가 없게) */
 export const PHONE_WATCH = [`(max-width: ${BASE}px)`, `(max-width: ${FOLD_MAX}px)`, LAND];
+/** 펼친 폴드에서 창이 차지하는 화면 몫(%) */
+const FOLD_FILL = 95;
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 /** CSS 글을 지금 방식에 맞춘다.
  *  phone: @media 머리의 폰 기준 폭 600→860, 601→861.
  *  zoom: @media 머리의 폭·높이 기준을 배율만큼 줄이고(752 폭이 PC 규칙에 걸리게), 화면 단위(vw·vh)는 배율만큼 키우고, 문서를 통째로 줄인다 */
+// @media 머리만 고친다: 주석 안의 「@media」 글자에서 시작해 다음 @container 머리까지 삼키지 않게 * 와 } 에서 끊는다
+// (11-22: 주석 뒤의 @container gwbody 1001px 가 700px 로 줄어 폴드 설정의 호출 흐름 표가 카드로 안 바뀌고 잘렸다)
 export function foldCss(css: string): string {
   const m = mode();
   if (m === 'base') return css;
-  if (m === 'phone') { const max = FOLD_MAX; return css.replace(/@media[^{]*\{/g, (head) => head.replace(/max-width:\s*600px/g, `max-width: ${max}px`).replace(/min-width:\s*601px/g, `min-width: ${max + 1}px`)); }
+  if (m === 'phone') { const max = FOLD_MAX; return css.replace(/@media[^{}*]*\{/g, (head) => head.replace(/max-width:\s*600px/g, `max-width: ${max}px`).replace(/min-width:\s*601px/g, `min-width: ${max + 1}px`)); }
   const k = foldZoom();
   return css
     .replace(/(\d*\.?\d+)(vw|vh|dvw|dvh|svh|lvh)\b/g, (_, n: string, u: string) => `${r2(Number(n) / k)}${u}`)
-    .replace(/@media[^{]*\{/g, (head) => head.replace(/((?:min|max)-(?:width|height):\s*)(\d*\.?\d+)px/g, (_, a: string, n: string) => `${a}${r2(Number(n) * k)}px`))
-    + `\nhtml { zoom: ${k}; }\n`;
+    .replace(/@media[^{}*]*\{/g, (head) => head.replace(/((?:min|max)-(?:width|height):\s*)(\d*\.?\d+)px/g, (_, a: string, n: string) => `${a}${r2(Number(n) * k)}px`))
+    + `\nhtml { zoom: ${k}; }\n`
+    // 펼친 폴드에서는 상황판 창과 설정 창을 화면 가로·세로 95% 로 (사용자 11-22: 설정 창이 상황판보다 좁아 다 잘린다 → 둘 다 95%). 「설정 창 폭」 값과 상한(1280·950·1340)은 이 화면에서 쓰지 않는다.
+    // 따로 뜨는 상점 창(.solo)과 AI 상담을 연 설정 창은 원래 규칙 그대로
+    + `.gx .gx-panel:not(.solo), .gw:not(.ai-on) .gw-win { width: ${r2(FOLD_FILL / k)}vw; height: ${r2(FOLD_FILL / k)}vh; }\n`;
 }
 
 /** 넣은 방식의 표: 배율이 바뀌어도 다시 넣게 배율까지 적는다 */

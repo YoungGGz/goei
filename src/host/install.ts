@@ -57,7 +57,7 @@ export async function checkInstall(charIndex: number, progress?: Progress): Prom
   const notes = await iconNotes();
   const note = notes[charId(char)];
   const lore = char.globalLore as LoreEntry[] | undefined;
-  const ours = !!note && note.ours === String(char.image ?? '');
+  const ours = (!!note && note.ours === String(char.image ?? '')) || (await iconShipped(notes, charId(char), String(char.image ?? '')));
   const iconOld = ours && (await iconStale(notes, charId(char)));
   const packInLore = (lore ?? []).some((e) => typeof e.content === 'string' && e.content.startsWith(WIKI_PACK_HEAD));
   const state = installCheck({
@@ -161,6 +161,22 @@ export async function installPictures(charIndex: number, progress: Progress): Pr
   // 채팅 속 그림 태그가 보는 에셋 목록도 다시 읽는다 (전수검사 11-13)
   void loadModuleAssets().catch(() => false);
   return saved;
+}
+
+/** 기록은 없지만 메인 아이콘이 이번 판 그림과 같은가: 봇 카드(charx)를 가져오면 아이콘이 이미 들어 있는데, 플러그인이 넣은 적이 없어 기록이 없다
+ *  → 점검이 「없음 · 다른 아이콘」으로 나왔다 (사용자 11-22). 그림을 읽어 지문이 같으면 우리 아이콘으로 적어 둔다 (설치 전 아이콘은 없음) */
+async function iconShipped(notes: Record<string, IconNote>, id: string, image: string): Promise<boolean> {
+  const want = installData().icon.digest;
+  if (!want || !image || !id) return false;
+  try {
+    const bytes = toBytes(await risuai.readImage(image));
+    if (!bytes?.length || (await digest(bytes)) !== want) return false;
+  } catch {
+    return false;
+  }
+  notes[id] = { ours: image, prev: notes[id]?.prev ?? '', digest: want };
+  await risuai.pluginStorage.setItem(ICON_KEY, JSON.stringify(notes)).catch(() => undefined);
+  return true;
 }
 
 /** 메인인 우리 아이콘이 이번 판 그림이 아닌가 (옛 그림). 기록에 지문이 없으면(옛 판이 넣은 것) 그림을 읽어 지문을 내고 같을 때만 적어 둔다.

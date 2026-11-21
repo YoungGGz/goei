@@ -82,6 +82,22 @@ test('host: 「이전 아이콘으로」는 기록을 지우지 않고 되돌렸
   assert.equal(r.iconPrev, 'assets/mine.png');
 });
 
+test('host: 봇 카드에 처음부터 든 아이콘(플러그인이 넣은 기록 없음)도 그림이 같으면 「있음」', async () => {
+  const box = fakeRisu({ chaId: 'c9', name: '괴이', image: 'assets/card-icon.webp' });
+  box.files.set('assets/card-icon.webp', ICON);
+  let r = await M.checkInstall(0);
+  assert.equal(r.state.icon, true, '카드 아이콘이 이번 판 그림이면 있음');
+  assert.equal(r.state.iconOld, false);
+  assert.equal(r.iconPrev, '', '설치 전 아이콘이 없으니 「이전 아이콘으로」는 없다');
+  assert.deepEqual(note(box), { ours: 'assets/card-icon.webp', prev: '', digest: DIGEST });
+  // 다른 그림이면 그대로 없음
+  const other = fakeRisu({ chaId: 'c10', name: '내 봇', image: 'assets/else.png' });
+  other.files.set('assets/else.png', new Uint8Array([1, 2, 3]));
+  r = await M.checkInstall(0);
+  assert.equal(r.state.icon, false);
+  assert.equal(note(other), undefined);
+});
+
 test('host·화면: 되돌린 뒤 Risu 에서 플러그인 아이콘을 직접 메인으로 고르면 「이전 아이콘으로」가 다시 나온다', async () => {
   const box = fakeRisu({ chaId: 'c3', name: '내 봇', image: 'assets/mine.png' });
   const ctx = () => ({ charIndex: 0, chatIndex: 0, char: box.char, chat: {} });

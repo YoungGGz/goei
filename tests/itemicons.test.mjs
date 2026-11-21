@@ -165,7 +165,7 @@ test('그림 칸 「종류/물건말/english」 (2026-11-10 사용자: 포인트
   is('휴대용 티타늄 캠핑 머그', '', '머그컵'); // 앞머리가 같은 말
   is('휴대용 티타늄 캠핑 머그', '도구/머그/mug', '머그컵'); // 종류를 다르게 적어도 전체에서 (전에는 도구 안에서 그물)
   is('휴대용 위조 인지 스탬프', '도구/스탬프/stamp', '도장'); // 한글 물건말이 없으면 영어 낱말
-  is('방염 속건성 이너웨어 세트', '옷/이너웨어/underwear', '팬티');
+  is('방염 속건성 이너웨어 세트', '옷/이너웨어/underwear', '방염 내의'); // 11-22: 속옷 분류 안에서 이름과 같은 낱말(방염)이 든 그림
   const f = matchItemIcon(pack, '휴대용 공간 차폐 쿼크로', '기기/쿼크로/quarkro');
   assert.equal(f, pack.base.misc, '그림이 없으면 비슷한 글자의 그림(가습기)도 종류 대표 그림도 아니라 상자 (11-10 사용자)');
 });
@@ -237,7 +237,7 @@ test('분류 말은 그 분류 안에서 물건마다 하나 (2026-11-10 사용�
   for (const w of ['과자', '다과', '간식', '주전부리', '군것질거리']) {
     const h = pack.hit(w, '');
     assert.ok(h?.pool?.length > 20, `${w}: 무리 ${h?.pool?.length}`);
-    assert.ok(h.pool.every((f) => up(f).includes('과자')), `${w}: 과자 그림만`);
+    assert.ok(h.pool.every((f) => up(f).includes('과자') || names(f).includes('과자')), `${w}: 과자 그림만`);
     const seen = new Set(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((s) => matchItemIcon(pack, w, '', s)));
     assert.ok(seen.size >= 3, `${w}: 물건마다 다른 그림 (${seen.size})`);
     assert.equal(matchItemIcon(pack, w, '', 'it1'), matchItemIcon(pack, w, '', 'it1'), '같은 물건은 늘 같은 그림');
@@ -253,19 +253,48 @@ test('분류 말은 그 분류 안에서 물건마다 하나 (2026-11-10 사용�
   // 그림 칸만 분류 말이고 이름으로는 못 찾으면 분류에서
   assert.ok(pack.hit('수상한 주전부리들', '음식/과자')?.pool?.length > 20);
   // 종류를 안 적었으면 성인·신체·괴이 그림은 보통 분류의 무리에 없다
-  assert.ok(pack.hit('가면', '')?.pool?.every((f) => kindsOf(f).some((k) => !['adult', 'body', 'anomaly'].includes(k))));
+  assert.ok(pack.hit('장난감', '')?.pool?.every((f) => kindsOf(f).some((k) => !['adult', 'body', 'anomaly'].includes(k))));
   // 군말·없는 말은 그대로 상자
   assert.equal(pack.hit('물건', ''), null);
+});
+
+test('뽑기는 묶음 말에서만, 그림 이름 그대로면 그 그림 (2026-11-22 사용자: 요원증이 보관증으로 — 로직이 먼저, 표는 보완)', () => {
+  // 이름이 그림 이름 그대로면 물건 id 가 뭐든 그 그림 (전에는 같은 분류의 다른 그림이 뽑혔다)
+  for (const w of ['권총', '담배', '마스크', '붕대', '휴대폰', '가방', '칼', '책', '컵', '우유', '빵', '사탕', '라이터', '항아리', '불상']) {
+    assert.equal(pack.hit(w, '')?.pool, undefined, `${w}: 뽑지 않음`);
+    for (const seed of ['a', 'b', 'c', 'd']) assert.ok(names(matchItemIcon(pack, w, '', seed)).includes(w), `${w} → ${names(matchItemIcon(pack, w, '', seed)).join('/')}`);
+  }
+  is('권총', '무기/권총/pistol', '권총');
+  is('담배', '음식/담배/cigarette', '담배');
+  // 같은 뜻 말·대체 말도 한 장
+  for (const [w, want] of [['나이프', '칼'], ['소설책', '책'], ['머그', '머그컵'], ['요원증', '사원증'], ['로사리오', '묵주'], ['돈다발', '현금다발'], ['엽총', '산탄총'], ['후레쉬', '손전등']]) {
+    assert.equal(pack.hit(w, '')?.pool, undefined, `${w}: 뽑지 않음`);
+    is(w, '', want);
+  }
+  // 분류 안에서 이름과 같은 낱말이 든 그림
+  is('관리국 요원증', '열쇠/요원증/id card', '관리국 사원증');
+  is('관리국 요원증', '열쇠/신분증/id card', '관리국 사원증');
+  for (const seed of ['a', 'b', 'c', 'd']) assert.ok(names(matchItemIcon(pack, '요원증', '열쇠/요원증/agent ID', seed)).includes('사원증'));
+  // 이름의 끝 두 낱말 이상이 그림 이름
+  is('할아버지 유품 상자', '잡동사니/상자/box', '유품 상자');
+  is('워터파크 카드 키', '', '카드 키(워터파크)'); // 이름의 낱말을 다 가진 그림이 먼저
+  // 그림 칸의 말이 대분류(장치·기기)면 그 종류 전체에서 뽑지 않는다
+  assert.equal(pack.hit('소거 장치', '기기/장치/device')?.pool, undefined);
+  // 분류에서 뺀 그림은 무리에 없다
+  const fileOf = (n) => table.icons.find((r) => r.name === n)?.file;
+  assert.ok(!pack.hit('가구', '')?.pool?.includes(fileOf('구속 의자')));
 });
 
 test('영어로 출력할 때 (2026-11-10 사용자: 영출 대비): 분류 말·복수형·그림 칸의 영어 낱말, 성인·신체 그림의 영어 이름', () => {
   const up = (f) => table.icons.filter((r) => r.file === f).flatMap((r) => r.up ?? []);
   const kindsOf = (f) => table.icons.filter((r) => r.file === f).map((r) => r.kind);
-  for (const [w, cat] of [['snack', '과자'], ['Snacks', '과자'], ['beverage', '음료'], ['drinks', '음료'], ['candies', '사탕'], ['medicine', '약'], ['jewelry', '장신구'], ['fish', '생선']]) {
+  for (const [w, cat] of [['snack', '과자'], ['Snacks', '과자'], ['beverage', '음료'], ['drinks', '음료'], ['medicine', '약'], ['jewelry', '장신구'], ['fish', '생선']]) {
     const h = pack.hit(w, '');
     assert.ok(h?.pool?.length > 5 && h.pool.every((f) => up(f).includes(cat)), `${w}: ${h?.pool?.length}`);
   }
   for (const [w, k] of [['food', 'food'], ['clothes', 'wear'], ['clothing', 'wear']]) assert.ok(pack.hit(w, '')?.pool?.every((f) => kindsOf(f).includes(k)), w);
+  is('candies', '', '사탕'); // 11-22: 사탕은 물건 하나가 떠오르는 말이라 뽑지 않는다
+  assert.equal(pack.hit('candies', '')?.pool, undefined);
   assert.ok(pack.hit('mystery treats', 'food/snack')?.pool?.length > 20, '그림 칸의 영어 분류 말');
   assert.ok(pack.hit('수상한 주전부리들', '음식/수상한 주전부리들/snack')?.pool?.length > 20, '그림 칸의 영어 낱말');
   // 세부 이름은 그대로

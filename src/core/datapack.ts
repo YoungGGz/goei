@@ -118,8 +118,8 @@ export interface ItemIconPack {
 export { clearIconMisses, ICON_ALIAS_DEFAULT, ICON_KIND_LABEL, ICON_KINDS_TEXT, iconGen, normIcon, parseIconAliases, readIconMisses, setIconAliases, setIconPool, splitIconWord } from './iconmatch';
 
 /** 표 → 찾기 함수 (core/iconmatch.ts = 그림/물건/match_icon.mjs) */
-function makeIconFind(table: ItemIconRow[], rep: Record<string, string>, base: Record<string, string>, same: Record<string, string>, cats: string[] | undefined) {
-  return makeIconIndex(table.map((r) => ({ file: r.f, keywords: r.k, phrases: [...r.k, ...r.h], kind: r.kind, up: r.u })), rep, { base, same, cats });
+function makeIconFind(table: ItemIconRow[], rep: Record<string, string>, base: Record<string, string>, same: Record<string, string>, cats: string[] | undefined, draw: string[] | undefined, one: string[] | undefined) {
+  return makeIconIndex(table.map((r) => ({ file: r.f, keywords: r.k, phrases: [...r.k, ...r.h], kind: r.kind, up: r.u })), rep, { base, same, cats, draw, one });
 }
 
 /** 소지품 그림 팩 글을 푼다. 형식이 다르면 던진다 */
@@ -142,7 +142,7 @@ export function applyItemsPack(text: string): ItemIconPack {
   for (const r of table) if (r.base) base[r.kind] = r.f;
   const same: Record<string, string> = {};
   if (obj(j.same)) for (const [k, v] of Object.entries(j.same)) if (typeof v === 'string') same[k] = v;
-  const hit = makeIconFind(table, rep, base, same, Array.isArray(j.cats) ? strs(j.cats) : undefined);
+  const hit = makeIconFind(table, rep, base, same, Array.isArray(j.cats) ? strs(j.cats) : undefined, Array.isArray(j.draw) ? strs(j.draw) : undefined, Array.isArray(j.one) ? strs(j.one) : undefined);
   return { table, rep, icons, base, hit, find: (name, icon) => hit(name, icon)?.file ?? null };
 }
 
