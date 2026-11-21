@@ -276,6 +276,23 @@ function layout(): void {
   cg!.style.height = `${small ? h * k : h}px`;
   cg!.style.transform = small || k === 1 ? '' : `scale(${k})`;
   if (small) stage.style.fontSize = '';
+  chatFit(stage.closest<HTMLElement>('.hs'));
+}
+
+/** 좁은 PC 창(.hs-n, 폴드 펼침 601~860): 채팅 칸이 왼쪽 칸 높이까지 늘면 입력칸·「보내기」가 첫 화면 아래로 내려간다(인터넷 탭은 브라우저 틀만큼 더).
+ *  배치는 그대로 두고 채팅 칸 높이만 사이트의 보이는 높이 안으로 줄인다. 왼쪽 칸보다 길게 늘이지는 않는다. 넓은 PC(1280)는 손대지 않는다 */
+function chatFit(page: HTMLElement | null): void {
+  const chat = page?.querySelector<HTMLElement>('.hs-bd > .hs-chat');
+  if (!page || !chat) return;
+  chat.style.height = '';
+  chat.style.alignSelf = '';
+  if (!page.classList.contains('hs-n')) return;
+  const top = chat.getBoundingClientRect().top - page.getBoundingClientRect().top + page.scrollTop;
+  const room = Math.floor(page.clientHeight - top - 12);
+  if (room >= 160 && room < chat.offsetHeight) {
+    chat.style.height = `${room}px`;
+    chat.style.alignSelf = 'start';
+  }
 }
 
 /** 마지막으로 찾은 물건 그림 주소: tick 마다 그림 팩(5천여 줄)을 다시 뒤지지 않게. 찾은 것만 기억한다(팩이 늦게 받혀도 다시 찾게) (전수검사 11-13) */
