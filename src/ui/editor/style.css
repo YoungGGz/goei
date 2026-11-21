@@ -1069,3 +1069,30 @@
 .gw .gw-anote > summary::-webkit-details-marker { display: none; }
 .gw .gw-anote > summary::after { content: ''; flex: none; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: translateY(-2px) rotate(45deg); }
 .gw .gw-anote[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+
+/* ── 눌러 보기 3차 고침 · 설정 (2026-11-21). 폰 설정은 0.21.24 모양 그대로 두어서 폰 아닌 화면에서만 ── */
+@media (min-width: 601px) and (min-height: 500px), (min-width: 601px) and (pointer: fine), (min-width: 601px) and (pointer: none) {
+  /* 표 머리 낱말이 중간에서 꺾였다(「컨텍/스트/포함」): 물려받은 overflow-wrap: anywhere 가 칸 최소 폭을 한 글자로 만들었다 → 머리 낱말은 안 끊는다 */
+  .gw .ck-h1 b, .gw .ck-h2 > span { overflow-wrap: normal; }
+  /* 카드 머리(고유 상점·시그니처 상품): 지우기는 오른쪽 끝, 시그니처 확률 칸은 원래 뜻대로 64px */
+  .gw .ms-fx-head > .gx-mini.danger { margin-left: auto; }
+  .gw .ms-fx-head .ph-inline .ms-num { width: 64px; }
+  /* 괴이·파밍 목록 머리: 추가 단추에 밀려 검색칸이 48px 로 줄던 것 → 줄바꿈 허용, 검색칸·고르기 상자는 120px 아래로 안 줄어든다 */
+  .gw-list-tools { flex-wrap: wrap; }
+  .gw-list-tools .dir-search, .gw-list-pane .gw-list-tools .gw-list-pick { flex: 1 1 120px; }
+  /* 괴이 공통 머리말: 펼치면 글 상자 아래 여백이 없어 마지막 줄이 칸 끝에 붙었다 */
+  .gw .gw-list-pane > .gw-anote[open] { padding-bottom: 12px; }
+  /* 확인 창의 어두운 덮개가 왼쪽 위 고정 머리(z 2)와 「맨 위로」(z 5) 밑에 깔려 그것만 밝게 떠 보였다 → 덮개를 맨 위 겹으로 */
+  .gw-win > .gw-confirm { z-index: 20; }
+  /* 넓은 줄(.wide)에 조작이 비면 이름이 한 글자 폭에 끼었다(「갱/신/기/록」) → 이름 위·설명 아래 */
+  .gw .ps-row.wide:has(> .ps-ctl:empty) { grid-template-areas: 'label' 'hint'; }
+  /* 표 고르기의 누름 칸이 끝 칸에서 판 밖으로 나가 표가 옆으로 밀리던 것 → 좌우만 자른다 */
+  .gw .ck > .ps-rows > .ck-line { overflow-x: clip; }
+  /* 고르기 목록 줄(상시 로어북 등): 아랫줄 설명이 없으면 이름이 체크칸보다 위로 떴다 → 이름이 두 칸을 다 써서 가운데 */
+  .gw .dir-ext-item > b:has(+ span) { grid-row: 1 / 3; }
+  /* 손가락으로 누르는 기기: 누른 줄에 :hover 채움이 남아 체크를 푼 줄이 고른 것처럼 보였다 */
+  @media (hover: none) { .gw .dir-ext-item:hover { background: none; } }
+}
+/* 절 머리 「?」 도움말: 그림은 18px 그대로, 누르는 칸만 34px */
+.gw .gw-fhint { position: relative; }
+.gw .gw-fhint::before { content: ''; position: absolute; inset: -8px; }

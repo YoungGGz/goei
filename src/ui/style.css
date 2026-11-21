@@ -2916,6 +2916,10 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 }
 /* 전수점검 눌러-중대-22·눌러2-보통-37: 주인공·아바타 고르기 카드, 상황판 고른 줄, 진행 중 사건 카드(종류 색 테두리가 고른 색을 덮었다)도 같은 민트 2px */
 .gx-whoc.on:not(.gx-lookchip) { position: relative; }
+/* 눌러 보기 3차: 첫 장면 칸(.gx-sc)도 같은 민트 2px. 마우스가 올라가 있으면 :hover:not(:disabled) 테두리(회색)가 더 세서 고른 직후 테두리가 회색으로 보였다 */
+.gx-sc.on { position: relative; }
+.gx-sc.on, .gx-sc.on:hover:not(:disabled) { border-color: var(--signal); }
+.gx-sc.on::after { content: ''; position: absolute; inset: 0; z-index: 3; border: 1px solid var(--signal); border-radius: inherit; pointer-events: none; }
 .gx-oprow.sel { position: relative; box-shadow: none; background: none; }
 .gx-oprow.sel::after, .ph-row:has(> .ph-main.on:not(.gn-dmrow))::after { border-width: 2px; } /* 테두리 없는 줄은 안쪽 겹만으로 2px */
 .gx-evc.art.sel, .gx-evc.art.live.sel:is(:has(> .k-an), :has(> .k-in), :has(> .k-ms)) { border-color: var(--signal); border-width: 1px; }
@@ -4229,7 +4233,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-sm .ph.want{background:#fffdf8;border:1.5px dashed #c9b9a6;box-shadow:none;place-items:start;align-content:start;padding:16px;gap:10px;text-align:left}
 .bs-sm .ph.want b{background:#3a322c;color:#fff;font-size:12px;padding:3px 8px;border-radius:4px;justify-self:start}
 .bs-sm .ph.want p{margin:0;font-size:13.5px;line-height:1.55;color:#5b524a}
-.bs-sm.bs-m .c .bs-sm .ph.want{padding:8px;gap:6px}.bs-sm.bs-m .c .bs-sm .ph.want p{font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.bs-sm.bs-m .c .ph.want{padding:8px;gap:6px}.bs-sm.bs-m .c .ph.want p{font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .bs-sm .ph.dark{background:radial-gradient(circle at 50% 40%,#4b4640,#24211e)}
 .bs-sm .ph .tag{position:absolute;left:8px;top:8px;padding:2px 7px;border-radius:3px;background:rgba(43,38,34,.85);color:#fff;font-size:11px;font-weight:700}
 .bs-sm .ph .tag.g{background:#3d7a58}
@@ -4257,7 +4261,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-sm.bs-m .bar2{flex-wrap:wrap;row-gap:8px}.bs-sm.bs-m .bar2 .loc{order:1}.bs-sm.bs-m .sort{order:2}.bs-sm.bs-m .cats{order:3;width:100%;overflow-x:auto;scrollbar-width:none}
 .bs-sm.bs-m .grid{grid-template-columns:minmax(0,1fr);gap:0}
 .bs-sm.bs-m .c{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid #e4ddd3}
-.bs-sm.bs-m .c .bs-sm .ph{border-radius:6px}.bs-sm.bs-m .c .bs-sm .ph img{width:85px;height:85px}.bs-sm.bs-m .c .nm{margin-top:2px}
+.bs-sm.bs-m .c .ph{border-radius:6px}.bs-sm.bs-m .c .ph img{width:85px;height:85px}.bs-sm.bs-m .c .nm{margin-top:2px}
 
 /* 첨부 공통 */
 .bs .ax{margin:12px 0;max-width:min(100%,520px)}

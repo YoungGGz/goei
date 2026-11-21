@@ -13,7 +13,7 @@ import { GUIDE_NAMES, guideTxt, setGuideOverride } from '../core/guides';
 import { onOffSwitch, switchHtml } from './controls';
 import { repaintTheme } from './theme';
 import {
-  AGENT_MAX, basicDefaults, CONSULT_CHATS_RANGE, CONSULT_LINES_RANGE, DIM_DEFAULT, TRACE_KEEP_RANGE, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
+  AGENT_MAX, basicDefaults, CONSULT_CHATS_RANGE, CONSULT_LINES_RANGE, DIM_DEFAULT, FOLD_ZOOM_DEFAULT, FOLD_ZOOM_RANGE, TRACE_KEEP_RANGE, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
 } from '../core/settings';
 import type { WorldSettings } from '../core/world/engine';
 import { savePrefs, saveVarDefaults, varDefaultsToLoad } from '../host/prefs';
@@ -417,6 +417,8 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       D('theme', theme, { help: `채팅 화면의 캐릭터 이미지 배경과 상태창(「테마」를 골랐을 때) 배색이에요. ${scope === 'chat' ? '이 채팅에 저장돼요. 새 채팅의 기본값은 시작 화면의 설정에서 정해요.' : '새 채팅이 시작할 때 쓸 배색이에요.'}`, scope: scope === 'chat' ? 'chat' : 'defaults' }),
       D('nav', getPrefs().nav ?? 'left'),
       D('fold', getPrefs().fold ?? 'pc'),
+      // PC 배치일 때만: 통째로 줄이는 배율 (ui/media.ts)
+      ...(getPrefs().fold === 'phone' ? [] : [D('fold-zoom', '', { ctl: stepBox('set-fold-zoom', 'n', getPrefs().foldZoom ?? FOLD_ZOOM_DEFAULT, ...FOLD_ZOOM_RANGE, '%', '펼친 폴드 화면 배율', busy) })]),
       D('wiki-side', getPrefs().wikiSide ?? 'right'),
       D('agents', getPrefs().agents ?? 'wall'),
       D('dim', '', { ctl: dimSlider(getPrefs().dim ?? DIM_DEFAULT, busy) }),
@@ -1006,9 +1008,9 @@ export async function handleSettings(action: string, value: string | undefined, 
     });
     return true;
   }
-  if (action === 'set-trace-keep' || action === 'set-consult-lines' || action === 'set-consult-chats') {
+  if (action === 'set-trace-keep' || action === 'set-consult-lines' || action === 'set-consult-chats' || action === 'set-fold-zoom') {
     // 값은 「n=수」. 범위를 벗어난 수는 범위 끝으로 맞추고, 수가 아니면 그대로 둔다
-    const [key, [lo, hi]] = action === 'set-trace-keep' ? ['traceKeep', TRACE_KEEP_RANGE] as const : action === 'set-consult-lines' ? ['consultLines', CONSULT_LINES_RANGE] as const : ['consultChats', CONSULT_CHATS_RANGE] as const;
+    const [key, [lo, hi]] = action === 'set-fold-zoom' ? ['foldZoom', FOLD_ZOOM_RANGE] as const : action === 'set-trace-keep' ? ['traceKeep', TRACE_KEEP_RANGE] as const : action === 'set-consult-lines' ? ['consultLines', CONSULT_LINES_RANGE] as const : ['consultChats', CONSULT_CHATS_RANGE] as const;
     const raw = v.slice(v.indexOf('=') + 1).trim();
     const n = Number(raw);
     if (/^-?\d+$/.test(raw)) await saveDefaults(env, (p) => ({ ...p, [key]: Math.max(lo, Math.min(hi, n)) }));

@@ -1187,6 +1187,11 @@ export async function handle(action: string, value?: string): Promise<void> {
       edUi.sel[edUi.node] = value;
       render();
     }
+    // 후보 목록에서 뺀 것이 본문에 그대로 남았다(수는 줄고 본문은 「관리국 · 명부에만 있음」, 눌러 보기 3차) → 고른 것을 비운다
+    if (action === 'dir-ext-del' && value && isKind(edUi.node) && edUi.sel[edUi.node] === value && !directoryDraft(ctx)[edUi.node === 'site' ? 'sites' : 'anomalies'].some((p) => p.lore === value)) {
+      edUi.sel[edUi.node] = '';
+      render();
+    }
     return;
   }
   if (action.startsWith('ip-')) {
