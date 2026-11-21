@@ -416,6 +416,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       // 테마는 채팅마다 ($st_fixed_theme, 원본 ensureDefaults) — 시작 뒤엔 이 채팅, 시작 전엔 새 채팅 기본값 (2026-10-28 QC: 「이 기기」 배지가 붙어 있었지만 실제로는 채팅에 저장됐다)
       D('theme', theme, { help: `채팅 화면의 캐릭터 이미지 배경과 상태창(「테마」를 골랐을 때) 배색이에요. ${scope === 'chat' ? '이 채팅에 저장돼요. 새 채팅의 기본값은 시작 화면의 설정에서 정해요.' : '새 채팅이 시작할 때 쓸 배색이에요.'}`, scope: scope === 'chat' ? 'chat' : 'defaults' }),
       D('nav', getPrefs().nav ?? 'left'),
+      D('fold', getPrefs().fold ?? 'pc'),
       D('wiki-side', getPrefs().wikiSide ?? 'right'),
       D('agents', getPrefs().agents ?? 'wall'),
       D('dim', '', { ctl: dimSlider(getPrefs().dim ?? DIM_DEFAULT, busy) }),
@@ -976,6 +977,10 @@ export async function handleSettings(action: string, value: string | undefined, 
   }
   if (action === 'set-agents') {
     await saveDefaults(env, (p) => ({ ...p, agents: v === 'list' ? 'list' : undefined }));
+    return true;
+  }
+  if (action === 'set-fold') {
+    if (v === 'pc' || v === 'phone') await saveDefaults(env, (p) => ({ ...p, fold: v === 'phone' ? 'phone' : undefined }));
     return true;
   }
   if (action === 'set-wiki-side') {

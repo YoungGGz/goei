@@ -3147,12 +3147,13 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
   .gx-rptpop { padding: 14px 20px; align-items: start; }
   .gx-rptpop .gx-rptcard { width: 100%; max-height: calc(100% - 28px); padding: 14px 14px 20px; border-radius: 18px; }
 }
-/* 폴드 펼침(PC 배치, 기록 상자 ~480px): 화면 너비가 아니라 기록 상자 너비로 같은 줄바꿈 — 이름·부제가 단추 셋에 밀려 4줄로 꺾이던 문제 (11-21) */
+/* 폴드 펼침(PC 배치, 기록 상자 ~480px): 한 줄 그대로 두고 단추 간격·폭만 줄여 이름·부제 자리를 낸다 (11-22 사용자: 줄 접기·아래로 내리기 X) */
 .gx-rec-pane { container: gxrec / inline-size; }
 @container gxrec (max-width: 620px) {
-  .ph-room-head { flex-wrap: wrap; }
-  .ph-room-head .ph-room-title { flex: 1 1 0; min-width: 0; }
-  .ph-room-head .ph-act { flex: 1 1 100%; justify-content: flex-end; }
+  .ph-room-head { gap: 6px; }
+  .ph-room-head .ph-act { gap: 4px; }
+  .ph-room-head .ph-act .gx-mini { padding: 0 8px; gap: 4px; }
+  .ph-room-head .ph-act .pp-reread-sel { width: 96px; padding-left: 8px; padding-right: 22px; }
 }
 .gx-png-title { font-size: 14px; font-family: var(--mono); color: var(--dim); padding-right: 36px; }
 .gx-png-img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--void); }

@@ -79,7 +79,7 @@ import { walletHeadButton, walletList, walletUi as walletTabUi } from './wallet'
 import { parsePoints, pointsOn, pointsVars, readPoints } from '../core/points';
 import { guideTxt } from '../core/guides';
 import { applyRecordsNav, closeToastHtml, endedReport, holdToast, releaseToast, syncCloseToast, handleRecords, journalList, rec, recordsInput, recordsNav, recordsTab, resetRecords, type RecordsEnv } from './records';
-import { isPhone, PHONE_MQ } from './media';
+import { foldStyle, isPhone, PHONE_WATCH, syncFoldStyles } from './media';
 
 /** ID카드 잔고 칩 → 장부 창 (열림·입력 알림) */
 
@@ -272,7 +272,7 @@ function ensureRoot(): HTMLElement {
   });
   startLookActs();
   const style = document.createElement('style');
-  style.textContent = css + LOOK_CSS;
+  foldStyle(style, css + LOOK_CSS);
   document.head.appendChild(style);
   root = document.createElement('div');
   root.className = 'gx';
@@ -432,7 +432,7 @@ function ensureRoot(): HTMLElement {
   // PC↔모바일 폭이 바뀌면 다시 그린다 (괴담넷은 모바일에서 목록 안 펼침, PC는 두 칸)
   if (!widthWatch) {
     widthWatch = true;
-    matchMedia(PHONE_MQ).addEventListener?.('change', () => root && render());
+    for (const q of PHONE_WATCH) matchMedia(q).addEventListener?.('change', () => root && render());
     // 창 둘레 기기 틀: 뷰포트 폭·필드 전체화면이 바뀌어 그릴지 말지가 달라질 때만 다시 그린다 (ui/frame.ts)
     const frameWatch = () => {
       if (!root || root.style.display === 'none') return;
@@ -1673,6 +1673,7 @@ function render(): void {
   // 창 모양 (설정 → 화면): 메뉴 위치, 창 바깥 어둡기
   const pf = getPrefs();
   root.dataset.nav = pf.nav ?? 'left';
+  syncFoldStyles(); // 설정 「펼친 폴드 화면 배치」가 바뀌었으면 CSS 의 폰 기준 폭을 다시 맞춘다 (ui/media.ts)
   root.dataset.wikiSide = pf.wikiSide ?? 'right';
   // --dim은 글자색 변수라 겹치면 안 된다. 테마별 막 색에 투명도만 바꿔 바로 칠함
   paintVeil(root, pf.dim ?? DIM_DEFAULT);

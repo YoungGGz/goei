@@ -36,7 +36,7 @@ import { siteLogo } from '../browser';
 import { basicSettings } from '../../core/settings';
 import { worldOn } from '../../core/world';
 import { ppValue } from '../../core/people/settings';
-import { isPhone } from '../media';
+import { foldStyle, isPhone, syncFoldStyles } from '../media';
 import { consultAction, consultAfterRender, consultAside, consultButton, consultClose, consultUi } from './consult';
 import { setCatalogHost } from './catalog';
 import { markCommitted, morph } from '../morph';
@@ -170,7 +170,7 @@ function ensureRoot(): HTMLElement {
     return root;
   }
   const style = document.createElement('style');
-  style.textContent = editorCss;
+  foldStyle(style, editorCss);
   document.head.appendChild(style);
   root = document.createElement('div');
   root.className = 'gw';
@@ -813,6 +813,7 @@ function body(ctx: ChatContext): string {
 let lastDrawn = '';
 
 export function render(): void {
+  syncFoldStyles(); // 설정 「펼친 폴드 화면 배치」 (ui/media.ts)
   if (!root || !edUi.open || !host) return;
   const ctx = host.ctx();
   if (ctx) overridesOf(ctx); // 저장·새로 읽기 뒤 덧쓰기 초안을 카드 값으로 맞춘다 (지침 화면처럼 초안을 안 쓰는 화면에서도)

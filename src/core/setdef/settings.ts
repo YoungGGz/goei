@@ -12,6 +12,7 @@ export const SETTINGS_SET: SetPage = {
       rows: [
         { key: 'theme', label: '테마', ctl: { t: 'seg', opts: [['light', '라이트'], ['dark', '다크'], ['paper', '페이퍼']] } },
         { key: 'nav', label: '메뉴 위치', ctl: { t: 'seg', opts: [['left', '왼쪽'], ['right', '오른쪽']] }, help: 'PC 창에서 메뉴 목록을 놓을 쪽이에요.', scope: 'device' },
+        { key: 'fold', label: '펼친 폴드 화면 배치', ctl: { t: 'seg', opts: [['pc', 'PC'], ['phone', '모바일']] }, help: '폴드를 펼친 화면처럼 폭이 601~860인 화면에서 쓸 배치예요. 그보다 좁으면 늘 모바일, 넓으면 늘 PC 배치예요.', scope: 'device' },
         { key: 'wiki-side', label: '위키 목록 위치', ctl: { t: 'seg', opts: [['left', '왼쪽'], ['right', '오른쪽']] }, help: '위키의 세로바와 숨은 목록 서랍을 놓을 쪽이에요. 폰의 「목록」 책갈피도 같은 쪽으로 가요.', scope: 'device' },
         { key: 'agents', label: '요원 칸', ctl: { t: 'seg', opts: [['wall', '모니터'], ['list', '목록']] }, help: '상황판 요원 칸 모양이에요.', scope: 'device' },
         { key: 'dim', label: '창 바깥 불투명도', ctl: { t: 'custom' }, help: '창 뒤 채팅 화면을 가리는 정도예요. 0%면 그대로 보이고 100%면 다 가려요.', scope: 'device' },

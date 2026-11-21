@@ -104,6 +104,8 @@ export interface Prefs {
   /** 위키 목록 서랍 쪽 (PC, 이 기기 공통, 2026-10-27 사용자). 없으면 왼쪽. 모바일은 늘 오른쪽 책갈피 */
   /** 위키 목록·세로바 쪽 (기본 오른쪽, 2026-10-29 사용자). 폰의 「목록」 책갈피도 따라간다 */
   wikiSide?: 'left' | 'right';
+  /** 펼친 폴드 같은 중간 폭(601~860) 화면의 배치 (이 기기 공통, 11-22 사용자). 없으면 PC 배치, 'phone' 이면 모바일 배치 */
+  fold?: 'phone';
   /** 상황판 요원 칸 모양 (이 기기 공통): 모니터 벽(기본) 또는 목록 */
   agents?: 'wall' | 'list';
   dim?: number;
@@ -221,6 +223,7 @@ export function setPrefs(raw: unknown): Prefs {
   const look = typeof o.look === 'string' && /^\d+\.\d+$/.test(o.look) ? o.look : undefined;
   const wikiSide = o.wikiSide === 'left' ? 'left' : o.wikiSide === 'right' ? 'right' : undefined;
   const agents = o.agents === 'list' ? 'list' : undefined;
+  const midLayout = o.fold === 'phone' ? ('phone' as const) : undefined;
   const dim = int(o.dim, 0, 100);
   const status = o.status === 'off' || o.status === 'light' || o.status === 'dark' || o.status === 'paper' ? o.status : undefined;
   const size = imgSize(o.imgSize);
@@ -262,7 +265,7 @@ export function setPrefs(raw: unknown): Prefs {
   const times = setTimes(o.times);
   // 띄운 보고서 알림 기억도 남긴다. 최근 50개 (전수검사 11-13)
   const noticedReports = Array.isArray(o.noticedReports) ? [...new Set(o.noticedReports.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.slice(0, 80)))].slice(-50) : [];
-  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(diagOk !== null ? { diagKeep: diagOk } : {}), ...(diagFail !== null ? { diagFailKeep: diagFail } : {}), ...(traceKeep !== null ? { traceKeep } : {}), ...(consultLines !== null ? { consultLines } : {}), ...(consultChats !== null ? { consultChats } : {}), ...(Object.keys(times).length ? { times } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
+  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(diagOk !== null ? { diagKeep: diagOk } : {}), ...(diagFail !== null ? { diagFailKeep: diagFail } : {}), ...(traceKeep !== null ? { traceKeep } : {}), ...(consultLines !== null ? { consultLines } : {}), ...(consultChats !== null ? { consultChats } : {}), ...(Object.keys(times).length ? { times } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(midLayout ? { fold: midLayout } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
   return prefs;
 }
 
