@@ -22,6 +22,9 @@
 //   --resume <폴더,…>     같은 판(커밋)의 지난 기록(report.json)을 읽어, 이미 누른 단추는 건너뛰고 못 누른 곳만 이어서 누른다.
 //                         지난 결과도 이번 보고서에 합친다(캡처는 지난 폴더 것을 가리킴). 판이 다르면 멈춘다 (11-09 사용자: 통과한 것을 왜 또 하냐)
 //   --plan                --resume 와 같이: 누르지 않고, 다시 누를 동작·연계·건너뛸 수만 보여 준다
+//   --only <파일.json>    처음 큐 대신 이 파일의 항목만 누른다 (남은 큐를 스레드 여럿에 나눌 때). 항목: { vp?, start?, path: ['a|v',…] 또는 [{key,nth}], key, nth?, label?, action?, value? }
+//                         또는 { queue: [...] }. 파일 안 열쇠는 전부 「누른 것」으로 쳐서 다른 몫 것을 다시 누르지 않는다. 눌러서 새로 열린 화면은 평소처럼 들어간다
+//   --slice i/n           --only 항목(vp·start 맞는 것)을 차례대로 n 덩이로 나눠 i 번째만 (예 --slice 3/3)
 //   --from 'a|v>b|v'      시작 상태에서 이 열쇠들을 차례로 누른 화면부터 점검한다 (한 화면만 빨리 다시 볼 때. 열쇠는 report.md 의 `action|value`)
 // 빌드(dist/)가 있어야 한다: npm run build
 import os from 'node:os';
@@ -56,6 +59,8 @@ const opt = { vp: ['pc', 'phone'], start: ['board', 'picker', 'items', 'shop', '
     else if (k === '--head') opt.head = v(); // --plan 시험용: 지금 판 대신 이 커밋과 비교
     else if (k === '--only-scope') opt.scope = v();
     else if (k === '--probe') opt.probe = v();
+    else if (k === '--only') opt.only = v();
+    else if (k === '--slice') { const [i, n] = v().split('/').map(Number); opt.slice = { i, n }; }
     else if (k === '--from') opt.from = v().split('>').map((x) => x.trim()).filter(Boolean).map((key) => ({ key, nth: 0 }));
     else if (k === '-h' || k === '--help') { console.log(readFileSync(fileURLToPath(import.meta.url), 'utf8').split('\n').filter((l) => l.startsWith('//')).map((l) => l.slice(3)).join('\n')); process.exit(0); }
     else throw new Error(`모르는 옵션: ${k}`);
@@ -602,9 +607,18 @@ for (const vp of opt.reportOnly ? [] : opt.vp) {
         queue.push({ ...it, path });
       }
     };
-    enqueue(opt.from, first, rv);
+    if (opt.only) {
+      // 남은 큐 나눠 돌리기: 처음 화면 대신 파일의 항목만. 파일의 열쇠는 전부 누른 것으로 친다 (다른 몫과 겹치지 않게)
+      const raw = JSON.parse(readFileSync(resolve(ROOT, opt.only), 'utf8'));
+      const all = (Array.isArray(raw) ? raw : raw.queue || raw.items || []).filter((q) => (!q.vp || q.vp === vp) && (!q.start || q.start === startKind));
+      for (const q of all) done.add(q.key);
+      let mine = all;
+      if (opt.slice) { const sz = Math.ceil(all.length / opt.slice.n); mine = all.slice((opt.slice.i - 1) * sz, opt.slice.i * sz); }
+      for (const q of mine) queue.push({ ...q, nth: q.nth ?? 0, path: (q.path || []).map((p) => (typeof p === 'string' ? { key: p, nth: 0 } : { key: p.key, nth: p.nth ?? 0 })) });
+      log(`--only ${opt.only}${opt.slice ? ` --slice ${opt.slice.i}/${opt.slice.n}` : ''}: 전체 ${all.length}개 중 ${mine.length}개`);
+    } else enqueue(opt.from, first, rv);
     // 이어 돌리기: 지난번에 들어가 본 화면들에서 아직 안 누른 것만 이어서 누른다
-    for (const r of prior) if (r.start === startKind && r.newList && r.path.length + 1 < opt.depth) enqueue([...r.path.map((key) => ({ key, nth: 0 })), { key: r.key, nth: r.nth ?? 0 }], r.newList);
+    if (!opt.only) for (const r of prior) if (r.start === startKind && r.newList && r.path.length + 1 < opt.depth) enqueue([...r.path.map((key) => ({ key, nth: 0 })), { key: r.key, nth: r.nth ?? 0 }], r.newList);
     let n = 0;
     while (queue.length) {
       const batch = queue.splice(0, opt.workers);
