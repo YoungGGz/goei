@@ -255,6 +255,8 @@
 .gw .gw-variants select { font: inherit; }
 .gw .gw-fmove { display: inline-flex; gap: 4px; }
 .gw .gw-xname { width: 220px; font-weight: 700; }
+.gw .gw-xname[aria-invalid] { border-color: var(--danger); }
+.gw .gw-xname-warn { margin: 0 0 6px; font-size: 12px; color: var(--danger); }
 .gw .gw-ro { margin: 6px 2px 0; font-size: 12.5px; color: var(--dim); }
 .gw .gw-add-field { display: flex; flex-wrap: wrap; gap: var(--gap); margin-top: 10px; }
 .gw .gw-add-field input[name] { flex: 1; min-width: 160px; }
@@ -347,8 +349,8 @@
 
 /* ── 본문 칸이 좁을 때 (폰 가로 844·창 폭 50~60% 등, 화면은 760 넘지만 조작 칸이 320 이 안 됨): 줄만 한 열로.
    이름 칸 200 옆에 단계 선택·막대가 다 안 들어가 창 밖으로 넘쳤다 (2026-10-28 QC). 화면 760 이하 규칙과 같은 줄 모양 ── */
-.gw-body { container-type: inline-size; }
-@container (max-width: 600px) {
+.gw-body { container: gwbody / inline-size; }
+@container gwbody (max-width: 600px) {
   .gw .ps-row, .gw .dir-line, .gw .dir-in, .gw .st-col-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'label' 'ctl' 'hint'; }
   .gw .st-col-row { grid-template-areas: 'label label' 'use show' 'hint hint'; grid-template-columns: auto auto; justify-content: start; }
   .gw .st-col-row.st-col-all > .gx-segs { grid-column: 1 / -1; grid-row: 2; }
@@ -363,8 +365,16 @@
   .gw .dir-in:has(> .dir-photo) > span:first-child, .gw .dir-in > .dir-photo, .gw .dir-in:has(> .dir-photo) > small, .gw .dir-in:has(> .dir-photo) > .dir-ext { grid-column: 1; }
 }
 /* 목록 + 상세 두 칸 페이지의 상세 칸도 따로 잰다 (전수점검 눌러-중대-19·눌러-보통-35): 본문은 600 넘어도 상세 칸은 380쯤이라
-   이름 칸 200 옆 값 칸이 130 남아 사진 줄 글자가 한 글자씩 세로로 쌓이고 소속 칩이 한 줄에 하나씩 늘어섰다 → 상세 칸이 좁으면 위 줄 모양(한 열) */
-.gw-detail { container-type: inline-size; }
+   이름 칸 200 옆 값 칸이 130 남아 사진 줄 글자가 한 글자씩 세로로 쌓이고 소속 칩이 한 줄에 하나씩 늘어섰다 → 상세 칸이 좁으면 줄 모양만 한 열로.
+   이름을 붙여 위 본문 규칙(목록→드롭다운, 머리 ▲▼)은 본문 폭으로만 켜진다: 이름 없는 규칙이면 상세 칸 폭으로 켜져 PC 두 칸에서도 머리에 ▲▼가 한 벌 더 생겼다 */
+.gw-detail { container: gwdetail / inline-size; }
+@container gwdetail (max-width: 600px) {
+  .gw .ps-row, .gw .dir-line, .gw .dir-in { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'label' 'ctl' 'hint'; }
+  .gw .ps-label > b, .gw .dir-line > span:first-child, .gw .dir-in > span:first-child { min-height: 0; }
+  .gw .ps-ctl > input, .gw .ps-ctl > select, .gw .dir-in > input, .gw .dir-in > select { width: 100%; }
+  .gw .dir-in:has(> .dir-photo) > span:first-child, .gw .dir-in > .dir-photo, .gw .dir-in:has(> .dir-photo) > small, .gw .dir-in:has(> .dir-photo) > .dir-ext { grid-column: 1; }
+  .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label' 'hint'; }
+}
 
 /* ── 좁은 화면 ── */
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
@@ -468,6 +478,7 @@
 .gw .gw-startpage .st-slot .gw-grip { flex: 0 0 auto; touch-action: none; }
 .gw .gw-startpage .st-slot .st-caret { display: inline-flex; width: 18px; color: var(--dim); }
 .gw .gw-startpage .st-slot .st-caret svg { width: 16px; height: 16px; }
+.gw .gw-startpage .st-slot .st-always { flex: none; font-size: 12px; color: var(--dim); }
 .gw .gw-startpage .st-slots .dir-row.dragging { opacity: .45; }
 .gw .gw-startpage .st-slots .dir-row.drop-before { box-shadow: 0 -3px 0 0 var(--signal); }
 .gw .gw-startpage .st-slots .dir-row.drop-after { box-shadow: 0 3px 0 0 var(--signal); }
@@ -476,7 +487,9 @@
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw .gw-startpage .st-slot { flex-wrap: wrap; row-gap: 6px; }
   .gw .gw-startpage .st-slot .dir-name { flex: 1 0 100%; }
-  .gw .gw-startpage .st-slot .gx-segs { margin-right: auto; }
+  .gw .gw-startpage .st-slot .gx-segs, .gw .gw-startpage .st-slot .st-always { margin-right: auto; }
+  /* 고르기가 없는 줄(플레이 조직)도 펼침 화살표는 오른쪽 끝 (왼쪽 아래에 붙었다, 전수점검 눌러-보통-45) */
+  .gw .gw-startpage .st-slot .st-caret { margin-left: auto; }
 }
 .gw .gw-startpage .st-sel { display: flex; align-items: baseline; gap: 8px; margin: 16px 0 8px; font-size: 15px; }
 .gw .gw-startpage .st-sel small { color: var(--dim); font-weight: 400; }
@@ -511,11 +524,18 @@
 .gw-totop.show { opacity: 1; pointer-events: auto; transform: none; }
 .gw-totop:hover { background: var(--accent-bg); }
 .gw-totop svg { width: 20px; height: 20px; }
+/* 「맨 위로」가 뜨는 자리(오른쪽 22~64px)를 기능 설정 본문이 비워 둔다: 떠 있는 단추가 줄 끝의 지우기 ×·입력값·펼침 화살표를 덮어 잘못 눌렸다 (전수점검 눌러-보통-32).
+   호출 흐름 판(.fl-page)은 오른쪽 여백을 따로 두고 단추를 바깥으로 붙인다(아래 761 규칙) */
+.gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 44px; }
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  .gw-totop { width: 36px; height: 36px; margin: 0 8px 14px 0; }
+  .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 34px; }
+}
 /* 조작 없이 설명만 있는 줄 (2026-11-08 사용자: 소지품 「넘기는 것·남는 것」 글 위 쓸데없는 여백) — 빈 조작 칸(높이 34)을 접고 설명을 이름 옆 첫 줄부터 */
 .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label hint'; }
 .gw .ps-row:has(> .ps-ctl:empty) > .ps-ctl { display: none; }
 .gw .ps-row:has(> .ps-ctl:empty) > .ps-label > b { min-height: 0; }
-@container (max-width: 600px) {
+@container gwbody (max-width: 600px) {
   .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label' 'hint'; }
 }
 /* 폰 배치(한 열)에서도 같게: 위 「이름 | 설명」 두 칸이 한 열 격자에 덮여 설명이 폭을 다 가져가고 이름(「고유 상점」)이 한 글자씩 세로로 쌓였다 (전수점검 눌러2-중대-4) */
@@ -816,7 +836,7 @@
 .gw .fl .ck-first { box-shadow: none; }
 .gw .fl-ph { display: none; }
 /* 떠 있는 「맨 위로」 단추(42px)가 「설정 →」 단추를 덮지 않게: 이 쪽에서는 단추를 오른쪽으로 10px 붙이고, 줄 오른쪽에 그 자리를 비운다 (2026-11-12 전수점검 A3). 폰은 폭이 모자라 그대로 */
-@media (min-width: 761px) { .gw .fl-page { padding-right: 22px; } .gw-body:has(.fl-page) ~ .gw-totop { margin-right: 12px; } }
+@media (min-width: 761px) { .gw .fl-page { padding-right: 22px; } .gw-body:has(.fl-page) ~ .gw-totop { margin-right: 2px; } }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw .fl-pc { display: none; }
   .gw .fl-ph { display: flex; }
@@ -852,7 +872,7 @@
 }
 /* 본문 칸이 한 줄(약 930px)보다 좁으면 (노트북 1280·1366, AI 상담을 연 창, 창 폭을 줄인 경우) PC 줄이 오른쪽에서 잘렸다 → 폰과 같은 카드로 (전수검사 11-13, 사용자 승인).
    1002 = 줄 932(테두리 포함) + .gw-page 좌우 48 + .fl-page 오른쪽 22. 둘 중 하나가 바뀌면 다시 셈. 위 폰 규칙을 그대로 옮긴 것 (@media 와 @container 는 규칙을 나눠 쓸 수 없다) */
-@container (max-width: 1001px) {
+@container gwbody (max-width: 1001px) {
   .gw .fl-pc { display: none; }
   .gw .fl-ph { display: flex; }
   /* 폰: 오른쪽 숫자 칸은 왼쪽 두 줄(메인 + 보조 = 합)에 이미 있어 숨긴다. 글이 한 줄씩 들어가게 */
@@ -901,7 +921,7 @@
 .gw-ai-top .ai-clear + .gx-x { margin-left: 0; }
 .gw-ai-top .ai-model:disabled { opacity: .45; cursor: default; }
 .gw-ai > .gw-confirm { z-index: 2; }
-.gw-ai > .gw-confirm .gw-confirm-box { margin: 0 16px; }
+/* 좌우 여백은 모든 확인 팝업 공통(.gw-confirm padding 16)으로 준다. 상자에 margin 을 또 주면 두 번 들어갔다 */
 .gw-ai-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
 .gw-ai .ai-sys { align-self: center; max-width: 92%; padding: 4px 10px; border-radius: 10px; background: var(--panel2); color: var(--dim); font-size: 12.5px; text-align: center; overflow-wrap: anywhere; }
 .gw-ai .ai-err { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 10px; color: var(--danger); }
@@ -926,7 +946,8 @@
 @media (max-width: 1280px) {
   .gw.ai-on { gap: 0; }
   .gw.ai-on .gw-win { width: min(var(--gw-width, 90%), 1340px); }
-  .gw-ai { position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 5; width: min(380px, calc(100% - 24px)); }
+  /* 화면 끝이 아니라 설정 창 오른쪽 안쪽에 맞춘다: 화면 끝 기준이라 창 밖으로 40px쯤 나왔다 (전수점검 눌러-보통-34) */
+  .gw-ai { position: fixed; right: calc((100% - min(var(--gw-width, 90%), 1340px)) / 2 + 12px); top: 50%; transform: translateY(-50%); z-index: 5; width: min(380px, calc(min(var(--gw-width, 90%), 1340px) - 24px)); }
 }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw.ai-on { gap: 0; }
@@ -963,25 +984,21 @@
 /* 저장·불러오기 「가져오기」: 「파일 올리기」를 다른 줄 단추처럼 이름 옆에 (오른쪽 끝에 혼자 떨어져 있었다, 눌러-보통-39) */
 .gw .ps-row.gw-import-row { grid-template-columns: var(--label) minmax(0, 1fr); }
 .gw .ps-row.gw-import-row > .ps-ctl { justify-content: flex-start; }
-@container (max-width: 600px) { .gw .ps-row.gw-import-row { grid-template-columns: minmax(0, 1fr) auto; } }
+@container gwbody (max-width: 600px) { .gw .ps-row.gw-import-row { grid-template-columns: minmax(0, 1fr) auto; } }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .gw .ps-row.gw-import-row { grid-template-columns: minmax(0, 1fr) auto; } }
 /* 꺼진 위험 단추: 어두운 바탕에 어두운 빨강이라 글자가 안 읽혔다 → 다른 꺼진 단추처럼 (눌러2-보통-28) */
 .gw .gx-mini.danger:disabled { color: var(--sub); }
 /* 폰 설정 목록 서랍 (눌러-보통-33): 열린 동안 아래 띠 손잡이가 서랍 글자 위에 떠 있었다 → 숨김. 서랍이 덮지 않은 본문 띠도 어둡게(눌러도 서랍만 닫힌다) */
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  /* 닫힌 평소에도 손잡이(높이 8 + 선 1)가 본문 맨 아래 줄(설명 끝·체크칸·스위치)에 걸쳤다 → 본문 칸을 그만큼 위에서 끝내 손잡이가 빈 띠에 앉게 */
+  .gw-win > .gw-body { margin-bottom: 9px; }
   .gw-win.drawer .gw-cdr .gx-cgrip { visibility: hidden; }
   .gw-win.drawer::after { content: ''; grid-area: body; z-index: 2; background: var(--scrim); pointer-events: none; }
-}
-/* 좁은 PC 창의 AI 상담 (눌러-보통-34): 설정 창 위에 겹쳐 띄우던 것이 창 오른쪽 밖으로 40px 나가고 본문을 덮었다 → 창을 줄여 옆에 둔다 (폰은 그대로 아래 서랍) */
-@media (min-width: 761px) and (max-width: 1280px) and (min-height: 500px), (min-width: 761px) and (max-width: 1280px) and (pointer: fine) {
-  .gw.ai-on { gap: 12px; }
-  .gw.ai-on .gw-win { width: calc(100% - 380px - 36px); }
-  .gw-ai { position: relative; right: auto; top: auto; transform: none; z-index: auto; width: 380px; }
 }
 /* 캐릭터 이미지 「요청 속 이미지 태그」「표시 범위」 (눌러-보통-36·눌러-사소-35): 고르기만 오른쪽 끝에 붙고 막대 시작·길이가 다른 줄과 달랐다 → 다른 줄처럼 왼쪽부터, 막대 폭도 같게 */
 .gw .st-recent { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px; width: var(--ctl); }
 .gw .st-recent > .st-range { width: 100%; }
-@container (max-width: 600px) { .gw .st-recent { width: 100%; } }
+@container gwbody (max-width: 600px) { .gw .st-recent { width: 100%; } }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .gw .st-recent { width: 100%; } }
 /* − 값 + 가운데 칸 (눌러-보통-38): .gw input:not(...)×5 공통 칸 규칙(특이도 0,6,1)이 .adv-step > input.adv-val(0,3,1)을 이겨
    상자 안에 테두리 상자가 또 생기고 단위가 떨어져 보였다 → 가운데 칸은 테두리·바탕·높이를 상자에 맡긴다 */

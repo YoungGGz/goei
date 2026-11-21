@@ -251,13 +251,13 @@ const ckCtl = (m: CkMark | undefined, act: string | null | undefined, aria: stri
 };
 /** 수 조작 하나 (격자 밖 줄에서도 같은 모양·같은 처리기) */
 export const numCtl = (act: string, m: CkNum, aria: string, unit = '', busy = false, acts: CkActs = FAM_ACTS): string => {
+  // 앞 값을 되돌려 둔다: 격자(ckWide) 안 폰 묶음에서도 부르므로 FAM_ACTS 로 덮으면 같은 묶음 다음 칸의 처리기가 바뀐다
+  const prev = [ckActs, ckUnit, inGrid] as const;
   ckActs = acts;
   ckUnit = unit;
   inGrid = false;
   const html = ckCtl(m, act, esc(aria), false, busy);
-  ckActs = FAM_ACTS;
-  ckUnit = '';
-  inGrid = true;
+  [ckActs, ckUnit, inGrid] = prev;
   return unit ? html.replace(/(<input[^>]*>)/, `$1<span>${esc(unit)}</span>`) : html;
 };
 export const ckGrid = (groups: CkGroup[], rows: CkRow[], foot = '', title = '', busy = false): string => {
@@ -296,7 +296,13 @@ const ckWide0 = (bands: CkBand[], labels: string[], busy = false): string => {
     return `<div class="mx mx-grid ck-ph" style="--mx-n:${cols.length}"><section class="ps-group"><h3>${esc(b.title)}</h3><div class="ps-rows">${labels.map((label, r) => `<div class="mx-row"><b class="mx-label">${label}</b>${cols.map(({ g, from }) => `<div class="mx-cell"><span class="mx-site">${esc(g.name)}</span><span class="fam-set">${g.opts.map((o, i) => {
       const m = b.marks[r][from + i];
       // 쓰지 않는 칸은 PC 표처럼 「–」 (비워 두면 이름만 남아 고장처럼 보였다, 전수점검 눌러-보통-52)
-      return m === null || m === undefined ? '<span class="fam-set1"><span class="ck-x" aria-label="없음">–</span></span>' : `<span class="fam-set1">${g.opts.length > 1 || o !== '켬' ? `<span>${esc(o)}</span>` : ''}${ckCtl(m, b.acts[r][from + i], `${esc(g.name)} ${esc(o)}`, false, busy)}</span>`;
+      if (m === null || m === undefined) return '<span class="fam-set1"><span class="ck-x" aria-label="없음">–</span></span>';
+      // 칸이 하나뿐인 수 묶음의 머리 글(개·%·시간·턴)은 단위다: 격자 밖 수 상자(numCtl)처럼 값 뒤 상자 안에 둔다.
+      // 상자 앞에 두면 같은 카드 안에서 단위가 앞인 칸과 뒤인 칸이 섞였다 (전수점검 눌러-보통-38). 최소·최대 같은 이름은 그대로 상자 앞
+      if (g.opts.length === 1 && o !== '켬' && typeof m === 'object') {
+        return `<span class="fam-set1">${numCtl(b.acts[r][from + i] ?? '', m, `${g.name} ${o}`, o, busy, ckActs)}</span>`;
+      }
+      return `<span class="fam-set1">${g.opts.length > 1 || o !== '켬' ? `<span>${esc(o)}</span>` : ''}${ckCtl(m, b.acts[r][from + i], `${esc(g.name)} ${esc(o)}`, false, busy)}</span>`;
     }).join('')}</span></div>`).join('')}</div>`).join('')}</div>${b.foot ? `<small class="mx-foot">${b.foot}</small>` : ''}</section></div>`;
   };
   const hasNum = (b: CkBand) => b.marks.some((row) => row.some((m) => m !== null && typeof m === 'object'));

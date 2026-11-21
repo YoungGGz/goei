@@ -30,6 +30,7 @@ import { itemPic } from './items';
 import { siteLogo } from './browser';
 import { isPhone } from './media';
 import { guideTxt } from '../core/guides';
+import { ICONS } from './icons';
 
 /** 상담 줄 + 그 줄을 쓴 때의 마지막 응답 키 (core/malls.ts mallEvents 가 이 키로 거른다) */
 type DeskLineK = DeskLine & { k?: string };
@@ -1013,11 +1014,11 @@ function tierTable(vars: Record<string, unknown> | undefined, site: MallSite): s
       ${cell('lo', '하한', num('lo', '하한'))}
       ${cell('hi', '상한', num('hi', '상한'))}
       <div class="ms-tb-c w"><span>가중치</span>${stepIn('ms-tier-w', k, w, 0, 99, '', '가중치')}</div>
-      <button class="gx-mini danger ms-tb-x" data-action="ms-tier-del" data-value="${k}" aria-label="지우기">×</button>
+      <button class="gx-mini icon danger ms-tb-x" data-action="ms-tier-del" data-value="${k}" aria-label="지우기" title="지우기">${ICONS.trash}</button>
       ${bad ? `<p class="ms-tb-err">${bad}</p>` : ''}
     </div>`;
   }).join('');
-  return `<div class="ms-tb ms-tiers"><div class="ms-tb-h"><span>이름</span><span>설명(영어)</span><span>하한</span><span>상한</span><span>가중치</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini primary" data-action="ms-tier-add" data-value="${site}" ${rows.length >= 12 ? 'disabled' : ''}>등급 추가</button></div></div>`;
+  return `<div class="ms-tb ms-tiers"><div class="ms-tb-h"><span>이름</span><span>설명(영어)</span><span>하한</span><span>상한</span><span>가중치</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini" data-action="ms-tier-add" data-value="${site}" ${rows.length >= 12 ? 'disabled' : ''}>${ICONS.plus}등급 추가</button></div></div>`;
 }
 /** 상담사 주사위 칸: 한 줄에 칸 이름 + 값(쉼표로 나눈 글 한 칸) + × (v2: 값마다 칩으로 쪼개면 높이가 3.7배가 돼서 한 칸으로) */
 interface AxisRaw { name: string; values: string[] }
@@ -1031,11 +1032,11 @@ function axisTable(vars: Record<string, unknown> | undefined): string {
     return `<div class="ms-ax${bad ? ' bad' : ''}">
       <label class="ms-tb-c n"><span>칸 이름</span><input class="gx-search" data-change="ms-ax-name" data-key="${i}" value="${esc(a.name)}" maxlength="20" placeholder="칸 이름" aria-label="칸 이름"></label>
       <label class="ms-tb-c v"><span>값</span><input class="gx-search" data-change="ms-ax-vals" data-key="${i}" value="${esc(a.values.join(', '))}" maxlength="900" placeholder="값, 값" aria-label="값"></label>
-      <button class="gx-mini danger ms-tb-x" data-action="ms-ax-del" data-value="${i}" aria-label="지우기">×</button>
+      <button class="gx-mini icon danger ms-tb-x" data-action="ms-ax-del" data-value="${i}" aria-label="지우기" title="지우기">${ICONS.trash}</button>
       ${bad ? `<p class="ms-tb-err">${bad}</p>` : ''}
     </div>`;
   }).join('');
-  return `<div class="ms-tb ms-axs"><div class="ms-tb-h"><span>칸 이름</span><span>값</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini primary" data-action="ms-ax-add" ${rows.length >= 12 ? 'disabled' : ''}>칸 추가</button></div></div>`;
+  return `<div class="ms-tb ms-axs"><div class="ms-tb-h"><span>칸 이름</span><span>값</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini" data-action="ms-ax-add" ${rows.length >= 12 ? 'disabled' : ''}>${ICONS.plus}칸 추가</button></div></div>`;
 }
 function mseg(site: MallSite, key: string, cur: string, items: [string, string][]): string {
   const sw = onOffSwitch(items, cur, 'ms-cfg', (v) => `${site}:${key}=${v}`);
@@ -1122,13 +1123,13 @@ function cosFixedGroup(ctx: ChatContext): string {
   const text = (id: string, key: string, v: string, ph: string, label: string, len: number) =>
     `<input class="gx-search" data-change="ms-fx" data-key="${id}:${key}" value="${esc(v)}" maxlength="${len}" placeholder="${ph}" aria-label="${esc(label)}">`;
   const items = list.map((f) => `<div class="ms-fx${f.on ? '' : ' off'}">
-      <div class="ms-fx-head">${text(f.id, 'name', f.name, '상품 이름', '이름', 40)}<span class="ph-inline"><span>확률</span>${num(f.id, 'pct', f.pct, '25', '확률', 100)}<span>%</span></span>${mseg('cos', `fx_on:${f.id}`, f.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']])}<button class="gx-mini danger" data-action="ms-fx-del" data-value="${esc(f.id)}" aria-label="지우기">×</button></div>
+      <div class="ms-fx-head">${text(f.id, 'name', f.name, '상품 이름', '이름', 40)}<span class="ph-inline"><span>확률</span>${num(f.id, 'pct', f.pct, '25', '확률', 100)}<span>%</span></span>${mseg('cos', `fx_on:${f.id}`, f.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']])}<button class="gx-mini icon danger" data-action="ms-fx-del" data-value="${esc(f.id)}" aria-label="지우기" title="지우기">${ICONS.trash}</button></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>값</span>${num(f.id, 'price', f.price, '999999', '값')}<span>원</span></span><span class="ph-inline"><span>할인 전</span>${num(f.id, 'was', f.was, '비우면 할인 없음', '할인 전 값')}<span>원</span></span></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>설명</span>${text(f.id, 'desc', f.desc, '겉보기 설명 (???·검열됨처럼 숨겨도 돼요)', '설명', 200)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>효과</span>${text(f.id, 'effect', f.effect, '화면에 보이는 광고 문구 (모호·검열·거짓·뚱딴지…)', '보이는 효과', 200)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>진실</span>${text(f.id, 'truth', f.truth, '숨긴 진짜 효과 — 메인 모델만 봐요. 비우면 「아무도 모름」', '진짜 효과', 200)}</span></div>
     </div>`).join('');
-  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini primary" data-action="ms-fx-add" ${list.length >= COS_FIXED_MAX ? 'disabled' : ''}>상품 추가</button></div>`;
+  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-fx-add" ${list.length >= COS_FIXED_MAX ? 'disabled' : ''}>${ICONS.plus}상품 추가</button></div>`;
   return group('시그니처 상품', `<p class="ps-note">모델이 아니라 코드가 새로고침마다 확률대로 끼워 넣는 상품이에요. 모델에게는 이름을 알리지 않고, 모델이 같은 이름을 내면 버려요. 이미 진열돼 있거나 산 것은 다시 안 넣어요. 다 지우면 안 써요. 「효과」는 화면에 보이는 광고 문구이고 「진실」은 숨긴 진짜 효과예요.</p>${items || '<p class="ps-note">없음.</p>'}${foot}`);
 }
 

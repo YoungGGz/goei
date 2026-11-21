@@ -8,6 +8,7 @@ import { switchHtml } from '../controls';
 import { ICONS } from '../icons';
 import { copyBtn } from '../copy';
 import { keepOpen, markOpen } from '../panels';
+import { askPopup } from './askpop';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -55,12 +56,19 @@ export function ruleTreeItems(): [string, string, string][] {
   return [['rule:all', '추가 규칙', n ? `<i class="gw-tree-badge">${n}</i>` : '']];
 }
 
+/** 규칙 지우기 확인 팝업 (ed-rule-del 로 묻는 중일 때) */
+export function ruleConfirmPopup(): string {
+  if (!ruleUi.confirmDel) return '';
+  const r = getUserRules().find((x) => x.id === ruleUi.confirmDel);
+  if (!r) return '';
+  return askPopup(`이 추가 규칙(「${r.title.trim() || '제목 없음'}」)을 지울까요? 지운 규칙은 되돌릴 수 없어요.`, { action: 'ed-rule-del-yes', value: r.id }, { action: 'ed-rule-del-no' });
+}
+
 /** 규칙 하나의 편집 칸 (접는 칸 안) */
 function ruleBox(r: UserRule): string {
   const chips = RULE_TARGETS.map((t) => `<button class="gx-chip${r.to.includes(t) ? ' on' : ''}" data-action="ed-rule-to" data-value="${esc(`${r.id}|${t}`)}" aria-pressed="${r.to.includes(t)}">${RULE_TARGET_LABEL[t]}</button>`).join('');
-  const del = ruleUi.confirmDel === r.id
-    ? `<button class="gx-mini danger" data-action="ed-rule-del-yes" data-value="${esc(r.id)}">정말 지우기</button><button class="gx-mini" data-action="ed-rule-del-no">취소</button>`
-    : `<button class="gx-mini danger" data-action="ed-rule-del" data-value="${esc(r.id)}">${ICONS.trash}지우기</button>`;
+  // 누르면 가운데 확인 팝업 (ruleConfirmPopup, 전수점검 눌러-보통-28)
+  const del = `<button class="gx-mini danger" data-action="ed-rule-del" data-value="${esc(r.id)}">${ICONS.trash}지우기</button>`;
   const key = `rule-${r.id}`;
   return `<details class="ps-adv gw-rule" data-keep="${esc(key)}"${keepOpen(key)}><summary class="ps-adv-sum"><b>${esc(r.title.trim() || '(제목 없음)')}</b><span class="adv-count">${r.to.map((t) => RULE_TARGET_LABEL[t]).join(' · ') || '붙일 곳 없음'} · ${tokenizerName() ? '' : '약 '}${tokens(r.text).toLocaleString()}토큰</span><span class="gw-state${r.on ? '' : ' off'}">${r.on ? '켬' : '끔'}</span></summary><div class="ps-adv-body">
     <div class="ps-rows">

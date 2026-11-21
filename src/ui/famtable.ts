@@ -81,7 +81,7 @@ export function boardTable(state: State, busy = false): string {
     { name: '게시글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '새 글 댓글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '활동 댓글 수', opts: ['최소', '최대'], kind: 'num' },
-    { name: '선쪽지', opts: ['받기', '확률 (%)'], kind: 'check' },
+    { name: '선쪽지', opts: ['받기', '확률(%)'], kind: 'check' },
   ], marks: each((st) => { const s = gnetSettings(st); const c = s.counts; return [cnt(c.post[0], 'post'), cnt(c.post[1], 'post'), cnt(c.cmt[0], 'cmt'), cnt(c.cmt[1], 'cmt'), cnt(c.act[0], 'act'), cnt(c.act[1], 'act'), s.incoming, s.incoming ? { n: s.incomingChance, lo: 0, hi: 100 } : null]; }),
     acts: each((st, site) => { const b = `b:${site}`; return [`${b}:post_min`, `${b}:post_max`, `${b}:cmt_min`, `${b}:cmt_max`, `${b}:act_min`, `${b}:act_max`, `${b}:incoming=${gnetSettings(st).incoming ? '0' : '1'}`, `${b}:incoming_chance`]; }),
     foot: helpBox('', [

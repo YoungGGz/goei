@@ -9,6 +9,7 @@ import { playerAgent } from '../core/player';
 import { userInfo } from '../host/user';
 import { copyBtn } from './copy';
 import { tokens } from '../core/gnet';
+import { ICONS } from './icons';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -37,7 +38,7 @@ export function imgPromptPane(ctx: ChatContext): string {
       <div class="gx-row-btns"><button class="gx-mini" data-action="ip-preview">${imgUi.preview ? '미리보기 닫기' : '조립 결과 미리보기'}</button></div>${preview}</section>
     <section class="ps-group"><h3>출력 대상 캐릭터<b>${picked.length}</b></h3><p class="ps-note">명부의 요원 영문명을 자동으로 읽어요 (한글 이름·별칭도 명부에서 가져와 보조 모델 자료로 써요). 체크를 풀면 그 인물은 태그를 안 만들어요. 그림 에셋 이름(영문명_표정)과 같아야 해요.</p>
       <div class="ip-names">${rows}</div>
-      <div class="ip-extra"><input class="gx-search" data-input="ip-extra" name="ip-extra" maxlength="40" placeholder="임의 추가 (영문명, 예: Avensha)" value="${esc(imgUi.extra)}"><button class="gx-mini ps-save" data-action="ip-extra-add" data-take="ip-extra"${needAttr('ip-extra', imgUi.extra)}>추가</button></div></section>
+      <div class="ip-extra"><input class="gx-search" data-input="ip-extra" name="ip-extra" maxlength="40" placeholder="임의 추가 (영문명, 예: Avensha)" value="${esc(imgUi.extra)}"><button class="gx-mini" data-action="ip-extra-add" data-take="ip-extra"${needAttr('ip-extra', imgUi.extra)}>${ICONS.plus}추가</button></div></section>
     <section class="ps-group"><h3>표정 세트<b>${cfg.keywords.length}</b></h3><p class="ps-note">쉼표로 나눠요. 카드 그림(영문명_표정)에 있는 이름이어야 해요. 비우면 기본 ${imgKeywordsDefault().length}종.</p>
       <div class="gw-copyto"><div class="gw-field-head ip-copyhead"><span class="gw-ftok">${tokens(keywords).toLocaleString()}토큰</span>${copyBtn()}</div><textarea class="gx-search nw-reqbox" name="ip-keywords" data-input="ip-keywords" data-autosave="ip-keywords-save" rows="3" maxlength="1200">${esc(keywords)}</textarea></div></section>
     ${imgUi.info ? `<p class="gx-hint">${esc(imgUi.info)}</p>` : ''}

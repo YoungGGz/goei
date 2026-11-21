@@ -120,7 +120,7 @@ export const HOMESHOP_SET: SetPage = {
         row('tear', '신호 찢김', on, '0.2~0.4초 동안 화면이 찢기고 다른 얼굴이 끼어들어요.'),
         row('tearP', '찢김 확률', num('tearP'), '장면이 바뀔 때마다 저절로 찢길 확률이에요. 큐시트의 「신호 찢김」은 늘 나와요.'),
         row('scan', '주사선', on),
-        row('scalePc', 'PC 표시 배율', { t: 'seg', opts: SCALES }, '자동 = 채팅 칸·상품 칸이 같이 보이게 화면에 맞춤 (들어가면 1배·2배).'),
+        row('scalePc', 'PC 표시 배율', { t: 'seg', opts: SCALES }, '자동 = 채팅 칸·상품 칸이 같이 보이게 화면에 맞춤(들어가면 1배·2배).'),
         row('scalePh', '폰 표시 배율', { t: 'seg', opts: SCALES }, '자동 = 화면 폭에 맞춤.'),
       ],
     },

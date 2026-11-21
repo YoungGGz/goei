@@ -11,7 +11,7 @@ import { LEGACY_DATA } from '../../core/lorebooks';
 import { getPrefs } from '../../core/settings';
 import { updateCharacterLore, type ChatContext } from '../../host/risu';
 import { savePrefs } from '../../host/prefs';
-import { bindCropDrag, cropValue, directoryDraft, directoryExtList, directoryInput, directoryList, directoryPhotoList, directoryView, dirUi, dirty as dirDirty, handleDirectory, resetDirectory, setCrop } from '../directory';
+import { bindCropDrag, cropValue, directoryConfirmPopup, directoryDraft, directoryExtList, directoryInput, directoryList, directoryPhotoList, directoryView, dirUi, dirty as dirDirty, handleDirectory, resetDirectory, setCrop } from '../directory';
 import { handleImgPrompt, imgInput, imgPromptPane } from '../imgprompt';
 import { GHOST_ICON, ICONS } from '../icons';
 import { labelSwitches } from '../controls';
@@ -21,11 +21,11 @@ import { NavHistory } from '../../core/navhist';
 import { booksInput, defaultsState } from '../advanced';
 import { rememberPanel } from '../panels';
 import editorCss from './style.css';
-import { recordCount, recordList, recordPage, recordAction, recordInput, recUi, rowsOf } from './record';
+import { recordConfirmPopup, recordCount, recordList, recordPage, recordAction, recordInput, recUi, rowsOf, xnameSync } from './record';
 import { relationsPage, relationsAction, relationsInput } from './relations';
-import { startPage } from './start';
+import { startConfirmPopup, startPage } from './start';
 import { guidePage, guideAction, guideBarSync, guideInput, guideUi } from './guides';
-import { isRuleNode, ruleAction, ruleInput, rulePage, ruleTreeItems } from './rules';
+import { isRuleNode, ruleAction, ruleConfirmPopup, ruleInput, rulePage, ruleTreeItems } from './rules';
 import { callSummary } from './flow';
 import { boardTable, shopTable } from '../famtable';
 import { ensureManage, isManageNode, manageAction, manageInput, managePage, manageConfirmPopup, manUi, type ManageNode, manageFile } from './manage';
@@ -278,7 +278,12 @@ function ensureRoot(): HTMLElement {
       if (box) box.innerHTML = directoryExtList(ctx);
       return;
     }
-    if (ctx && recordInput(name, el.dataset.key ?? '', el.value, ctx)) return void touched();
+    if (ctx) {
+      const took = recordInput(name, el.dataset.key ?? '', el.value, ctx);
+      if (name === 'ed-extra-name') xnameSync(el as HTMLInputElement);
+      if (took === 'invalid') return;
+      if (took) return void touched();
+    }
     if (ctx && relationsInput(name, el.dataset.key ?? '', el.value, ctx)) return void touched();
     if (guideInput(name, el.dataset.key ?? '', el.value)) {
       touched();
@@ -565,7 +570,7 @@ function settingsPage(ctx: ChatContext, page: SetPage): string {
   // 기능 판 안의 머리 설명은 여기 설명과 겹치니 뺀다 (인물 기록 소개)
   if (info) body = body.replace(/<p class="ps-note">메인 응답이 끝날 때마다[\s\S]*?<\/p>/, '');
   // 인물 페이지는 맨 위에 자기 도식이 있으니 「호출 흐름 →」 단추만 (callSummary 안에서)
-  const calls = callSummary(ctx, page, !!info);
+  const calls = callSummary(ctx, page);
   const lead = info
     ? `<p class="gx-muted">${esc(info.desc)}${info.example ? ` <span class="gw-eg">예) ${esc(info.example)}</span>` : ''}${on === false && info.off ? ` <span class="gw-off-note">${esc(info.off)}</span>` : ''}</p>${calls}</header>`
     : `${calls}</header>`;
@@ -811,7 +816,12 @@ export function render(): void {
   const confirm = edUi.confirm
     ? `<div class="gw-confirm"><div class="gw-confirm-box"><p>고친 것을 카드에 저장하지 못했어요${edUi.notice ? ` (${esc(edUi.notice)})` : ''}. 저장하지 않고 닫을까요?</p>
         <div class="gx-row-btns"><button class="gx-mini danger" data-action="ed-close-force">저장 안 하고 닫기</button><button class="gx-mini" data-action="ed-confirm-no">취소</button></div></div></div>`
-    : tabOf(edUi.node) === 'set' || tabOf(edUi.node) === 'manage' ? mainDefaultsPopup() || manageConfirmPopup() : '';
+    : tabOf(edUi.node) === 'set' || tabOf(edUi.node) === 'manage' ? mainDefaultsPopup() || manageConfirmPopup()
+    // 지우기 확인도 같은 가운데 팝업 (전수점검 눌러-보통-28)
+    : isKind(edUi.node) ? recordConfirmPopup(edUi.node)
+    : isRuleNode(edUi.node) ? ruleConfirmPopup()
+    : edUi.node === 'start' ? startConfirmPopup()
+    : edUi.node === 'base' ? directoryConfirmPopup() : '';
   const tab = tabOf(edUi.node);
   edUi.last[tab] = edUi.node;
   const tabs = TABS.map(([id, label, icon]) => `<button class="gw-tab${tab === id ? ' on' : ''}" role="tab" aria-selected="${tab === id}" data-action="ed-tab" data-value="${id}">${icon}<span>${label}</span></button>`).join('');
@@ -895,20 +905,10 @@ export function render(): void {
 }
 
 /** 기능 설정 우하단 「맨 위로」 (2026-11-08 사용자): 조금 내려갔을 때만 보인다.
- *  늘 떠 있으면 그 자리의 지우기 ×·입력값·펼침 화살표를 덮어 잘못 눌렸다 (전수점검 눌러-보통-32) → 위로 올리는 중에만 보이고, 손을 떼고 2초 뒤 사라진다 */
-let topLast = 0;
-let topHide: ReturnType<typeof setTimeout> | null = null;
+ *  그 자리의 지우기 ×·입력값·펼침 화살표를 덮던 것(전수점검 눌러-보통-32)은 보임 규칙이 아니라 자리로 푼다: 기능 설정 본문 오른쪽에 단추 폭만큼 빈 띠(style.css) */
 function syncTop(): void {
   const b = root?.querySelector<HTMLElement>('.gw-totop');
-  const y = root?.querySelector<HTMLElement>('.gw-body')?.scrollTop ?? 0;
-  const up = y < topLast;
-  topLast = y;
-  if (!b) return;
-  if (topHide) clearTimeout(topHide);
-  topHide = null;
-  const show = y > 240 && up;
-  b.classList.toggle('show', show);
-  if (show) topHide = setTimeout(() => root?.querySelector<HTMLElement>('.gw-totop')?.classList.remove('show'), 2000);
+  if (b) b.classList.toggle('show', (root?.querySelector<HTMLElement>('.gw-body')?.scrollTop ?? 0) > 240);
 }
 
 const boundOnce = new WeakSet<HTMLElement>();

@@ -456,7 +456,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ...(s.router === 'model' ? [
       stageModel('router', 'Router 호출에 쓸 모델이에요. 갱신과 같게 = 위 갱신 모델'),
       ppRow('router_timeout', String(s.routerTimeout)),
-      `<div class="pp-rules one">${ruleBox('pp-router-rules', 'Router 에 덧붙일 지침', v('router_rules'), '장면 인물을 고를 때 규칙을 더해요 (예: 어떤 인물은 늘 빼기). 기본 지침 전체는 설정 「지침 → 인물 기록 지침 → Router」에서 고쳐요', 2000, '예: 관리국 요원만 고르고 민간인은 빼라', 'pp-rrules-save')}</div>`,
+      `<div class="pp-rules one">${ruleBox('pp-router-rules', '장면 인물 고르기(Router)에 덧붙일 지침', v('router_rules'), '장면 인물을 고를 때 규칙을 더해요 (예: 어떤 인물은 늘 빼기). 기본 지침 전체는 설정 「지침 → 인물 기록 지침 → Router」에서 고쳐요', 2000, '예: 관리국 요원만 고르고 민간인은 빼라', 'pp-rrules-save')}</div>`,
     ] : []),
   ].join('');
   const director = [
@@ -512,7 +512,7 @@ export function peopleDiagPane(ctx: ChatContext, canChat = true): string {
     ppRow('update_now', '', { ctl: updateBar(ctx, canChat) }),
     dg.toggle ? ppRow('diag_all', '', { ctl: dg.toggle, ...(dg.count ? { help: dg.count } : {}) }) : '',
     `<div class="ps-row wide"><div class="ps-label"><b>갱신 기록</b><small>${esc(`최근 갱신의 입력 크기·결과·실패 이유예요. 이 기기 플러그인 저장소에 성공 ${diagKeep().ok}건·실패 ${diagKeep().fail}건까지 두고 오래된 것부터 지워요. 토큰은 한글 1자=1, 그 외 0.3으로 어림했어요.`)}</small></div><div class="ps-ctl">${dg.body}</div></div>`,
-    ppRow('diag-clear', '', { ctl: `<button class="gx-mini danger" data-action="pp-diag-clear" ${peopleUi.diag?.length ? '' : 'disabled'}>진단 지우기</button>` }),
+    ppRow('diag-clear', '', { ctl: `<button class="gx-mini danger" data-action="pp-diag-clear" ${peopleUi.diag?.length ? '' : 'disabled'}>${ICONS.trash}진단 지우기</button>` }),
   ].join(''));
 }
 

@@ -7,6 +7,7 @@ import { SCENARIOS } from '../../core/scenarios';
 import { agentScene, agentSceneSaved, factionScenes } from '../../core/scenes';
 import type { Directory } from '../../core/world/directory';
 import type { ChatContext } from '../../host/risu';
+import { askPopup } from './askpop';
 import { directoryDraft, dirUi, photoBlock, startSlots, type StartSlot } from '../directory';
 import { ICONS } from '../icons';
 
@@ -27,16 +28,28 @@ const area = (key: string, value: string, label: string, rows = 6, help = '', ph
 const seg = (action: string, value: string, on: boolean, a: string, b: string) =>
   `<div class="gx-segs gx-segs-sm"><button class="gx-seg${on ? ' on' : ''}" data-action="${action}" data-value="${esc(`1|${value}`)}">${a}</button><button class="gx-seg${!on ? ' on' : ''}" data-action="${action}" data-value="${esc(`0|${value}`)}">${b}</button></div>`;
 
+/** 시작 화면의 지우기 확인 팝업: 묶음(stUi.confirm)·새 장면(dirUi.confirmDel 「scene|칸|장면」) */
+export function startConfirmPopup(): string {
+  const d = dirUi.draft;
+  if (stUi.confirm) {
+    const g = d?.startGroups.find((x) => x.code === stUi.confirm);
+    if (g) return askPopup(`「${g.name}」 묶음을 지울까요? 구성원 요원과 첫 장면 글은 남아요.`, { action: 'dir-group-del', value: `yes|${g.code}` }, { action: 'dir-group-del', value: `no|${g.code}` });
+  }
+  const [k, code, fm] = dirUi.confirmDel.split('|');
+  if (k === 'scene' && code && fm) return askPopup('이 장면을 지울까요? 지운 장면은 되돌릴 수 없어요.', { action: 'dir-scene-del', value: `yes|${code}|${fm}` }, { action: 'dir-scene-del', value: `no|${code}|${fm}` });
+  return '';
+}
+
 /** 칸 한 줄 (순서 목록) — 줄을 누르면 펼치고, 손잡이를 끌어 순서를 바꾼다 (11-07 사용자: 열기/접기 단추·▲▼ 단추는 비효율) */
 function slotRow(s: StartSlot): string {
   const open = stUi.sel === s.code;
   const kind = s.kind === 'builtin' ? '기본 세력' : s.kind === 'group' ? '묶음' : '플레이 조직';
-  // 플레이 조직 줄은 숨길 수 없어 보임/숨김을 안 낸다. 펼치면 「시작 칸에서 빼기」 (전수검사 11-13)
+  // 플레이 조직 줄은 숨길 수 없어 보임/숨김 대신 「늘 보임」만 적는다(고르기가 빠진 줄이 고장처럼 보였다, 전수점검 눌러-보통-45). 펼치면 「시작 칸에서 빼기」 (전수검사 11-13)
   return `<div class="dir-row${open ? ' open' : ''}" data-slot-row="${esc(s.code)}">
     <div class="dir-head st-slot" data-action="dir-start-open" data-value="${esc(s.code)}" role="button" aria-expanded="${open}">
       <span class="gw-grip" data-drag-slot="${esc(s.code)}" title="끌어서 순서 바꾸기">${ICONS.grip}</span>
       <span class="dir-name"><b>${esc(s.name)}</b><small>${kind} · ${esc(s.code)}${s.count ? ` · ${s.count}명` : ''}</small></span>
-      ${s.kind === 'extra' ? '' : seg('dir-start-show', s.code, !s.hidden, '보임', '숨김')}
+      ${s.kind === 'extra' ? '<small class="st-always" title="플레이 조직은 숨길 수 없어요. 펼쳐서 「시작 칸에서 빼기」로 빼요.">늘 보임</small>' : seg('dir-start-show', s.code, !s.hidden, '보임', '숨김')}
       <span class="st-caret">${open ? ICONS.up : ICONS.down}</span>
     </div>
   </div>`;
@@ -54,7 +67,7 @@ function scenesBlock(code: string, d: Directory): string {
       // 새 장면 지우기는 「지울까요? 지우기/취소」를 거친다 (전수검사 11-13)
       return `<details class="st-scene${r.hidden ? ' off' : ''}" data-keep="${esc(keep)}"${keepOpen(keep)}><summary><b>${esc(r.label || `장면 ${r.fm}`)}</b><small>${r.custom ? '새 장면' : '기본 장면'} ${r.fm}${r.hidden ? ' · 숨김' : ''}</small></summary>
         <div class="dir-line"><span>${r.custom ? '새 장면' : '기본 장면'} ${r.fm}</span>
-          <span class="gx-row-btns">${seg('dir-scene-show', `${code}|${r.fm}`, !r.hidden, '보임', '숨김')}${r.custom ? (dirUi.confirmDel === `scene|${code}|${r.fm}` ? `<span class="gx-hint">이 장면을 지울까요? <button class="gx-mini danger" data-action="dir-scene-del" data-value="${esc(`yes|${code}|${r.fm}`)}">지우기</button><button class="gx-mini" data-action="dir-scene-del" data-value="${esc(`no|${code}|${r.fm}`)}">취소</button></span>` : `<button class="gx-mini danger" data-action="dir-scene-del" data-value="${esc(`ask|${code}|${r.fm}`)}">지우기</button>`) : ''}</span></div>
+          <span class="gx-row-btns">${seg('dir-scene-show', `${code}|${r.fm}`, !r.hidden, '보임', '숨김')}${r.custom ? `<button class="gx-mini danger" data-action="dir-scene-del" data-value="${esc(`ask|${code}|${r.fm}`)}">${ICONS.trash}지우기</button>` : ''}</span></div>
         ${input(k('label'), r.label, '이름')}
         ${area(k('ko'), r.ko, '한국어', 6, r.hasDefault ? '비우면 기본 글로 돌아가요' : '')}
         ${area(k('en'), r.en, 'English', 6, r.hasDefault ? '비우면 기본 글로 돌아가요' : '')}
@@ -62,7 +75,7 @@ function scenesBlock(code: string, d: Directory): string {
     })
     .join('');
   const tail = (BUILTIN.includes(code) ? SCENARIOS.factions.find((f) => f.code === code)?.scenarios ?? [] : []).filter((s) => s.kind !== 'opening').map((s) => s.label);
-  return `<div class="dir-line"><span>첫 장면</span><button class="gx-mini" data-action="dir-scene-add" data-value="${esc(code)}">${ICONS.plus} 장면 추가</button></div>
+  return `<div class="dir-line"><span>첫 장면</span><button class="gx-mini" data-action="dir-scene-add" data-value="${esc(code)}">${ICONS.plus}장면 추가</button></div>
     <p class="gx-muted">내 페르소나로 시작할 때 고르는 공용 장면이에요. 인물로 시작하면 그 인물의 첫 장면(요원 기록 · 묶음 구성원 칸)과 직접 입력·커스텀 임무만 보여요.${tail.length ? ` 직접 입력·커스텀 임무는 늘 있어요.` : ''}</p>
     ${list || '<p class="gx-muted">공용 장면이 없어요. 직접 입력·커스텀 임무로 시작해요.</p>'}`;
 }
@@ -106,9 +119,8 @@ function slotDetail(s: StartSlot, ctx: ChatContext, d: Directory): string {
     const g = d.startGroups.find((x) => x.code === s.code);
     if (!g) return '';
     const k = (f: string) => `group:${f}|${g.code}`;
-    const del = stUi.confirm === g.code
-      ? `<div class="gx-hint">「${esc(g.name)}」 묶음을 지울까요? 구성원 요원과 첫 장면 글은 남아요. <button class="gx-mini danger" data-action="dir-group-del" data-value="${esc(`yes|${g.code}`)}">지우기</button><button class="gx-mini" data-action="dir-group-del" data-value="${esc(`no|${g.code}`)}">취소</button></div>`
-      : `<button class="gx-mini danger" data-action="dir-group-del" data-value="${esc(`ask|${g.code}`)}">${ICONS.trash} 묶음 지우기</button>`;
+    // 누르면 가운데 확인 팝업 (startConfirmPopup, 전수점검 눌러-보통-28)
+    const del = `<button class="gx-mini danger" data-action="dir-group-del" data-value="${esc(`ask|${g.code}`)}">${ICONS.trash}묶음 지우기</button>`;
     return `<div class="dir-panel">
       ${input(k('name'), g.name, '이름', '', '시작 화면 칸 이름')}
       ${area(k('blurb'), g.blurb, '시작 화면 설명', 3, '', '이 칸을 고를 때 보이는 한두 줄 소개')}

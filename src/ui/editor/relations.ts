@@ -85,7 +85,7 @@ export function relationsPage(ctx: ChatContext, over: WorldOverrides, rulesOnly:
     <div class="gw-list-pane"><div class="gw-list-tools"><select class="gw-list-pick" data-change="ed-rel-pick" aria-label="조직 고르기">${all.map((o) => `<option value="${esc(o.name)}"${o.name === sel ? ' selected' : ''}>${esc(o.name)}${excluded.has(o.name) ? ' (제외)' : ''}</option>`).join('')}</select><span class="gw-list-title">조직 ${included.length}${all.length > included.length ? ` <small>· 제외 ${all.length - included.length}</small>` : ''}</span></div><div class="gw-list gw-rel-list">${list}</div></div>
     <div class="gw-detail">
       <header class="gw-head"><h2>${esc(sel)}</h2>
-        <div class="gw-head-act"><span class="gw-tokens">Faction ${tokenizerName() ? '' : '약 '}${tokens(fac).toLocaleString()}토큰</span>
+        <div class="gw-head-act"><span class="gw-tokens">세력 지침 ${tokenizerName() ? '' : '약 '}${tokens(fac).toLocaleString()}토큰</span>
           <button class="gx-chip${sym() ? ' on' : ''}" data-action="ed-rel-sym" aria-pressed="${sym()}">대칭</button>
           <button class="gx-mini${relUi.preview ? ' on' : ''}" data-action="ed-rel-preview">${ICONS.book}세력 지침 보기</button></div>
         <p class="gx-muted">고른 조직이 다른 조직을 어떻게 보는지 한 줄씩 정해요. 「대칭」이 켜져 있으면 반대 방향도 같이 바뀌어요. 표 하나가 세력 지침에 들어가고, 메모를 쓴 줄만 표 아래 한 줄로 붙어요.</p></header>

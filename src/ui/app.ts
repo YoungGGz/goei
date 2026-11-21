@@ -1896,7 +1896,7 @@ function body(): string {
     case 'not-lite':
       return `${header('연결 안 됨')}<div class="gx-empty">
         <p><b>${esc(view.name || '이 캐릭터')}</b>는 ${view.goei ? `${BRAND.name} 카드지만 플러그인 정보(Plugin manifest)가 없어요.` : `${BRAND.name} 카드가 아니에요.`}</p>
-        <p>${view.goei ? '설치 · 점검에서 매니페스트와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
+        <p>${view.goei ? '설치 · 점검에서 플러그인 정보와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
         <button class="gx-start" data-action="install-open">${view.goei ? '설치 · 점검 열기' : `이 봇에 ${BRAND.name} 설치`}</button>
       </div>`;
     case 'started':

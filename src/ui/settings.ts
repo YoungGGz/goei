@@ -108,12 +108,12 @@ function ownShopsField(vars: Record<string, unknown> | undefined, busy: boolean)
   const text = (o: OwnShop, key: 'name' | 'alias', ph: string, len: number) =>
     `<input class="st-text" type="text" maxlength="${len}" value="${esc(o[key])}" data-change="set-own" data-key="${esc(o.id)}:${key}" placeholder="${ph}" aria-label="${ph}"${busy ? ' disabled' : ''}>`;
   const rows = list.map((o) => `<div class="ms-fx${o.on ? '' : ' off'}">
-      <div class="ms-fx-head">${text(o, 'name', '상점 이름 (로어 이름 그대로)', 30)}${switchHtml({ action: 'set-own-on', value: o.on ? `${o.id}:0` : `${o.id}:1`, on: o.on, disabled: busy, label: `${o.name || '고유 상점'} 켜고 끄기` })}<button class="gx-mini danger" data-action="set-own-del" data-value="${esc(o.id)}" aria-label="${esc(o.name || '고유 상점')} 지우기"${busy ? ' disabled' : ''}>${ICONS.trash}지우기</button></div>
-      <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>다른 이름</span>${text(o, 'alias', '쉼표로 나눠서 (예: 포인트몰, 복지몰)', 120)}</span></div>
+      <div class="ms-fx-head">${text(o, 'name', '상점 이름(로어 이름 그대로)', 30)}${switchHtml({ action: 'set-own-on', value: o.on ? `${o.id}:0` : `${o.id}:1`, on: o.on, disabled: busy, label: `${o.name || '고유 상점'} 켜고 끄기` })}<button class="gx-mini danger" data-action="set-own-del" data-value="${esc(o.id)}" aria-label="${esc(o.name || '고유 상점')} 지우기"${busy ? ' disabled' : ''}>${ICONS.trash}지우기</button></div>
+      <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>다른 이름</span>${text(o, 'alias', '쉼표로 나눠서(예: 포인트몰, 복지몰)', 120)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>인터넷 접속</span>${seg('set-own-web', `${o.id}:${o.web || 'none'}`, ownWeb().map(([v, l]) => [`${o.id}:${v}`, l]), busy)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>직접 가면</span>${seg('set-own-visit', `${o.id}:${o.visit || 'none'}`, OWN_VISIT.map(([v, l]) => [`${o.id}:${v}`, l]), busy)}</span></div>
     </div>`).join('');
-  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini primary" data-action="set-own-add"${list.length >= OWN_MAX || busy ? ' disabled' : ''}>고유 상점 추가</button><button class="gx-mini" data-action="set-own-reset"${busy ? ' disabled' : ''}>초기값으로</button></div>`;
+  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="set-own-add"${list.length >= OWN_MAX || busy ? ' disabled' : ''}>${ICONS.plus}고유 상점 추가</button><button class="gx-mini" data-action="set-own-reset"${busy ? ' disabled' : ''}>초기값으로</button></div>`;
   return field('고유 상점', '', `로어에 있는, 자기 창이 따로 있는 상점이에요. 켜진 줄은 상점 판단 기준에 들어가요. 주인공이 그 사이트·앱에 실제로 접속해 있으면 응답 아래 「접속하기」가 붙고, 누르면 상황판 없이 인터넷 창만 그 사이트로 열려요. 직접 매장에 가 있으면 「직접 가면」에 고른 창이 열려요(열지 않음이면 안 열림). 표에 없는 편의점 같은 곳은 그대로 기본 상점창이에요.`) + rows + foot;
 }
 
@@ -159,12 +159,12 @@ function rulesBlock(stored: unknown, busy: boolean): string {
       <label class="ms-tb-c n"><span>종류·물건말</span><input class="gx-search" data-change="set-items-rules-cell" data-key="${i}:a" value="${esc(r.a)}" maxlength="${ALIAS_WORD_MAX}" aria-label="종류·물건말"${dis}></label>
       <i class="ms-arrow" aria-hidden="true">→</i>
       <label class="ms-tb-c n"><span>판정</span><input class="gx-search" data-change="set-items-rules-cell" data-key="${i}:b" value="${esc(r.b)}" maxlength="${ALIAS_WORD_MAX}" aria-label="판정"${dis}></label>
-      <button class="gx-mini danger ms-tb-x" data-action="set-items-rules-del" data-value="${i}" aria-label="지우기"${dis}>×</button>
+      <button class="gx-mini icon danger ms-tb-x" data-action="set-items-rules-del" data-value="${i}" aria-label="지우기" title="지우기"${dis}>${ICONS.trash}</button>
       ${bad ? `<p class="ms-tb-err">${bad}</p>` : ''}
     </div>`;
   }).join('');
   const changed = RULES_TABLE.changed(stored);
-  const foot = `<div class="ms-tb-foot"><button class="gx-mini primary" data-action="set-items-rules-add"${busy || !RULES_TABLE.canAdd(stored) ? ' disabled' : ''}>추가</button>${changed ? `<button class="gx-mini" data-action="set-items-rules-reset"${dis}>초기값으로</button>` : ''}</div>`;
+  const foot = `<div class="ms-tb-foot"><button class="gx-mini" data-action="set-items-rules-add"${busy || !RULES_TABLE.canAdd(stored) ? ' disabled' : ''}>${ICONS.plus}추가</button>${changed ? `<button class="gx-mini" data-action="set-items-rules-reset"${dis}>초기값으로</button>` : ''}</div>`;
   const help = typeof def.help === 'string' ? def.help : '';
   return `<details class="ps-adv${changed ? ' ps-changed' : ''}" data-keep="items-rules"${keepOpen('items-rules')}><summary class="ps-adv-sum"><b>${esc(def.label)}</b><span class="adv-count">${rows.length}줄</span></summary><div class="ps-adv-body"><div class="ms-tb ms-pairs">${pairGrid(head, body, rows.length)}${foot}</div>${help ? `<p class="ps-note">${help}</p>` : ''}</div></details>`;
 }
@@ -181,12 +181,12 @@ function aliasBlock(stored: unknown, busy: boolean): string {
       <label class="ms-tb-c n"><span>이름의 끝 말</span><input class="gx-search" data-change="set-items-alias-cell" data-key="${i}:a" value="${esc(r.a)}" maxlength="${ALIAS_WORD_MAX}" aria-label="이름의 끝 말"${dis}></label>
       <i class="ms-arrow" aria-hidden="true">→</i>
       <label class="ms-tb-c n"><span>바꿔 찾을 말</span><input class="gx-search" data-change="set-items-alias-cell" data-key="${i}:b" value="${esc(r.b)}" maxlength="${ALIAS_WORD_MAX}" aria-label="바꿔 찾을 말"${dis}></label>
-      <button class="gx-mini danger ms-tb-x" data-action="set-items-alias-del" data-value="${i}" aria-label="지우기"${dis}>×</button>
+      <button class="gx-mini icon danger ms-tb-x" data-action="set-items-alias-del" data-value="${i}" aria-label="지우기" title="지우기"${dis}>${ICONS.trash}</button>
       ${bad ? `<p class="ms-tb-err">${bad}</p>` : ''}
     </div>`;
   }).join('');
   const changed = aliasChanged(stored);
-  const foot = `<div class="ms-tb-foot"><button class="gx-mini primary" data-action="set-items-alias-add"${busy || !aliasCanAdd(stored) ? ' disabled' : ''}>추가</button>${changed ? `<button class="gx-mini" data-action="set-items-alias-reset"${dis}>초기값으로</button>` : ''}</div>`;
+  const foot = `<div class="ms-tb-foot"><button class="gx-mini" data-action="set-items-alias-add"${busy || !aliasCanAdd(stored) ? ' disabled' : ''}>${ICONS.plus}추가</button>${changed ? `<button class="gx-mini" data-action="set-items-alias-reset"${dis}>초기값으로</button>` : ''}</div>`;
   const help = typeof def.help === 'string' ? def.help : '';
   return `<details class="ps-adv${changed ? ' ps-changed' : ''}" data-keep="items-alias"${keepOpen('items-alias')}><summary class="ps-adv-sum"><b>${esc(def.label)}</b><span class="adv-count">${rows.length}줄</span></summary><div class="ps-adv-body"><div class="ms-tb ms-pairs">${pairGrid(head, body, rows.length)}${foot}</div>${help ? `<p class="ps-note">${help}</p>` : ''}</div></details>`;
 }
@@ -444,7 +444,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
     ].join('')) : ''}`,
     board: `${group('', [
       D('anomaly', '', { ctl: anomaly, help: scope === 'chat' ? '켜면 괴이·사건·특수가 저절로 생기고 응답마다 지도와 요원 상태를 갱신해요. 끄면 지금 상황판을 비워요. 커스텀 임무는 꺼져 있어도 쓸 수 있어요.' : '새 채팅을 상황판을 켠 채로 시작할지 정해요.' }),
-      D('agent', '', { ctl: stepper('set-agent', 'n', s.agentLimit, 0, AGENT_MAX, '명', '요원 표시 인원', busy), help: `상황판과 편성에 보일 등록 요원 수 (0~${AGENT_MAX}명, 0이면 숨김)` }),
+      D('agent', '', { ctl: stepper('set-agent', 'n', s.agentLimit, 0, AGENT_MAX, '명', '요원 표시 인원', busy), help: `상황판과 편성에 보일 등록 요원 수(0~${AGENT_MAX}명, 0이면 숨김)` }),
       D('support', s.supportOn ? '1' : '0'),
     ].join(''))}
     ${worldGrid(world, busy)}`,

@@ -1,5 +1,6 @@
 // 설정 → 「카드 명부」: 로어북 폴더에서 모은 괴이·미스틱 사이트·요원의 세부값 편집.
 // 고친 값은 카드 로어북 「Directory」에 저장되어 카드와 함께 공유되고, 이 카드의 모든 채팅에 바로 적용된다.
+import { askPopup } from './editor/askpop';
 import {
   agentGroup, assignOrg, directoryData, moveAgent, type Directory, factionDisplayNames, orgAffiliation, orgOf, type OrgRow, phoneTabs, readDirectory, type AgentRow,
   type BaseRow, type PlaceRow, withDirectory, agentGender, loreGender, type AppendixRow,
@@ -465,7 +466,7 @@ export function orgPanel(o: OrgRow, ctx: ChatContext, d: Directory): string {
     <div class="dir-line"><span>거점</span><div class="dir-chips">${d.bases
       .filter((b) => b.org === o.name)
       .map((b) => chip('dir-base-goto', b.name, b.name, false))
-      .join('')}<button class="gx-chip" data-action="dir-base-new" data-value="${esc(o.name)}">＋ 거점 추가</button></div></div>
+      .join('')}<button class="gx-mini" data-action="dir-base-new" data-value="${esc(o.name)}">${ICONS.plus}거점 추가</button></div></div>
   </div>`;
 }
 
@@ -528,8 +529,8 @@ function basePanel(b: BaseRow, ctx: ChatContext, d: Directory): string {
     ${input(k('aliases'), b.aliases.join(', '), '별칭', '쉼표로 나눠 적어요')}
     <div class="dir-rename"><label class="dir-in"><span>거점 이름</span><input name="dir-base-name" value="${esc(b.name)}" autocomplete="off" data-enter="dir-base-rename"></label>
       <button class="gx-mini" data-action="dir-base-rename" data-take="dir-base-name">이름 바꾸기</button>
-      ${dirUi.confirmDel === `base|${b.name}` ? '' : `<button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`ask|${b.name}`)}">지우기</button>`}</div>
-    ${dirUi.confirmDel === `base|${b.name}` ? `<div class="gx-hint">「${esc(b.name)}」 거점을 지울까요? <button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`yes|${b.name}`)}">지우기</button><button class="gx-mini" data-action="dir-base-del" data-value="${esc(`no|${b.name}`)}">취소</button></div>` : ''}
+      ${dirUi.confirmDel === `base|${b.name}` && !inEditor ? '' : `<button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`ask|${b.name}`)}">${ICONS.trash}지우기</button>`}</div>
+    ${dirUi.confirmDel === `base|${b.name}` && !inEditor ? `<div class="gx-hint">「${esc(b.name)}」 거점을 지울까요? <button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`yes|${b.name}`)}">지우기</button><button class="gx-mini" data-action="dir-base-del" data-value="${esc(`no|${b.name}`)}">취소</button></div>` : ''}
   </div>`;
 }
 
@@ -728,7 +729,18 @@ export function directoryBar(): string {
   return barButtons(!dirty() || dirUi.busy);
 }
 
+/** 설정 창 안에서 그리는 중인지: 설정 창에서는 거점 지우기 확인을 다른 확인처럼 가운데 팝업으로 (directoryConfirmPopup, 전수점검 눌러-보통-28) */
+let inEditor = false;
+/** 거점 지우기 확인 팝업 (설정 창 「거점」 화면) */
+export function directoryConfirmPopup(): string {
+  const at = dirUi.confirmDel.indexOf('|');
+  if (dirUi.confirmDel.slice(0, at) !== 'base') return '';
+  const name = dirUi.confirmDel.slice(at + 1);
+  return askPopup(`「${name}」 거점을 지울까요?`, { action: 'dir-base-del', value: `yes|${name}` }, { action: 'dir-base-del', value: `no|${name}` });
+}
+
 export function directoryView(ctx: ChatContext, scoped = false): string {
+  inEditor = scoped;
   const d = draftOf(ctx);
   const kinds: [Kind, string, number][] = [
     ['anomaly', '괴이', d.anomalies.length],
@@ -774,7 +786,7 @@ function addPanel(ctx: ChatContext): string {
   if (dirUi.kind === 'org' || dirUi.kind === 'base') {
     const [name, act, hint] = dirUi.kind === 'org' ? ['dir-org-new', 'dir-org-add', '새 조직 이름'] : ['dir-base-new', 'dir-base-new', '새 거점 이름'];
     return `<div class="dir-ext"><div class="dir-add"><input name="${name}" placeholder="${hint}" aria-label="${hint}" autocomplete="off" data-enter="${act}">
-      <button class="gx-mini" data-action="${act}" data-take="${name}">추가</button></div></div>`;
+      <button class="gx-mini" data-action="${act}" data-take="${name}">${ICONS.plus}추가</button></div></div>`;
   }
   return `<div class="dir-ext"><input class="gx-search" data-input="dir-ext-q" value="${esc(dirUi.addQ)}" placeholder="다른 폴더의 로어북 이름·폴더 검색" aria-label="후보로 넣을 로어북 검색" autocomplete="off">
     <div class="dir-ext-list">${directoryExtList(ctx)}</div></div>`;
@@ -939,6 +951,11 @@ function setPlayable(d: Directory, o: OrgRow, on: boolean): void {
     a.phoneTabs = edit(a.phoneTabs, tab);
   }
   dirUi.notice = '';
+}
+
+/** 새로 넣은 시작 칸은 지금 보이는 순서의 맨 끝에: 순서를 정한 적이 없으면 플레이 조직이 묶음보다 앞에 정렬돼 새 카드가 중간에 끼었다 (전수점검 눌러2-보통-29) */
+function startToEnd(d: Directory, code: string): void {
+  d.startOrder = [...startSlots(d).map((x) => x.code).filter((c) => c !== code), code];
 }
 
 /** 시작 화면에서 펼친 칸의 편집 칸(목록 아래)으로 화면을 옮긴다. 추가·켜기로 펼쳐도 같이 (반응이 없어 보였다, 전수점검 눌러-보통-45) */
@@ -1242,6 +1259,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       for (let n = 2; d.startGroups.some((g) => g.name === name) || d.orgs.some((o) => o.name === name); n++) name = `새 묶음 ${n}`;
       d.startGroups.push({ name, code, blurb: '', english: '', hidden: false });
       d.usedCodes = [...d.usedCodes, code];
+      startToEnd(d, code);
       stUi.sel = code;
       dirUi.done = '';
       showSel();
@@ -1314,7 +1332,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       else if (!o.faction) {
         setPlayable(d, o, arg === '1');
         // 시작 화면 페이지에서 켰으면 그 칸을 바로 펼친다
-        if (arg === '1' && o.spec.playable && o.spec.code) { stUi.sel = o.spec.code; showSel(); }
+        if (arg === '1' && o.spec.playable && o.spec.code) { startToEnd(d, o.spec.code); stUi.sel = o.spec.code; showSel(); }
         else if (arg === '0' && stUi.sel === o.spec.code) stUi.sel = '';
       }
       dirUi.done = '';

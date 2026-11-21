@@ -25,6 +25,8 @@ import { wiki } from '../wiki';
 
 import { copyText } from '../copy';
 import { ICONS } from '../icons';
+import { josa } from '../../core/josa';
+import { askPopup } from './askpop';
 import { mainDefaultsConfirm, settingsNotices } from '../settings';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -169,7 +171,7 @@ function backupPage(ctx: ChatContext, canChat: boolean): string {
   const sizes = manUi.sizes;
   const store = STORE.map(([key, label, help, drop]) => {
     const n = sizes?.[key] ?? 0;
-    const ctl = `<span class="gw-tokens">${sizes ? (n ? kb(n) : '없음') : '…'}</span>${drop && n ? (manUi.confirm === drop.slice(4) ? `<button class="gx-mini danger" data-action="${drop}-yes">정말 지우기</button><button class="gx-mini" data-action="man-no">취소</button>` : `<button class="gx-mini danger" data-action="${drop}">${ICONS.trash}지우기</button>`) : ''}`;
+    const ctl = `<span class="gw-tokens">${sizes ? (n ? kb(n) : '없음') : '…'}</span>${drop && n ? `<button class="gx-mini danger" data-action="${drop}">${ICONS.trash}지우기</button>` : ''}`;
     return row(label, ctl, help);
   }).join('');
   const importRows = `<div class="ps-row gw-import-row"><div class="ps-label"><b>가져오기</b><small>내보낸 JSON을 붙여 넣거나 파일을 올리고 「적용」을 누르세요. 지금 기기 설정(과 세계 편집)을 통째로 바꿔요.</small></div>
@@ -258,10 +260,17 @@ function logPage(ctx: ChatContext, canChat: boolean): string {
     </div></div>`;
 }
 
-/** 가져오기 확인 팝업 (2026-11-08 사용자: 저장·불러오기의 확인은 전부 팝업) */
+/** 확인 팝업 (2026-11-08 사용자: 저장·불러오기의 확인은 전부 팝업). 가져오기·저장소 지우기·호출 기록 지우기가 같은 팝업을 쓴다
+ *  (저장소·호출 기록 지우기만 그 자리 「정말 지우기」 칩이라 확인 방식이 화면마다 달랐다, 전수점검 눌러-보통-28) */
+const popup = (msg: string, yes: string, label: string): string => askPopup(msg, { action: yes }, { action: 'man-no' }, label);
 export function manageConfirmPopup(): string {
-  if (manUi.confirm !== 'import') return '';
-  return `<div class="gw-confirm"><div class="gw-confirm-box"><p>가져온 설정으로 지금 기기 설정(과 세계 편집)을 통째로 덮어쓸까요? 덮어쓴 설정은 되돌릴 수 없어요.</p><div class="gx-row-btns"><button class="gx-mini danger" data-action="man-import-yes">적용</button><button class="gx-mini" data-action="man-no">취소</button></div></div></div>`;
+  if (manUi.confirm === 'import') return popup('가져온 설정으로 지금 기기 설정(과 세계 편집)을 통째로 덮어쓸까요? 덮어쓴 설정은 되돌릴 수 없어요.', 'man-import-yes', '적용');
+  if (manUi.confirm) {
+    const st = STORE.find((x) => x[3] === `man-${manUi.confirm}`);
+    if (st) return popup(`이 기기의 「${st[1]}」${josa(st[1], '을', '를').slice(st[1].length)} 지울까요? ${st[2]}.`, `man-${manUi.confirm}-yes`, '지우기');
+  }
+  if (traceUi.confirm) return popup('호출 기록을 모두 지울까요? 지운 기록은 되돌릴 수 없어요.', 'man-drop-trace-yes', '지우기');
+  return '';
 }
 
 export function managePage(ctx: ChatContext, node: ManageNode, canChat: boolean): string {
@@ -278,9 +287,7 @@ export function managePage(ctx: ChatContext, node: ManageNode, canChat: boolean)
     return flowPage(ctx, head, canChat);
   }
   if (node === 'manage:trace') {
-    const confirm = traceUi.confirm
-      ? `<button class="gx-mini danger" data-action="man-drop-trace-yes">정말 지우기</button><button class="gx-mini" data-action="man-no">취소</button>`
-      : `<button class="gx-mini danger" data-action="man-drop-trace">${ICONS.trash}기록 지우기</button>`;
+    const confirm = `<button class="gx-mini danger" data-action="man-drop-trace">${ICONS.trash}기록 지우기</button>`;
     return tracePage(head, confirm);
   }
   return logPage(ctx, canChat);

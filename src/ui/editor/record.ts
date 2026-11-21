@@ -15,17 +15,23 @@ import { facePic } from '../../host/assets';
 import { picAvatar } from '../images';
 import { ICONS } from '../icons';
 import { copyBtn } from '../copy';
+import { askPopup } from './askpop';
 import { needAttr } from '../needfill';
 import { agentSceneFields, agentSceneState } from './start';
 import { edUi, overridesOf, setOverrides } from './index';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-/** 지우기·삭제 단추: 처음 누르면 그 자리에 「정말 지우기 / 취소」 (manage.ts 지우기와 같은 모양) */
-const delBtn = (kind: WorldKind, name: string, label: string) =>
-  recUi.confirmDel === `${kind}|${name}`
-    ? `<button class="gx-mini danger" data-action="ed-delete-yes">정말 ${label}</button><button class="gx-mini" data-action="ed-delete-no">취소</button>`
-    : `<button class="gx-mini danger" data-action="ed-delete">${ICONS.trash}${label}</button>`;
+/** 지우기·삭제 단추: 누르면 가운데 확인 팝업 (recordConfirmPopup, 설정 창의 다른 확인과 같은 모양) */
+const delBtn = (_kind: WorldKind, _name: string, label: string) =>
+  `<button class="gx-mini danger" data-action="ed-delete">${ICONS.trash}${label}</button>`;
+
+/** 기록 지우기 확인 팝업 (ed-delete 로 묻는 중일 때) */
+export function recordConfirmPopup(kind: WorldKind): string {
+  const [k, name] = recUi.confirmDel.split('|');
+  if (!recUi.confirmDel || k !== kind || !name) return '';
+  return askPopup(`「${name}」 기록을 지울까요?${isDefaultRecord(kind, name) ? ' 기본 세계의 기록은 「되살리기」로 되돌릴 수 있어요.' : ' 지운 기록은 되돌릴 수 없어요.'}`, { action: 'ed-delete-yes' }, { action: 'ed-delete-no' });
+}
 
 export const recUi = {
   /** 괴이 공통 머리말 칸 펼침 */
@@ -39,6 +45,8 @@ export const recUi = {
   variant: '' as string,
   /** 지우기 확인 중인 기록 「종류|이름」 (전수검사 11-13, 사용자 승인: 한 번 더 묻기) */
   confirmDel: '',
+  /** 받지 않은 칸 이름 (빈 이름·겹친 이름): 칸 key → 친 글자와 알림. 다시 그려도 친 글자와 알림이 남게 (전수점검 보통-69) */
+  xname: {} as Record<string, { value: string; msg: string }>,
   tokensHtml: (ctx: ChatContext, kind: WorldKind, over: WorldOverrides): string => {
     const name = edUi.sel[kind] ?? '';
     const rec = name ? worldRecord(kind, name, over) : null;
@@ -153,15 +161,16 @@ function fieldRow(kind: WorldKind, rec: WorldRecord, def: FieldDef, name: string
 
 function extraRow(kind: WorldKind, rec: WorldRecord, e: ExtraField, i: number, name: string): string {
   const key = `${kind}|${name}|${i}`;
+  const bad = recUi.xname[key];
   const id = e.kind === 'block' ? `x:${e.name}` : `xl:${i}`;
   const place = e.kind === 'line' ? `<small class="gw-ftitle">${e.sec === 'appearance' ? 'Appearance' : 'Identity'} 절 · 한 줄${e.at ? ` · ${esc(e.at)} 뒤` : ' · 맨 앞'}</small>` : '<small class="gw-ftitle">절</small>';
   const ctl = e.kind === 'line'
     ? `<input data-input="ed-extra" data-key="${esc(key)}" value="${esc(e.value)}" autocomplete="off">`
     : `<textarea data-input="ed-extra" data-key="${esc(key)}" rows="3">\n${esc(e.value)}</textarea>`;
   return `<div class="gw-field extra gw-copyto" data-field-row="${esc(id)}">
-    <div class="gw-field-head"><span class="gw-grip"${e.kind === 'block' ? ' draggable="true" title="끌어서 순서 바꾸기"' : ''}>${e.kind === 'block' ? ICONS.grip : ''}</span><input class="gw-xname" data-input="ed-extra-name" data-key="${esc(key)}" value="${esc(e.name)}" aria-label="칸 이름">${place}<span class="gw-ftok">${tokens(e.value) ? `${tokens(e.value)}토큰` : ''}</span>
+    <div class="gw-field-head"><span class="gw-grip"${e.kind === 'block' ? ' draggable="true" title="끌어서 순서 바꾸기"' : ''}>${e.kind === 'block' ? ICONS.grip : ''}</span><input class="gw-xname" data-input="ed-extra-name" data-key="${esc(key)}" value="${esc(bad ? bad.value : e.name)}" aria-label="칸 이름"${bad ? ' aria-invalid="true"' : ''}>${place}<span class="gw-ftok">${tokens(e.value) ? `${tokens(e.value)}토큰` : ''}</span>
       <span class="gw-fmove">${copyBtn()}${e.kind === 'block' ? `<button class="gx-mini icon" data-action="ed-field-up" data-value="${esc(id)}" aria-label="위로">${ICONS.up}</button><button class="gx-mini icon" data-action="ed-field-down" data-value="${esc(id)}" aria-label="아래로">${ICONS.down}</button>` : ''}<button class="gx-mini icon danger" data-action="ed-extra-del" data-value="${i}" aria-label="칸 지우기">${ICONS.trash}</button></span></div>
-    ${ctl}</div>`;
+    ${xnameWarn(bad?.msg ?? '')}${ctl}</div>`;
 }
 
 /** 기본 정보 카드: 명부 판(directory.ts)을 설정 페이지와 같은 줄 모양으로. 요원 Roster 포함·조직 관계도 포함 토글은 첫 줄 (2026-10-27 사용자: 상자 속 상자 없애기) */
@@ -249,7 +258,7 @@ export function recordPage(ctx: ChatContext, kind: WorldKind, over: WorldOverrid
     const nameOf = (c: string) => d.orgs.find((o) => codeOf(o) === c)?.name ?? c;
     const playables = d.orgs.filter((o) => codeOf(o) && o.name !== sel && !variants.includes(codeOf(o)));
     const variantBar = kind === 'org' || variants.length
-      ? `<div class="gw-variants"><span>플레이 세력별 시점 글<button type="button" class="gw-fhint" data-action="ed-hint" aria-label="설명" data-hint="주인공이 어느 세력으로 플레이하느냐에 따라 이 ${kind === 'org' ? '조직' : '기록'}의 칸 글을 다르게 보냅니다. 「기본」은 모두에게 가는 글이고, 세력을 추가해 칸을 채우면 그 세력으로 플레이할 때만 채운 칸이 그 글로 바뀝니다(비운 칸은 기본 글). 예: 가짜 관리국으로 플레이할 때 관리국 소개를 가짜 관리국이 아는 대로.">?</button></span><button class="gx-chip${recUi.variant ? '' : ' on'}" data-action="ed-variant" data-value="">기본</button>${variants.map((c) => `<button class="gx-chip${recUi.variant === c ? ' on' : ''}" data-action="ed-variant" data-value="${esc(c)}">${esc(nameOf(c))} 시점</button>`).join('')}${kind === 'org' && playables.length ? `<select name="ed-variant-new" aria-label="시점이 될 플레이 세력"><option value="">세력 고르기</option>${playables.map((o) => `<option value="${esc(codeOf(o))}">${esc(o.name)}</option>`).join('')}</select><button class="gx-mini" data-action="ed-variant-add" data-take="ed-variant-new">추가</button>` : ''}</div>`
+      ? `<div class="gw-variants"><span>플레이 세력별 시점 글<button type="button" class="gw-fhint" data-action="ed-hint" aria-label="설명" data-hint="주인공이 어느 세력으로 플레이하느냐에 따라 이 ${kind === 'org' ? '조직' : '기록'}의 칸 글을 다르게 보냅니다. 「기본」은 모두에게 가는 글이고, 세력을 추가해 칸을 채우면 그 세력으로 플레이할 때만 채운 칸이 그 글로 바뀝니다(비운 칸은 기본 글). 예: 가짜 관리국으로 플레이할 때 관리국 소개를 가짜 관리국이 아는 대로.">?</button></span><button class="gx-chip${recUi.variant ? '' : ' on'}" data-action="ed-variant" data-value="">기본</button>${variants.map((c) => `<button class="gx-chip${recUi.variant === c ? ' on' : ''}" data-action="ed-variant" data-value="${esc(c)}">${esc(nameOf(c))} 시점</button>`).join('')}${kind === 'org' && playables.length ? `<select name="ed-variant-new" aria-label="시점이 될 플레이 세력"><option value="">세력 고르기</option>${playables.map((o) => `<option value="${esc(codeOf(o))}">${esc(o.name)}</option>`).join('')}</select><button class="gx-mini" data-action="ed-variant-add" data-take="ed-variant-new">${ICONS.plus}추가</button>` : ''}</div>`
       : '';
     const readonly = kind === 'agent' ? (() => {
       const a = d.agents.find((x) => x.lore === sel);
@@ -306,7 +315,20 @@ function anomalyNoteBox(over: WorldOverrides): string {
     <div class="gw-copyto gw-copybox"><textarea data-input="ed-anote" rows="5">${esc(note)}</textarea>${copyBtn()}</div></details>`;
 }
 
-export function recordInput(name: string, key: string, value: string, ctx: ChatContext): boolean {
+/** 받지 않은 칸 이름 알림 (칸 머리 바로 아래) */
+const xnameWarn = (msg: string): string => (msg ? `<p class="gw-xname-warn" role="alert">${esc(msg)}</p>` : '');
+
+/** 칸 이름 입력 뒤: 다시 그리지 않고(커서 유지) 그 칸의 알림만 맞춘다 */
+export function xnameSync(el: HTMLInputElement): void {
+  const bad = recUi.xname[el.dataset.key ?? ''];
+  el.toggleAttribute('aria-invalid', !!bad);
+  const row = el.closest('.gw-field');
+  row?.querySelector('.gw-xname-warn')?.remove();
+  if (bad) row?.querySelector('.gw-field-head')?.insertAdjacentHTML('afterend', xnameWarn(bad.msg));
+}
+
+/** 입력 처리. 'invalid' = 내 칸이지만 받지 않음(칸 이름이 비었거나 겹침, 저장할 것 없음) */
+export function recordInput(name: string, key: string, value: string, ctx: ChatContext): boolean | 'invalid' {
   if (name === 'ed-import') {
     recUi.importText = value;
     return true;
@@ -347,12 +369,13 @@ export function recordInput(name: string, key: string, value: string, ctx: ChatC
     if (!rec.extra[i]) return false;
     const old = rec.extra[i].name;
     // 빈 이름·다른 칸과 같은 이름은 적지 않고 옛 이름을 둔다: 겹치는 동안 순서가 어긋나거나 칸 하나가 편집기에서 사라졌다 (전수점검 보통-69)
+    // 알림은 그 칸 바로 아래에 둔다: 창 위 알림 줄은 자동 저장이 비우고 다시 그려 거의 보이지 않았다 (검토 지적)
     const t = value.trim();
     if (!t || rec.extra.some((e, j) => j !== i && e.name.trim() === t)) {
-      edUi.notice = t ? '같은 이름의 칸이 있어요. 다른 이름을 적어 주세요.' : '칸 이름을 적어 주세요.';
-      return true;
+      recUi.xname[key] = { value, msg: t ? '같은 이름의 칸이 있어요. 다른 이름을 적어 주세요.' : '칸 이름을 적어 주세요.' };
+      return 'invalid';
     }
-    if (edUi.notice === '같은 이름의 칸이 있어요. 다른 이름을 적어 주세요.' || edUi.notice === '칸 이름을 적어 주세요.') edUi.notice = '';
+    delete recUi.xname[key];
     rec.extra[i] = { ...rec.extra[i], name: value };
     if (rec.order) rec.order = rec.order.map((o) => (o === `x:${old}` ? `x:${value}` : o));
   } else return false;
@@ -381,6 +404,7 @@ export async function recordAction(action: string, value: string | undefined, ct
       recUi.importResult = null;
       recUi.variant = '';
       recUi.confirmDel = '';
+      recUi.xname = {};
       return true;
     case 'ed-roster-toggle': {
       const cur = current(ctx, kind);
@@ -508,6 +532,7 @@ export async function recordAction(action: string, value: string | undefined, ct
       const i = Number(value);
       if (!cur || !cur.rec.extra[i]) return true;
       const removed = cur.rec.extra.splice(i, 1)[0];
+      recUi.xname = {}; // 칸 번호가 밀리니 받지 않은 이름 기억도 버린다
       if (cur.rec.order) cur.rec.order = cur.rec.order.filter((o) => o !== `x:${removed.name}`);
       setOverrides(putRecord(over, kind, cur.name, cur.rec));
       return true;

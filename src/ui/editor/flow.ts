@@ -228,15 +228,16 @@ function wa(word: string): string {
 const FLOW_BACK = '<button class="gx-mini" data-action="ed-node" data-value="manage:flow">호출 흐름 →</button>';
 
 /** 기능 설정 페이지 맨 위 한 줄 (2026-11-07 사용자: 메뉴마다 도식은 중복, 「이 기능의 호출: …」 한 줄만). 그 페이지로 가는 칸의 호출 수만 모은다 */
-export function callSummary(ctx: ChatContext, page: string, feature = false): string {
+export function callSummary(ctx: ChatContext, page: string): string {
   // 인물 페이지는 맨 위에 자기 도식이 있어 호출 칩은 겹친다. 「호출 흐름 →」 단추만 (2026-11-08 사용자: 어디는 있고 어디는 없다)
   if (page === 'people') return `<p class="gw-calls">${FLOW_BACK}</p>`;
   const { pre, post, manual } = flowNodes(ctx);
   // 인터넷 페이지는 호출 줄을 두지 않는다 (격자의 「자동 호출」이 그 내용)
   if (page === 'net') return '';
   const mine = [...pre, ...post, ...manual].filter((n) => n.page === `set:${page}`);
-  // 호출 칸이 없는 페이지(우주 쇼핑몰 등)도 같은 줄과 「호출 흐름 →」를 둔다 (다른 쇼핑몰에만 있었다, 전수점검 눌러-사소-20)
-  if (!mine.length) return !feature ? '' : `<p class="gw-calls"><span class="gw-call-lead">이 기능의 호출 · 매 턴 자동 호출 없음</span>${FLOW_BACK}</p>`;
+  // 우주 쇼핑몰: 진열·문의 호출 칸은 상점 페이지에 모여 있어(모델·자동 호출 표) 이 페이지엔 호출 칸이 없다. 다른 쇼핑몰처럼 줄과 「호출 흐름 →」를 두고 어디서 정하는지 적는다 (전수점검 눌러-사소-20).
+  // 호출 칸이 없는 다른 페이지(소지품·세력·생성 공통·상황판)는 갱신기 같은 다른 호출에 얹혀 있어 「호출 없음」이라 적으면 틀린 말이라 두지 않는다 (검토 지적)
+  if (!mine.length) return page === 'cos' ? `<p class="gw-calls"><span class="gw-call-lead">이 기능의 호출 · 진열·문의 호출은 「상점」 페이지에서 정해요</span>${FLOW_BACK}</p>` : '';
   const auto = mine.filter((n) => n.on);
   const sure = auto.reduce((s, n) => s + n.sure, 0);
   const maybe = auto.reduce((s, n) => s + n.maybe, 0);
