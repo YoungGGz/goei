@@ -1021,6 +1021,13 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 @media (min-width: 601px) and (max-width: 1080px) and (min-height: 500px), (min-width: 601px) and (max-width: 1080px) and (pointer: fine), (min-width: 601px) and (max-width: 1080px) and (pointer: none) {
   .gx-body.ph-app { grid-template-columns: minmax(260px, 300px) minmax(0, 1fr); }
 }
+/* 폴드 펼침처럼 창이 좁은 PC 배치(창 약 580px): 두 칸이면 오른쪽 대화 칸이 210px 남짓이라 말풍선이 두세 글자마다 줄이 바뀌고 방 머리 단추가 잘렸다 (11-21 실기 크기 훑기).
+   폰처럼 목록 또는 대화 한 칸만 보인다. 배치(PC 틀·왼쪽 메뉴)는 그대로 */
+@media (min-width: 601px) and (max-width: 799px) and (min-height: 500px), (min-width: 601px) and (max-width: 799px) and (pointer: fine), (min-width: 601px) and (max-width: 799px) and (pointer: none) {
+  .gx-body.ph-app { grid-template-columns: minmax(0, 1fr); }
+  .ph-app.is-list .ph-pane, .ph-app.is-detail .ph-side { display: none; }
+  .gx-body .ph-side { border-right: 0; }
+}
 
 /* 설정 탭 (v0.12.0): 묶음 카드 + 줄. 넓은 화면에서 너무 퍼지지 않게 가운데 */
 .gx-settings { display: flex; flex-direction: column; gap: 18px; }
