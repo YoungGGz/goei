@@ -5278,6 +5278,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .ms-sample i { color: var(--signal); font-style: normal; }
 /* 연어 마켓 윗줄 오른쪽 묶음(찾기칸·글쓰기·내 채팅): 사이 8px, 높이 36px 로 같게 (2026-11-10 사용자: 간격이 제각각) */
 .bs-sm .hd .sr + .wr, .bs-sm .hd .wr + .ch { margin-left: -14px; }
+/* 연어 마켓 머리 (눌러보기 3차): 창이 좁으면 로고·메뉴가 한 글자씩 세로로 꺾였다 → 로고·메뉴는 한 줄로 두고 검색칸이 줄어든다 */
+.bs-sm .hd .lg, .bs-sm .hd nav { flex: none; white-space: nowrap; }
+.bs-sm:not(.bs-m) .hd .sr { flex: 0 1 260px; min-width: 0; }
 .bs-sm .hd .wr, .bs-sm .hd .ch { height: 36px; padding: 0 14px; display: inline-flex; align-items: center; white-space: nowrap; box-sizing: border-box; }
 .bs-sm.bs-m .hd .sr + .wr { margin-left: 0; }
 /* 연어 마켓 본문: 구분선은 본문 칸 아래가 아니라 단추 줄 위에 전체 너비로 */
@@ -5665,6 +5668,50 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-opview { height: 320px; flex: none; }
   .gx-ops > :not(.gx-opview) { max-height: 260px; }
   .gx-opcnt em { white-space: nowrap; }
-  /* 임무: 오른쪽 편성 칸을 조금 좁혀 지도 몫을 늘린다 */
-  .gx-field { grid-template-columns: minmax(0, 1fr) minmax(280px, 300px); gap: 14px; }
+  /* 임무: 두 칸을 반반으로 (왼쪽이 166px 라 지역 고르기가 화살표만 남고 「커스텀」이 잘리고 지도 핀이 엉켰다, 눌러보기 3차 fold_i).
+     위 줄은 지역 고르기 + 커스텀, 검색은 다음 줄. 편성 카드는 얼굴을 줄여 이름 자리를 남긴다 */
+  .gx-field { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .gx-mapbar { flex-wrap: wrap; }
+  .gx-mapbar > .gx-select { flex: 1 1 60px; }
+  .gx-mapbar > .gx-mapfind { order: 3; flex: 1 1 100%; }
+  .gx-mapbar > .gx-mswap { padding: 0 10px 0 8px; }
+  .gx-acard.pick.wide { --acard-h: 96px; gap: 10px; padding: 8px 10px; }
+  .gx-acard.pick.wide .gx-acard-side > .gx-ava { width: 56px; height: 56px; aspect-ratio: auto; align-self: center; border-radius: 12px; }
+  /* 상황판 요원 목록: 한 줄에 한 명 (두 줄이면 오른쪽 열 위키 단추가 칸 끝에서 잘렸다) */
+  .gx-agrows { grid-template-columns: minmax(0, 1fr); }
+  .gx-agrow:nth-child(odd) { border-right: 0; }
+  /* 인터넷 사이트 머리: 메뉴 글자가 한 글자씩 세로로 쌓이지 않게, 검색칸이 남는 폭만 쓴다 */
+  .bs-gn .hd { padding: 0 14px; gap: 14px; }
+  .bs-gn .hd nav { flex: none; gap: 12px; white-space: nowrap; }
+  .bs-gn .hd .sr { flex: 1 1 0; width: auto; min-width: 0; max-width: 280px; }
+  .bs-gal .hd { gap: 12px; }
+  .bs-gal .hd .lg { flex: none; white-space: nowrap; }
+  .bs-gal .hd .sch { flex: 1 1 0; width: auto; min-width: 0; max-width: 320px; }
+  /* 연어 마켓 머리는 두 줄: 로고·메뉴 / 검색·글쓰기·내 채팅 */
+  .bs-sm:not(.bs-m) .hd { flex-wrap: wrap; height: auto; padding: 8px 14px; gap: 8px 14px; }
+  .bs-sm:not(.bs-m) .hd .lg { flex: none; white-space: nowrap; }
+  .bs-sm:not(.bs-m) .hd nav { flex: 1 1 calc(100% - 180px); gap: 14px; white-space: nowrap; }
+  .bs-sm:not(.bs-m) .hd .sr { flex: 1 1 160px; width: auto; min-width: 0; margin-left: 0; }
+  /* 괴담넷 본문: 왼쪽 글 목록 칸을 좁혀 글·새 글 칸에 폭을 준다 (글 칸이 170~200px 라 답글 안내가 세로로 쌓였다) */
+  .bs-gn:not(.bs-m) .wrap { grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  .bs-gn:not(.bs-m) .side { padding: 6px; }
+  .bs-gn:not(.bs-m) .side button { padding: 8px; }
+  .bs-gn:not(.bs-m) .side h6 { margin: 10px 8px 4px; }
+  .bs-gn:not(.bs-m) .gmain { padding: 14px; }
+  .bs-wpf:not(.bs-m) .cols { grid-template-columns: 130px minmax(0, 1fr); }
+  /* 괴이위키: 「최근 변경」 칸을 본문 아래로 (본문이 190~225px 라 낱말마다 꺾였다). 문서 정보 상자는 본문 폭 그대로 */
+  .wk .top { gap: 12px; padding: 0 14px; }
+  .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+  .wk .nw-infobox { float: none; width: 100%; margin: 0 0 14px; }
+}
+/* 그중에서도 좁은 창(601~780 폭): 두 칸으로 나눌 폭이 안 되는 화면은 한 칸씩 보인다 */
+@media (min-width: 601px) and (max-width: 780px) and (min-height: 500px), (min-width: 601px) and (max-width: 780px) and (pointer: fine), (min-width: 601px) and (max-width: 780px) and (pointer: none) {
+  /* 괴담톡: 목록 또는 대화 한 칸 (대화 칸이 210px 라 머리 단추가 겹쳐 「방 삭제」 자리에서 전화 창이 뜨고 「초대」가 창 밖으로 나갔다).
+     방 머리의 「목록으로」 단추로 돌아간다 */
+  .gx-body.ph-app { grid-template-columns: minmax(0, 1fr); }
+  .ph-app.is-list > .ph-pane, .ph-app.is-detail > .ph-side { display: none; }
+  .gx-body.ph-app > .ph-side { border-right: 0; }
+  /* 기록 › 인물 머리: 단추 셋을 다음 줄로 내려 이름 아래 설명이 4~5줄로 꺾이지 않게 */
+  .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) { flex-wrap: wrap; }
+  .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) > .ph-act { flex: 1 0 100%; justify-content: flex-end; }
 }

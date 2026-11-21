@@ -913,6 +913,9 @@
   .gw .flc-c > .gx-segs { display: flex; min-width: 0; }
   .gw .flc-c > .gx-segs > .gx-seg { flex: 0 1 auto; white-space: nowrap; }
   .gw .flc-c .fl-help { margin: 0; }
+  /* 칸보다 긴 고르기(Director 「방식」 네 칸)는 다음 줄로 넘긴다: 좁은 PC 창(폴드 펼침 673 폭)에서 글자가 서로 겹쳤다 (눌러보기 3차 fold_i) */
+  .gw .flc-c > .gx-segs { flex-wrap: wrap; height: auto; max-height: none; }
+  .gw .flc-c > .gx-segs > .gx-seg { flex: 0 0 auto; min-height: calc(var(--h) - 2px); }
 }
 
 /* ── AI 상담 (설정 개편 6단계, 시안8): PC = 설정 창 옆 380px 창, 폰 = 아래에서 올라오는 판. 설정 창 머리의 「AI 상담」 단추로 연다 ── */
