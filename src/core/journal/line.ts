@@ -10,6 +10,22 @@ export function journalClock(at: number | null): string {
   return `${two(d.getUTCMonth() + 1)}.${two(d.getUTCDate())} ${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`;
 }
 
+/** 소요 분 → 「38분」「1시간 5분」「1시간」. 모르면 빈 글 (기록 화면·보고서 PNG·채팅 카드·연대기가 같이 쓴다, 전수점검 사소-57) */
+export function durLabel(min: number | null): string {
+  if (min === null || !Number.isFinite(min)) return '';
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return h ? `${h}시간${m ? ` ${m}분` : ''}` : `${m}분`;
+}
+
+/** 보고서 종류·종료 줄 「괴이 · 종료 (직접 종료)」 (보고서 창·PNG 가 같이 쓴다, 전수점검 눌러2-보통-26) */
+export function reportEndLabel(r: { kind: JournalRow['kind']; cause: JournalRow['cause'] }): string {
+  return `${JOURNAL_KIND_LABEL[r.kind]} · 종료${r.cause === 'manual' ? ' (직접 종료)' : r.cause === 'ttl' ? ' (시간 경과)' : ''}`;
+}
+
+/** 보고서 딱지: 내가 낀 사건 「내 사건」, 아니면 「그 외」 (이름은 사용자 결정, 일지 칩과 같은 말) */
+export const reportBadge = (r: { mine: boolean }) => (r.mine ? '내 사건' : '그 외');
+
 /** 템플릿 기호·줄바꿈을 막는다 (글 그대로 다른 곳에 들어갈 수 있어서) */
 const plain = (s: string, max: number) => s.replace(/\{\{/g, '｛｛').replace(/\}\}/g, '｝｝').replace(/%%/g, '％％').replace(/\s+/g, ' ').trim().slice(0, max);
 

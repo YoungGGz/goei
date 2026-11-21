@@ -75,8 +75,10 @@ export const wiki: WikiState = {
   view: 'home', title: '', query: '', homeQuery: '', history: [], inherited: [], previousTitle: null, direct: false, confirmDelete: null, failure: null, notice: '', info: '', listOpen: false, tab: 'all', filter: '', newTitle: '', docReq: '', rewrite: null, rewritePrev: true,
 };
 
-export function resetWiki() {
+/** newChat: 다른 채팅으로 옮겼을 때. 앞 채팅의 「최근 실패 원문」·알림도 비운다 (전수점검 사소-59) */
+export function resetWiki(newChat = false) {
   Object.assign(wiki, { view: 'home', title: '', query: '', homeQuery: '', history: [], inherited: [], previousTitle: null, direct: false, confirmDelete: null, notice: '', newTitle: '', docReq: '', rewrite: null });
+  if (newChat) Object.assign(wiki, { failure: null, info: '' });
 }
 
 interface Job {
@@ -103,10 +105,17 @@ function registry(ctx: ChatContext): Registry {
   return regCache.reg;
 }
 const source = (ctx: ChatContext): RefSource => playerSource({ char: ctx.char as RefSource['char'], chat: ctx.chat, persona: personaText() } as RefSource);
-function canon(ctx: ChatContext) {
+/** byEntry: 명부 항목 문서로도 잇는다 (entries 자신이 부를 때는 false: 서로 부르지 않게) */
+function canon(ctx: ChatContext, byEntry = true) {
   const r = registry(ctx);
   const src = source(ctx);
-  return (t: string) => ownDoc(ctx, t) ?? canonicalTitle(r, src, t).title;
+  return (t: string) => ownDoc(ctx, t) ?? (byEntry ? entryDoc(ctx, canonicalTitle(r, src, t).title) : canonicalTitle(r, src, t).title);
+}
+/** 정식 이름 문서가 없으면 그 이름을 가진 명부 항목의 문서 (조직 「발푸르기스」 → 기본 문서 「발푸르기스 협회」, 전수점검 보통-65) */
+function entryDoc(ctx: ChatContext, t: string): string {
+  if (!t || findDoc(ctx.chat, t, ctx.char.globalLore)) return t;
+  const e = entries(ctx).find((x) => x.title !== t && (x.name === t || x.terms.includes(t)) && findDoc(ctx.chat, x.title, ctx.char.globalLore));
+  return e?.title ?? t;
 }
 /** 그 제목 그대로 된 문서가 있으면 별칭보다 먼저 (거점 「백일몽 본사」는 조직 「백일몽」과 다른 문서, 2026-10-21 사용자) */
 function ownDoc(ctx: ChatContext, t: string): string | null {
@@ -156,7 +165,8 @@ function search(ctx: ChatContext, q: string): boolean {
   wiki.query = query;
   if (!query) return false;
   const own = ownDoc(ctx, query);
-  const c = own ? { title: own, known: true } : canonicalTitle(registry(ctx), source(ctx), query);
+  const found = own ? { title: own, known: true } : canonicalTitle(registry(ctx), source(ctx), query);
+  const c = { ...found, title: entryDoc(ctx, found.title) };
   if (findDoc(ctx.chat, c.title, ctx.char.globalLore)) return go('doc', c.title, query), true;
   if (c.known) return openTitle(ctx, c.title, 'direct'), true;
   // 여러 개가 걸리면 검색 화면에서 고르게. 하나도 없으면 「없어요 · 작성하기」 (바로 작성 화면으로 가지 않는다)
@@ -280,7 +290,8 @@ export async function autoWriteWiki(ctx: ChatContext, messageIndex: number, open
       return;
     }
     const old = findDoc(cur.chat, title, cur.char.globalLore);
-    await generate(cur, target, title, !!old && !old.base);
+    // 다시 쓸 때도 사용자가 적어 둔 「이 문서 지침」을 그대로 넘긴다 (빠지면 저장할 때 지워진다, 전수점검 보통-66)
+    await generate(cur, target, title, !!old && !old.base, old && !old.base ? old.meta?.docRequest ?? '' : '');
   } finally {
     if (target === quietEnv) wiki.notice = notice;
   }
@@ -345,7 +356,7 @@ let entryCache: { lore: unknown; stamp: number; viewer: string; list: Entry[] } 
 function entries(ctx: ChatContext): Entry[] {
   const viewer = String(ctx.chat.scriptstate?.['$st_faction'] ?? '');
   if (entryCache && entryCache.lore === ctx.char.globalLore && entryCache.stamp === moduleAssetStamp() && entryCache.viewer === viewer) return entryCache.list;
-  const c = canon(ctx);
+  const c = canon(ctx, false);
   const list: Entry[] = [];
   const dir = readDirectory(ctx.char.globalLore);
   // 괴이 폴더 밖에서 발생 후보로 들어온 요원·세력 로어북(흡혈귀·탐미주의 등)은 인물·조직 항목으로만 보인다
@@ -602,14 +613,16 @@ function todayDoc(ctx: ChatContext, docs: WikiDoc[]): { doc: WikiDoc; text: stri
 function homeView(ctx: ChatContext): string {
   const docs = sortedDocs(ctx);
   const pick = (t: string) => `<button type="button" class="wl" data-action="wiki-pick" data-value="${esc(t)}">${esc(shownName(ctx, t))}</button>`;
-  const links = (list: WikiDoc[], tab: Tab) => [...list.slice(0, 9).map((d) => pick(d.title)), `<button type="button" class="wl" data-action="wiki-browse" data-value="${tab}">[전체]</button>`].join(' · ');
+  // [전체]는 그 줄의 숫자에 든 분류 탭마다 (괴담·장소 = 괴이 + 특수, 전수점검 사소-56)
+  const all = (tabs: Tab[]) => tabs.map((t) => `<button type="button" class="wl" data-action="wiki-browse" data-value="${t}">[${tabs.length > 1 ? `${TABS.find(([x]) => x === t)?.[1]} ` : ''}전체]</button>`);
+  const links = (list: WikiDoc[], tabs: Tab[]) => [...list.slice(0, 9).map((d) => pick(d.title)), ...all(tabs.filter((t) => list.some((d) => docCat(ctx, d) === t)))].join(' · ');
   const places = docs.filter((d) => ['an', 'ms'].includes(docCat(ctx, d)));
   const people = docs.filter((d) => docCat(ctx, d) === 'ag');
   const today = todayDoc(ctx, docs);
   const rows = [
     today ? [IROW_ICO.doc, `오늘의 문서 · ${esc(shownName(ctx, today.doc.title))}`, `${esc(today.text)} <button type="button" class="wl" data-action="wiki-pick" data-value="${esc(today.doc.title)}">[더 보기]</button>`] : null,
-    places.length ? [IROW_ICO.pin, `괴담·장소 <small>${places.length}</small>`, links(places, 'an')] : null,
-    people.length ? [IROW_ICO.person, `인물 <small>${people.length}</small>`, links(people, 'ag')] : null,
+    places.length ? [IROW_ICO.pin, `괴담·장소 <small>${places.length}</small>`, links(places, ['an', 'ms'])] : null,
+    people.length ? [IROW_ICO.person, `인물 <small>${people.length}</small>`, links(people, ['ag'])] : null,
     [IROW_ICO.pen, '새 문서 요청', '찾는 문서가 없으면 <button type="button" class="wl" data-action="wiki-new">문서 작성 요청</button>을 남겨 주세요.'],
   ].filter((r): r is string[] => !!r);
   const story = docs.filter((d) => !d.base).sort((a, b) => (b.meta?.created ?? 0) - (a.meta?.created ?? 0));
@@ -1140,6 +1153,6 @@ export function previewWikiAuto(ctx: ChatContext): { title: LlmMessage[] | null;
   if (!title) return { title: titleMsgs, article: null };
   const old = findDoc(ctx.chat, title, ctx.char.globalLore);
   const regenerate = !!old && !old.base;
-  const p = articlePrompt(ctx, title, { inherited: regenerate ? (old?.meta && !old.meta.direct ? old.meta.primarySources : []) : [], previousDoc: regenerate && s.refreshPrevious ? old : null, writingRequest: String(ctx.chat.scriptstate?.['$nw_writing_request'] ?? ''), docRequest: '', direct: regenerate ? !!old?.meta?.direct : false });
+  const p = articlePrompt(ctx, title, { inherited: regenerate ? (old?.meta && !old.meta.direct ? old.meta.primarySources : []) : [], previousDoc: regenerate && s.refreshPrevious ? old : null, writingRequest: String(ctx.chat.scriptstate?.['$nw_writing_request'] ?? ''), docRequest: regenerate ? old?.meta?.docRequest ?? '' : '', direct: regenerate ? !!old?.meta?.direct : false });
   return { title: titleMsgs, article: p.messages };
 }

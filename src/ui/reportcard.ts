@@ -1,12 +1,12 @@
 // 채팅 속 보고서 카드 (docs/설계안_기록_보고서.md 5-12절): 사건이 종료된 응답의 상태창 아래에 display 처리기가 그린다.
 // 메시지 본문에는 아무것도 넣지 않고 모델 요청에도 가지 않는다 — 채팅 변수($goei_reports)를 읽어 보여 주기만. 채팅은 플러그인 CSS 가 없어 인라인 스타일.
-import { JOURNAL_KIND_LABEL, journalClock, type Report } from '../core/journal';
+import { JOURNAL_KIND_LABEL, durLabel, journalClock, reportBadge, type Report } from '../core/journal';
 import { locName } from '../core/world/geo';
 import type { Palette } from './theme';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-const two = (n: number) => String(n).padStart(2, '0');
-const dur = (min: number | null) => (min === null ? '' : `${Math.floor(min / 60) ? `${Math.floor(min / 60)}h ` : ''}${two(min % 60)}m`);
+// 소요는 보고서 창·PNG·연대기와 같은 「1시간 5분」 꼴 (전수점검 사소-57)
+const dur = durLabel;
 
 /** 카드 HTML 한 장. p = 창 배색 (CSS 변수로 테마를 따라간다) */
 export function reportCardHtml(r: Report, p: Palette): string {
@@ -15,7 +15,7 @@ export function reportCardHtml(r: Report, p: Palette): string {
   const place = [h.place, locName(h.loc) || h.loc].filter((x, i, a) => x && a.indexOf(x) === i).join(' · ');
   const meta = [place, h.at !== null ? `종료 ${journalClock(h.at).slice(6)}` : '', h.duration !== null ? `소요 ${dur(h.duration)}` : ''].filter(Boolean).join(' · ');
   const who = r.agents.map((a) => a.name).filter(Boolean).join(' · ');
-  const badge = r.mine ? '내가 출동' : '요원 처리';
+  const badge = reportBadge(r);
   // 채팅 속 다른 카드와 같은 폭 규칙 (왼쪽 정렬, 420px 안팎, 2026-11-08 사용자)
   const box = `display:block;width:fit-content;min-width:min(100%,420px);max-width:100%;box-sizing:border-box;margin:10px auto 0;padding:10px 16px;border:1px solid ${p.accentLine};border-radius:14px;background:${p.accentBg};color:${p.sub};font-size:.92em;line-height:1.5;`;
   const chip = `display:inline-block;padding:0 8px;border-radius:999px;border:1px solid ${r.mine ? p.signal : p.accentLine};color:${r.mine ? p.signal : p.sub};font-size:.85em;line-height:1.6;margin-left:6px;vertical-align:middle;`;

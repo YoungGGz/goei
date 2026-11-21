@@ -543,7 +543,7 @@ export function unlockHint(e: ManagedEntry): string {
 }
 
 /** Risu 방식: 키를 소문자로, 띄어쓰기를 모두 지우고 메시지마다 포함 검사 (v2026.8.250 lorebook.svelte.ts) */
-export function pickLoreRisu(entries: ManagedEntry[], messages: LoreMessage[], depth: number): LorePick[] {
+export function pickLoreRisu(entries: ManagedEntry[], messages: LoreMessage[], depth: number, unlocked: string[] = []): LorePick[] {
   const squash = (s: string) => s.toLowerCase().replace(/\s+/g, '');
   const window = messages.slice(-Math.max(1, depth)).map((m) => ({ m, flat: squash(m.data) }));
   const out: LorePick[] = [];
@@ -556,7 +556,13 @@ export function pickLoreRisu(entries: ManagedEntry[], messages: LoreMessage[], d
     }
     if (reasons.length) out.push({ entry, score: 0, reasons });
   }
-  return sortPicks(out);
+  // 해금 전 부록·본 항목이 안 켜진 부록은 키가 나와도 넣지 않는다 (플러그인 방식 pickAppendices 와 같은 거르기, 전수점검 중대-10)
+  const done = new Set(unlocked);
+  const parentOn = new Set(out.filter((p) => !p.entry.appendix).map((p) => p.entry.name));
+  return sortPicks(out.filter((p) => {
+    const a = p.entry.appendix;
+    return !a || !((a.when.unlock && !done.has(p.entry.name)) || (a.when.needParent && !parentOn.has(a.parent)));
+  }));
 }
 
 /** 고른 항목을 자리마다 이어 붙인다 (CBS를 풀고 장식 줄을 뗀다) */
@@ -590,7 +596,7 @@ export function computeLore(lore: LoreEntry[] | undefined, chat: Chat, o: LoreOp
   const entries = managedEntries(lore).filter((e) => !o.exclude?.includes(e.name));
   if (!entries.length) return null;
   const msgs = loreMessages(chat, o.input, o.mode === 'risu');
-  const picks = o.mode === 'risu' ? pickLoreRisu(entries, msgs, o.depth) : pickLore(entries, msgs, loreState(chat), o, msgs.at(-1)?.role === 'user');
+  const picks = o.mode === 'risu' ? pickLoreRisu(entries, msgs, o.depth, readUnlocked(chat.scriptstate)) : pickLore(entries, msgs, loreState(chat), o, msgs.at(-1)?.role === 'user');
   // Risu가 직접 켤 때는 자리를 비운다 (picks는 확인 화면에 보일 Risu 방식 추정).
   // 자리 항목이 없는 카드의 가상 항목(플러그인 세계 데이터)은 Risu가 볼 수 없으니, Risu 방식으로 고른 것을 플러그인이 끼운다 (QC 2026-10-28)
   const books = lore ?? [];

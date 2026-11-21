@@ -103,6 +103,11 @@ test('Risu가 직접 켜는 방식에서도 해금이 걸린 부록은 막아 �
   assert.ok(body('빛이 없으라 · 수도원').startsWith('@@dont_activate'), '해금이 걸린 부록');
   const plugin = lore.syncDecorators(next, 'plugin');
   assert.ok(plugin.find((e) => e.comment === '남해지사 · 시설').content.startsWith('@@dont_activate'), '플러그인 방식으로 돌아오면 다시 붙인다');
+  // Risu 방식으로 고른 목록(가상 항목은 플러그인이 끼운다)도 해금 전 부록·본 항목 없는 부록은 키가 나와도 뺀다 (전수점검 중대-10)
+  const es = lore.managedEntries(books);
+  const risu = (unlocked) => lore.pickLoreRisu(es, [{ role: 'user', data: '신마음수도원에 갔다' }], 10, unlocked).map((p) => p.entry.name);
+  assert.deepEqual(risu([]), [], '해금 전');
+  assert.deepEqual(risu(['빛이 없으라 · 수도원']), ['빛이 없으라 · 수도원'], '해금 뒤');
 });
 
 test('카드 업데이트: 사용자 명부에 없는 부록 조건만 더한다', () => {

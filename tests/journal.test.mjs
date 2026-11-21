@@ -423,7 +423,8 @@ test('PNG 카드: 바탕 900×1200 부터, 머리·그림 틀·제목·시각 �
   assert.deepEqual(g.calls[0], ['fillRect', 0, 0, 900, 1200], '첫 호출이 바탕 전체');
   assert.deepEqual(r.sections, ['bg', 'head', 'art-empty', 'title', 'tiles', 'trail', 'agents', 'result', 'people', 'wallet', 'foot']);
   const texts = g.calls.filter((c) => c[0] === 'fillText').map((c) => c[1]);
-  for (const t of ['괴이 ː ANOMALY', 'INCIDENT REPORT · RPT-0101-01', '소라 랜드', '내가 출동', '발생', '투입', '종료', '소요', '1h 47m', '경과', '… 외 5건', '투입 요원', '쟈알디', '스팡달', '인물 기록 변화', '+6 → 신뢰', '−2', '결과', '가계부', '처리 수당', '+80,000', '−12,500', '종료 시점 잔고', '₩ 207,500', 'ANOMALY SIMULATION 2.4']) {
+  // 머리 표기는 창 머리처럼 「괴이」·「ː」·「ANOMALY」 세 조각, 딱지·소요는 보고서 창과 같은 말 (전수점검 눌러2-보통-26·사소-57)
+  for (const t of ['괴이', 'ː', 'ANOMALY', 'INCIDENT REPORT · RPT-0101-01', '소라 랜드', '괴이 · 종료', '내 사건', '발생', '투입', '종료', '소요', '1시간 47분', '경과', '… 외 5건', '투입 요원', '쟈알디', '스팡달', '인물 기록 변화', '+6 → 신뢰', '−2', '결과', '가계부', '처리 수당', '+80,000', '−12,500', '종료 시점 잔고', '₩ 207,500', 'ANOMALY SIMULATION 2.4']) {
     assert.ok(texts.some((x) => x.includes(t)), `글: ${t}`);
   }
   assert.equal(texts.filter((x) => /^경과 \d+ /.test(x)).length, 6, '경과 최대 6줄');
@@ -432,12 +433,17 @@ test('PNG 카드: 바탕 900×1200 부터, 머리·그림 틀·제목·시각 �
   // 바닥글은 늘 같은 자리 (y = 1200 − 48 − 28)
   const foot = g.calls.find((c) => c[0] === 'fillText' && c[1] === 'ANOMALY SIMULATION 2.4');
   assert.deepEqual(foot.slice(2), [48, 1124]);
-  // 간이 보고서: 인물·가계부 구역 없음, 「요원 처리」 배지
+  // 빚(음수) 잔고는 − 가 붙는다 (전수점검 보통-67)
+  const gNeg = fakeCtx();
+  paintReport(gNeg, pngReport({ balance: -3000 }), { colors: COLORS, sans: 'sans-serif', mono: 'monospace' });
+  assert.ok(gNeg.calls.some((c) => c[0] === 'fillText' && c[1] === '−₩ 3,000'), '음수 잔고');
+  // 간이 보고서: 인물·가계부 구역 없음, 「그 외」 배지, 직접 종료면 종류 줄에 (직접 종료)
   const g2 = fakeCtx();
-  const r2 = paintReport(g2, pngReport({ full: false, mine: false, people: undefined, wallet: undefined, balance: undefined }), { colors: COLORS, sans: 'sans-serif', mono: 'monospace' });
+  const r2 = paintReport(g2, pngReport({ full: false, mine: false, cause: 'manual', people: undefined, wallet: undefined, balance: undefined }), { colors: COLORS, sans: 'sans-serif', mono: 'monospace' });
   assert.deepEqual(r2.sections, ['bg', 'head', 'art-empty', 'title', 'tiles', 'trail', 'agents', 'result', 'foot']);
   const texts2 = g2.calls.filter((c) => c[0] === 'fillText').map((c) => c[1]);
-  assert.ok(texts2.includes('요원 처리'));
+  assert.ok(texts2.includes('그 외'));
+  assert.ok(texts2.includes('괴이 · 종료 (직접 종료)'));
   assert.ok(!texts2.includes('가계부') && !texts2.includes('인물 기록 변화'));
   // 그림이 있으면 틀 안에 꽉 차게 (clip → drawImage → restore), 가로 804 틀에 1600×900 그림
   const g3 = fakeCtx();
