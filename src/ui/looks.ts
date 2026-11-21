@@ -271,7 +271,7 @@ export const LOOK_CSS = `
 .gx-lookchip:disabled { cursor: default; opacity: .75; }
 .gx-lookface { width: 34px; height: 34px; border-radius: 9px; }
 .gx-lookface .gx-look { position: absolute; left: 50%; top: 0; translate: -50% 0; }
-@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gx-lookg { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
   .gx-lookc { height: 262px; padding: 4px 2px; }
 }

@@ -209,7 +209,7 @@ function membersCard(ctx: ChatContext, sel: string, d: Directory): string {
 
 export function recordPage(ctx: ChatContext, kind: WorldKind, over: WorldOverrides, q: string, sel: string): string {
   const d = directoryDraft(ctx);
-  // 폰(760px 이하)에서는 목록 대신 드롭다운 하나 (목록이 화면을 다 먹지 않게). CSS 가 폭에 따라 하나만 보여 준다
+  // 폰(600px 이하)에서는 목록 대신 드롭다운 하나 (목록이 화면을 다 먹지 않게). CSS 가 폭에 따라 하나만 보여 준다
   // 고른 것이 없으면 첫 줄이 고른 것처럼 보이지 않게 빈 안내 줄을 고른 채로 둔다 (본문은 비었는데 첫 항목이 떠 있었다, 전수점검 눌러-중대-21)
   const pick = `<select class="gw-list-pick" data-change="ed-sel" aria-label="${WORLD_KIND_LABEL[kind]} 고르기">${sel ? '' : `<option value="" selected disabled>${josa(WORLD_KIND_LABEL[kind], '을', '를')} 고르세요</option>`}${rowsOf(ctx, kind, over)
     .map((r) => `<option value="${esc(r.name)}"${r.name === sel ? ' selected' : ''}>${esc(r.name)}${r.sub ? ` · ${esc(r.sub)}` : ''}${r.state === 'deleted' ? ' (지움)' : r.state === 'new' ? ' (추가)' : r.state === 'edited' ? ' (고침)' : ''}</option>`)

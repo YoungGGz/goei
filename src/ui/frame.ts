@@ -1,5 +1,5 @@
 // 상황판 창 둘레의 기기 틀 (설정 → 화면 「외부 프레임」, 2026-10-29 사용자 결정).
-// - PC 전용: 폰(760px 이하)·필드 전체화면(document.fullscreenElement)에서는 안 그린다. 설정 창(.gw)에는 없다.
+// - PC 전용: 폰(600px 이하)·필드 전체화면(document.fullscreenElement)에서는 안 그린다. 설정 창(.gw)에는 없다.
 // - 창(.gx-panel) 크기 규칙은 그대로 두고 틀만 창 테두리 바깥으로 뻗는다. 뷰포트가 좁아 「창 최대 폭 + 틀 두께 + 여백」이 안 들어가면 창은 그대로 두고 틀만 숨긴다.
 // - 그림 파일 없이 CSS·SVG 로 그린다 (style.css 「외부 프레임」 절). 확정 시안: docs/시안/상황판_프레임/Tablet.dc.html · Tactical.dc.html
 import type { Prefs } from '../core/settings';

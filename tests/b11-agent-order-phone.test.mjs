@@ -42,5 +42,5 @@ test('요원이 아니거나 명부에 없는 이름이면 단추가 없다', ()
 test('CSS: 넓은 창에서는 숨기고, 목록이 드롭다운으로 바뀌는 두 규칙(좁은 칸·좁은 화면)에서만 보인다', () => {
   assert.match(css, /\n\.gw-head h2 \.gw-hmove \{ display: none;/);
   const shown = [...css.matchAll(/\.gw-list-pane \.gw-list-pick \{ display: block;[^\n]*\n  \.gw-head h2 \.gw-hmove \{ display: inline-flex; \}/g)];
-  assert.equal(shown.length, 2, '@container 600 과 @media 760 두 곳');
+  assert.equal(shown.length, 2, '@container 600 과 @media 600 두 곳');
 });
