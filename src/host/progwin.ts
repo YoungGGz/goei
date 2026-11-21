@@ -100,6 +100,7 @@ ${themeVars('[x-goei-prog]')}
   display: flex; flex-direction: column; align-items: center; gap: 7px; box-shadow: 0 8px 18px -10px rgba(0,0,0,.6);
   touch-action: none; /* 끌 때 화면이 같이 밀리지 않게 */
 }
+[x-goei-prog][x-goei-phone="true"] [data-dot]::before { content: ''; position: absolute; top: 0; bottom: 0; left: -6px; right: 0; }
 [x-goei-prog][x-goei-phone="true"] [data-dot] svg { width: 14px; height: 14px; margin-bottom: 1px; color: var(--g-sub); }
 [x-goei-prog][x-goei-phone="true"][x-goei-run="true"] [data-dot] svg { color: var(--g-signal); }
 [x-goei-prog][x-goei-phone="true"] [data-dot] [data-p="dots"] { display: flex; flex-direction: column; align-items: center; gap: 7px; }

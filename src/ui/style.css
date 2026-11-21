@@ -472,7 +472,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 /* 커스텀 탭 (v0.16.21): 종류 고르기와 검색을 한 줄에. 종류는 임무 탭 상황 필터와 같은 칩, 남는 폭은 검색 */
 /* 줄이 좁으면 취소·전환을 다음 줄로 넘긴다 (한 줄에 우겨 검색칸이 빈 동그라미로 눌리고 「⇆ 임」에서 잘렸다, 전수점검 눌러-중대-4). 폰 서랍은 아래에서 한 줄 가로 밀기 */
 .gx-mfilter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
-.gx-mfilter .gx-chip { flex: none; padding: 0 14px; }
+.gx-mfilter .gx-chip { flex: none; }
 .gx-mfilter .gx-search { flex: 1 1 140px; width: auto; min-width: 120px; height: var(--ctl-sm); min-height: var(--ctl-sm); margin-left: 4px; border-radius: 8px; padding: 0 14px; font-size: 13px; }
 .gx-mapcol .gx-hint, .gx-mapcol > .gx-muted { margin: 0; }
 
@@ -942,7 +942,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .ph-compose { display: flex; align-items: flex-end; gap: 6px; }
 .ph-input { flex: 1; min-width: 0; min-height: 44px; max-height: 140px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 21px; background: var(--panel); color: var(--text); font: inherit; font-size: 15px; line-height: 1.45; resize: none; field-sizing: content; }
 .ph-input:focus { outline: none; border-color: var(--accent-line); }
-.ph-plus { width: 42px; height: 42px; border-radius: 50%; }
+.ph-plus { width: 44px; height: 44px; border-radius: 50%; }
 .ph-send { display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border: 0; border-radius: 15px; background: var(--signal); color: var(--on-signal); box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--signal) 70%, transparent); transition: transform .12s ease, filter .12s ease; }
 .ph-send svg { width: 22px; height: 22px; }
 .ph-send:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
@@ -1171,7 +1171,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-team .gx-note { margin-top: 0; }
 /* 편성 칸 (v0.16.21): 작전 메모는 PC 기본 두 줄, 출발·임무 요청 버튼은 낮게 (사용자 요청) */
 .gx-team .gx-note textarea { min-height: 0; }
-.gx-team .gx-start { min-height: 44px; border-radius: 12px; font-size: 16px; }
+.gx-team .gx-start { min-height: 44px; height: 44px; padding: 0 16px; border-radius: 12px; font-size: 16px; }
 .gx-notice { margin: 12px 20px 0; }
 /* 지원 인원 카드: 요원 카드와 같은 모양, 인원은 카드 안 −/+ */
 .gx-scard { grid-column: 1 / -1; align-items: center; cursor: default; }
@@ -1282,6 +1282,14 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-stepb i { width: 20px; height: 20px; font-size: 12px; }
   .gx-stepb span { flex-direction: row; align-items: baseline; gap: 6px; }
   .gx-stepb b { font-size: 14px; flex: none; }
+  @media (max-width: 380px) {
+    .gx-stepb { padding: 4px 10px; }
+    .gx-stepb span { flex-direction: column; align-items: flex-start; gap: 0; }
+    .gx-stepb b, .gx-stepb small { line-height: 1.25; max-width: 100%; }
+    .gx-sitbar { gap: 4px; }
+    .gx-sitbar .gx-chip { gap: 4px; padding: 0 10px; }
+    .gx-sitbar .gx-unplace { margin-left: 0; }
+  }
   /* 편성 단계: 요원 목록이 넓게. 작전 메모는 한 줄로 접어 두고 누르면 펼친다 */
   /* 목표·인원은 위 목표·편성 줄에 이미 나온다 */
   .gx-team > .gx-goal { display: none; }
@@ -1358,6 +1366,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-evc-act { display: flex; align-items: center; flex: none; margin: -4px -4px -4px auto; }
 .gx-evc-act .gx-icon { width: 26px; height: 26px; }
 .gx-evc-act .gx-icon svg { width: 15px; height: 15px; }
+.gx-evc-act .gx-icon { position: relative; }
+.gx-evc-act .gx-icon::after { content: ''; position: absolute; inset: -4px; }
 .gx-evc-act .gx-mini { min-height: 26px; padding: 0 8px; font-size: 12px; }
 /* 상황 딱지 (v0.16.21, 사용자 요청: 알록달록해서 눈에 안 들어온다): 괴이는 붉은 계열, 사건은 노란 계열, 특수는 파란 계열로 통일.
    괴이는 바탕은 모두 같고 등급 글자만 높을수록 밝게 빛난다 */
@@ -1399,11 +1409,11 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-board .gx-acard, .gx-acard.pick.wide { flex-wrap: nowrap; align-items: center; gap: 10px; padding: 10px; }
   .gx-board .gx-acard .gx-ava, .gx-acard.pick.wide .gx-ava { width: 60px; height: 60px; border-radius: 14px; font-size: 22px; }
   .gx-board .gx-acard-act, .gx-acard.pick.wide .gx-acard-act { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; margin: 0; }
-  .gx-board .gx-acard-tool, .gx-acard.pick.wide .gx-acard-tool { width: var(--ctl-h); height: var(--ctl-h); }
+  .gx-board .gx-acard-tool, .gx-acard.pick.wide .gx-acard-tool { width: var(--ctl-sm); height: var(--ctl-sm); }
   .gx-board .gx-acard-tool svg, .gx-acard.pick.wide .gx-acard-tool svg { width: 18px; height: 18px; }
   /* 이름·상태 줄은 버튼 자리만큼 비우고, 딱지는 높이 고정 (줄이 바뀌어도 찌그러지지 않게) */
   /* 이름과 상태 딱지는 한 줄, 긴 이름은 말줄임 (딱지가 다음 줄로 떨어져 카드마다 높이가 달랐다, 전수점검 눌러-보통-5) */
-  .gx-board .gx-acard-top, .gx-acard.pick.wide .gx-acard-top { flex-wrap: nowrap; row-gap: 4px; column-gap: 6px; padding-right: 76px; }
+  .gx-board .gx-acard-top, .gx-acard.pick.wide .gx-acard-top { flex-wrap: nowrap; row-gap: 4px; column-gap: 6px; padding-right: 64px; }
   .gx-board .gx-acard-top b, .gx-acard.pick.wide .gx-acard-top b { flex: 0 1 auto; min-width: 0; max-width: 100%; }
   .gx-board .gx-st, .gx-acard.pick.wide .gx-st { flex: none; height: 20px; line-height: 20px; padding: 0 7px; font-size: 11.5px; }
   .gx-board .gx-acard-txt small, .gx-acard.pick.wide .gx-acard-txt small, .gx-board .gx-acard-sit, .gx-acard.pick.wide .gx-acard-sit { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
@@ -1572,8 +1582,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .ph-notice-bar .gx-mini { margin: 0 8px 8px 0; }
 /* 단톡 만들기: 주제는 평소 한 줄, 적거나 누르면 넓어진다 */
 .ph-gbody { gap: 8px; }
-.ph-gbody > .ph-gname, .ph-gbody > .ph-pick-q { height: 40px; min-height: 40px; padding: 9px 12px; flex: none; }
-.ph-gbody > .ph-topic { height: 40px; min-height: 40px; padding: 9px 12px; line-height: 1.4; resize: none; overflow: hidden; transition: height .15s ease; }
+.ph-gbody > .ph-gname, .ph-gbody > .ph-pick-q { height: var(--ctl-sm); min-height: var(--ctl-sm); padding: 6px 12px; flex: none; }
+.ph-gbody > .ph-topic { height: var(--ctl-sm); min-height: var(--ctl-sm); padding: 6px 12px; line-height: 1.4; resize: none; overflow: hidden; transition: height .15s ease; }
 .ph-gbody > .ph-topic:focus, .ph-gbody > .ph-topic:not(:placeholder-shown) { height: 76px; overflow: auto; }
 .ph-gbody > .ph-tabs { padding: 0; }
 /* 괴담넷 글 (v0.16.23): PC는 본문과 댓글을 다른 바탕의 두 덩어리로, 댓글 사이 구분선은 또렷하게 */
@@ -1843,7 +1853,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-mdrawer .gx-note { display: block; margin: 0; }
   .gx-mdrawer .gx-note textarea { width: 100%; }
   .gx-mgo { padding: 0 12px 10px; }
-  .gx-mgo .gx-start { min-height: 46px; border-radius: 12px; font-size: 16px; }
+  .gx-mgo .gx-start { min-height: 44px; height: 44px; padding: 0 16px; border-radius: 12px; font-size: 16px; }
   /* 장소 검색 제안은 서랍 위로 펼친다 */
   .gx-mdrawer .gx-mapfind { position: relative; }
   .gx-mdrawer .gx-mapsug { top: auto; bottom: calc(100% + 6px); }
@@ -2771,7 +2781,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .pp-evidence { margin-left: 0; }
   .pp-entry-btns { margin-left: 0; width: 100%; justify-content: flex-end; }
   .pp-slot h4 .pp-entry-btns { width: auto; margin-left: auto; }
-  .pp-edit-row .gx-segs .gx-seg { flex: 1 0 auto; min-width: auto; padding: 0 4px; }
+  .pp-edit-row .gx-segs { flex: 1 1 100%; display: flex; }
+  .pp-edit-row .gx-segs .gx-seg { flex: 1 0 auto; min-width: var(--ctl-sm); padding: 0 6px; }
   .pp-diag-who { flex-basis: 100%; }
 }
 /* 인물 기록: 지난 항목(대체·요약·취소·사라짐) 접기 */
@@ -2865,7 +2876,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 }
 /* 전수점검 눌러-중대-22·눌러2-보통-37: 주인공·아바타 고르기 카드, 상황판 고른 줄, 진행 중 사건 카드(종류 색 테두리가 고른 색을 덮었다)도 같은 민트 2px */
 .gx-whoc.on:not(.gx-lookchip) { position: relative; }
-.gx-oprow.sel { position: relative; box-shadow: none; }
+.gx-oprow.sel { position: relative; box-shadow: none; background: none; }
 .gx-oprow.sel::after { border-width: 2px; }
 .gx-evc.art.sel, .gx-evc.art.live.sel:is(:has(> .k-an), :has(> .k-in), :has(> .k-ms)) { border-color: var(--signal); border-width: 1px; }
 .gx-mlist li.gx-mx.sel { box-shadow: none; }
@@ -2892,7 +2903,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 /* 아바타 창 남·여 단추: 누름 칸 34 (조작 기준, 눌러3 — 바깥 틀 테두리만큼 늘림) */
 .gx-lookpop .gx-segs { height: auto; }
 .gx-lookpop .gx-seg { min-height: var(--ctl-sm); }
-.gx-seg.on { background: var(--accent-bg); color: var(--text); }
+.gx-seg.on { background: var(--accent-bg); color: var(--signal); }
 .gx-step { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; border-radius: 8px; background: var(--panel2); font-size: 16px; }
 .gx-x { width: 36px; height: 36px; border-radius: 8px; }
 .pp-upbar, .ph-act, .gx-row-btns { gap: 8px; }
@@ -3037,7 +3048,7 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
 .gx-rpt-head .ph-back { width: 36px; height: 36px; }
 .gx-rpt-acts { margin-left: auto; display: flex; flex-wrap: wrap; gap: 6px; }
 .gx-rpt-acts .gx-mini small { font-size: 11px; color: var(--dim); margin-left: 2px; }
-.gx-rpt-acts .gx-mini.on { border-color: var(--amber); color: var(--amber); }
+.gx-rpt-acts .gx-mini.on { border-color: var(--accent-line); color: var(--signal); background: var(--accent-bg); }
 .gx-rpt-top { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 4px 12px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--panel); }
 .gx-rpt-top .gx-gmark { width: 44px; height: 44px; border-radius: 12px; font-size: 20px; font-style: normal; grid-row: span 3; align-self: start; }
 .gx-rpt-top .gx-gmark svg { width: 22px; height: 22px; }
@@ -3687,6 +3698,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .gx-cdr { display: none; }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gx-nav { position: relative; }
+  .gx-nav:has(.gx-cdr) { margin-top: 9px; }
   .gx-cdr { --cdr-grip: 8px; --cdr-pad: 10px; --cdr-move: .26s; display: block; position: absolute; left: 0; right: 0; bottom: calc(100% + 1px); height: 0; z-index: 4; pointer-events: none; clip-path: inset(-100vh 0 0 0); }
   .gx-cslide { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; transform: translateY(calc(100% - var(--cdr-grip))); transition: transform var(--cdr-move) cubic-bezier(.22, .8, .3, 1); will-change: transform; }
   .gx-cdr.open .gx-cslide { transform: none; }
@@ -3988,7 +4000,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs { --void: transparent; --text: var(--bs-ink); --sub: var(--bs-ink); --dim: var(--bs-dim); --line: var(--bs-line); --line2: var(--bs-line); --panel: var(--bs-chip); --panel2: var(--bs-line); --amber: var(--bs-ac); --accent-bg: color-mix(in srgb, var(--bs-ac) 10%, transparent); --accent: var(--bs-ac); }
 .gx-body.gn.bs > :not(.gx-toast) { max-width: none; margin-left: 0; margin-right: 0; }
 /* 알림은 여러 줄로 감싸고(위 줄이 폭 제한을 풀어 한 줄로 화면 밖까지 뻗었다), 아래 댓글·쪽지 입력칸을 덮지 않게 위에 띄운다. 실패 원문 펼침은 사이트 색 */
-.gx-body.gn.bs > .gx-toast { bottom: auto; top: 12px; white-space: normal; overflow-wrap: anywhere; }
+.gx-body.gn.bs > .gx-toast { bottom: auto; top: 12px; white-space: normal; overflow-wrap: anywhere; max-width: min(88%, 420px); }
 .bs .nw-fail summary { color: var(--bs-ac); font-weight: 700; }
 .bs .nw-fail p { color: var(--bs-dim); }
 /* 아래는 시안 CSS 그대로 (선택자만 사이트 이름으로) */
@@ -4018,7 +4030,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-gn .row .th{width:54px;height:54px;border-radius:3px;background:var(--bg2);display:grid;place-items:center;overflow:hidden;border:1px solid var(--line);filter:grayscale(.35) contrast(1.05)}
 .bs-gn .row .th img{width:42px;height:42px;image-rendering:pixelated}
 .bs-gn .pg{display:flex;gap:6px;justify-content:center;padding:18px 0 4px;font-size:13px;color:var(--dim)}.bs-gn .pg b{color:#fff;background:var(--red);border-radius:2px;padding:0 7px}
-.bs-gn.bs-m .wrap{grid-template-columns:minmax(0,1fr);padding:10px}.bs-gn.bs-m .side,.bs-gn.bs-m .hd nav{display:none}.bs-gn.bs-m .hd{padding:0 12px;gap:10px}.bs-gn.bs-m .hd .sr{width:auto;flex:1}.bs-gn.bs-m .gmain{padding:12px 14px}
+.bs-gn.bs-m .wrap{grid-template-columns:minmax(0,1fr);padding:10px}.bs-gn.bs-m .side,.bs-gn.bs-m .hd nav{display:none}.bs-gn.bs-m .hd{padding:0 12px;gap:10px}.bs-gn.bs-m .hd .sr{width:auto;flex:1;min-width:0}.bs-gn.bs-m .gmain{padding:12px 14px}
 /* ── 괴담갤: 디시인사이드 갤러리 모양 ── */
 .bs-gal{background:#fff;color:#333;min-height:100%;font:12.5px 'Nanum Gothic','Noto Sans KR','Dotum',sans-serif;min-width:0}
 .bs-gal a{color:inherit;text-decoration:none}
@@ -4351,6 +4363,12 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .br .br-prof { width: 34px; height: 34px; border: 3px solid transparent; background-clip: padding-box; box-sizing: border-box; margin: 0 1px; }
   .br .br-tabn { position: relative; }
   .br .br-tabn::after { content: ''; position: absolute; inset: -8px; }
+  .bs-gn.bs-m .mchips button, .bs-gn .sort button, .bs-gn .hd .lg { position: relative; }
+  .bs-gn.bs-m .mchips button::after { content: ''; position: absolute; inset: -4px 0; }
+  .bs-gn .sort button::after { content: ''; position: absolute; inset: 0 -5px; }
+  .bs-gn .hd .lg::after { content: ''; position: absolute; inset: -3px 0; }
+  .wk .wl { position: relative; }
+  .wk .wl::after { content: ''; position: absolute; inset: -5px 0; }
   .br-tcard .br-tx { width: 36px; height: 36px; }
   .br .br-bm { height: 34px; }
   .bs-gn .sort button, .bs-gal .lt button { min-height: 34px; }
