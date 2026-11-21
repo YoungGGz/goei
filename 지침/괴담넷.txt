@@ -122,7 +122,7 @@ Use current dates, valid new IDs and actual Korean content. These two posts illu
 @@END
 
 @@SECTION REACT.GUIDELINE
-Generate __GN_REPLY_RANGE__ NEW NPC replies to the actual new post/comment, each at most __LIMIT_comment_tokens__ tokens. Vary reception; zero is valid, with no filler. Respond concretely in each account's established voice and knowledge. Do not copy user text, invent user actions, repeat saved comments or return/edit existing records.
+Generate __GN_REPLY_RANGE__ NEW NPC replies to the actual new post/comment, each at most __LIMIT_comment_tokens__ tokens. Vary reception, with no filler. Respond concretely in each account's established voice and knowledge. Do not copy user text, invent user actions, repeat saved comments or return/edit existing records.
 Use the supplied saved indices. For a reply, parent is replyTo or an earlier NEW reply beneath it; otherwise parent=0, a supplied existing index or an earlier NEW index. New indices start at commentCount+1; parent must precede child within the same thread. For a newly drafted post, commentCount=0. Discussion cannot execute or resolve the main scene.
 @@END
 
