@@ -689,6 +689,10 @@ const LOGO_SM = (id: BoardSite, cls = 'bs-logo') => siteLogo(id === 'gal' ? 'gal
 /** 목록에 보일 글 (분류·찾기·정렬) */
 /** 연어 마켓 말머리 (전수검사 11-13, 사용자 8-1): 「구합니다」류도 삽니다, 정보 말머리(지침 POST.TRADE_TAG.INFO)가 들어간 말머리도 오컬트 정보 */
 const smWant = (p: GPost): boolean => { const t = p.tag ?? ''; const buy = smTag('BUY'); return (!!buy && t.includes(buy)) || /구합니다|구해요|구함|구매|매입/.test(t); };
+/** 정보 글: 물건이 아니라 정보를 사고파는 글 — 삽니다처럼 물건 그림 없이 말머리만 (사용자 11-22: 정보에 기본 상자 그림이 붙는다) */
+const smInfo = (p: GPost): boolean => { const info = smTag('INFO'); return !!info && (p.tag ?? '').includes(info); };
+/** 물건 그림을 안 붙이는 글의 말머리 (삽니다·정보), 아니면 '' */
+const smNoPic = (p: GPost): string => (smInfo(p) ? smTag('INFO') : smWant(p) ? smTag('BUY') : '');
 const tagHit = (site: BoardSite, p: GPost, cat: string): boolean =>
   site === 'sm' && cat === smTag('BUY') ? smWant(p) : site === 'sm' && cat === smTag('INFO') ? (p.tag ?? '').includes(cat) : p.tag === cat;
 function shownPosts(st: GState, site: BoardSite): GPost[] {
@@ -897,11 +901,11 @@ function siteList(site: BoardSite, st: GState, now: string, busy: boolean, unrea
     }
     case 'sm': {
       const cards = list.map((p) => {
-        const want = smWant(p);
-        const u = smPicUrl(p);
+        const want = smNoPic(p);
+        const u = want ? null : smPicUrl(p);
         const img = u ? `<img src="${esc(u)}" alt="">` : ICONS.bag;
         const ph = want
-          ? `<div class="ph want"><span class="tag">${esc(smTag('BUY'))}</span><p>${esc([...previewText(p.body)].slice(0, 70).join(''))}</p></div>`
+          ? `<div class="ph want"><span class="tag">${esc(want)}</span><p>${esc([...previewText(p.body)].slice(0, 70).join(''))}</p></div>`
           : `<div class="ph ${SM_BG[p.id % SM_BG.length]}">${img}${p.tag ? `<span class="tag${p.tag === smTag('FREE') ? ' g' : ''}">${esc(p.tag)}</span>` : ''}</div>`;
         const price = priceOf(p);
         return openBtn(p, `${ph}<div><div class="nm">${esc(p.title)}${dot(p)}</div>${price ? `<div class="pr">${esc(price)}</div>` : ''}<div class="mt">${esc(ago(p, now))} · 관심 ${p.votes} · 댓글 ${p.comments.length}</div></div>`, 'c');
@@ -997,9 +1001,9 @@ function sitePost(site: BoardSite, p: GPost, busy: boolean, now: string): string
       const price = priceOf(p);
       // 위는 사진 | 내용(판매자·제목·값·본문)만 두 칸, 단추 줄과 문의는 그 아래 한 칸 — 전체를 가운데 좁게(720px) (2026-11-10 사용자: 사진 아래가 텅 비고, 문의를 넓게 펴면 휑하다).
       // 삽니다 글은 물건 그림 없이 빈 사진 칸만 (사용자: 포맷상 칸은 있어야 한다)
-      const want = smWant(p);
+      const want = smNoPic(p);
       const u = want ? null : smPicUrl(p);
-      const pic = want ? `<div class="ph want"><span class="tag">${esc(smTag('BUY'))}</span></div>` : `<div class="ph ${SM_BG[p.id % SM_BG.length]}">${u ? `<img src="${esc(u)}" alt="">` : ICONS.bag}</div>`;
+      const pic = want ? `<div class="ph want"><span class="tag">${esc(want)}</span></div>` : `<div class="ph ${SM_BG[p.id % SM_BG.length]}">${u ? `<img src="${esc(u)}" alt="">` : ICONS.bag}</div>`;
       // 판매자와 관심·댓글·조회는 사진 아래 한 묶음(왼쪽 칸), 오른쪽은 제목 → 값 → 말머리·날짜 → 본문
       return `<article class="detail gn-post"><div class="side">${pic}<div class="seller"><i></i><div>${who}<small>관심 ${p.votes} · 댓글 ${p.comments.length} · 조회 ${p.views}</small></div></div></div><div class="info">
         <h2 class="gn-post-title">${esc(p.title)}</h2>${price ? `<div class="price">${esc(price)}</div>` : ''}<div class="mt2">${p.tag ? `${esc(p.tag)} · ` : ''}${esc(p.date)} · ${esc(ago(p, now))}</div>

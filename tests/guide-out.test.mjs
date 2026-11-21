@@ -65,6 +65,10 @@ const ANSWERED = [
   [' block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.', ' block just before the latest user input; follow the note in that block.'],
   // 전수점검 사소-77: Director 언어를 한국어로 두면 메모가 한국어라 「English reference」가 틀린다
   ['this English reference does not change it', 'this reference does not change it'],
+  // 사용자 11-22: 연어 마켓 「정보」는 정보 공유가 아니라 정보를 사고파는 글
+  ["Each post is a listing whose tag is exactly one of 팝니다 (selling), 삽니다 (buying), 나눔 (giving away) or 정보 (occult information).", "Each post is a listing whose tag is exactly one of 팝니다 (selling), 삽니다 (buying), 나눔 (giving away) or 정보 (information for sale or wanted). A 정보 listing trades a piece of information the way other listings trade goods: the poster either sells what they know or offers to pay for what someone else knows. The post says only what the information is about and why it is worth paying for, names a price or asks for offers, and says how it is handed over once the deal is made; the information itself is never written in the post or given away in the comments. It is not a tip, a warning, a rumor thread or a discussion post."],
+  ["Comments are questions, haggling, 예약 requests and warnings.", "Comments are questions, haggling, 예약 requests and warnings; under a 정보 listing they haggle, ask for proof that the information is real, or doubt the seller, and nobody leaks the information for free."],
+  ["salvage, information and odd services. Sellers and buyers", "salvage, information and odd services. Information is a commodity here like any other: it is sold and bought, never posted for free. Sellers and buyers"],
 ];
 const moved = Object.entries(OLD.sections).flatMap(([file, list]) => list.map(([name, body]) => ({ file, name, body })));
 
@@ -167,7 +171,7 @@ test('기본 지침으로 만든 요청문 = 옮기기 전 코드가 만들던 �
     ['never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines).', 'never add an item and never re-stock the shelf (no "+" lines, no mode all). Prices stay as listed (no "~" lines); an item may be withdrawn ("-" lines).'],
   ];
   const cosLater = (k, t) => (/\.cos\b/.test(k) ? [...COS_LATER, ...COS_LATER.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t) : t);
-  for (const k of names) assert.equal(BASE[k], cosLater(k, later(OLD.calls[k])), k);
+  for (const k of names) { const a = BASE[k], b = cosLater(k, later(OLD.calls[k])); if (a !== b && process.env.DBG) { let i = 0; while (a[i] === b[i]) i++; console.log(k, i, JSON.stringify(a.slice(i - 80, i + 160)), JSON.stringify(b.slice(i - 80, i + 160))); } assert.equal(a, b, k); }
 });
 
 test('새 절이 없는 지침(옛 글로 고쳐 둔 것)이면 코드에 남긴 옛 글을 쓴다: 요청문이 같다', () => {

@@ -5174,6 +5174,16 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 /* ── 괴담갤 오른쪽 힛갤 칸 (11-09): 본문(.body)과 별개로 고정 ── */
 .bs-gal .gal-cols { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 20px; align-items: start; max-width: 1280px; margin: 0 auto; padding: 0 16px; }
 .bs-gal .gal-cols.solo { grid-template-columns: minmax(0, 1fr); }
+/* 게시판 칸이 좁으면 힛갤을 내리고 글 목록이 폭을 다 쓴다 (사용자 11-22: 펼친 폴드에서 제목 칸이 아예 안 나온다 — 번호·말머리·글쓴이·날짜·조회·추천 칸만 396px 이라
+   힛갤 240px 까지 두면 제목 자리가 없다). 화면 크기가 아니라 게시판 칸 폭 기준이라 창을 줄인 PC 도 같다 */
+.bs-gal, .bs-gn { container-type: inline-size; }
+@container (max-width: 900px) {
+  .bs-gal .gal-cols { grid-template-columns: minmax(0, 1fr); }
+  .bs-gal .gal-side { display: none; }
+  /* 괴담넷 왼쪽 메뉴는 두되 폭과 여백을 줄인다 (사용자 11-22: 폴드에서 메뉴가 자리를 너무 차지한다) */
+  .bs-gn .wrap { grid-template-columns: 168px minmax(0, 1fr); gap: 14px; padding: 16px 16px; }
+  .bs-gn .side .splist .sp { padding: 6px 6px; }
+}
 .bs-gal .gal-main { min-width: 0; }
 .bs-gal .gal-main > .body, .bs-gal .gal-main > .bs-plain, .bs-gal .gal-main > .bs-plain .body { width: auto; max-width: 1000px; margin: 0; min-width: 0; }
 .bs-gal .gal-main > .bs-x { padding: 10px 0 0; }
@@ -5309,6 +5319,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 /* 연어 마켓 윗줄 오른쪽 묶음(찾기칸·글쓰기·내 채팅): 사이 8px, 높이 36px 로 같게 (2026-11-10 사용자: 간격이 제각각) */
 .bs-sm .hd .sr + .wr, .bs-sm .hd .wr + .ch { margin-left: -14px; }
 .bs-sm .hd .wr, .bs-sm .hd .ch { height: 36px; padding: 0 14px; display: inline-flex; align-items: center; white-space: nowrap; box-sizing: border-box; }
+/* 머리줄이 좁아도 이름·메뉴 글자는 줄바꿈하지 않고 찾기 칸이 줄어든다 (11-22 펼친 폴드: 「중고거/래」「삽니/다」로 꺾였다) */
+.bs-sm .hd .lg, .bs-sm .hd nav, .bs-sm .hd nav button { flex: none; white-space: nowrap; }
+.bs-sm .hd .sr { flex: 0 1 260px; width: auto; min-width: 60px; }
 .bs-sm.bs-m .hd .sr + .wr { margin-left: 0; }
 /* 연어 마켓 본문: 구분선은 본문 칸 아래가 아니라 단추 줄 위에 전체 너비로 */
 .bs-sm .detail > .info .body { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
