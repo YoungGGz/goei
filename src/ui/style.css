@@ -3422,7 +3422,6 @@ button.gx-op-ln::before { content: ''; position: absolute; left: 0; right: 0; to
 .it-btns .gx-chip.red { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 60%, transparent); }
 /* 단추가 꼭 넷이면 둘씩 두 줄 (눌러3: 넷째 「합치기」 혼자 한 줄을 다 차지했다) */
 .it-pop .it-btns:not(.it-formfoot):has(> .gx-chip:nth-child(4):last-child) > .gx-chip { flex-basis: calc(50% - 3px); }
-.it-btns.it-btns-end { margin-top: 6px; } /* 버리기는 늘 맨 아래 한 줄 (눌러-사소-11: 물건마다 자리가 달랐다) */
 .it-fhead { min-height: 36px; } /* 입력 창 제목 줄: 닫기가 첫 입력칸 위에 얹히지 않게 (눌러-중대-13) */
 .it-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
 .it-form label { display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 13px; color: var(--sub); }
