@@ -1116,11 +1116,6 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
     case 'wiki-auto':
       await setVar(ctx, env, `$nw_${action.slice(5)}`, v);
       return true;
-    case 'wiki-settings':
-      if (wiki.view === 'settings') go('home');
-      else go('settings');
-      wiki.listOpen = false;
-      break;
     default:
       return false;
   }

@@ -1211,9 +1211,6 @@ export async function handleGnet(action: string, value: string | undefined, base
       if (gnet.compose?.kind === 'comment' || gnet.compose?.kind === 'dm') gnet.compose = null;
       gnet.attachMenu = false;
       break;
-    case 'gn-settings':
-      gnet.settings = !gnet.settings;
-      break;
     case 'gn-att-menu':
       gnet.attachMenu = !gnet.attachMenu;
       break;

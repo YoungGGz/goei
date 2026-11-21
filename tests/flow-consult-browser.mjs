@@ -78,8 +78,8 @@ if (!process.env.CONSULT_ONLY) {
   await clickSel(page, `${DO}[data-value="pp-set|router=${routerTo}"]`);
   await settle(page);
   ok((await bar(page)) !== before, '맨 위 띠의 호출 수가 바로 바뀜');
-  eq(await say('Router'), routerTo === 'model' ? '1회' : '호출 없음', 'Router 호출 글');
-  eq(await page.evaluate(() => !!document.querySelector('.gw .fl-pc [data-value="pp-set|model_router=aux"]')), routerTo === 'model', 'Router 모델은 「모델이 고름」일 때만');
+  eq(await say('Router'), routerTo === 'model' ? '1회' : '호출 없음 (코드가 고름)', 'Router 호출 글');
+  eq(await page.evaluate(() => !!document.querySelector('.gw .fl-pc [data-value="pp-set|model_router=aux"]')), routerTo === 'model', 'Router 모델은 켰을 때만');
   // 인물 사용을 끄면 Router·Director·갱신기·정리 줄이 흐려지고 띠가 준다
   await clickSel(page, `${DO}[data-value="pp-set|on=0"]`);
   await settle(page);
@@ -325,10 +325,10 @@ async function send(page, text, replies) {
   eq(ph.tops.join(','), '1px solid', '폰: 모든 판에 위 테두리');
   eq(ph.pcShown, 0, '폰: PC 표는 안 보인다');
   eq(ph.over, 0, '폰: 가로로 넘치는 것 없음');
-  eq(ph.steps.length, 1, `폰: 수 상자는 한 가지 크기 (${ph.steps})`);
+  ok(ph.steps.every((x) => x === '104x34' || x === '206x34'), `폰: 수 상자는 규격 두 가지(작은 것 104·큰 것 206)뿐 (${ph.steps})`);
   // 폰에서도 조작이 저장된다
   const a = await snap(page);
-  await clickSel(page, '.gw .fl-ph [data-action="fl-do"][data-value="pp-set|router=model"]');
+  await clickSel(page, '.gw .fl-ph [data-action="fl-do"][data-value^="pp-set|router="]');
   await settle(page);
   ok((await snap(page)).chat !== a.chat, '폰: 조작이 저장된다');
   await clickSel(page, '.gw [data-action="ai-toggle"]');

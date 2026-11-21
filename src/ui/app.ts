@@ -81,6 +81,10 @@ import { guideTxt } from '../core/guides';
 import { applyRecordsNav, closeToastHtml, endedReport, holdToast, releaseToast, syncCloseToast, handleRecords, journalList, rec, recordsInput, recordsNav, recordsTab, resetRecords, type RecordsEnv } from './records';
 import { PHONE_WATCH, foldStyle, isPhone, syncFoldStyles, zpx, zrect, zrectQ } from './media';
 
+/** 설정 창을 한 번이라도 열었나: 「설정」 단추는 처음엔 화면 페이지로, 그 뒤로는 마지막에 보던 페이지로 연다 (사용자 11-22: 닫았다 열 때마다 화면 설정이 열렸다).
+ *  업데이트 알림처럼 다른 페이지를 짚어 여는 것은 그 페이지로 간다 */
+let edSeen = false;
+
 /** ID카드 잔고 칩 → 장부 창 (열림·입력 알림) */
 
 interface Draft {
@@ -1113,7 +1117,8 @@ async function handle(action: string, value?: string): Promise<void> {
       change: panelChange,
       canChat: () => view.kind === 'started',
       mobileNav: mobileNavHtml,
-    }, (value as EditorNode) || undefined);
+    }, edSeen && value === 'set:screen' ? undefined : (value as EditorNode) || undefined);
+    edSeen = true;
     return;
   }
   if (action === 'install-open') {
@@ -1124,9 +1129,6 @@ async function handle(action: string, value?: string): Promise<void> {
     await savePrefs((p) => ({ ...p, editorWidth: Math.max(50, Math.min(100, Number(value) || 90)) }));
     return render();
   }
-  // 어디서 「설정」을 누르든 설정 창 하나 (2026-10-27 사용자): 괴담넷·괴담톡·위키 판의 설정 단추는 그 기능 페이지로
-  const FEAT_SET: Record<string, string> = { 'gn-settings': 'set:net', 'ph-settings': 'set:phone', 'wiki-settings': 'set:wiki' };
-  if (FEAT_SET[action]) return handle('ed-open', FEAT_SET[action]);
   if (action === 'prefs-open' || action === 'prefs-close') {
     // 시작 전 「새 채팅 기본 설정」: 설정 창을 연다 (패널 안 설정 탭은 없앴다)
     resetSettings();
@@ -1327,10 +1329,6 @@ async function handle(action: string, value?: string): Promise<void> {
       const run = navStep(action === 'nav-back' ? -1 : 1);
       return run ? run() : render();
     }
-    case 'feature-set':
-      // 기능 설정은 설정 창의 그 페이지로 (2026-10-27)
-      if (value === 'phone' || value === 'wiki' || value === 'people' || value === 'image' || (value === 'gnet' && GNET_ON)) return handle('ed-open', `set:${value}`);
-      return;
     case 'ops-sel':
       // 관제실 상황판: 일지 줄·지도 표시 → 왼쪽 큰 보기가 그 상황으로. 보던 화면(CCTV·위성)은 그대로 (2026-10-21 사용자). 모바일은 큰 보기로 올라간다
       opsUi.sel = value ?? '';

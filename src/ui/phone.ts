@@ -1348,9 +1348,6 @@ export async function handlePhone(action: string, value: string | undefined, ctx
       // 대화방이 열려 있으면 (PC 두 칸 화면) 그대로 두고 목록만 바꾼다
       Object.assign(phone, { sub: v as Sub, query: '', ...(phone.view === 'room' ? {} : { view: 'list', invite: null, picked: [] }) });
       break;
-    case 'ph-settings':
-      Object.assign(phone, { view: phone.view === 'settings' ? 'list' : 'settings', invite: null, picked: [] });
-      break;
     case 'ph-att-menu':
       phone.attachMenu = !phone.attachMenu;
       break;
