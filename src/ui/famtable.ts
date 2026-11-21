@@ -63,9 +63,9 @@ export function boardTable(state: State, busy = false): string {
     acts: each((_, site) => PRIV.map(([v]) => `b:${site}:privacy=${v}`)),
     foot: helpBox('사생활은 게시판 사람들이 「보호 대상」을 얼마나 입에 올리는지예요.', [
       ['이목집중', '목격담과 소문이 자주 올라와요.'],
-      ['자율', '이미 유명한 경우에만 멀리서 본 정도로 나와요.'],
-      ['약보호', '평범한 사람으로 다뤄요. 큰 사건의 여파만 나와요.'],
-      ['강보호', '약보호보다 더 줄여요.'],
+      ['자율', '아무도 못 본 사적인 일만 빼요. 큰 일의 여파는 가벼운 소문으로 나와요.'],
+      ['약보호', '이미 유명한 경우에만 멀리서 본 정도로 나와요.'],
+      ['강보호', '평범한 사람으로 다뤄요. 세상에서 손꼽히는 인물이 아니면 평범한 목격담은 안 나와요.'],
       ['언급금지', '본인 이야기는 전혀 없고 행동의 결과만 나와요.'],
     ]) };
   const tx = (st: State, s: BoardSite, k: string, aria: string) => { const v = cur(st, k); return text('fam-text', `b:${s}:${k}`, v === '-' ? '' : v, '', 200, `${BOARD_NAME[s]} ${aria}`, busy); };
@@ -73,7 +73,7 @@ export function boardTable(state: State, busy = false): string {
     label: name(s), cells: [tx(views[i], s, 'subject', '주제'), tx(views[i], s, 'mood', '분위기·말투'), tx(views[i], s, 'protagonist', '보호 대상')],
   })), helpBox('', [
     ['주제', '올라올 글의 주제예요. 비우면 세계관에 맞는 여러 주제가 올라와요.'],
-    ['분위기·말투', '글쓴이들의 말투예요. 비우면 익명 커뮤니티 말투예요.'],
+    ['분위기·말투', '글쓴이들의 말투예요. 비우면 그 게시판 지침의 기본 말투예요.'],
     ['보호 대상', '「사생활」이 지켜 줄 사람의 이름이에요. 비우면 주인공이에요.'],
   ]), '주제와 말투');
   const cnt = (n: number, k: CountKey) => ({ n, lo: COUNT_RANGE[k][0], hi: COUNT_RANGE[k][1] });
@@ -87,7 +87,7 @@ export function boardTable(state: State, busy = false): string {
     foot: helpBox('', [
       ['게시글 수', '새로고침 한 번에 새로 만드는 글의 수예요. 많을수록 토큰을 더 써요.'],
       ['새 글 댓글 수', '새로 만드는 글마다 달리는 댓글의 수예요.'],
-      ['활동 댓글 수', '새 글·댓글·답장 때 지난 글에 새로 붙는 댓글의 수예요.'],
+      ['활동 댓글 수', '글 쓰기·댓글 달기·글 하나 새로고침 때 지난 글에 새로 붙는 댓글의 수예요.'],
       ['선쪽지 받기', '켜면 게시판 사람이 먼저 쪽지를 보낼 수 있어요.'],
       ['선쪽지 확률', '새로고침 한 번에 선쪽지가 올 확률이에요.'],
     ]) };

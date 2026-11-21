@@ -20,7 +20,7 @@ export interface Site {
 /** 쇼핑몰·망상홈쇼핑 이름은 지침 절(우주 쇼핑몰·백일몽 포인트몰 MALL_NAME · 망상홈쇼핑 CHANNEL_NAME)을 읽을 때마다 부른다: 화면과 요청이 같은 글 (고친 지침이 바로 보이게) */
 export const SITES: Site[] = [
   { id: 'gn', name: '괴담넷', title: '괴담넷 - 자유게시판', host: 'goedam.net', path: '/board/free' },
-  { id: 'gal', name: '괴담 갤러리', title: '괴담 갤러리 - 괴담갤', host: 'gall.goedam.co.kr', path: '/board/lists/?id=horror' },
+  { id: 'gal', name: '괴담갤', title: '괴담 갤러리 - 괴담갤', host: 'gall.goedam.co.kr', path: '/board/lists/?id=horror' },
   { id: 'wpf', name: '세정게', title: '::: 世界政治 게시판 :::', host: 'www.wpf.or.kr', path: '/zboard/zboard.php?id=politics' },
   { id: 'sm', name: '연어 마켓', title: '연어 마켓 | 미친 세상을 거슬러 오르는 우리들', host: 'salmon-market.kr', path: '' },
   { id: 'cos', get name() { return guideTxt('Cos', 'MALL_NAME'); }, get title() { return `★${guideTxt('Cos', 'MALL_NAME')}★에 오는 것을 환영하는 것이다`; }, host: 'cosmic-mall.alien', path: '/~shop/index.html' },
@@ -244,7 +244,7 @@ export function loginHtml(o: ChromeOpts): string {
   return `<div class="br-lgn" role="dialog" aria-label="로그인"><h4>로그인</h4><div class="br-face">${face}</div>
     <input class="br-in" name="br-nick" data-enter="br-login-save" value="${esc(nick)}" placeholder="닉네임" maxlength="36" aria-label="닉네임">
     <button class="br-b1" data-action="br-login-save" data-take="br-nick"${needAttr('br-nick', nick)}>로그인</button><hr>
-    <button class="br-b2" data-action="br-login-guest">${o.nick ? '로그아웃' : '닫기'}</button></div>`;
+    <button class="br-b2" data-action="br-login-guest">${o.nick ? '로그아웃' : '로그인하지 않고 계속'}</button></div>`;
 }
 
 /** 폰: 탭 목록 화면 */

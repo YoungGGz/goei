@@ -256,7 +256,8 @@ export function cut(s: string, n: number): string {
 export function validDate(s: unknown): string {
   const v = String(s ?? '').trim();
   if (!v || v === 'null' || v === 'undefined' || v === '날짜 미상') return '';
-  return /^\d{4}[.-]\d\d[.-]\d\d/.test(v) ? cut(v, 24) : '';
+  // 「2025-05-13」 꼴도 화면이 읽는 점 꼴(2025.05.13)로 맞춰 둔다
+  return /^\d{4}[.-]\d\d[.-]\d\d/.test(v) ? cut(v.replace(/^(\d{4})[.-](\d\d)[.-](\d\d)/, '$1.$2.$3'), 24) : '';
 }
 
 function postId(v: unknown): number | null {
@@ -382,7 +383,8 @@ export function readGnet(chat: Chat): GState {
     if (done.length) {
       st.posts = st.posts.filter((p) => !done.includes(p));
       for (const p of done) delete p.back;
-      st.archive = [...done, ...st.archive];
+      // 그사이 스크랩을 푼 남의 글은 보관할 까닭이 없어 돌려보내지 않는다 (보관함은 내 글·스크랩만 보인다)
+      st.archive = [...done.filter((p) => p.mine || p.scrap), ...shelf(st)];
     }
   }
   return st;
@@ -523,7 +525,8 @@ export function replyForUser(p: GPost, c: GComment): boolean {
 
 /** 저장 직전: 예전에 있던 기록은 읽음 상태를 물려받고, 새 기록만 알림 대상이면 안 읽음 */
 export function reconcileUnread(st: GState, previous: GState): void {
-  const old = new Map(previous.posts.map((p) => [p.id, p]));
+  // 보관함에서 잠깐 되돌아온 글도 읽음 상태를 물려받게 보관함 글까지 본다
+  const old = new Map([...(previous.archive ?? []), ...previous.posts].map((p) => [p.id, p]));
   const run = <T extends { nick: string; body: string; unread: boolean }>(rows: T[], prior: T[], side: (r: T) => string, wanted: (r: T) => boolean) => {
     const queue = new Map<string, T[]>();
     for (const r of prior) {
@@ -674,10 +677,9 @@ export function sourceFor(p: GPost, ci: number): GSource {
 }
 
 export function addOutgoingDm(st: GState, nick: string, body: string, date: string, source?: GSource): void {
-  if (!st.sources[nick]) {
-    const s = source ?? findPublicSource(st, nick);
-    if (s) st.sources[nick] = s;
-  }
+  // 글을 보고 보낸 쪽지면 그 글을 원글로 바꾼다 (입력칸 안내와 모델이 받는 원글이 같게)
+  const s = source ?? (st.sources[nick] ? undefined : findPublicSource(st, nick));
+  if (s) st.sources[nick] = s;
   st.dms.push({ nick, side: 'me', body: trimTokens(body, LIMITS.dm_tokens), unread: false, date });
 }
 
@@ -792,7 +794,19 @@ export function sampledBoard(value: Record<string, unknown>): unknown {
 export function applyBoard(before: GState, current: GState, value: unknown, o: BoardOptions): BoardResult {
   if (snapshotKey(before) !== snapshotKey(current)) throw new GnetError('생성하는 동안 게시판이 바뀌어서 새로고침 결과를 적용하지 않았어요.');
   if (!isObj(value)) throw new GnetError('게시판 JSON 객체가 아니에요.');
-  const rows = o.settings.sampling ? sampledBoard(value) : value.posts;
+  if (!o.settings.sampling) return boardFrom(current, value.posts, o);
+  // 다양성 강화: 고른 벌이 다 걸러지면 다른 벌로 (지침: 둘 다 검사한다)
+  const first = sampledBoard(value);
+  const other = first === value.posts ? value.alternativePosts : value.posts;
+  try {
+    return boardFrom(current, first, o);
+  } catch (error) {
+    if (!(error instanceof GnetError) || !Array.isArray(other) || !other.length || other === first) throw error;
+    return boardFrom(current, other, o);
+  }
+}
+
+function boardFrom(current: GState, rows: unknown, o: BoardOptions): BoardResult {
   if (!Array.isArray(rows) || !rows.length) throw new GnetError('posts 배열에 게시글이 없어서 기존 게시판을 유지했어요.');
   const st: GState = structuredClone(current);
   const old = new Map(st.posts.map((p) => [p.id, p]));
@@ -800,6 +814,7 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
   const seen = new Set<number>();
   let skippedPosts = 0;
   let skippedComments = 0;
+  let badComments = 0;
   const day = /^(\d{4}[.-]\d\d[.-]\d\d)/.exec(o.date)?.[1]?.replace(/-/g, '.');
   // 새 글 번호는 요청 때 저장된 최고 번호보다 커야 한다 (원본: > max(100000, seq))
   const floor = Math.max(100000, current.seq);
@@ -892,7 +907,9 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
       const content = stripped === got ? got : stripped.trim();
       const sig = `${cAuthor}\0${content}`;
       if (!cAuthor || !content.trim() || c.mine === true || cAuthor === o.nick || remap.get(parent) === false) {
-        skippedComments++;
+        // 사용자 명의로 온 것과 형식이 틀린 것(빈 작성자·내용, 뺀 윗댓글에 달린 답글)은 따로 센다
+        if (cAuthor && content.trim() && (c.mine === true || cAuthor === o.nick)) skippedComments++;
+        else badComments++;
         return void remap.set(n, false);
       }
       q.comments.push({ nick: cut(cAuthor, 80), body: content, parent: (remap.get(parent) as number | undefined) ?? 0, mine: false, unread: false });
@@ -911,7 +928,11 @@ export function applyBoard(before: GState, current: GState, value: unknown, o: B
   shelve(st, st.posts.filter((p) => !kept.has(p.id)));
   st.posts = posts;
   trimBoard(st, o.settings);
-  const notice = skippedPosts + skippedComments > 0 ? `게시판을 새로 불러왔어요. 사용자 명의로 온 새 글 ${skippedPosts}개와 댓글·연결 답글 ${skippedComments}개는 뺐어요.` : '';
+  const parts = [
+    skippedPosts + skippedComments > 0 ? `사용자 명의로 온 새 글 ${skippedPosts}개와 댓글 ${skippedComments}개는 뺐어요.` : '',
+    badComments > 0 ? `형식이 맞지 않는 댓글과 뺀 댓글에 달린 답글 ${badComments}개는 뺐어요.` : '',
+  ].filter(Boolean);
+  const notice = parts.length ? `게시판을 새로 불러왔어요. ${parts.join(' ')}` : '';
   // 남긴 글은 새 댓글만 돌아오므로 응답이 아니라 반영 뒤 게시판의 댓글로 센다
   return { st, notice, emptyComments: !st.posts.some((p) => p.comments.length) };
 }
@@ -1010,7 +1031,10 @@ export function stampComments(p: GPost, from: number, raws: string[], now: strin
   const postMin = stampMinutes(p.date);
   const floorOf = (i: number): number | null => {
     const c = p.comments[i];
-    const cands = [postMin, stampMinutes(c.parent > 0 ? p.comments[c.parent - 1]?.time : undefined), i > 0 ? stampMinutes(p.comments[i - 1]?.time) : null];
+    // 바로 앞 댓글 시각이 아직 비어 있으면(모델이 빠뜨림) 그 앞의 시각 있는 댓글을 경계로 본다
+    let prev: number | null = null;
+    for (let j = i - 1; j >= 0 && prev === null; j--) prev = stampMinutes(p.comments[j]?.time);
+    const cands = [postMin, stampMinutes(c.parent > 0 ? p.comments[c.parent - 1]?.time : undefined), prev];
     const known = cands.filter((x): x is number => x !== null);
     return known.length ? Math.max(...known) : null;
   };

@@ -84,7 +84,7 @@ test('advanced: real card prompts follow reference toggles, persona, turns and l
     return r.messages.map((m) => m.content);
   };
   let [sys, user] = run({});
-  assert.ok(user.includes('[공통: 봇 설명]') && user.includes('[공통: 작가 노트]') && user.includes('[공통: 사용자 페르소나]\n키가 큰 탐정'));
+  assert.ok(user.includes('[공통: 봇 설명]') && user.includes('[공통: 작가 노트]') && user.includes('[공통: 사용자 페르소나]\n## User-controlled protagonist (narrator reference only)\n키가 큰 탐정'), '게시판 주인공 머리말(SYSTEM.PROTAGONIST_HEAD)은 페르소나 자료 머리에');
   assert.ok(user.includes('[user]\n첫 턴'));
   [sys, user] = run({ [CFG('adv_desc')]: '0', [CFG('adv_persona')]: '0', [CFG('adv_turns')]: '1', '$gen_lang': 'ja' });
   assert.ok(!user.includes('[공통: 봇 설명]') && !user.includes('사용자 페르소나') && user.includes('[공통: 작가 노트]'));

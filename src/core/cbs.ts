@@ -59,10 +59,13 @@ function getvar(env: CbsEnv, name: string): string {
   return v === undefined || v === null ? 'null' : String(v);
 }
 
+/** 식 안에 끼운 값 자리(getvar 등으로 풀린 글). 글 속 ( ) ! 같은 글자가 연산자로 읽히지 않게 한 덩어리로 둔다 */
+const SLOT = /^\u0000(\d+)\u0000$/;
+
 /** {{? 식}}: 비교·논리·사칙연산 정도 */
-function calc(expr: string): string {
+function calc(expr: string, slots: string[] = []): string {
   const src = expr.trim();
-  const tokens = src.match(/\d+(?:\.\d+)?|null|true|false|&&|\|\||==|!=|>=|<=|[-+*/%()<>!]|"[^"]*"|[^\s()<>=!&|+*/%-]+/g) ?? [];
+  const tokens = src.match(/\u0000\d+\u0000|\d+(?:\.\d+)?|null|true|false|&&|\|\||==|!=|>=|<=|[-+*/%()<>!]|"[^"]*"|[^\s()<>=!&|+*/%-]+/g) ?? [];
   let pos = 0;
   type V = number | string | null | boolean;
   const peek = () => tokens[pos];
@@ -72,6 +75,11 @@ function calc(expr: string): string {
   const atom = (): V => {
     const t = tokens[pos++];
     if (t === undefined) return null;
+    const slot = SLOT.exec(t);
+    if (slot) {
+      const val = slots[Number(slot[1])] ?? '';
+      return val === 'null' ? null : val;
+    }
     if (t === '(') {
       const v = or();
       pos++;
@@ -163,10 +171,11 @@ function fn(inner: string, env: CbsEnv): string | null {
       return a.some((x) => truthy(x.trim())) ? '1' : '0';
     case 'not':
       return truthy((a[0] ?? '').trim()) ? '0' : '1';
+    // 사용자 글에 '::'가 들어 있어도 글 전체를 본다
     case 'length':
-      return String((a[0] ?? '').trim().length);
+      return String(a.join('::').trim().length);
     case 'trim':
-      return (a[0] ?? '').trim();
+      return a.join('::').trim();
     case 'user':
       return env.user ?? '{{user}}';
     case 'char':
@@ -231,8 +240,14 @@ function blockEnd(s: string, from: number): { else: number; elseEnd: number; clo
   return null;
 }
 
-export function evaluate(text: string, env: CbsEnv): string {
+/** slots 를 주면 이 단계에서 풀린 값은 글 대신 값 자리 표시를 남긴다({{? 식}} 안에서만 쓴다) */
+export function evaluate(text: string, env: CbsEnv, slots?: string[]): string {
   if (!text.includes('{{')) return text;
+  const put = (v: string) => {
+    if (!slots) return v;
+    slots.push(v);
+    return `\u0000${slots.length - 1}\u0000`;
+  };
   let out = '';
   let i = 0;
   while (i < text.length) {
@@ -262,9 +277,16 @@ export function evaluate(text: string, env: CbsEnv): string {
       i = b.end;
       continue;
     }
+    if (head.startsWith('?')) {
+      const vals: string[] = [];
+      const expr = evaluate(raw, env, vals).trim();
+      out += put(calc(expr.slice(1), vals));
+      i = k;
+      continue;
+    }
     const inner = evaluate(raw, env);
     const v = fn(inner, env);
-    out += v === null ? `{{${inner}}}` : v;
+    out += v === null ? `{{${inner}}}` : put(v);
     i = k;
   }
   return out;

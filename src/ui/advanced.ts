@@ -182,7 +182,18 @@ export async function handleAdvanced(action: string, value: string | undefined, 
     const own = fn ? fnSet(fn[1] as FnFeature, fn[2], fn[3]) : null;
     const hit = fn ? null : parse(v);
     if (own) vars = { [own[0]]: own[1] };
-    else if (hit) vars = { [advVar(hit[0], hit[1])]: hit[2] };
+    else if (hit) {
+      vars = { [advVar(hit[0], hit[1])]: hit[2] };
+      // 최소·최대 짝(「…_min」과 「…」): 최소가 최대를 넘으면 상대도 같이 맞춘다 (게시글·댓글 수 칸과 같게)
+      const [f, item, val] = hit;
+      const mate = item.key.endsWith('_min') ? advItem(f, item.key.slice(0, -4)) : advItem(f, `${item.key}_min`);
+      if (item.type === 'num' && mate?.type === 'num' && val !== '') {
+        const state = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
+        const other = Number(advValue(state as never, f, mate.key));
+        const n = Number(val);
+        if (item.key.endsWith('_min') ? n > other : n < other) vars[advVar(f, mate)] = val;
+      }
+    }
   } else if (action === 'adv-books') {
     booksUi.open = !booksUi.open;
     booksUi.q = '';

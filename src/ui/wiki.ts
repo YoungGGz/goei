@@ -565,7 +565,7 @@ export function wikiList(ctx: ChatContext): string {
     return `<h4 data-ksec="${k}">${head}</h4>${rows.map((d) => linkRow(ctx, d.title, { dot: tab !== 'story' && !d.base })).join('')}`;
   }).join('');
   const index = keys.length > 1
-    ? `<div class="nw-kgrid" hidden><div class="nw-kgrid-in" role="group" aria-label="가나다 색인">${KEYS.map((k) => `<button type="button" data-k="${k}" ${keys.includes(k) ? '' : 'disabled'}>${k}</button>`).join('')}</div></div>`
+    ? `<div class="nw-kgrid" hidden><div class="nw-kgrid-in" role="group" aria-label="가나다 색인"><button type="button" class="nw-kx" aria-label="닫기" title="닫기">${ICONS.close}</button>${KEYS.map((k) => `<button type="button" data-k="${k}" ${keys.includes(k) ? '' : 'disabled'}>${k}</button>`).join('')}</div></div>`
     : '';
   return `${chips}<div class="wls">${groups}</div>${index}`;
 }
@@ -579,14 +579,13 @@ function docCat(ctx: ChatContext, d: WikiDoc): Exclude<Tab, 'all' | 'story'> {
 const inTab = (ctx: ChatContext, d: WikiDoc, t: Tab) => (t === 'all' ? true : t === 'story' ? !d.base : docCat(ctx, d) === t);
 
 /** 머리줄 (시안 WKTOP·WKMAIN): 로고, 최근 변경·임의 문서, 목록 단추, (대문은 임의 문서 단추) 검색칸 */
-function topBar(main: boolean): string {
+function topBar(): string {
   const open = wiki.listOpen;
   const wlb = `<button type="button" class="wlb wk-menu${open ? ' on' : ''}" data-action="wiki-list" aria-expanded="${open}" aria-label="${open ? '목록 접기' : '목록 펼치기'}" title="목록">${LIST_ICO}</button>`;
-  const nav = main
-    ? `<nav><button type="button" data-action="wiki-recent">${ni(CLOCK)}최근 변경</button></nav>`
-    : `<nav><button type="button" data-action="wiki-recent">${ni(CLOCK)}최근 변경</button><button type="button" data-action="wiki-random">${ni(SHUFFLE)}임의 문서</button></nav>`;
-  const rnd = main ? `<button type="button" class="rnd" data-action="wiki-random" title="임의 문서" aria-label="임의 문서"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#00a495" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SHUFFLE}</svg></button>` : '';
-  const sr = `<label class="sr"><input class="wk-in" type="search" name="wiki-q" data-input="wiki-query" data-enter="wiki-search" placeholder="${main ? '여기에서 검색' : '문서 제목 검색'}" value="${esc(wiki.query)}" aria-label="위키 검색" autocomplete="off"><button type="button" class="sg" data-action="wiki-search" data-take="wiki-q" aria-label="검색">${SRCH}</button></label>`;
+  // 머리 띠는 대문과 문서·다른 화면이 같은 모양 (사용자 11-08: 나머지 화면도 대문과 같은 모양)
+  const nav = `<nav><button type="button" data-action="wiki-recent">${ni(CLOCK)}최근 변경</button></nav>`;
+  const rnd = `<button type="button" class="rnd" data-action="wiki-random" title="임의 문서" aria-label="임의 문서"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#00a495" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SHUFFLE}</svg></button>`;
+  const sr = `<label class="sr"><input class="wk-in" type="search" name="wiki-q" data-input="wiki-query" data-enter="wiki-search" placeholder="여기에서 검색" value="${esc(wiki.query)}" aria-label="위키 검색" autocomplete="off"><button type="button" class="sg" data-action="wiki-search" data-take="wiki-q" aria-label="검색">${SRCH}</button></label>`;
   return `<div class="top wk-top"><button type="button" class="lg wk-logo" data-action="wiki-home" aria-label="괴이위키 대문">${LOGO}괴이위키</button>${nav}${wlb}${rnd}${sr}</div>`;
 }
 
@@ -785,13 +784,14 @@ export function wikiTab(ctx: ChatContext, env?: WikiEnv): string {
   const open = wiki.listOpen;
   const main = wiki.view === 'home';
   // 목록 서랍 (시안 wk_list): 머리줄 아래 설정한 쪽(기본 오른쪽)에서. 폰은 오른쪽 아래 「목록」 책갈피
+  // 판 머리에 닫기 (판 밖 어두운 띠를 눌러도 닫히지만 닫기라는 표시가 없었다)
   const drawer = `<aside class="wdr${open ? ' open' : ''}" aria-label="위키 목록"${open ? '' : ' inert'}>
-      <label class="wsr">${SRCH}<input type="search" name="wiki-filter" data-input="wiki-filter" placeholder="이름·제목 검색" value="${esc(wiki.filter)}" aria-label="이름·제목 검색" autocomplete="off"></label>
+      <div class="wdh"><label class="wsr">${SRCH}<input type="search" name="wiki-filter" data-input="wiki-filter" placeholder="이름·제목 검색" value="${esc(wiki.filter)}" aria-label="이름·제목 검색" autocomplete="off"></label><button type="button" class="wdx" data-action="wiki-list" data-value="close" aria-label="목록 접기" title="목록 접기">${ICONS.close}</button></div>
       <div class="wlist">${wikiList(ctx)}</div>${fail}</aside>`;
   const grab = `<button type="button" class="wgrab" data-action="wiki-list" data-value="open" aria-label="목록 펼치기">‹<span>목록</span></button>`;
   const scrim = open ? '<button type="button" class="wscrim" data-action="wiki-list" data-value="close" aria-label="목록 접기" tabindex="-1"></button>' : '';
   return `<main class="gx-body wk hasdr${main ? ' nm' : ''}${open ? ' dr-open' : ''}">
-    ${topBar(main)}<div class="wtres">${wikiTopResults(ctx)}</div>
+    ${topBar()}<div class="wtres">${wikiTopResults(ctx)}</div>
     <div class="wsc">${status ? `<div class="wst nw-status">${status}</div>` : ''}${paneHtml(ctx)}</div>
     ${grab}${drawer}${scrim}
     ${note}
@@ -906,6 +906,10 @@ export function bindWikiSide(root: HTMLElement, act: (value: string) => void): v
     if (!grid) return;
     if (t.closest('[data-kpick]')) {
       grid.hidden = false;
+      return;
+    }
+    if (t.closest('.nw-kx')) {
+      grid.hidden = true;
       return;
     }
     const k = t.closest<HTMLElement>('.nw-kgrid [data-k]')?.dataset.k;

@@ -13,7 +13,7 @@ import { applyAdvanced, genSettings } from './advanced';
 import { fnHistory, fnNum, fnRefs } from './reffn';
 import { craftMessages, craftSettings, memoTexts, retryAnalyze, type CraftMessage } from './craft';
 import { trimRelated, trimSecondary, trimTurns } from './budget';
-import { cbsEnv, collectRefs, factionCodesToNames, policySections, recentTurns, refText, storyText, type RefSource } from './refs';
+import { cbsEnv, collectRefs, factionCodesToNames, PERSONA_SOURCE, policySections, recentTurns, refText, storyText, type RefSource } from './refs';
 
 export type GnetOp = 'refresh' | 'post' | 'comment' | 'dm';
 
@@ -79,9 +79,7 @@ function fill(template: string, values: Record<string, string>): string {
 }
 
 export function systemText(b: GnetBooks, guideline: string, format: string, identity?: unknown, attachments = false): string {
-  const head = b.txt('SYSTEM.PROTAGONIST_HEAD');
-  const intro = fmt(b.read('SYSTEM'), b.read('JAILBREAK'), b.read('JOB'), `\n\n${b.txt('IMPORTANT_NOTE')}`, 'anonymous forum author', '', '')
-    .replace(/## Main Protagonist \([^\n]*\)/, () => head);
+  const intro = fmt(b.read('SYSTEM'), b.read('JAILBREAK'), b.read('JOB'), `\n\n${b.txt('IMPORTANT_NOTE')}`, 'anonymous forum author', '', '');
   let outro = fmt(b.read('OUTPUT'), '', format, guideline);
   if (identity) outro += `\n${b.txt('DM.ROLE_BINDING')}\n${JSON.stringify(identity)}`;
   outro += `\n${b.language}`;
@@ -107,6 +105,10 @@ function pack(src: RefSource, b: GnetBooks, fn: GnetOp, thoughts: ThoughtsKey, g
     related: t.related && !trimRelated(), secondary: t.secondary && !trimSecondary(),
     extra: [{ source: b.txt('REFS.SITUATION_SOURCE'), content: b.read('LB.EXTRA') }],
   });
+  // 주인공 머리말(SYSTEM.PROTAGONIST_HEAD 절)은 사용자 페르소나 자료 머리에 붙인다
+  const head = b.txt('SYSTEM.PROTAGONIST_HEAD').trim();
+  const me = rows.find((r) => r.sources.includes(PERSONA_SOURCE));
+  if (head && me) me.content = `${head}\n${me.content}`;
   // 참고 자료 머리말은 이 게시판 지침의 절 (사용자 2026-11-14 C-4 (나): 공통 지침에서 읽지 않음. 같은 날: 모델에 가는 글은 모두 지침 파일로)
   const material = `${b.txt('REQUEST.HEAD_REFS')}\n${refText(rows)}\n${b.txt('REQUEST.HEAD_STORY')}\n${story}\n${b.txt('REQUEST.HEAD_TASK')}\n${extras}`;
   const attachments = hasAttachment(material);
