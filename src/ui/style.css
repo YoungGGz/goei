@@ -3513,10 +3513,14 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .it-tipfloat .sh-amt.pay { white-space: normal; line-height: 1.4; }
 .sh-c:disabled { opacity: .5; cursor: default; }
 .sh-band.dim { color: var(--dim); }
+.sh-band-lb { display: block; margin: 0 0 2px; font: 500 11.5px/1.2 inherit; } /* 판매 칸 「산 값」 윗줄, 값 아랫줄: 폰 3열 칸(약 100px)에서 큰 값이 말줄임으로 가리지 않게 (전수점검 눌러2-사소-16) */
 .sh-ref.sell { background: color-mix(in srgb, var(--signal) 14%, var(--panel2)); }
 /* 팔 것 고르기 머리 줄 */
 .sh-shelf.sh-pick { min-height: inherit; } /* 판매로 바꿔도 창 높이 그대로: 소지품 상자가 그 높이를 채움 */
 .sh-pick > .sh-mine { flex: 1 1 auto; }
+/* 판매 본문이 넘치면 스크롤 막대를 늘 보이게 (전역 막대는 12%라 거의 안 보임 — 전수점검 눌러2-중대-3) */
+.sh-body:has(> .sh-pick) { scrollbar-color: color-mix(in srgb, var(--sub) 40%, transparent) transparent; }
+.sh-body:has(> .sh-pick)::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--sub) 40%, transparent); border: 2px solid transparent; background-clip: padding-box; }
 /* 상점 팔기 (2026-11-12 사용자: 장착 칸과 물건 칸 구분): PC·폰 모두 [장착 띠 상자(.sh-eq > .it-eqbox.sell)] 아래 [소지품 구획(.sh-mine)] 두 상자. 한 격자에 엮던 .sh-sellgrid 는 없앴다 */
 .sh-pick-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; font-size: 13.5px; color: var(--sub); }
 .sh-pick-head .gx-chip { min-height: 28px; font-size: 12.5px; }

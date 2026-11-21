@@ -78,3 +78,17 @@ test('보통-43: 안 연 주문도 상자가 소지품에 없으면 넘칠 때 �
   const all = M.pruneOrders(list, 2, { alive: new Set(), turn: 1, last: '' });
   assert.equal(all.length, 3, '상자를 모르면 그대로 둔다');
 });
+
+test('눌러2-사소-14: 주인 대화로 진열을 바꿔도 산 물건과 같은 이름의 새 물건은 새로고침처럼 보통 상품으로 들어온다', () => {
+  const st = { ...base, items: [{ ...it('생수'), id: 'w0', sold: true }, { ...it('장갑'), id: 'g0' }] };
+  const talk = (r) => ({ owner: '자', reprice: [], remove: [], add: [], all: [], closed: false, ...r });
+  const all = M.applyTalk(st, talk({ mode: 'all', all: [it('생수'), it('끈')] }));
+  const a = all.items.find((x) => x.name === '생수' && !x.sold);
+  assert.ok(a, '전체 다시 짜기에서 빠지지 않는다');
+  assert.notEqual(a.id, 'w0');
+  const part = M.applyTalk(st, talk({ mode: 'partial', add: [it('생수'), it('장갑')] }));
+  assert.ok(part.items.some((x) => x.name === '생수' && !x.sold), '더하기에서 빠지지 않는다');
+  assert.equal(part.items.filter((x) => x.name === '장갑').length, 1, '진열 중인 것과 같은 이름은 여전히 막는다');
+  const ids = part.items.map((x) => x.id);
+  assert.equal(new Set(ids).size, ids.length);
+});

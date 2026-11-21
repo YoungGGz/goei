@@ -862,7 +862,8 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
   const r = st.identity.points ? { ...r0, all: r0.all.map(pointPrice), add: r0.add.map(pointPrice), reprice: r0.reprice.map(pointPrice) } : r0;
   let items = st.items.slice();
   if (r.mode === 'all') {
-    const fresh = withIds(st, r.all, items.filter((x) => x.sold));
+    // 산 물건은 이름을 막지 않고 id 만 피한다 (applyShelf 와 같이, 전수점검 눌러2-사소-14)
+    const fresh = withIds(st, r.all, [], items.filter((x) => x.sold));
     if (fresh.length) items = [...items.filter((x) => x.sold), ...fresh];
   } else if (r.mode === 'partial') {
     for (const n of r.remove) items = items.filter((x) => x.sold || !sameShopName(x.name, n));
@@ -874,7 +875,7 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
         return { ...rest, price: p.price, ...(p.pay ? { pay: p.pay } : {}), ...(x.pay ? {} : { orig: x.orig ?? x.price }) };
       });
     }
-    items = [...items, ...withIds(st, r.add, items)];
+    items = [...items, ...withIds(st, r.add, items.filter((x) => !x.sold), items.filter((x) => x.sold))];
   }
   // 정보 쪽지: 대사에 붙여 두고 내용은 notes 에 (같은 제목은 다시 안 내민다)
   let notes = st.notes ?? [];

@@ -215,7 +215,7 @@ function pickCell(it: Item, st: ShopState): string {
   const tr = traitsOf(it);
   const tip = `<span class="it-tip" aria-hidden="true"><b>${esc(it.name)}</b>${tr ? `<small>${esc(tr)}</small>` : ''}${it.desc ? `<p>${esc(it.desc)}</p>` : ''}${it.effect ? `<p class="ef">효과: ${esc(it.effect)}</p>` : ''}${Number.isSafeInteger(it.price) ? `<span class="sh-amt">산 값 ${esc(amt(it.price!))}</span>` : ''}</span>`;
   return `<button class="it-c sh-c${sel ? ' sel' : ''}" data-action="shop-sell-pick" data-value="${esc(it.id)}" aria-label="${esc(it.name)} 판매" ${shopUi.loading ? 'disabled' : ''}>
-    <span class="it-ic">${pic(it.name, it.icon)}</span><span class="sh-nm"><b>${esc(it.name)}</b></span><span class="sh-band dim">${sel && typeof st.sell?.price === 'number' ? `<i>▴</i>${esc(amt(st.sell.price))}` : Number.isSafeInteger(it.price) ? `산 값 ${esc(amt(it.price!))}` : '&nbsp;'}</span>${tip}</button>`;
+    <span class="it-ic">${pic(it.name, it.icon)}</span><span class="sh-nm"><b>${esc(it.name)}</b></span><span class="sh-band dim">${sel && typeof st.sell?.price === 'number' ? `<i>▴</i>${esc(amt(st.sell.price))}` : Number.isSafeInteger(it.price) ? `<small class="sh-band-lb">산 값</small>${esc(amt(it.price!))}` : '&nbsp;'}</span>${tip}</button>`;
 }
 
 /** 주인 사진이 없을 때 기본 얼굴: 어둠 속 역광 그림자 (사용자 11-07, 후보 C). 성별·옷·얼굴을 알 수 없는 형체만 */
@@ -238,8 +238,8 @@ function ownerHtml(ctx: ChatContext, st: ShopState, drawer: boolean): string {
 function talkbox(st: ShopState): string {
   const off = st.closed || !!shopUi.loading || !st.loaded;
   const sell = shopUi.chipKind === 'sell';
-  // 칩: 「판매: 이름」·「문의: 이름」 같은 꼴, 떼기 ×는 따로 누르는 단추 (누름 칸 34, 전수점검 눌러2-보통-18)
-  const chip = shopUi.chip ? `<span class="sh-ref${sell ? ' sell' : ''}"><span class="sh-ref-nm">${sell ? '판매' : '문의'}: ${esc(shopUi.chip)}</span><button type="button" class="sh-ref-x" data-action="shop-chip-x" aria-label="${esc(shopUi.chip)} 빼기">×</button></span>` : '';
+  // 칩: 「판매: 이름」·「묻기: 이름」 같은 꼴, 떼기 ×는 따로 누르는 단추 (누름 칸 34, 전수점검 눌러2-보통-18)
+  const chip = shopUi.chip ? `<span class="sh-ref${sell ? ' sell' : ''}"><span class="sh-ref-nm">${sell ? '판매' : '묻기'}: ${esc(shopUi.chip)}</span><button type="button" class="sh-ref-x" data-action="shop-chip-x" aria-label="${esc(shopUi.chip)} 빼기">×</button></span>` : '';
   const ph = st.closed ? '거래가 끊겼어요' : sell ? (typeof st.sell?.price === 'number' ? '값을 다시 불러 보기' : '값을 부르거나 그냥 보내기') : shopUi.chip ? '이 물건에 대해 묻기' : '주인에게 말하기';
   // 폼 제출은 플러그인 iframe(allow-forms 없음)에서 안 오므로 Enter(data-enter)·단추(data-action+data-take)로 보낸다
   return `<div class="sh-talk" data-sh-talk="1">
@@ -498,6 +498,14 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       shopUi.pick = !shopUi.pick;
       shopUi.detail = '';
       env.render();
+      // PC 판매: 본문이 주인 상자에 눌려 소지품 카드가 그림 가운데에서 잘리면, 첫 줄 카드(이름·값까지)가 다 보이게 본문을 내린다 (전수점검 눌러2-중대-3)
+      if (shopUi.pick) requestAnimationFrame(() => {
+        const body = document.querySelector<HTMLElement>('.sh-body');
+        const cell = body?.querySelector<HTMLElement>('.sh-mine .sh-grid > *');
+        if (!body || !cell) return;
+        const over = cell.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom;
+        if (over > 0) body.scrollTop += over + 8;
+      });
       return true;
     case 'shop-sell-pick': {
       // 팔 것 고름: 상태에 들고, 입력창에 「팔기: 이름」 칩. 값은 보낼 때 묻는다
