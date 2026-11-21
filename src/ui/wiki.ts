@@ -361,7 +361,7 @@ function entries(ctx: ChatContext): Entry[] {
   } catch {
     /* 목록 로어북이 없으면 거점만 뺀다 */
   }
-  for (const a of dir.agents) list.push({ cat: 'ag', name: a.name, title: c(a.lore || a.name), sub: [a.rank, a.department].filter(Boolean).join(' · ') || a.english, photo: mainPic(ctx.char, a), face: facePic(ctx.char, a, true), terms: [a.name, a.english, ...a.aliases] });
+  for (const a of dir.agents) list.push({ cat: 'ag', name: a.name, title: c(a.lore || a.name), sub: [a.department, a.rank].filter(Boolean).join(' · ') || a.english, photo: mainPic(ctx.char, a), face: facePic(ctx.char, a, true), terms: [a.name, a.english, ...a.aliases] });
   // 조직: 명부의 조직 전부 (플레이 세력이면 시작 화면 이름). 문서는 세력 폴더 로어북 이름 (발푸르기스 → 발푸르기스 협회)
   const lore = ctx.char.globalLore ?? [];
   const facs = factionList(lore);

@@ -3,11 +3,11 @@
 // 값의 우선순위: 명부 > 옛 World catalog / Agent roster 줄 > 로어북 키에서 추정.
 // 세력 호칭·괴담톡 탭·첫 턴 로어북도 명부에 두고, 옛 카드는 Faction display·Phone tabs·Start trigger에서 읽는다.
 // 폴더가 없는 카드는 옛 목록 그대로 쓴다.
-import { BUILTIN, OPEN_TO, extraFactions, extraNames, extraTabId, extraTabs, type FactionSpec, pickSpec } from '../factions';
+import { BUILTIN, OPEN_TO, extraNames, extraTabId, extraTabs, openTabCodes, type FactionSpec, pickSpec } from '../factions';
 import { DIRECTORY_COMMENT, directoryEntries, isDirectory, LEGACY_DATA, parseSeedManifest } from '../lorebooks';
 import { agentShared, orgShared } from '../sharedpics';
 import { pickScenes, type ScenesData } from '../scenes';
-import { closeNeutralTab, freeGroupCode, migrateRoster, NEUTRAL_BLURB, NEUTRAL_ENGLISH, NEUTRAL_GROUP, NEUTRAL_IDS, ROSTER_V } from './roster-v';
+import { closeNeutralTab, renameNeutralTab, freeGroupCode, migrateRoster, NEUTRAL_BLURB, NEUTRAL_ENGLISH, NEUTRAL_GROUP, NEUTRAL_IDS, ROSTER_V } from './roster-v';
 import type { LoreEntry } from '../types';
 import { readStartItems, type StartItem } from '../startitems';
 import { itemWeight } from '../itemtraits';
@@ -324,7 +324,8 @@ export const DEFAULT_PHONE_TABS = {
     { id: 'T01', name: '관리', visible_for: ['A00'], name_by_faction: { B00: '가짜' } },
     { id: 'T02', name: '가짜', visible_for: ['B00'], name_by_faction: { B00: '관리' } },
     { id: 'T03', name: '백일', visible_for: ['C00'] },
-    { id: 'T04', name: '중립', visible_for: ['A00', 'B00', 'C00', 'E00'] },
+    // 탭 이름은 시작 화면 묶음 이름과 같게 (11-06 사용자 「이면의 주민들」, 전수점검 사소-45·눌러2-보통-12)
+    { id: 'T04', name: NEUTRAL_GROUP, visible_for: ['A00', 'B00', 'C00', 'E00'] },
     { id: 'T05', name: '기타', visible_for: ['A00', 'B00', 'C00', 'D00', 'E00'] },
     { id: 'X01', name: '괴이', visible_for: ['A00', 'B00', 'C00', 'D00', 'E00'] },
   ],
@@ -335,7 +336,7 @@ export function phoneTabsSection(lore: LoreEntry[]): PhoneTabsData {
   const fromBook = obj(book(lore, 'Phone tabs'));
   const picked = saved && typeof saved === 'object' ? obj(saved) : fromBook;
   // 명부가 없는 원본 카드의 탭 글도 저장된 명부와 같은 기본값으로 읽는다 (roster-v.ts 판 8). 읽은 사본만 고친다
-  if (picked === fromBook && Array.isArray(fromBook.tabs)) { fromBook.tabs = (fromBook.tabs as unknown[]).map((t) => ({ ...obj(t) })); closeNeutralTab(fromBook.tabs); }
+  if (picked === fromBook && Array.isArray(fromBook.tabs)) { fromBook.tabs = (fromBook.tabs as unknown[]).map((t) => ({ ...obj(t) })); closeNeutralTab(fromBook.tabs); renameNeutralTab(fromBook.tabs); }
   const d = Array.isArray(picked.tabs) && (picked.tabs as unknown[]).length ? picked : obj(DEFAULT_PHONE_TABS);
   const tabs = (Array.isArray(d.tabs) ? (d.tabs as unknown[]) : []).map(obj).map((t) => {
     const tab: PhoneTabData = { id: s(t.id), name: s(t.name), visible_for: list(t.visible_for) };
@@ -561,8 +562,8 @@ export interface TabInfo {
 
 export function phoneTabs(lore: LoreEntry[]): TabInfo[] {
   const out = phoneTabsSection(lore).tabs.map((t) => ({ id: t.id, name: t.name, visibleFor: [...t.visible_for] }));
-  // 새 세력: 민간인을 뺀 기본 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다 (phone.ts tabCatalog와 같음)
-  const extra = extraFactions(lore).map((f) => f.code);
+  // 새 세력·시작 묶음: 민간인을 뺀 기본 세력 모두에게 열린 탭은 이들에게도 열고, 새 세력에는 전용 탭을 덧붙인다 (phone.ts tabCatalog와 같음)
+  const extra = openTabCodes(lore);
   if (!extra.length) return out;
   for (const t of out) if (OPEN_TO.every((f) => t.visibleFor.includes(f))) t.visibleFor.push(...extra.filter((f) => !t.visibleFor.includes(f)));
   for (const t of extraTabs(lore)) if (!out.some((x) => x.id === t.id)) out.push(t);

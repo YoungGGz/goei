@@ -555,6 +555,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .nw-more b { color: var(--dim); font-weight: 500; }
 .nw-meta p, .nw-fail p { margin: 6px 0; font-size: 13px; color: var(--dim); }
 .nw-fail textarea { width: 100%; font-size: 13px; }
+/* 괴담톡 목록 위 「최근 실패 원문」: 누름 줄 34 (전수점검 눌러2-보통-9: 18px 글자 줄이 도구 줄에 붙어 있었다) */
+.ph-side > .nw-fail { flex: none; }
+.ph-side > .nw-fail > summary { display: flex; align-items: center; min-height: 34px; }
 @media (max-width: 520px) {
   .nw-infobox { float: none; width: 100%; margin: 0 0 12px; }
 }
@@ -871,6 +874,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .ph-gbody > textarea { flex: none; }
 .ph-gbody > .ph-pick { flex: 1; min-height: 0; overflow-y: auto; }
 .ph-room-title small { color: var(--dim); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 괴담톡 대화방 머리의 소속·직급(인원·주제): 오른쪽 도구 넷에 밀려 「종…」만 남았다 → 두 줄까지 접는다 (전수점검 눌러-보통-7) */
+.ph-app .ph-room > .ph-room-head .ph-room-title small { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; overflow-wrap: anywhere; }
 
 .ph-members { flex: none; margin: 0; padding: 6px 16px; font-size: 13px; color: var(--dim); border-bottom: 1px solid var(--panel2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ph-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; padding: 14px 16px 10px; overscroll-behavior: contain; }
@@ -934,7 +939,6 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .ph-input { flex: 1; min-width: 0; min-height: 44px; max-height: 140px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 21px; background: var(--panel); color: var(--text); font: inherit; font-size: 15px; line-height: 1.45; resize: none; field-sizing: content; }
 .ph-input:focus { outline: none; border-color: var(--accent-line); }
 .ph-plus { width: 42px; height: 42px; border-radius: 50%; }
-.ph-plus.on svg { transform: rotate(45deg); }
 .ph-send { display: grid; place-items: center; width: 44px; height: 44px; flex: none; padding: 0; border: 0; border-radius: 15px; background: var(--signal); color: var(--on-signal); box-shadow: 0 4px 12px -6px color-mix(in srgb, var(--signal) 70%, transparent); transition: transform .12s ease, filter .12s ease; }
 .ph-send svg { width: 22px; height: 22px; }
 .ph-send:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
@@ -1557,11 +1561,10 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .ph-notice-bar .gx-mini { margin: 0 8px 8px 0; }
 /* 단톡 만들기: 주제는 평소 한 줄, 적거나 누르면 넓어진다 */
 .ph-gbody { gap: 8px; }
-.ph-gbody > .ph-gname { height: 40px; min-height: 40px; padding: 9px 12px; flex: none; }
+.ph-gbody > .ph-gname, .ph-gbody > .ph-pick-q { height: 40px; min-height: 40px; padding: 9px 12px; flex: none; }
 .ph-gbody > .ph-topic { height: 40px; min-height: 40px; padding: 9px 12px; line-height: 1.4; resize: none; overflow: hidden; transition: height .15s ease; }
 .ph-gbody > .ph-topic:focus, .ph-gbody > .ph-topic:not(:placeholder-shown) { height: 76px; overflow: auto; }
 .ph-gbody > .ph-tabs { padding: 0; }
-@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .ph-gbody > .ph-topic::placeholder, .ph-gbody > .ph-gname::placeholder { font-size: 12.5px; } }
 /* 괴담넷 글 (v0.16.23): PC는 본문과 댓글을 다른 바탕의 두 덩어리로, 댓글 사이 구분선은 또렷하게 */
 .gn-pane .gn-doc { gap: 14px; }
 /* 글·댓글 카드는 줄어들지 않고 .gn-doc가 스크롤한다 (overflow: hidden 카드가 flex 안에서 줄어 댓글이 잘리던 문제) */

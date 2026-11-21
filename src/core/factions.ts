@@ -216,6 +216,9 @@ export function factionList(lore: LoreEntry[] | undefined): Faction[] {
 
 /** 새 세력 (명부 조직 중 플레이로 켠 것). 시작 묶음은 세력이 아니라서 뺀다 */
 export const extraFactions = (lore: LoreEntry[] | undefined) => factionList(lore).filter((f) => !f.builtin && !f.group);
+/** 「모든 세력에게 열린 괴담톡 탭」을 같이 여는 코드: 새 세력과 시작 묶음(「이면의 주민들」 등). 묶음 인물로 시작하면 소속 코드가 묶음 코드로 남을 수 있다
+ *  (core/start.ts effectiveFaction: 인물의 원 소속이 플레이 세력이 아닐 때). 전용 탭(extraTabs)은 새 세력에만 (전수점검 중대-8) */
+export const openTabCodes = (lore: LoreEntry[] | undefined) => factionList(lore).filter((f) => !f.builtin).map((f) => f.code);
 /** 시작 묶음 코드인가 */
 export const isGroupCode = (lore: LoreEntry[] | undefined, code: string) => !!factionList(lore).find((f) => f.code === code)?.group;
 /** 요원 목록 공개 대상 등에 쓰는 코드 전체 */

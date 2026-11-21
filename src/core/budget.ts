@@ -17,6 +17,11 @@ export function trimTurns(n: number): number {
   return level < 4 ? n : Math.max(1, Math.floor(n / 2 ** (level - 3)));
 }
 
+/** 같이 싣는 지난 방 수 (괴담톡 보기 전용 방): 1단계부터 절반씩 (최소 1). 방이 많이 쌓여도 상한 안으로 줄일 수 있게 (전수점검 보통-51) */
+export function trimRooms(n: number): number {
+  return level < 1 ? n : Math.max(Math.min(n, 1), Math.floor(n / 2 ** level));
+}
+
 export class BudgetError extends Error {}
 
 export function promptTokens(p: { messages: { content: string }[] }): number {

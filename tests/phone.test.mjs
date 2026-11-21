@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { phone as P, phonePrompt as PP, unwrapCalls, recentTurns } from '../dist-test/core.mjs';
+import { phone as P, phonePrompt as PP, unwrapCalls, recentTurns, migrateLore } from '../dist-test/core.mjs';
 
 import { REAL } from './realcard.mjs';
 const realLore = existsSync(REAL) ? (() => { const m = JSON.parse(readFileSync(REAL, 'utf8')); return m.lorebook ?? m.module?.lorebook; })() : null;
@@ -15,7 +15,7 @@ test('directory follows faction tabs, custom contacts land in 기타', { skip: !
   assert.deepEqual(a.tabs.map((t) => t.id), ['T01', 'T04', 'T05']);
   assert.ok(a.contacts.length > 10 && a.contacts.every((c) => c.visible));
   const b = P.directory(realLore, chatOf({ '$st_faction': 'B00' }));
-  assert.deepEqual(b.tabs.map((t) => [t.id, t.name]).slice(0, 2), [['T02', '관리'], ['T04', '중립']]);
+  assert.deepEqual(b.tabs.map((t) => [t.id, t.name]).slice(0, 2), [['T02', '관리'], ['T04', '이면의 주민들']]);
   const all = P.directory(realLore, chatOf({ '$ph_all_contacts': '1', '$ph_anomaly_contacts': '1' }));
   assert.ok(all.tabs.some((t) => t.id === 'X01') && all.tabs.some((t) => t.id === 'T03'));
   const custom = { version: 1, seq: 1, items: [{ id: P.contactId('custom:1'), name: '김씨', note: '편의점 사장' }] };
@@ -23,6 +23,35 @@ test('directory follows faction tabs, custom contacts land in 기타', { skip: !
   const kim = c.contacts.find((x) => x.name === '김씨');
   assert.ok(kim.custom && kim.tabs.includes('T05'));
   assert.equal(P.contactId('P001'), 'c_50303031');
+});
+
+test('시작 묶음(「이면의 주민들」 F00) 코드로 시작해도 모두에게 열린 탭이 보이고, 직접 추가한 연락처가 기타에 보인다 (전수점검 중대-8)', { skip: !realLore }, () => {
+  const moved = migrateLore(realLore);
+  const g = P.directory(moved, chatOf({ '$st_faction': 'F00' }));
+  assert.deepEqual(g.tabs.map((t) => [t.id, t.name]), [['T04', '이면의 주민들'], ['T05', '기타']]);
+  assert.ok(g.contacts.some((c) => c.name === '차여진'));
+  const custom = { version: 1, seq: 1, items: [{ id: P.contactId('custom:1'), name: '김씨' }, { id: P.contactId('P001'), name: '쟈알디', agentId: 'P001' }] };
+  const c = P.directory(moved, chatOf({ '$st_faction': 'F00', '$ph_contacts': JSON.stringify(custom) }));
+  const kim = c.contacts.find((x) => x.name === '김씨');
+  const jy = c.contacts.find((x) => x.agentId === 'P001');
+  // 명부 인물을 기타에 넣어도 지울 수 있다 (전수점검 보통-49). 내 소속 탭에 원래 보이는 사람은 지우기가 없다
+  assert.ok(kim?.visible && kim.removable && jy?.visible && jy.removable);
+  const a = P.directory(moved, chatOf({ '$ph_contacts': JSON.stringify(custom) }));
+  assert.equal(a.contacts.find((x) => x.agentId === 'P001')?.removable, false);
+});
+
+test('대기 줄 길이 기준은 「대기 설명」 토큰 상한 하나 (전수점검 보통-50)', () => {
+  const long = '한참 시간이 흐르고 난 뒤에';
+  assert.ok([...long].length > 12);
+  assert.equal(P.hiddenPause(long), false);
+  const keep = P.LIMITS.pause_tokens;
+  try {
+    P.LIMITS.pause_tokens = 5;
+    assert.equal(P.hiddenPause(long), true);
+    assert.equal(P.hiddenPause('잠시 후'), false);
+  } finally {
+    P.LIMITS.pause_tokens = keep;
+  }
 });
 
 test('patch accepts only appended rows from active members', () => {

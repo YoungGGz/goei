@@ -458,8 +458,10 @@ export function refreshRetry(prompt: PhonePrompt, reason: string): PhonePrompt['
 
 // ── 보기 전용 방 (라이트보드 미니톡 사전설정, 2026-11-06) ──
 /** 보기 전용 방 한 개를 만드는 요청 */
-export function viewPrompt(src: RefSource, names: Record<string, string>, views: ViewRoom[]): PhonePrompt {
-  const set = viewSettings(src.chat.scriptstate);
+/** cont: 열어 둔 방의 「이어 보기」 — 종류·시점은 그 방 것, 지난 기록도 그 방만 (전수점검 보통-45) */
+export function viewPrompt(src: RefSource, names: Record<string, string>, views: ViewRoom[], cont?: ViewRoom): PhonePrompt {
+  const base = viewSettings(src.chat.scriptstate);
+  const set = cont ? { ...base, preset: cont.preset, pov: cont.people.find((p) => p.id === cont.pov)?.name ?? base.pov } : base;
   const p = sections(src);
   const opt = (k: string) => (p[k] === undefined ? '' : section(p, k).replace(/__VIEW_LIMIT_(messages|text)__/g, (_, k2: 'messages' | 'text') => String(VIEW_LIMITS[k2])));
   const keys = ['VIEW.COMMON'];
@@ -471,7 +473,7 @@ export function viewPrompt(src: RefSource, names: Record<string, string>, views:
   // 지침 속 낱말이 아니라 절이 있는지로 본다 (전수검사 11-13)
   if (p['VIEW.OUTPUT'] === undefined) throw new PhoneError(`${GUIDE_LABEL.Phone} 지침에 보기 전용 방 섹션이 없어요.`);
   const system = [...keys.map(opt).filter(Boolean), genSettings(src.chat.scriptstate).language ?? languageLine()].join('\n\n');
-  const rooms = viewRooms(views, set.preset, fnHistory(src.chat.scriptstate, 'ph', 'view'));
+  const rooms = viewRooms(cont ? [cont] : views, set.preset, fnHistory(src.chat.scriptstate, 'ph', 'view'));
   const owner = ownerCharacter(src).character;
   const body = {
     viewpoint: { name: set.pov || owner || guideTxt('Common', 'REFS.USER_NAME'), isPhoneOwner: !set.pov || set.pov === owner },

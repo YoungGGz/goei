@@ -4,7 +4,7 @@
 import type { Chat, ChatMessage, LoreEntry } from './types';
 import { readWorld } from './world/output';
 import { phoneTabsSection, readDirectory, rosterOf } from './world/directory';
-import { OPEN_TO, extraFactions, extraTabs, factionType, isFactionCode } from './factions';
+import { OPEN_TO, extraTabs, factionType, isFactionCode, openTabCodes } from './factions';
 import { dateNow, storyTurns, tokens, cut } from './gnet';
 import { attachmentRecords, describe, sitePicAsPhoto, stripForged } from './attach';
 import { pickRecords, related, type Focus, type Pick } from './focus';
@@ -181,6 +181,8 @@ export interface Contact extends PPerson {
   terms: string[];
   visible: boolean;
   saved: boolean;
+  /** 「연락처 추가」로만 보이는 사람 (직접 적은 사람, 내 소속 탭에 없는 명부 인물): 지울 수 있다 (전수점검 보통-49) */
+  removable?: boolean;
 }
 
 export interface PhoneTab {
@@ -209,8 +211,8 @@ function tabCatalog(lore: LoreEntry[]): { entries: TabDef[]; orders: Record<stri
     if (entries.some((e) => e.id === row.id)) continue;
     entries.push({ id: row.id, name: row.name || row.id, names: { ...row.name_by_faction }, visibleFor: new Set(row.visible_for) });
   }
-  // 새 세력: 민간인을 뺀 기본 세력 모두에게 열린 탭은 새 세력에도 열고, 전용 탭을 덧붙인다
-  const extra = extraFactions(lore).map((f) => f.code);
+  // 새 세력·시작 묶음: 민간인을 뺀 기본 세력 모두에게 열린 탭은 이들에게도 열고, 새 세력에는 전용 탭을 덧붙인다 (전수점검 중대-8: 묶음 코드엔 탭이 하나도 없었다)
+  const extra = openTabCodes(lore);
   if (extra.length) {
     for (const e of entries) if (OPEN_TO.every((f) => e.visibleFor.has(f))) for (const f of extra) e.visibleFor.add(f);
     for (const t of extraTabs(lore)) if (!entries.some((e) => e.id === t.id)) entries.push({ id: t.id, name: t.name, names: {}, visibleFor: new Set(t.visibleFor) });
@@ -286,13 +288,15 @@ export function directory(lore: LoreEntry[] | undefined, chat: Chat): Directory 
   for (const entry of readCustom(chat).items) {
     let c = map.get(entry.id);
     if (c) {
+      // 내 소속 탭에 이미 보이는 사람은 지우면 대화까지 사라지므로 지우기를 두지 않는다
+      c.removable = !c.visible;
       if (!c.tabs.includes('T05')) c.tabs = [...c.tabs, 'T05'];
       if (!c.visible && visible.has('T05')) {
         c.visible = true;
         contacts.push(c);
       }
     } else {
-      c = { id: entry.id, name: entry.name, english: '', lore: '', group: guideTxt('Phone', 'CONTACT.GROUP_CUSTOM'), rank: '', department: '', note: entry.note ?? '', custom: true, tabs: ['T05'], terms: [entry.name, entry.note ?? ''], visible: visible.has('T05'), saved: true };
+      c = { id: entry.id, name: entry.name, english: '', lore: '', group: guideTxt('Phone', 'CONTACT.GROUP_CUSTOM'), rank: '', department: '', note: entry.note ?? '', custom: true, tabs: ['T05'], terms: [entry.name, entry.note ?? ''], visible: visible.has('T05'), saved: true, removable: true };
       map.set(c.id, c);
       if (c.visible) contacts.push(c);
     }
@@ -308,8 +312,9 @@ export function personOf(c: PPerson): PPerson {
   return p;
 }
 
+/** 소속(부서) · 직급: 임무·상황판 요원 카드(ui/images.ts agentInner)와 같은 순서 (전수점검 눌러-보통-8) */
 export function contactDetails(c: PPerson | undefined): string {
-  return [c?.rank, c?.department].filter(Boolean).join(' · ');
+  return [c?.department, c?.rank].filter(Boolean).join(' · ');
 }
 
 // ── 대화방 ──
@@ -410,10 +415,11 @@ export function membership(st: PState, r: PRoom, kind: 'invite' | 'exit', cid: s
 /** 문장부호만 있는 대기 표시는 기록하지 않는다 (원본 P.emptyPause) */
 export const emptyPause = (t: string) => String(t ?? '').replace(/[\s.…⋯．]/g, '') === '';
 
-/** 대기 줄은 「잠시 후」 같은 짧은 시간 표시만 남긴다. 모델이 지문(「○○가 기겁하며…」)을 쓰면 버린다 */
+/** 대기 줄은 「잠시 후」 같은 짧은 시간 표시만 남긴다. 모델이 지문(「○○가 기겁하며…」)을 쓰면 버린다.
+ *  길이 기준은 고급 설정 「대기 설명」 토큰 상한 하나 (전수점검 보통-50: 따로 박힌 12자 기준이 먼저 버려 설정이 효과가 없었다) */
 export const hiddenPause = (t: string) => {
   const s = String(t ?? '').trim();
-  return emptyPause(s) || [...s].length > 12 || /[다요][.!…]*$/.test(s);
+  return emptyPause(s) || tokens(s) > LIMITS.pause_tokens || /[다요][.!…]*$/.test(s);
 };
 
 export const listedRooms = (st: PState) =>
