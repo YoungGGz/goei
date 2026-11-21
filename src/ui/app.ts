@@ -2070,7 +2070,7 @@ function tabs(): string {
   const unreadPhone = view.kind === 'started' && phoneUnread(view.ctx);
   const cur: Tab = tab === 'mission' ? 'map' : inBrowser() ? 'net' : tab;
   const item = (id: Tab, label: string, icon: string, cls = '', badge = '') =>
-    `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
+    `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" title="${label}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
   const ctx = view.kind === 'started' ? view.ctx : null;
   return `<nav class="gx-nav" aria-label="주요 화면">
     ${ctx ? brand(ctx) : ''}
@@ -2081,7 +2081,7 @@ function tabs(): string {
     ${item('net', '인터넷', ICONS.net)}
     ${!ctx || invMenuOn(ctx) ? item('items', '소지품', ICONS.bag, 'desk') : ''}
     ${item('records', '기록', ICONS.records, 'desk')}
-    <button class="gx-nb desk" data-action="ed-open" data-value="set:screen">${ICONS.settings}<span>설정</span>${ctx && hasUpdate(ctx) ? '<span class="gx-nbadge dot" aria-label="새 버전"></span>' : ''}</button>
+    <button class="gx-nb desk" data-action="ed-open" data-value="set:screen" title="설정">${ICONS.settings}<span>설정</span>${ctx && hasUpdate(ctx) ? '<span class="gx-nbadge dot" aria-label="새 버전"></span>' : ''}</button>
     <span class="gx-nav-gap"></span>
     ${ctx ? navHistBar() : ''}
     ${mobileBar(item, unreadPhone, ctx)}

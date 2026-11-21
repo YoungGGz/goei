@@ -5578,3 +5578,24 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 /* 뽑기 예 (눌러-사소-42): 둘째 줄이 칸 번호 밑 왼쪽 끝에서 시작했다 → 칸 번호 뒤로 내어 쓰기 */
 .ms-sample li { padding-left: calc(2.6em + 4px); text-indent: calc(-2.6em - 4px); }
 .ms-sample li > b { text-indent: 0; margin-right: 4px; }
+
+/* 폴드 펼친 화면 같은 좁은 PC 창(601~860 폭): PC 배치 그대로, 왼쪽 메뉴만 아이콘 줄로 (11-21 사용자: 673 폭은 PC 배치).
+   236px 메뉴가 화면 3분의 1을 먹어 본문 오른쪽이 잘렸다. 글자는 화면 읽기용으로만 남기고, 프로필 카드는 숨긴다 */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  .gx-panel.has-nav { grid-template-columns: 68px minmax(0, 1fr); }
+  .gx[data-nav="right"] .gx-panel.has-nav { grid-template-columns: minmax(0, 1fr) 68px; }
+  .gx-nav { padding: 12px 8px; align-items: center; }
+  .gx-nav > .gx-nav-brand { display: none; }
+  .gx-nav > .gx-nb { justify-content: center; width: 48px; padding: 0; }
+  .gx-nav > .gx-nb > span:not(.gx-nbadge) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .gx-nav > .gx-nb .gx-nbadge { position: absolute; top: 6px; right: 6px; margin: 0; }
+  .gx-nav > .gx-navhist { flex-direction: column; width: 100%; padding-left: 0; padding-right: 0; }
+  .gx-nav > .gx-navhist .gx-nh { flex: none; width: 100%; }
+  /* 상황판: CCTV 화면과 상황 목록을 위아래로 (두 칸이면 CCTV 시각이 세로로 깨지고 괴이·사건·특수 글이 한 글자씩 꺾였다) */
+  .gx-ops { display: flex; flex-direction: column; height: auto; }
+  .gx-opview { height: 320px; flex: none; }
+  .gx-ops > :not(.gx-opview) { max-height: 260px; }
+  .gx-opcnt em { white-space: nowrap; }
+  /* 임무: 오른쪽 편성 칸을 조금 좁혀 지도 몫을 늘린다 */
+  .gx-field { grid-template-columns: minmax(0, 1fr) minmax(280px, 300px); gap: 14px; }
+}
