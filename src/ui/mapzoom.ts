@@ -10,6 +10,10 @@ interface View { z: number; x: number; y: number }
 /** 지역별 확대 상태. 다시 그려도 보던 자리를 지킨다 */
 const views = new Map<string, View>();
 
+/** 창 크기가 바뀌면 지금 그려진 지도의 채우기·자리를 다시 맞춘다 (한 번만 건다) */
+let reapply: (() => void) | null = null;
+let resizeBound = false;
+
 /** nation: 지역 지도일 때 맨 아래 「전국」 (v0.16.17: 지도 위 줄에 있던 ← 전국을 확대 버튼 밑으로).
  *  원래 크기 버튼은 맨 위: 확대하면 생기는데 아래에 두면 +/− 가 한 칸씩 밀려 올라갔다 (v0.16.18) */
 export function mapZoomControls(nation = false): string {
@@ -118,7 +122,7 @@ export function bindMapZoom(root: HTMLElement): void {
   if (!canvas || !layer) return;
   const key = canvas.dataset.map ?? '';
   // 처음엔 가운데 (PC 임무 탭은 칸이 그림보다 낮아 위아래가 잘린다. 2026-10-21 사용자: 끌어서 본다)
-  let v = views.get(key) ?? { z: 1, x: 0, y: Number.NaN };
+  let v = views.get(key) ?? { z: 1, x: Number.NaN, y: Number.NaN };
   const canPan = () => layer.offsetWidth * v.z > canvas.clientWidth + 1 || layer.offsetHeight * v.z > canvas.clientHeight + 1;
 
   const img = canvas.querySelector<HTMLImageElement>('.gx-mapimg');
@@ -129,7 +133,16 @@ export function bindMapZoom(root: HTMLElement): void {
       layer.style.transform = '';
       return;
     }
+    // 폴드 펼침 폭(601~860, CSS --gx-mapfill: 1): 칸이 남은 높이를 다 쓰므로 그림을 칸 높이까지 키운다.
+    // 칸보다 넓어진 그림은 좌우로 끌어서 본다. 핀은 겹(.gx-mapzoom) 기준 %라 겹 폭만 바꾸면 제자리를 지킨다
+    const fill = getComputedStyle(canvas).getPropertyValue('--gx-mapfill').trim() === '1';
+    if (fill && img?.naturalWidth && img.naturalHeight) {
+      const w = Math.max(canvas.clientWidth, (canvas.clientHeight * img.naturalWidth) / img.naturalHeight);
+      layer.style.width = `${Math.ceil(w)}px`;
+    } else layer.style.removeProperty('width');
     if (Number.isNaN(v.y)) v = { ...v, y: (canvas.clientHeight - layer.offsetHeight) / 2 };
+    // 처음엔 좌우도 가운데 (그림이 칸보다 넓을 때 한반도가 왼쪽에 붙지 않게)
+    if (Number.isNaN(v.x)) v = { ...v, x: (canvas.clientWidth - layer.offsetWidth) / 2 };
     v = clamp(v, canvas.clientWidth, canvas.clientHeight, layer.offsetWidth, layer.offsetHeight);
     views.set(key, v);
     layer.style.transform = v.z === 1 && !v.x && !v.y ? '' : `translate(${v.x}px, ${v.y}px) scale(${v.z})`;
@@ -153,13 +166,15 @@ export function bindMapZoom(root: HTMLElement): void {
   };
   if (img && !img.complete) img.addEventListener('load', apply, { once: true });
   apply();
+  reapply = () => (canvas.isConnected ? apply() : (reapply = null));
+  if (!resizeBound) (resizeBound = true), window.addEventListener('resize', () => reapply?.());
 
   canvas.querySelector('.gx-zoom')?.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-zoom]');
     if (!b) return;
     e.stopPropagation();
     const w = canvas.clientWidth / 2, h = canvas.clientHeight / 2;
-    if (b.dataset.zoom === 'reset') (v = { z: 1, x: 0, y: Number.NaN }), apply();
+    if (b.dataset.zoom === 'reset') (v = { z: 1, x: Number.NaN, y: Number.NaN }), apply();
     else zoomAt(v.z * (b.dataset.zoom === 'in' ? 1.6 : 1 / 1.6), w, h);
   });
 
