@@ -5810,6 +5810,14 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .ms-bm .bp-it { padding: 10px; }
   .ms-bm .bp-pic { height: 100px; }
   .ms-bm .bd-win { top: 12px; right: 12px; width: min(420px, calc(100% - 24px)); height: min(560px, calc(100% - 24px)); }
+  /* 주문 조회 표: 고정 칸 120·110·96px 가 408px 본문을 먹어 상품 이름이 한 글자씩 세로로 쌓였다 → 고정 칸을 줄이고 이름은 낱말 단위로 */
+  .ms-bm .bp-otb th, .ms-bm .bp-otb td { padding: 8px 10px; }
+  .ms-bm .bp-otb th:nth-child(2), .ms-bm .bp-otb td:nth-child(2) { width: 76px; }
+  .ms-bm .bp-otb th:nth-child(3), .ms-bm .bp-otb td:nth-child(3) { width: 84px; white-space: nowrap; }
+  .ms-bm .bp-otb th:nth-child(4), .ms-bm .bp-otb td:nth-child(4) { width: 60px; }
+  .ms-bm .bp-oname { gap: 8px; }
+  .ms-bm .bp-oname b { word-break: keep-all; overflow-wrap: anywhere; }
+  .ms-bm .bp-take { padding: 7px 12px; white-space: nowrap; }
 }
 @media (min-width: 601px) and (max-width: 860px) and (min-height: 500px) and (max-height: 760px) {
   .br-ntp { padding-top: 32px; }
