@@ -1,7 +1,7 @@
 // 호출 진행 창 모양 확인 (작업용): node tests/progwin-browser.mjs <사진 폴더>
 // Risu 의 setInnerHTML 은 class·style 속성을 지운다 (시험 흉내도 그렇게 한다) → 그래도 칸·줄 모양이 살아 있어야 한다
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, closeWin, launch, loadFixture, openWin } from './qc-settings-harness.mjs';
 
 const OUT = process.argv[2] || '.scratch/progwin';

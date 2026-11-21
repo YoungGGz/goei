@@ -1,7 +1,7 @@
 // QC · 설정 창 「바뀐 곳만 다시 그리기」 (2026-11-06 사용자, 전수점검 남은 것 6): 같은 화면에서 스위치 하나를 누르면
 // 글칸·목록 요소가 그대로 남고(같은 DOM 노드), 치던 글·스크롤이 유지되며, 스위치 표시만 바뀐다. 다른 화면으로 가면 통째로 새로 그린다.
 // 사용법: node tests/qc-settings-morph-browser.mjs <fixture.json> [pc|phone|land|all]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, clickSel, goNode, launch, loadFixture, openEditor, openWin, setInput, VIEWPORTS } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);

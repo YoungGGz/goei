@@ -3,7 +3,7 @@
 // 사용: node tests/itemstate-browser.mjs <사진 폴더> [core.mjs 경로] [--before]
 //   --before = 고치기 전 빌드로 같은 장면을 찍기만 한다 (확인 없음). 옛 지침에는 그림 말을 다시 고르라는 말이 없으므로 그림 말 없이 보낸다
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { boot, closeEditor, launch, loadFixture, openEditor, openWin, setInput, sleep } from './qc-settings-harness.mjs';

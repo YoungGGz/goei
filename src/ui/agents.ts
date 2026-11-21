@@ -2,7 +2,7 @@
 
 import { ICONS } from './icons';
 import { headSeg } from './evcard';
-import { isPhone } from './media';
+import { isPhone, zpx, zrect } from './media';
 
 export type AgentView = 'wall' | 'list';
 /** 편성 기준: 작전 중(op) · 편성 가능(ok) · 작전 중은 아니지만 편성 불가(lock: 실종·사망 등) */
@@ -115,9 +115,9 @@ export function bindAgentTips(root: HTMLElement): void {
     bub.className = 'gx-agtip';
     bub.innerHTML = `<b>${esc(el.dataset.agtip ?? '')}</b>${esc(el.dataset.agtipText ?? '')}`;
     root.appendChild(bub);
-    const r = el.getBoundingClientRect();
+    const r = zrect(el);
     const w = bub.offsetWidth;
-    const x = Math.min(window.innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
+    const x = Math.min(zpx(window.innerWidth) - w - 8, Math.max(8, r.left + r.width / 2 - w / 2));
     bub.style.left = `${x}px`;
     bub.style.top = `${r.top - bub.offsetHeight - 10}px`;
     // 꼬리는 칸 가운데를 가리킨다 (말풍선이 화면 끝에서 밀려도)

@@ -87,7 +87,7 @@ export function seedPerson(name: string, sheet: string | null, base: SeedBase = 
     for (const [section, slot] of Object.entries(SEED_SECTIONS)) {
       const body = s.sections[section];
       if (!body) continue;
-      const list: Entry[] = bullets(body).map((text, i) => ({ id: entryId(name, slot, '#0', i, text), text: plain(text, 300), src: 'seed', anchor: '#0', seq: i }));
+      const list: Entry[] = bullets(body).map((text, i) => ({ id: entryId(name, slot, '#0', i, text), text: seedText(text), src: 'seed', anchor: '#0', seq: i }));
       if (list.length) p.slots[slot] = list;
     }
   }
@@ -97,7 +97,17 @@ export function seedPerson(name: string, sheet: string | null, base: SeedBase = 
 /** 시트의 Identity·Character 절이 시작값 항목으로 옮겨질 때의 글 (seedPerson 과 같은 변환) */
 export function seedTexts(sheet: string): Set<string> {
   const s = parseSheet(sheet);
-  return new Set(Object.keys(SEED_SECTIONS).flatMap((section) => (s.sections[section] ? bullets(s.sections[section]).map((text) => plain(text, 300)) : [])));
+  // 옛 판(300자에서 그냥 자름)으로 이미 저장된 시작값 항목도 같은 줄로 본다
+  return new Set(Object.keys(SEED_SECTIONS).flatMap((section) => (s.sections[section] ? bullets(s.sections[section]).flatMap((text) => [seedText(text), plain(text, 300)]) : [])));
+}
+
+/** 시작값 항목 글: 300자를 넘으면 단어 사이에서 끊고 「…」 (단어 가운데서 잘려 「judgme」처럼 보였다, 눌러3-PC-3) */
+export function seedText(text: string, max = 300): string {
+  const s = plain(text, Infinity);
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  const sp = cut.lastIndexOf(' ');
+  return `${sp >= max * 0.6 ? cut.slice(0, sp) : cut}…`;
 }
 
 /** 시트의 고정 절만 (본편에 원문으로 넣을 부분) */

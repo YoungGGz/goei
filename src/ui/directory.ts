@@ -1,5 +1,6 @@
 // 설정 → 「카드 명부」: 로어북 폴더에서 모은 괴이·미스틱 사이트·요원의 세부값 편집.
 // 고친 값은 카드 로어북 「Directory」에 저장되어 카드와 함께 공유되고, 이 카드의 모든 채팅에 바로 적용된다.
+import { zpx, zrect } from './media';
 import { scrollInside } from './panels';
 import { askPopup } from './editor/askpop';
 import {
@@ -306,12 +307,12 @@ export function bindCropDrag(root: HTMLElement, done: () => void): void {
     const key = box.dataset.crop ?? '';
     const frame = box.querySelector<HTMLElement>('.dir-crop-frame');
     const move = (e: PointerEvent) => {
-      const r = img.getBoundingClientRect();
+      const r = zrect(img);
       if (!r.width || !r.height) return;
       const w = cropValue(key)[2];
       const half = ((w / 100) * r.width) / 2;
-      const px = Math.max(Math.min(half, r.width / 2), Math.min(r.width - half, e.clientX - r.left));
-      const py = Math.max(Math.min(half, r.height / 2), Math.min(r.height - half, e.clientY - r.top));
+      const px = Math.max(Math.min(half, r.width / 2), Math.min(r.width - half, zpx(e.clientX) - r.left));
+      const py = Math.max(Math.min(half, r.height / 2), Math.min(r.height - half, zpx(e.clientY) - r.top));
       const c: [number, number, number] = [(px / r.width) * 100, (py / r.height) * 100, w];
       setCrop(key, c);
       if (frame) Object.assign(frame.style, { left: `${c[0]}%`, top: `${c[1]}%` });

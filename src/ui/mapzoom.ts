@@ -1,3 +1,4 @@
+import { zpx, zrect } from './media';
 // 지도 확대: 지도 칸(.gx-canvas)은 그대로 두고 안쪽 그림(.gx-mapzoom)만 키우고 옮긴다.
 // 휴대폰은 두 손가락 벌리기·한 손가락 끌기, PC는 Ctrl+휠(트랙패드 오므리기)·끌기, 어디서나 +/− 버튼.
 // 핀은 그림과 함께 자리를 옮기고, 크기는 조금만 커지도록 되돌려 줄인다(--pz).
@@ -30,7 +31,7 @@ function clamp(v: View, cw: number, ch: number, lw: number, lh: number): View {
 
 type Box = { l: number; t: number; r: number; b: number };
 const hit = (a: Box, b: Box) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
-const box = (el: Element): Box => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+const box = (el: Element): Box => { const r = zrect(el); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
 const grow = (b: Box, n: number): Box => ({ l: b.l - n, t: b.t - n, r: b.r + n, b: b.b + n });
 /** 이름표와 남의 점 사이 최소 틈(px) */
 const DOT_GAP = 5;
@@ -44,7 +45,8 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
   const dots = [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')];
   if (!labs.length) return;
   for (const el of labs) el.style.removeProperty('--lx'), el.style.removeProperty('--ly');
-  const F = box(frame);
+  // 칸 테두리(1px)에서 1px 더 안쪽까지만 (이름표가 칸 위 끝을 3px 넘어 검색 칸을 덮었다, 752×749 실리수)
+  const F = grow(box(frame), -2);
   const inFrame = (r: Box) => r.l >= F.l && r.r <= F.r && r.t >= F.t && r.b <= F.b;
   const dotBox = dots.map((d) => { const dot = d.querySelector('.gx-dot'); return dot ? box(dot) : null; });
   const order = labs.map((el, i) => ({ el, i })).sort((a, b) => rank(a.el) - rank(b.el) || a.i - b.i);
@@ -54,8 +56,14 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     const name = el.querySelector('.gx-pname');
     const D = dotBox[i];
     if (!name || !D) continue;
-    const N = box(name);
-    const w = N.r - N.l, h = N.b - N.t, my = (D.t + D.b) / 2 - h / 2;
+    const N0 = box(name);
+    const w = N0.r - N0.l, h = N0.b - N0.t;
+    // 점이 칸 안에 보이는데 제자리 이름표가 칸 밖으로 삐져나가면 칸 안으로 밀어 넣는다 (확대해 칸 밖으로 나간 점은 그대로)
+    const dIn = D.l >= F.l && D.r <= F.r && D.t >= F.t && D.b <= F.b;
+    const nl = dIn && w <= F.r - F.l ? Math.min(Math.max(N0.l, F.l), F.r - w) : N0.l;
+    const nt = dIn && h <= F.b - F.t ? Math.min(Math.max(N0.t, F.t), F.b - h) : N0.t;
+    const N = { l: nl, t: nt, r: nl + w, b: nt + h };
+    const my = (D.t + D.b) / 2 - h / 2;
     // 아래(제자리) → 위 → 오른쪽 → 왼쪽 → 네 귀퉁이 → 옆 반 칸 위아래
     // (옆 반 칸: 귀퉁이까지 막혀 이름표 없는 점이 여럿 남았다, 전수점검 눌러-사소-1·눌러2-보통-7. 점에 닿는 자리만이라 어느 점 이름인지는 그대로 읽힌다)
     const up = D.t - 2 - h, dn = D.b + 2, rt = D.r + 1, lt = D.l - 1 - w, hh = h / 2 + 1;
@@ -66,14 +74,16 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     let at = -1;
     spots.some(([l, t], k) => {
       const r = { l, t, r: l + w, b: t + h };
-      if ((k === 0 || inFrame(r)) && (rank(el) === 0 && k === 0 || free(r))) return (at = k), placed.push(r), true;
+      if ((k === 0 || inFrame(r)) && free(r)) return (at = k), placed.push(r), true;
       return false;
     });
+    // 고른 핀은 숨기지 않는다: 빈자리가 없을 때만 제자리 (전에는 늘 제자리라 옆 점이 「중구」 이름표를 덮어 「ㅇ구」로 읽혔다, 눌러3-PC-2)
+    if (at < 0 && rank(el) === 0) at = 0, placed.push({ l: N.l, t: N.t, r: N.r, b: N.b });
     const blocked = at < 0;
     el.classList.toggle('lab-off', blocked);
-    if (at > 0) {
-      el.style.setProperty('--lx', `${(spots[at][0] - N.l) / z}px`);
-      el.style.setProperty('--ly', `${(spots[at][1] - N.t) / z}px`);
+    if (at >= 0 && (spots[at][0] !== N0.l || spots[at][1] !== N0.t)) {
+      el.style.setProperty('--lx', `${(spots[at][0] - N0.l) / z}px`);
+      el.style.setProperty('--ly', `${(spots[at][1] - N0.t) / z}px`);
     }
     const d = dots[i];
     d.toggleAttribute('title', blocked);
@@ -139,7 +149,7 @@ export function bindMapZoom(root: HTMLElement): void {
     apply();
   };
   const local = (px: number, py: number) => {
-    const r = canvas.getBoundingClientRect();
+    const r = zrect(canvas);
     return [px - r.left - canvas.clientLeft, py - r.top - canvas.clientTop] as const;
   };
   if (img && !img.complete) img.addEventListener('load', apply, { once: true });
@@ -170,8 +180,8 @@ export function bindMapZoom(root: HTMLElement): void {
     if ((e.target as HTMLElement).closest('.gx-zoom')) return (start = null);
     if (t.length === 2) {
       const [mx, my] = local((t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2);
-      start = { d: dist(t), mx, my, v: { ...v }, x: t[0].clientX, y: t[0].clientY };
-    } else if (t.length === 1) start = { d: 0, mx: 0, my: 0, v: { ...v }, x: t[0].clientX, y: t[0].clientY };
+      start = { d: dist(t), mx, my, v: { ...v }, x: zpx(t[0].clientX), y: zpx(t[0].clientY) };
+    } else if (t.length === 1) start = { d: 0, mx: 0, my: 0, v: { ...v }, x: zpx(t[0].clientX), y: zpx(t[0].clientY) };
   }, { passive: true });
   canvas.addEventListener('touchmove', (e) => {
     const t = e.touches;
@@ -187,7 +197,7 @@ export function bindMapZoom(root: HTMLElement): void {
     } else if (t.length === 1 && canPan() && !start.d) {
       // 확대했을 때만 한 손가락으로 지도를 옮긴다(아니면 화면 스크롤)
       e.preventDefault();
-      const dx = t[0].clientX - start.x, dy = t[0].clientY - start.y;
+      const dx = zpx(t[0].clientX) - start.x, dy = zpx(t[0].clientY) - start.y;
       if (Math.hypot(dx, dy) > MOVE) dragged = true;
       v = { ...start.v, x: start.v.x + dx, y: start.v.y + dy };
       apply();
@@ -196,7 +206,7 @@ export function bindMapZoom(root: HTMLElement): void {
   canvas.addEventListener('touchend', (e) => {
     // 두 손가락 중 하나를 떼면 남은 손가락으로 이어서 옮기기
     const t = e.touches;
-    start = t.length === 1 ? { d: 0, mx: 0, my: 0, v: { ...v }, x: t[0].clientX, y: t[0].clientY } : null;
+    start = t.length === 1 ? { d: 0, mx: 0, my: 0, v: { ...v }, x: zpx(t[0].clientX), y: zpx(t[0].clientY) } : null;
   }, { passive: true });
 
   // PC: Ctrl+휠(트랙패드 오므리기)로만 확대·축소, 마우스 끌기.
@@ -209,10 +219,10 @@ export function bindMapZoom(root: HTMLElement): void {
   }, { passive: false });
   canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse' || e.button !== 0 || !canPan() || (e.target as HTMLElement).closest('.gx-zoom')) return;
-    const sx = e.clientX, sy = e.clientY, sv = { ...v };
+    const sx = zpx(e.clientX), sy = zpx(e.clientY), sv = { ...v };
     dragged = false;
     const move = (m: PointerEvent) => {
-      const dx = m.clientX - sx, dy = m.clientY - sy;
+      const dx = zpx(m.clientX) - sx, dy = zpx(m.clientY) - sy;
       if (Math.hypot(dx, dy) > MOVE) dragged = true;
       if (dragged) (v = { ...sv, x: sv.x + dx, y: sv.y + dy }), apply();
     };
@@ -221,3 +231,4 @@ export function bindMapZoom(root: HTMLElement): void {
     window.addEventListener('pointerup', up);
   });
 }
+

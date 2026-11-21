@@ -2,7 +2,7 @@
 // 값이 기기 설정(prefs) 또는 채팅 변수(setChatToIndex)에 맞게 저장되는지, 범위(이 채팅/새 채팅 기본값/시작 전)가 섞이지 않는지,
 // 경계값·잘못된 입력, 다시 열었을 때 같은 값이 보이는지를 본다. 세 뷰포트.
 // 사용법: node tests/qc-settings-pages-browser.mjs <fixture.json> [pc|phone|land|all]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { auditDom, boot, chatOf, closeEditor, closeWin, goNode, launch, loadFixture, openEditor, openWin, prefsOf, setChat, setInput, sleep, isPhoneVp, VIEWPORTS } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);
@@ -10,7 +10,10 @@ const which = process.argv[3] ?? 'all';
 const vps = which === 'all' ? Object.keys(VIEWPORTS) : [which];
 const browser = await launch();
 
-const PAGES = ['screen', 'image', 'board', 'status', 'net', 'phone', 'wiki', 'journal', 'items', 'people', 'factions', 'lore', 'adv']; // 11-09: 업데이트는 점검 → 설치·업데이트(install) 페이지로 합쳐짐
+const PAGES0 = ['screen', 'image', 'board', 'status', 'net', 'phone', 'wiki', 'journal', 'items', 'people', 'factions', 'lore', 'adv']; // 11-09: 업데이트는 점검 → 설치·업데이트(install) 페이지로 합쳐짐
+// 나눠 돌리기 (11-21): QC_PAGES=screen,image 는 그 페이지만 눌러 보고, QC_EXTRA=0 은 눌러 보기 뒤의 따로 보는 검사(기본값 저장·상점 표·고급 칸·로어북 호출)를 건너뛴다
+const PAGES = process.env.QC_PAGES ? PAGES0.filter((p) => process.env.QC_PAGES.split(',').includes(p)) : PAGES0;
+const EXTRA = process.env.QC_EXTRA !== '0';
 /** 기능 페이지: 값은 늘 이 채팅 변수 (범위 전환 없음) */
 const FEATURE = new Set(['net', 'phone', 'wiki', 'people', 'journal', 'factions']);
 /** 누르면 저장이 아니라 다른 일을 하는 단추 (확인창·네트워크·화면 이동·LLM 호출) — 전수 클릭에서 뺀다 */
@@ -213,6 +216,7 @@ for (const vp of vps) {
         if (vp !== 'pc') assert.deepEqual(a.overflow, [], `${vp} ${p}/${mode}: 가로 넘침`);
       }
     }
+    if (EXTRA) {
     // 기본값으로 저장·불러오기: 요원 표시 인원을 3으로 두고 저장 → 기본값 3, 7로 바꾼 뒤 불러오기 → 3 (이 채팅 값만 바뀜)
     await goNode(page, 'set:board');
     const bar = async (what) => {
@@ -438,13 +442,14 @@ for (const vp of vps) {
     // 업데이트 페이지: 화면만 (확인 단추·버전 글자)
     await goNode(page, 'install');
     assert.ok(await page.$('.gw [data-action="upd-check"]'), '업데이트 확인 단추');
+    }
     await closeEditor(page, true);
     await closeWin(page);
     assert.deepEqual(errors, [], `${vp}: 시작 뒤 오류`);
     await page.close();
   }
   // ── 로어북 호출 「상시 로어북」: 줄·목록·검색·체크 저장 (시작 전 = 새 채팅 기본값, 시작 뒤 = 이 채팅) ──
-  for (const mode of ['pre', 'chat']) {
+  if (EXTRA) for (const mode of ['pre', 'chat']) {
     const VAR = '$gen_active_books';
     const chat0 = mode === 'pre' ? { message: [], scriptstate: {} } : { message: [{ role: 'user', data: 'hi' }, { role: 'char', data: '본문' }], scriptstate: { $st_faction: 'A00', $st_lang: 'ko', $st_fm: '2' } };
     const { page, errors } = await boot(browser, fx, chat0, vp);

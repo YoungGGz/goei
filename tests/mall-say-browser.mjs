@@ -1,6 +1,6 @@
 // 우주 쇼핑몰 상담: 보낸 말이 응답을 기다리는 동안 바로 보인다 (작업용): node tests/mall-say-browser.mjs <사진 폴더>
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, launch, loadFixture, openWin, closeEditor } from './qc-settings-harness.mjs';
 import { build } from 'esbuild';
 const out = await build({ stdin: { contents: `export { emptyShop } from './src/core/shop'; export { mallVarsOf } from './src/core/malls';`, resolveDir: process.cwd() }, bundle: true, format: 'esm', write: false });

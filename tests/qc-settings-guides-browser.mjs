@@ -1,7 +1,7 @@
 // QC 03 · 설정 창 「지침」·「점검」 탭: 기본 지침 7종 절 단위 편집·저장·되돌리기(합치면 원문과 같음), 이미지 지침 페이지,
 // 추가 규칙(추가·대상·켬/끔·삭제·상한 100개·글자 상한), 점검(상태 점검·요청 기록·설정 내보내기 JSON·저장소 사용량·가져오기·지우기). 세 뷰포트.
 // 사용법: node tests/qc-settings-guides-browser.mjs <fixture.json> [pc|phone|land|all]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { readFileSync } from 'node:fs';
 import { auditDom, boot, clickSel, closeEditor, goNode, launch, loadFixture, openEditor, openWin, prefsOf, setInput, sleep, VIEWPORTS } from './qc-settings-harness.mjs';
 

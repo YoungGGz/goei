@@ -6,7 +6,7 @@ import { distPack, distWorldPack } from './data-init.mjs';
 import { execSync } from 'node:child_process';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { gzipSync } from 'node:zlib';
 
 // 설정 창의 괴담넷 페이지 열기/닫기 (2026-10-29: 판 안 설정 단추 없음)

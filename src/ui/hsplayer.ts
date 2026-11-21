@@ -4,6 +4,7 @@
 // - 글자·숫자·띠는 그림이 아니라 HTML 로 얹는다 (도트 글꼴, 11-10 도트 시안 site_mock_dot).
 // - 화면을 다시 그려도(app render) 캔버스·채팅 줄은 같은 DOM 을 다시 꽂아 끊기지 않는다. 화면에서 빠지면(탭 닫기·창 닫기) 멈추고, 다시 꽂히면 그 자리부터.
 // - 동작 고르기·길이 계산은 core/homeshop.ts (설정 값). 여기는 시간 흐름과 그리기만.
+import { zpx } from './media';
 import { clipsOf, cueMs, dropEnd, dropRest, nextDrop, moodMap, moodName, CUE_EVENT_LABEL, hsName, idleState, hsPayText, moodClip, nextIdle, parseClipGroups, pickVersion, type CueCut, type CutId, type HsClip, type HsCue, type HsSettings, type HsShow, type IdleState } from '../core/homeshop';
 import type { HsArt } from '../host/homeshop';
 import { HS_FONT } from '../host/homeshop';
@@ -223,7 +224,7 @@ function fitScale(w: number, h: number): number {
   const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   // PC: 채팅 칸 최소 폭 260 + 사이 14 · 방송 칸 테두리 2. 높이: 보이는 높이의 60% (아래 상품 칸·주문 단추가 첫 화면에 같이 보이게)
   const roomW = (phone ? inner : inner - 274) - 2;
-  const roomH = (page.clientHeight || window.innerHeight) * (phone ? 0.5 : 0.6) - 36;
+  const roomH = (page.clientHeight || zpx(window.innerHeight)) * (phone ? 0.5 : 0.6) - 36;
   const fit = Math.max(0.25, Math.min(roomW / w, roomH / h));
   return fit >= 2 ? 2 : fit >= 1 ? 1 : fit;
 }

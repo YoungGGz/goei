@@ -1,3 +1,4 @@
+import { zpx, zrect } from './media';
 // PC 마우스 제스처 (11-09 사용자: 브라우저 확장 「마우스 제스처」처럼). 오른쪽 단추를 누른 채 끌면 선이 그려지고, 놓을 때 모양으로 동작한다.
 //   ←  뒤로 (상황판 전체, 폰 쓸기와 같은 navStep)      →  앞으로
 //   ㄴ (↓ 뒤 →)  탭 닫기 (인터넷)                      ㄱ 거꾸로 (↑ 뒤 ←)  닫은 탭 다시 열기 (인터넷, 2026-11-10 사용자: ㄱ 을 역순으로 그리는 것)
@@ -139,8 +140,8 @@ export function bindMouseGesture(root: HTMLElement, h: GestureHandler): void {
     }
   };
   const local = (e: PointerEvent): [number, number] => {
-    const r = root.getBoundingClientRect();
-    return [e.clientX - r.left, e.clientY - r.top];
+    const r = zrect(root);
+    return [zpx(e.clientX) - r.left, zpx(e.clientY) - r.top];
   };
   const finish = () => {
     if (!on) return;
@@ -197,3 +198,4 @@ export function bindMouseGesture(root: HTMLElement, h: GestureHandler): void {
     if (on) e.preventDefault();
   });
 }
+

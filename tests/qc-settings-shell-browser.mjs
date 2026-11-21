@@ -2,7 +2,7 @@
 // 즐겨찾기 5개 상한, 메뉴 왼쪽/오른쪽, 바깥 어둡기 단계, 테마 3종이 패널·편집 창 모든 페이지에 적용(배색 변수), 창 폭 50~100 (저장값 검사),
 // 폰 한 열·가로 넘침 없음·글칸 전체 폭, 편집 창 서랍, Esc·바깥 클릭 닫기.
 // 사용법: node tests/qc-settings-shell-browser.mjs <fixture.json> [pc|phone|land|all]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { auditDom, boot, clickSel, closeEditor, closeWin, goNode, launch, loadFixture, openEditor, openWin, prefsOf, sleep, isPhoneVp, VIEWPORTS } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);

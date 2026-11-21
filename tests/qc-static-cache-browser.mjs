@@ -3,7 +3,7 @@
 //  2) 같은 봇의 다른 채팅으로 바꾸면(채팅 화면은 그대로) 배색·상태창 칸 구성이 그 채팅 것으로 바뀐다
 // 사용법: node tests/qc-static-cache-browser.mjs <fixture.json>
 import { readFileSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { addUserPost, writeGnet, CFG } from '../dist-test/core.mjs';
 import { launch, boot, open } from './qc-static-harness.mjs';
 

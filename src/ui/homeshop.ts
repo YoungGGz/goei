@@ -27,7 +27,7 @@ import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '..
 import { mountPlayer, playerCut, playerHold, playerPhone, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
 import { itemPic } from './items';
-import { isPhone } from './media';
+import { isPhone, zpx } from './media';
 import { playerFlush } from './hsplayer';
 import { appendLog, hsLogOperator, hsLogSticker, sameProgram, type HsLogEntry } from '../core/hslog';
 import { isWaiting, onWaiting } from '../host/waiting';
@@ -938,7 +938,7 @@ function peelDrag(corner: HTMLButtonElement): void {
   let moved = false;
   corner.addEventListener('pointerdown', (e) => {
     if (corner.disabled) return;
-    start = { x: e.clientX, y: e.clientY };
+    start = { x: zpx(e.clientX), y: zpx(e.clientY) };
     peel = 0;
     moved = false;
     corner.setPointerCapture(e.pointerId);
@@ -949,7 +949,7 @@ function peelDrag(corner: HTMLButtonElement): void {
     // 들리는 모서리에서 스티커 안쪽(대각선)으로 간 거리 / 젖힐 수 있는 최대
     const sx = st.classList.contains('c-br') || st.classList.contains('c-tr') ? 1 : -1;
     const sy = st.classList.contains('c-br') || st.classList.contains('c-bl') ? 1 : -1;
-    const d = (sx * (start.x - e.clientX) + sy * (start.y - e.clientY)) / Math.SQRT2;
+    const d = (sx * (start.x - zpx(e.clientX)) + sy * (start.y - zpx(e.clientY))) / Math.SQRT2;
     if (Math.abs(d) > 4) moved = true;
     const cs = getComputedStyle(st);
     const max = (parseFloat(cs.getPropertyValue('--pmax')) || 96) * (parseFloat(cs.getPropertyValue('--lim')) || 1);

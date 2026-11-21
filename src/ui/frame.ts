@@ -3,7 +3,7 @@
 // - 창(.gx-panel) 크기 규칙은 그대로 두고 틀만 창 테두리 바깥으로 뻗는다. 뷰포트가 좁아 「창 최대 폭 + 틀 두께 + 여백」이 안 들어가면 창은 그대로 두고 틀만 숨긴다.
 // - 그림 파일 없이 CSS·SVG 로 그린다 (style.css 「외부 프레임」 절). 확정 시안: docs/시안/상황판_프레임/Tablet.dc.html · Tactical.dc.html
 import type { Prefs } from '../core/settings';
-import { isPhone } from './media';
+import { isPhone, zpx } from './media';
 
 export type FrameKind = NonNullable<Prefs['frame']>;
 
@@ -31,8 +31,8 @@ export function frameState(pref: FrameKind | undefined, nav: boolean): FrameStat
   if (want === 'none') return { kind: 'none', hidden: false };
   // 폰·필드 전체화면: 기기 틀을 그릴 자리가 없다 (숨김 안내도 없음)
   if (isPhone() || document.fullscreenElement) return { kind: 'none', hidden: false };
-  const w = window.innerWidth;
-  const h = window.innerHeight;
+  const w = zpx(window.innerWidth);
+  const h = zpx(window.innerHeight);
   if (w < (nav ? PANEL_W.nav : PANEL_W.pre) + EXTRA_W[want] + PAD[want] * 2) return { kind: 'none', hidden: true };
   // 틀은 화면 높이의 90%까지만 쓴다 (style.css .gx-frame, 2026-11-11 사용자)
   if (want === 'tactical' && (h - PAD.tactical * 2) * 0.9 - EXTRA_H.tactical < TACTICAL_MIN_H) return { kind: 'none', hidden: true };

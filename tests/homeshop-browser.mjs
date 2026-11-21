@@ -1,7 +1,7 @@
 // 망상홈쇼핑 방송 화면 확인 (2026-11-11, 작업용): node tests/homeshop-browser.mjs <사진 폴더>
 // (「인터넷에 상시 노출」을 켠 채팅) 인터넷 즐겨찾기로 열기 → 편성(상품·큐시트·채팅) 한 번 호출 → 방송이 큐시트대로 흐른다 → 스티커 들추기 → 전화 주문(흥정·맞교환 감정 → 맞교환으로 주문) → 설정 페이지
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, closeEditor, closeWin, goNode, launch, loadFixture, openEditor, openWin } from './qc-settings-harness.mjs';
 import { distPack } from './data-init.mjs';
 import { SHOW } from './homeshop-show.mjs';

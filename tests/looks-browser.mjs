@@ -1,7 +1,7 @@
 // 아바타 (2026-11-07~08): 시작 패널 「내 페르소나」 아래 아바타 칸 → 팝업(성별 → 그 성별 일반 프리셋 + 고른 세력 전용 프리셋, 정면 대기 동작)에서 꼭 고름.
 // 세력 전용(관리국·가짜 관리국·백일몽 직원)은 그 세력일 때만. 시작한 뒤에도 같은 팝업으로 바꾼다.
 // 사용법: node tests/looks-browser.mjs <out-dir> [fixture.json]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { mkdirSync } from 'node:fs';
 import { boot, chatOf, closeEditor, closeWin, launch, loadFixture, openWin, setChat, sleep } from './qc-settings-harness.mjs';
 import { distPack } from './data-init.mjs';

@@ -36,7 +36,7 @@ import { siteLogo } from '../browser';
 import { basicSettings } from '../../core/settings';
 import { worldOn } from '../../core/world';
 import { ppValue } from '../../core/people/settings';
-import { isPhone } from '../media';
+import { foldStyle, isPhone, syncFoldStyles, zpx, zrect, zrectQ } from '../media';
 import { consultAction, consultAfterRender, consultAside, consultButton, consultClose, consultUi } from './consult';
 import { setCatalogHost } from './catalog';
 import { markCommitted, morph } from '../morph';
@@ -170,7 +170,7 @@ function ensureRoot(): HTMLElement {
     return root;
   }
   const style = document.createElement('style');
-  style.textContent = editorCss;
+  foldStyle(style, editorCss);
   document.head.appendChild(style);
   root = document.createElement('div');
   root.className = 'gw';
@@ -192,17 +192,21 @@ function ensureRoot(): HTMLElement {
     // 거점: 지역 지도를 누른 자리가 거점 위치 (%) — 패널(app.ts)과 같은 처리
     const pickMap = t.closest<HTMLElement>('[data-base-pick]');
     if (pickMap) {
-      const img = pickMap.querySelector('img')?.getBoundingClientRect();
+      const img = zrectQ(pickMap.querySelector('img'));
       if (!img || !img.width || !img.height) return;
-      const x = ((ev as MouseEvent).clientX - img.left) / img.width * 100;
-      const y = ((ev as MouseEvent).clientY - img.top) / img.height * 100;
+      const x = (zpx((ev as MouseEvent).clientX) - img.left) / img.width * 100;
+      const y = (zpx((ev as MouseEvent).clientY) - img.top) / img.height * 100;
       if (x < 0 || x > 100 || y < 0 || y > 100) return;
       return void run('dir-base-xy', `${x.toFixed(1)}|${y.toFixed(1)}|${pickMap.dataset.basePick}`);
     }
     if (slotDropped) return; // 손잡이를 놓은 직후의 click 은 칸 펼치기가 아니다
     const el = t.closest<HTMLElement>('[data-action]');
     if (!el || el.hasAttribute('disabled')) return;
-    if (el.dataset.action === 'ed-hint') return hintFor === el ? hideHint() : showHint(el); // 폰: 누르면 열고 닫는다
+    if (el.dataset.action === 'ed-hint') {
+      // 폰: 누르면 열고 닫는다. 손가락으로 누르면 브라우저가 mouseover 를 먼저 보내 방금 띄운 것을 이 click 이 바로 닫았다(「?」를 눌러도 설명이 안 뜸, 눌러 보기 3차) → 막 띄운 것은 둔다
+      if (hintFor === el && Date.now() - hintAt < 700) return;
+      return hintFor === el ? hideHint() : showHint(el);
+    }
     const take = el.dataset.take ? root?.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${el.dataset.take}"]`)?.value : undefined;
     void run(el.dataset.action!, take ?? el.dataset.value);
   });
@@ -391,9 +395,9 @@ function ensureRoot(): HTMLElement {
       let best: typeof drop = null;
       let gap = Infinity;
       for (const r of rows) {
-        const b = r.getBoundingClientRect();
+        const b = zrect(r);
         const d = Math.abs(e.clientY - (b.top + b.height / 2));
-        if (d < gap) [gap, best] = [d, { el: r, after: e.clientY > b.top + b.height / 2 }];
+        if (d < gap) [gap, best] = [d, { el: r, after: zpx(e.clientY) > b.top + b.height / 2 }];
       }
       if (best?.el !== drop?.el || best?.after !== drop?.after) mark(best);
     };
@@ -809,6 +813,7 @@ function body(ctx: ChatContext): string {
 let lastDrawn = '';
 
 export function render(): void {
+  syncFoldStyles(); // 설정 「펼친 폴드 화면 배치」 (ui/media.ts)
   if (!root || !edUi.open || !host) return;
   const ctx = host.ctx();
   if (ctx) overridesOf(ctx); // 저장·새로 읽기 뒤 덧쓰기 초안을 카드 값으로 맞춘다 (지침 화면처럼 초안을 안 쓰는 화면에서도)
@@ -890,9 +895,9 @@ export function render(): void {
     if (panel && !boundOnce.has(panel)) {
       boundOnce.add(panel);
       let y0: number | null = null;
-      panel.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+      panel.addEventListener('pointerdown', (e) => { y0 = zpx(e.clientY); });
       panel.addEventListener('pointermove', (e) => {
-        if (y0 === null || e.clientY - y0 < 18) return;
+        if (y0 === null || zpx(e.clientY) - y0 < 18) return;
         y0 = null;
         setCdr(false);
       });
@@ -1027,14 +1032,14 @@ function showHint(btn: HTMLElement): void {
   p.setAttribute('role', 'tooltip');
   p.textContent = text;
   root.appendChild(p);
-  const r = btn.getBoundingClientRect();
-  const w = Math.min(320, window.innerWidth - 24);
+  const r = zrect(btn);
+  const w = Math.min(320, zpx(window.innerWidth) - 24);
   p.style.width = `${w}px`;
-  p.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - w - 12))}px`;
+  p.style.left = `${Math.max(12, Math.min(r.left, zpx(window.innerWidth) - w - 12))}px`;
   p.style.top = `${r.bottom + 6}px`;
   // 아래가 모자라면 위로
-  const h = p.getBoundingClientRect().height;
-  if (r.bottom + 6 + h > window.innerHeight - 8) p.style.top = `${Math.max(8, r.top - 6 - h)}px`;
+  const h = zrect(p).height;
+  if (r.bottom + 6 + h > zpx(window.innerHeight) - 8) p.style.top = `${Math.max(8, r.top - 6 - h)}px`;
   hintEl = p;
   hintFor = btn;
   hintAt = Date.now();
@@ -1052,6 +1057,8 @@ const ROW_DEL: Record<string, string> = {
   'ms-fx-del': '이 시그니처 상품을 지울까요?',
   'set-items-rules-del': '이 판정 표 줄을 지울까요?',
   'set-items-alias-del': '이 그림 대체 말 줄을 지울까요?',
+  // 인물 기록 점검 「진단 지우기」만 묻지 않고 바로 전부 지웠다 (눌러 보기 3차)
+  'pp-diag-clear': '이 기기에 저장된 갱신 기록을 모두 지울까요?',
 };
 
 export async function handle(action: string, value?: string): Promise<void> {
@@ -1178,6 +1185,11 @@ export async function handle(action: string, value?: string): Promise<void> {
     // 다른 폴더에서 넣은 후보는 바로 골라 기본 정보(발생 후보·빼기)를 보여 준다
     if (action === 'dir-ext-add' && value && isKind(edUi.node) && directoryDraft(ctx)[edUi.node === 'site' ? 'sites' : 'anomalies'].some((p) => p.lore === value)) {
       edUi.sel[edUi.node] = value;
+      render();
+    }
+    // 후보 목록에서 뺀 것이 본문에 그대로 남았다(수는 줄고 본문은 「관리국 · 명부에만 있음」, 눌러 보기 3차) → 고른 것을 비운다
+    if (action === 'dir-ext-del' && value && isKind(edUi.node) && edUi.sel[edUi.node] === value && !directoryDraft(ctx)[edUi.node === 'site' ? 'sites' : 'anomalies'].some((p) => p.lore === value)) {
+      edUi.sel[edUi.node] = '';
       render();
     }
     return;

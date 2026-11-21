@@ -1,6 +1,6 @@
 // 왼쪽 메뉴 묶음(호출·표시·기능)과 가계부 → 소지품 합침 (2026-11-12 사용자): 「설정 →」 도착, 켜고 끄기, 설정 찾기, 시작 전 기본값, PC·폰
 // 사용법: node tests/menu-merge-browser.mjs
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, chatOf, goNode, launch, loadFixture, openEditor, openWin, prefsOf, sleep } from './qc-settings-harness.mjs';
 const fx = loadFixture(new URL('../.scratch/fixture/fixture.json', import.meta.url).pathname);
 const CHAR = '문을 열었다.\n[▣|2025.01.01|02:47 PM|☀️|4°C|본부|목표|없음|대기|관리국/요원|100000]';

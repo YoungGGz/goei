@@ -3,7 +3,7 @@
 // + (개선 나3) 본체 beforeRequest 가 통째로 던져도 시작기가 요청을 막지 않고 플러그인 표식만 지워 보내는지.
 // 사용법: node tests/qc-static-risu-browser.mjs <fixture.json>
 import { readFileSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { launch, hostScript, plugin, testBodyCode } from './qc-static-harness.mjs';
 
 const fixture = JSON.parse(readFileSync(process.argv[2], 'utf8'));

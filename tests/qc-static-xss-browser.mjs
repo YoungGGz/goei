@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 import { distWorldPack } from './data-init.mjs';
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { addUserPost, addUserComment, addOutgoingDm, writeGnet, CFG, saveDoc, addWalletEntry, walletVars, phone } from '../dist-test/core.mjs';
 
 const require = createRequire(execSync('npm root -g').toString().trim() + '/');

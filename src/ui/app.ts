@@ -79,7 +79,7 @@ import { walletHeadButton, walletList, walletUi as walletTabUi } from './wallet'
 import { parsePoints, pointsOn, pointsVars, readPoints } from '../core/points';
 import { guideTxt } from '../core/guides';
 import { applyRecordsNav, closeToastHtml, endedReport, holdToast, releaseToast, syncCloseToast, handleRecords, journalList, rec, recordsInput, recordsNav, recordsTab, resetRecords, type RecordsEnv } from './records';
-import { isPhone, PHONE_MQ } from './media';
+import { PHONE_WATCH, foldStyle, isPhone, syncFoldStyles, zpx, zrect, zrectQ } from './media';
 
 /** ID카드 잔고 칩 → 장부 창 (열림·입력 알림) */
 
@@ -272,7 +272,7 @@ function ensureRoot(): HTMLElement {
   });
   startLookActs();
   const style = document.createElement('style');
-  style.textContent = css + LOOK_CSS;
+  foldStyle(style, css + LOOK_CSS);
   document.head.appendChild(style);
   root = document.createElement('div');
   root.className = 'gx';
@@ -316,10 +316,10 @@ function ensureRoot(): HTMLElement {
     // 명부 거점: 지역 지도를 누른 자리가 거점 위치 (%)
     const pickMap = t.closest<HTMLElement>('[data-base-pick]');
     if (pickMap) {
-      const img = pickMap.querySelector('img')?.getBoundingClientRect();
+      const img = zrectQ(pickMap.querySelector('img'));
       if (!img || !img.width || !img.height) return;
-      const x = ((ev as MouseEvent).clientX - img.left) / img.width * 100;
-      const y = ((ev as MouseEvent).clientY - img.top) / img.height * 100;
+      const x = (zpx((ev as MouseEvent).clientX) - img.left) / img.width * 100;
+      const y = (zpx((ev as MouseEvent).clientY) - img.top) / img.height * 100;
       if (x < 0 || x > 100 || y < 0 || y > 100) return;
       return void run('dir-base-xy', `${x.toFixed(1)}|${y.toFixed(1)}|${pickMap.dataset.basePick}`);
     }
@@ -376,9 +376,9 @@ function ensureRoot(): HTMLElement {
       let best: typeof drop = null;
       let gap = Infinity;
       for (const r of rows) {
-        const b = r.getBoundingClientRect();
+        const b = zrect(r);
         const d = Math.abs(e.clientY - (b.top + b.height / 2));
-        if (d < gap) [gap, best] = [d, { el: r, after: e.clientY > b.top + b.height / 2 }];
+        if (d < gap) [gap, best] = [d, { el: r, after: zpx(e.clientY) > b.top + b.height / 2 }];
       }
       if (best?.el !== drop?.el || best?.after !== drop?.after) mark(best);
     };
@@ -402,7 +402,8 @@ function ensureRoot(): HTMLElement {
   // 물건 설명 팝업 (2026-11-08 사용자: 특가 구획에서 잘리고, 진열대에서 스크롤바가 생겼다 사라지며 움찔거렸다).
   // 칸 안의 .it-tip 은 내용만 들고, 보여 주기는 창 맨 위 층 하나(.it-tipfloat)가 맡는다. 칸 옆에 띄우고 화면 끝에 닿으면 반대쪽으로
   root.addEventListener('pointerover', (ev) => {
-    if (ev.pointerType && ev.pointerType !== 'mouse') return;
+    // 폰 배치는 설명 말풍선이 없다 (style.css 폰 .it-tip 숨김과 같게, 눌러3: 폰에서 옆 칸을 덮고 남았다)
+    if ((ev.pointerType && ev.pointerType !== 'mouse') || isPhone()) return;
     const cell = (ev.target as HTMLElement | null)?.closest?.<HTMLElement>('.it-c:not(.empty), .it-slot:not(.empty)');
     const tip = cell?.querySelector<HTMLElement>(':scope > .it-tip');
     if (!cell || !tip) return;
@@ -431,7 +432,7 @@ function ensureRoot(): HTMLElement {
   // PC↔모바일 폭이 바뀌면 다시 그린다 (괴담넷은 모바일에서 목록 안 펼침, PC는 두 칸)
   if (!widthWatch) {
     widthWatch = true;
-    matchMedia(PHONE_MQ).addEventListener?.('change', () => root && render());
+    for (const q of PHONE_WATCH) matchMedia(q).addEventListener?.('change', () => root && render());
     // 창 둘레 기기 틀: 뷰포트 폭·필드 전체화면이 바뀌어 그릴지 말지가 달라질 때만 다시 그린다 (ui/frame.ts)
     const frameWatch = () => {
       if (!root || root.style.display === 'none') return;
@@ -599,12 +600,12 @@ function showTip(cell: HTMLElement, tip: HTMLElement): void {
   tipLayer.style.left = '0px';
   tipLayer.style.top = '0px';
   tipLayer.classList.add('on');
-  const r = cell.getBoundingClientRect();
+  const r = zrect(cell);
   const w = tipLayer.offsetWidth;
   const h = tipLayer.offsetHeight;
   const gap = 8;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vw = zpx(window.innerWidth);
+  const vh = zpx(window.innerHeight);
   let x = r.right + gap;
   if (x + w > vw - gap) x = r.left - gap - w;
   if (x < gap) x = Math.max(gap, Math.min(vw - gap - w, r.left));
@@ -1416,6 +1417,9 @@ async function handle(action: string, value?: string): Promise<void> {
       walletTabUi.edit = false;
       return refresh();
     }
+    case 'id-fold':
+      await savePrefs((p) => ({ ...p, idFold: getPrefs().idFold === true ? undefined : true }));
+      return render();
     case 'agents-view':
       // 상황판 요원 칸 제목줄의 모니터·목록 아이콘 (설정 「요원 칸」과 같은 기기 공통 값)
       if (value !== 'wall' && value !== 'list') return;
@@ -1638,6 +1642,9 @@ function render(): void {
   // 안쪽 스크롤 칸(편성 요원 목록·사이드 칸 등)도 같은 탭이면 자리를 지킨다
   const inner = root.dataset.tab === tab ? [...root.querySelectorAll<HTMLElement>(INNER_SCROLL)].map((el) => el.scrollTop) : [];
   const facLeft = root.querySelector<HTMLElement>('.gx-facs')?.scrollLeft;
+  // 상점 본문: 같은 화면(구매·판매)이면 다시 그려도 스크롤 자리를 지킨다 (눌러3: 판매 화면에서 물건을 고르면 맨 위로 튀어 고른 칸이 가려졌다)
+  const shKey = shopUi.open ? (shopUi.pick ? 'pick' : 'buy') : '';
+  const shKeep = shKey && root.dataset.shp === shKey ? root.querySelector<HTMLElement>('.sh-body')?.scrollTop ?? 0 : 0;
   // 설정 기능 페이지·위키 문서 칸: 진단 행 펼치기·📌·취소처럼 전체를 다시 그려도 그 칸의 자리를 지킨다 (맨 위로 튀던 문제, 2026-10-26)
   const pageKeep = root.dataset.pk === pageKey() ? [...root.querySelectorAll<HTMLElement>(PAGE_SCROLL)].map((el) => el.scrollTop) : [];
   // 같은 위키 문서면 펼쳐 둔 스포일러 접기도 그대로 (전수검사 11-13)
@@ -1669,6 +1676,7 @@ function render(): void {
   // 창 모양 (설정 → 화면): 메뉴 위치, 창 바깥 어둡기
   const pf = getPrefs();
   root.dataset.nav = pf.nav ?? 'left';
+  syncFoldStyles(); // 설정 「펼친 폴드 화면 배치」가 바뀌었으면 CSS 의 폰 기준 폭을 다시 맞춘다 (ui/media.ts)
   root.dataset.wikiSide = pf.wikiSide ?? 'right';
   // --dim은 글자색 변수라 겹치면 안 된다. 테마별 막 색에 투명도만 바꿔 바로 칠함
   paintVeil(root, pf.dim ?? DIM_DEFAULT);
@@ -1724,6 +1732,10 @@ function render(): void {
   if (next && keep) next.scrollTop = keep;
   if (inner.length) root.querySelectorAll<HTMLElement>(INNER_SCROLL).forEach((el, i) => inner[i] && (el.scrollTop = inner[i]));
   if (view.kind === 'picker') showPickedFac(facLeft);
+  root.dataset.shp = shKey;
+  if (shKeep) { const b = root.querySelector<HTMLElement>('.sh-body'); if (b) b.scrollTop = shKeep; }
+  // 다시 그려 설명을 띄운 칸이 없어졌으면 설명도 닫는다 (눌러3: 새로고침 뒤에도 옆 칸을 덮은 채 남았다)
+  if (tipFor && !tipFor.isConnected) hideTip();
   root.dataset.pk = pageKey();
   if (openKeep.length) root.querySelectorAll<HTMLDetailsElement>('.wk .wsc details').forEach((d, i) => openKeep[i] && (d.open = true));
   if (pageKeep.length) root.querySelectorAll<HTMLElement>(PAGE_SCROLL).forEach((el, i) => pageKeep[i] && (el.scrollTop = pageKeep[i]));
@@ -1742,6 +1754,17 @@ function render(): void {
     // 사진이 늦게 뜨면 높이가 바뀌므로 맨 아래를 보던 중이면 한 번 더
     if (logKeep < 0) nlog.querySelectorAll('img').forEach((img) => img.addEventListener('load', () => (nlog.scrollTop = nlog.scrollHeight), { once: true }));
   }
+  // 게시판 실패 글: 새로 생기면 보이게 내린다 (눌러3 PC: 글 아래 「새 댓글 보기」를 누르면 실패 줄이 글 위, 주소줄 밑으로 잘려 있었다)
+  const gnFail = root.querySelector<HTMLElement>('.bs .gn-fail');
+  const gnFailKey = gnFail ? `${tab}|${gnFail.textContent ?? ''}` : '';
+  if (gnFail && root.dataset.gnf !== gnFailKey) {
+    const sc = gnFail.closest<HTMLElement>('.bs');
+    if (sc) {
+      const top = zrect(gnFail).top - zrect(sc).top;
+      if (top < 0 || top > sc.clientHeight - 40) sc.scrollTop = Math.max(0, sc.scrollTop + top - 12);
+    }
+  }
+  root.dataset.gnf = gnFailKey;
   root.dataset.gn = gnKey;
   if (gnKeep) ['.gn .ph-content', '.gn-pane .gn-doc'].forEach((q, i) => {
     const el = root!.querySelector<HTMLElement>(q);
@@ -1771,9 +1794,9 @@ function render(): void {
   const cpanel = root.querySelector<HTMLElement>('.gx-cpanel');
   if (cpanel) {
     let y0: number | null = null;
-    cpanel.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+    cpanel.addEventListener('pointerdown', (e) => { y0 = zpx(e.clientY); });
     cpanel.addEventListener('pointermove', (e) => {
-      if (y0 === null || e.clientY - y0 < 18) return;
+      if (y0 === null || zpx(e.clientY) - y0 < 18) return;
       y0 = null;
       setDrawer(false);
     });
@@ -2223,13 +2246,13 @@ function mobileNavHtml(): string {
 /** 왼쪽 위: 표지 + 세로 ID카드 */
 function brand(ctx: ChatContext): string {
   return `<div class="gx-nav-brand">
-      ${idCard(ctx)}
+      ${idCard(ctx, true)}
     </div>`;
 }
 
 /** 세로 ID카드 (v0.16.22, 사용자 설계): 맨 위 유저 사진({{source::user}})·이름({{user}}), 아래 소속과 위치·목표·시각·날씨.
  *  배경엔 소속 사진이 아래에서 위로 옅어지며 은은하게 비친다. PC 왼쪽 위, 모바일은 머리 버튼으로 작은 창 */
-function idCard(ctx: ChatContext): string {
+function idCard(ctx: ChatContext, foldable = false): string {
   const facs = factionList(ctx.char.globalLore);
   const code = String(ctx.chat.scriptstate?.['$st_faction'] ?? '') || currentChoice(ctx.chat).faction || '';
   const f = code ? findFaction(code, facs) : undefined;
@@ -2257,9 +2280,13 @@ function idCard(ctx: ChatContext): string {
   const aff = f?.group ? String(ctx.chat.scriptstate?.['$ib_affiliation'] ?? '').trim() : '';
   const who = `<span class="gx-id-who"><b>${esc(name)}</b><small>${esc([f ? (f.group ? (aff && aff !== f.name ? aff : '') : selfName(ctx, f.code, f.name)) : '소속 없음', pa?.rank ?? ''].filter(Boolean).join(' · '))}</small></span>`;
   const bg = img ? `<span class="gx-id-bg" style="background-image:url('${esc(img)}')"></span>` : '';
-  return `<div class="gx-id">${bg}
-      ${photo}
-      ${who}
+  // 왼쪽 칸 카드 접기 (11-22 사용자): 카드 맨 위 띠를 눌러 사진·이름·소속을 접고 편다. 잔고·위치·목표·날짜는 남는다. 이 기기 공통
+  const folded = foldable && getPrefs().idFold === true;
+  const strip = foldable ? `<button class="gx-id-fold" data-action="id-fold" aria-expanded="${!folded}" aria-label="${folded ? '카드 펼치기' : '카드 접기'}" title="${folded ? '펼치기' : '접기'}">${folded ? ICONS.down : ICONS.up}</button>` : '';
+  return `<div class="gx-id${folded ? ' folded' : ''}">${bg}
+      ${strip}
+      ${folded ? '' : photo}
+      ${folded ? '' : who}
       ${status || walletChip(ctx) ? `<span class="gx-op-st">${walletChip(ctx)}${status}</span>` : ''}
     </div>`;
 }

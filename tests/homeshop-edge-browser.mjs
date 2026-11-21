@@ -1,6 +1,6 @@
 // 망상홈쇼핑 모서리 확인 (작업용): node tests/homeshop-edge-browser.mjs
 // 두 번 누르기 · 응답 다시 굴리기(주문·상자·맞교환이 되돌아가나) · 상자 두 번 열기 · 본편 턴이 넘어가면 편성 한 칸 · 정말 다 팔린 상품만 매진(다시 열어도 매진)
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, closeEditor, closeWin, launch, loadFixture, openWin } from './qc-settings-harness.mjs';
 import { distPack } from './data-init.mjs';
 import { SHOW } from './homeshop-show.mjs';

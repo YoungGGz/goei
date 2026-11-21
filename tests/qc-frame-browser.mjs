@@ -4,7 +4,7 @@
 // - 폰(390×844)·좁은 창(1000×900)·필드 전체화면(document.fullscreenElement 흉내)에서는 틀이 없다. 좁은 창은 설정 줄에 안내
 // - 설정 창(.gw) 안에는 틀이 없다. 전술 볼트 SVG 의 gradient id 가 겹치지 않는다. 글자는 LINK·STBY·REC 뿐
 // 사용법: node tests/qc-frame-browser.mjs <fixture.json>
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, clickSel, closeEditor, launch, loadFixture, openEditor, openWin, prefsOf, sleep } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);

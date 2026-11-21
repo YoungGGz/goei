@@ -4,7 +4,7 @@
 // 다시 받기·파일 넣기에 성공하면 본체가 __goeiRelaunch 로 다시 띄워 달라고 한다.
 // 창을 띄우는 때(시작기 창의 prompt 정책과 같게): 카드를 열었거나 단추를 눌렀을 때(prompt) 는 늘, 메시지 표시·요청으로 조용히 다시 시작했을 때는
 // 사용자가 「닫기」로 닫은 적이 없을 때만. 닫음 표시는 전역(__goeiWorldDismissed, host/datapack.ts)이라 본체가 다시 실행돼도 남고, 자료가 들어오면 지워진다.
-// 파일로 넣기: 릴리스 zip 의 goei-data-world.txt(조각을 이은 팩 글 하나). 네트워크가 막힌 환경에서 본체(goei-body.js)와 함께 넣으면 켜진다.
+// 파일로 넣기: 릴리스 페이지의 goei-data-world.txt(조각을 이은 팩 글 하나). 네트워크가 막힌 환경에서 본체(goei-body.js)와 함께 넣으면 켜진다.
 import { PANEL_CSS } from '../loader/panel';
 import { installWorldFile, loadWorldData, type WorldGlobals } from './datapack';
 
@@ -45,7 +45,7 @@ export function showWorldDataPanel(reason: string, prompt = false): void {
   root.setAttribute(MARK, '1');
   root.innerHTML = `<style>${PANEL_CSS}</style><div class="gl-back"><div class="gl-card" role="dialog" aria-label="괴이 ː ANOMALY">
       <b>괴이 ː ANOMALY</b>
-      <p>세계 자료(요원·조직·괴이 기록)를 받지 못했어요. 플러그인은 이 자료를 받아 둔 뒤에 켜져요. 네트워크를 확인하고 다시 받거나, 릴리스 zip에 든 goei-data-world.txt를 넣어 주세요.</p>
+      <p>세계 자료(요원·조직·괴이 기록)를 받지 못했어요. 플러그인은 이 자료를 받아 둔 뒤에 켜져요. 네트워크를 확인하고 다시 받거나, 릴리스 페이지의 「세계 자료」(goei-data-world.txt)를 넣어 주세요.</p>
       <p class="gl-msg"></p>
       <div class="gl-act"><button class="primary" data-gl="get">다시 받기</button><button data-gl="file">파일로 넣기</button><button data-gl="close">닫기</button></div>
     </div></div>`;

@@ -2,7 +2,7 @@
 // 저장 뒤 카드 명부(setCharacterToIndex) 반영, 미저장 닫기 확인창, 기본 정보, 세력 관계(대칭 on/off·메모·공통 규칙·포함 스위치), 거점.
 // 세 뷰포트 (폰은 목록 대신 드롭다운).
 // 사용법: node tests/qc-settings-world-browser.mjs <fixture.json> [pc|phone|land|all]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { auditDom, boot, closeEditor, clickSel, goNode, launch, loadFixture, openEditor, openWin, setInput, sleep, VIEWPORTS } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);

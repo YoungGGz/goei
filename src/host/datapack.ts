@@ -3,7 +3,7 @@
 //
 // 세계 자료(goei-data-world): 본체 부팅 때 저장소(pluginStorage goei:data-world)의 글이 이 본체의 지문과 맞으면 읽고, 아니면 받아 저장한다.
 //   시작기는 본체 조각만 받으므로 자료는 본체가 스스로 받는다. 받기 실패는 start() 가 본체의 받기 창(host/datapanel.ts: 다시 받기 · 파일로 넣기 · 닫기)을
-//   띄우고 던진다. 네트워크가 막힌 환경은 릴리스 zip 의 goei-data-world.txt(조각을 이은 한 파일)를 그 창에서 파일로 넣는다 (installWorldFile).
+//   띄우고 던진다. 네트워크가 막힌 환경은 릴리스 페이지의 goei-data-world.txt(조각을 이은 한 파일)를 그 창에서 파일로 넣는다 (installWorldFile).
 // 설치 자료(goei-data-install): 설치·점검 때 받아 저장소(goei:data-install)에 둔다 — 점검표·「이전 아이콘으로」가 저장소에서 영구히 받아 오는 데
 //   의존하지 않게 (인계서 3절 규칙). 세계 자료와 같은 흐름(지문이 맞으면 읽기만, 판이 바뀌면 다시 받기).
 // 어떤 기능도 저장소에서 영구히 받아 오는 데 의존하지 않는다: 두 자료 다 한 번 받으면 pluginStorage 에 있다.
@@ -153,7 +153,7 @@ async function keepWorldData(text: string): Promise<void> {
 }
 
 /**
- * 파일로 넣은 세계 자료 (받기 창의 「파일로 넣기」): 릴리스 zip 의 goei-data-world.txt(조각을 이은 팩 글 하나). 이 본체의 지문(길이·FNV)과 맞을 때만 쓴다.
+ * 파일로 넣은 세계 자료 (받기 창의 「파일로 넣기」): 릴리스 페이지의 goei-data-world.txt(조각을 이은 팩 글 하나). 이 본체의 지문(길이·FNV)과 맞을 때만 쓴다.
  * 목록 파일(goei-data-world.json)이나 조각 하나를 넣으면 무엇을 넣어야 하는지 알려 준다
  */
 export async function installWorldFile(raw: string): Promise<void> {
@@ -165,7 +165,7 @@ export async function installWorldFile(raw: string): Promise<void> {
     } catch {
       // 팩 글이 아니다
     }
-    if (head && typeof head === 'object' && Array.isArray((head as { parts?: unknown }).parts)) throw new DataPackError('그건 조각 목록(goei-data-world.json)이에요. 릴리스 zip 의 goei-data-world.txt 를 넣어 주세요.');
+    if (head && typeof head === 'object' && Array.isArray((head as { parts?: unknown }).parts)) throw new DataPackError('그건 조각 목록(goei-data-world.json)이에요. 릴리스 페이지의 goei-data-world.txt 를 넣어 주세요.');
     throw new DataPackError(`이 플러그인 판과 맞는 세계 자료(goei-data-world.txt)가 아니에요. (${text.length.toLocaleString()}자, 기대 ${WORLD_PACK.expect.length.toLocaleString()}자)`);
   }
   await keepWorldData(text);

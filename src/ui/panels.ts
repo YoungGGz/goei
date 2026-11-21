@@ -1,3 +1,4 @@
+import { zrect } from './media';
 // 접는 칸(<details data-keep>)이 다시 그려도 열린 채로 남게 기억한다 (설정을 하나 바꿀 때마다 닫히지 않게)
 const open = new Set<string>();
 
@@ -40,8 +41,8 @@ export function scrollInside(el: HTMLElement | null | undefined, block: 'start' 
     box = box.parentElement;
   }
   if (!box) return;
-  const b = box.getBoundingClientRect();
-  const r = el.getBoundingClientRect();
+  const b = zrect(box);
+  const r = zrect(el);
   const off = r.top - b.top;
   let top = box.scrollTop;
   if (block === 'start') top += off;
@@ -50,3 +51,4 @@ export function scrollInside(el: HTMLElement | null | undefined, block: 'start' 
   else if (off + r.height > box.clientHeight) top += off + r.height - box.clientHeight;
   box.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
 }
+
