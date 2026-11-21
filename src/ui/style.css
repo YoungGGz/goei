@@ -293,6 +293,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .gx-seg.on { background: var(--line); color: var(--text); }
 
 .gx-scs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+/* 첫 장면이 없을 때의 안내는 격자 한 칸이 아니라 줄 전체 (반쪽 폭으로 두 줄 꺾였다, 전수점검 눌러-사소-5) */
+.gx-scs > .gx-hint { grid-column: 1 / -1; }
 .gx-sc {
   position: relative; display: flex; align-items: center; gap: 10px; text-align: left;
   min-height: 56px; padding: 8px 14px;
@@ -351,7 +353,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .gx-list li { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
 .gx-list p { margin: 6px 0 0; font-size: 15px; color: var(--sub); }
 
-.gx-gmark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: 16px; grid-row: span 2; align-self: start; }
+/* 등급 표식은 <i> 라 기울임이 기본 → 어디서나 바로 세운다 (상세 창의 「B」만 기울어 보였다, 전수점검 눌러2-보통-6) */
+.gx-gmark { font-style: normal; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-family: var(--mono); font-weight: 700; font-size: 16px; grid-row: span 2; align-self: start; }
 .gx-gmark.an { background: var(--danger-bg); color: var(--danger); }
 .gx-gmark.in { background: var(--amber-bg); color: var(--amber); }
 .gx-gmark.ms { background: var(--accent-bg); color: var(--signal); }
@@ -378,8 +381,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .gx-sidecol .gx-sec { padding: 0; }
 .gx-mapbar { display: flex; gap: 8px; align-items: center; }
 /* 임무 탭 (v0.16.21): 지역 고르기 옆에 장소 검색. 결과는 아래로 펼쳐지는 작은 목록 */
-.gx-mapbar > .gx-select { flex: 0 0 150px; min-width: 0; }
-.gx-mapfind { position: relative; flex: 1; min-width: 0; }
+.gx-mapbar > .gx-select { flex: 0 1 auto; min-width: 0; text-overflow: ellipsis; }
+/* 고르기는 가장 긴 지역 이름(「전북특별자치도」) 폭, 남는 폭은 검색 (고르기를 150px·38%로 묶어 PC는 「장소 검」, 폰은 「전북특별자:」로 잘렸다, 전수점검 눌러-중대-4·눌러2-보통-8) */
+.gx-mapfind { position: relative; flex: 1 1 96px; min-width: 96px; }
 /* 임무 ↔ 커스텀 전환 (PC, ui/field.ts modeSwap): 지역·검색 줄과 커스텀 필터 줄의 오른쪽 끝. 눈에 띄게 (2026-10-29 사용자) */
 .gx-mswap { display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto; height: 36px; padding: 0 14px 0 12px; border: 1px solid var(--accent-line); border-radius: 8px; background: var(--accent-bg); color: var(--signal); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; box-shadow: none; }
 .gx-mswap:hover { border-color: var(--signal); }
@@ -395,7 +399,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .gx-sugi:hover, .gx-sugi:focus-visible { background: var(--panel2); outline: none; }
 .gx-sugi small { color: var(--dim); font-size: 12px; }
 .gx-sugnone { margin: 0; padding: 10px 12px; color: var(--dim); font-size: 13px; text-align: center; }
-@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .gx-mapbar > .gx-select { flex-basis: 38%; } }
 .gx-select, .gx-search {
   min-height: var(--ctl-sm); padding: 0 12px; border: 1px solid var(--line); border-radius: 8px;
   background: var(--void); color: var(--text); font: inherit;
@@ -467,9 +470,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .gx-mlist li.gx-mgrp small { font-weight: 400; }
 .gx-mapcol .gx-segs { align-self: flex-start; }
 /* 커스텀 탭 (v0.16.21): 종류 고르기와 검색을 한 줄에. 종류는 임무 탭 상황 필터와 같은 칩, 남는 폭은 검색 */
-.gx-mfilter { display: flex; align-items: center; gap: 6px; min-width: 0; }
+/* 줄이 좁으면 취소·전환을 다음 줄로 넘긴다 (한 줄에 우겨 검색칸이 빈 동그라미로 눌리고 「⇆ 임」에서 잘렸다, 전수점검 눌러-중대-4). 폰 서랍은 아래에서 한 줄 가로 밀기 */
+.gx-mfilter { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .gx-mfilter .gx-chip { flex: none; padding: 0 14px; }
-.gx-mfilter .gx-search { flex: 1; width: auto; min-width: 0; height: var(--ctl-sm); min-height: var(--ctl-sm); margin-left: 4px; border-radius: 8px; padding: 0 14px; font-size: 13px; }
+.gx-mfilter .gx-search { flex: 1 1 140px; width: auto; min-width: 120px; height: var(--ctl-sm); min-height: var(--ctl-sm); margin-left: 4px; border-radius: 8px; padding: 0 14px; font-size: 13px; }
 .gx-mapcol .gx-hint, .gx-mapcol > .gx-muted { margin: 0; }
 
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
@@ -1125,6 +1129,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-mapimg { -webkit-user-drag: none; pointer-events: none; }
 .gx-zbtn.txt { font-size: 12px; font-weight: 700; letter-spacing: -.02em; }
 .gx-zoom { position: absolute; right: 8px; bottom: 8px; display: flex; flex-direction: column; gap: 6px; z-index: 2; }
+/* 오른쪽 아래가 고른 핀·사건 핀을 덮으면 왼쪽 아래로 (mapzoom.ts placeZoom, 전수점검 눌러-중대-2) */
+.gx-canvas.zl .gx-zoom { right: auto; left: 8px; }
 .gx-zbtn {
   width: 36px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
   background: color-mix(in srgb, var(--void) 88%, transparent); color: var(--text);
@@ -1177,8 +1183,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 /* 모바일 단계 바 (v0.16.9): 목표 고르기와 편성을 한 화면씩. PC는 두 칸이라 숨김 */
 .gx-stepbar { display: none; }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
-  .gx-stepbar { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .gx-stepbar.has-swap { grid-template-columns: 1fr 1fr 84px; }
+  /* 편성 칸은 「편성 1/4」 글 폭만, 남는 폭은 고른 목표 이름에 (똑같이 나눠 목표가 「고…」 첫 글자만 보였다, 전수점검 눌러-중대-3) */
+  .gx-stepbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .gx-stepbar.has-swap { grid-template-columns: minmax(0, 1fr) auto 84px; }
   /* 임무↔커스텀 전환: 단계 바 오른쪽 끝 (v0.16.18) */
   .gx-stepswap { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--sub); font: inherit; font-size: 13px; font-weight: 700; white-space: nowrap; }
   .gx-stepswap svg { width: 16px; height: 16px; }
@@ -1302,7 +1309,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-idbtn { display: none; overflow: hidden; padding: 0; }
 .gx-idbtn img { width: 100%; height: 100%; object-fit: cover; }
 .gx-idpop-card { position: relative; width: 300px; max-width: 100%; max-height: calc(100% - 8px); overflow-y: auto; }
-.gx-idpop-card .gx-id { padding: 24px 18px 18px; }
+/* 사진 틀은 닫기(위 10 + 36) 밑에서 시작한다 (닫기 상자가 사진 틀 오른쪽 위 모서리를 덮어 선이 끊겨 보였다, 전수점검 눌러2-사소-3) */
+.gx-idpop-card .gx-id { padding: 54px 18px 18px; }
 .gx-idpop-card .gx-id-photo { width: 240px; height: 240px; border-radius: 24px; }
 .gx-idpop-card .gx-agpop-x { z-index: 1; }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .gx-idbtn { display: grid; } }
@@ -1390,8 +1398,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-board .gx-acard-tool, .gx-acard.pick.wide .gx-acard-tool { width: var(--ctl-h); height: var(--ctl-h); }
   .gx-board .gx-acard-tool svg, .gx-acard.pick.wide .gx-acard-tool svg { width: 18px; height: 18px; }
   /* 이름·상태 줄은 버튼 자리만큼 비우고, 딱지는 높이 고정 (줄이 바뀌어도 찌그러지지 않게) */
-  .gx-board .gx-acard-top, .gx-acard.pick.wide .gx-acard-top { flex-wrap: wrap; row-gap: 4px; column-gap: 6px; padding-right: 76px; }
-  .gx-board .gx-acard-top b, .gx-acard.pick.wide .gx-acard-top b { flex: 0 1 auto; max-width: 100%; }
+  /* 이름과 상태 딱지는 한 줄, 긴 이름은 말줄임 (딱지가 다음 줄로 떨어져 카드마다 높이가 달랐다, 전수점검 눌러-보통-5) */
+  .gx-board .gx-acard-top, .gx-acard.pick.wide .gx-acard-top { flex-wrap: nowrap; row-gap: 4px; column-gap: 6px; padding-right: 76px; }
+  .gx-board .gx-acard-top b, .gx-acard.pick.wide .gx-acard-top b { flex: 0 1 auto; min-width: 0; max-width: 100%; }
   .gx-board .gx-st, .gx-acard.pick.wide .gx-st { flex: none; height: 20px; line-height: 20px; padding: 0 7px; font-size: 11.5px; }
   .gx-board .gx-acard-txt small, .gx-acard.pick.wide .gx-acard-txt small, .gx-board .gx-acard-sit, .gx-acard.pick.wide .gx-acard-sit { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
   .gx-board .gx-acard { cursor: pointer; }
@@ -1988,6 +1997,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-evbtn { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; border: 0; border-radius: var(--ctl-r); display: grid; place-items: center; background: rgba(8, 12, 14, .58); color: #f2f6f5; }
 .gx-evbtn svg { width: 17px; height: 17px; }
 .gx-evbtn:hover { background: rgba(8, 12, 14, .82); }
+/* 상세 창 닫기: 공통 닫기 크기 36, 휴지통과 떨어뜨린다 (전수점검 눌러-보통-3) */
+.gx-evbtn.gx-evx { width: 36px; height: 36px; margin-left: 8px; border-radius: 8px; }
+.gx-evbtn.gx-evx svg { width: 18px; height: 18px; }
 .gx-evart-cap { position: absolute; z-index: 1; left: 12px; right: 10px; bottom: 9px; display: flex; flex-direction: column; gap: 6px; color: #fff; min-width: 0; max-height: calc(100% - 52px); overflow-y: auto; scrollbar-width: none; }
 .gx-evc.art:not(.open) .gx-evart-cap { max-height: none; overflow: visible; bottom: 7px; }
 .gx-evart-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; text-shadow: 0 1px 4px rgba(0, 0, 0, .7); }
@@ -2079,6 +2091,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-evart.k-an .gx-badge { --c: #ff8a7a; }
 .gx-evart.k-in .gx-badge { --c: #ffc35a; }
 .gx-evart.k-ms .gx-badge { --c: #8cc8ff; }
+/* 「목표」 딱지는 종류와 상관없이 고른 색(민트): 사건 카드만 종류 색(빨강)이라 장소 카드와 달랐다 (전수점검 눌러-사소-2) */
+.gx-evart .gx-badge.gx-goaltag { --c: var(--signal); }
 .gx-evart :is(.gx-evart-l1, .gx-evc-tags) > .gx-badge.op { --c: #b9a6ff; }
 .gx-evart :is(.gx-evart-l1, .gx-evc-tags) > .gx-badge.wait { --c: #9aa5aa; border: 0; box-shadow: inset 0 0 0 1px rgba(154, 165, 170, .5); }
 .gx-evart :is(.gx-evart-l1, .gx-evc-tags) > .gx-badge.wait::before { background: none; box-shadow: inset 0 0 0 1px currentColor; }
@@ -2174,7 +2188,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-opmapi { position: absolute; top: 4px; bottom: 8px; left: 50%; transform: translateX(-50%); aspect-ratio: 1100 / 880; max-width: calc(100% - 16px); }
 .gx-opmapi > img { width: 100%; height: 100%; display: block; filter: grayscale(.85) sepia(.25) hue-rotate(120deg) brightness(.62) contrast(1.3) saturate(1.4); }
 .gx-opmapi::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(79, 209, 181, .13) 0 1px, transparent 1px 34px), repeating-linear-gradient(90deg, rgba(79, 209, 181, .13) 0 1px, transparent 1px 34px), radial-gradient(ellipse at center, transparent 55%, rgba(5, 10, 12, .55) 100%); }
-.gx-oppin { position: absolute; z-index: 2; transform: translate(-6px, -50%); display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; }
+.gx-oppin { position: absolute; z-index: 2; transform: translate(-6px, calc(-50% + var(--dy, 0px))); display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; }
 .gx-oppin i { width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 25%, transparent), 0 0 14px var(--c); }
 .gx-oppin em { font-style: normal; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: rgba(8, 12, 14, .78); white-space: nowrap; }
 .gx-oppin.sel em { background: #5fe6c6; color: #0c1a17; } .gx-oppin.sel i { outline: 2px solid #fff; outline-offset: 2px; }
@@ -2203,7 +2217,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-oprow-t > b { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 14px; }
 .gx-oprow-t > b > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gx-oprow-t > b > .gx-gmark { flex: none; width: 19px; height: 19px; font-size: 11px; border-radius: 5px; } .gx-oprow-t > b > .gx-gmark svg { width: 12px; height: 12px; }
-.gx-oprow-t > small { display: flex; min-width: 0; font-size: 12px; color: var(--dim); white-space: nowrap; } .gx-oprow-t > small > span { overflow: hidden; text-overflow: ellipsis; }
+.gx-oprow-t > small { display: flex; align-items: baseline; min-width: 0; font-size: 12px; color: var(--dim); white-space: nowrap; } /* 글줄에 맞춤: 「· 종료」만 위로 떴다 (전수점검 눌러-사소-3) */ .gx-oprow-t > small > span { overflow: hidden; text-overflow: ellipsis; }
 .gx-oprow .gx-evc-note { color: var(--dim); text-shadow: none; } .gx-oprow .gx-evc-note::before { color: var(--dim); } .gx-oprow .gx-evc-note.op { color: #8a74e8; }
 .gx-oprow .gx-evdep { margin-left: 0; color: color-mix(in srgb, var(--text) 30%, transparent); }
 .gx-oprow .gx-evdep.on { color: var(--signal); filter: none; } .gx-oprow .gx-evdep.other { color: #d99a2b; filter: none; }
@@ -2218,7 +2232,6 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-oplog > ul { flex: none; max-height: none; overflow: visible; overscroll-behavior: auto; }
   .gx-opcnt em { padding: 4px 6px; }
 }
-.gx-ops .gx-gmark { font-style: normal; }
 .gx-body .gx-opcnt em i { display: inline; width: auto; height: auto; border-radius: 0; background: none; font: 700 17px/1 var(--mono); color: var(--c); }
 .gx-oppin:not(.sel) em { opacity: .85; font-size: 12px; }
 
@@ -2302,10 +2315,12 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 
 /* 요원 사원증 창 (가로 명함 비율): 위 띠 · 직사각형 사진 + 신상 · 아래 번호와 톡·위키 */
 .gx-agcard { position: absolute; z-index: 41; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(500px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; box-sizing: border-box; border-radius: 16px; background: var(--panel); border: 1px solid var(--line2); color: var(--text); box-shadow: 0 22px 60px rgba(0, 0, 0, .5); }
-.gx-agcard-band { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 6px 0 14px; background: linear-gradient(90deg, color-mix(in srgb, var(--signal) 22%, var(--panel2)), var(--panel2)); border-bottom: 1px solid var(--line); font: 700 11px var(--mono); letter-spacing: .2em; color: var(--signal); }
+.gx-agcard-band { display: flex; align-items: center; gap: 8px; height: 46px; padding: 0 5px 0 14px; background: linear-gradient(90deg, color-mix(in srgb, var(--signal) 22%, var(--panel2)), var(--panel2)); border-bottom: 1px solid var(--line); font: 700 11px var(--mono); letter-spacing: .2em; color: var(--signal); }
 .gx-agcard-band b { font-family: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: .02em; color: var(--text); }
-/* 닫기는 공통 36, 아래 단추는 작은 조작(--ctl-sm) 규격 (전수검사 11-13) */
-.gx-agcard-x { margin-left: auto; width: 36px; height: 36px; border: 0; border-radius: 7px; background: none; color: var(--dim); font-size: 13px; cursor: pointer; }
+/* 닫기는 공통 닫기 모양(36·모서리 8·선 1px·바탕), 아래 단추는 작은 조작(--ctl-sm) 규격 (전수검사 11-13. 테두리·바탕 없는 작은 ✕ 글자라 누르기 어려웠다, 전수점검 눌러-보통-2) */
+.gx-agcard-x { margin-left: auto; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--sub); cursor: pointer; }
+.gx-agcard-x:hover { color: var(--text); border-color: var(--line2); }
+.gx-agcard-x svg { display: block; width: 18px; height: 18px; }
 .gx-agcard-main { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 16px; padding: 16px; }
 .gx-agcard-ph { position: relative; align-self: stretch; min-height: 168px; border-radius: 10px; overflow: hidden; background: var(--panel2); box-shadow: inset 0 0 0 1px var(--line); }
 .gx-agcard-ph > img, .gx-agcard-ph > .gx-ava { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0; object-fit: cover; object-position: 50% 12%; font-size: 40px; }
@@ -2518,6 +2533,13 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 
 /* 상세 창 = 상황판 CCTV 그대로 (2026-10-21 사용자): 가로 600px, 세로는 PC 상황판 CCTV 비율(534×440) */
 .gx-opview.ev-pop { position: absolute; z-index: 41; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(600px, calc(100% - 32px)); height: auto; aspect-ratio: 534 / 440; max-height: calc(100% - 32px); box-shadow: 0 16px 48px rgba(0, 0, 0, .45); }
+/* 폰: 상황판 CCTV 와 같은 높이(340). 가로 비율대로면 257px 라 소개 글이 말줄임 없이 중간에서 끊겼다. 그래도 넘치면 글 칸에 스크롤 막대를 보인다 (전수점검 눌러2-보통-6) */
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .gx-opview.ev-pop { aspect-ratio: auto; height: 340px; } }
+.gx-opview.ev-pop .gx-opcap { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .45) transparent; }
+/* 글 칸은 조준선 위에 (조준선이 글자 사이로 지나가 읽기 어려웠다). 신호 끊김 화면(z 4)은 그대로 위. 화면이 번쩍여도 읽히게 글자 둘레를 짙게 (전수점검 눌러-보통-4·눌러2-보통-6) */
+.gx-opcap, .gx-mx.open .gx-evart-cap { z-index: 3; }
+:is(.gx-opcap, .gx-mx.open .gx-evart-cap) :is(b, small, .gx-evc-sit, .gx-evc-desc) { text-shadow: 0 0 2px rgba(0, 0, 0, .95), 0 1px 6px rgba(0, 0, 0, .9); }
+.gx-mx.open .gx-evart-name small { color: rgba(255, 255, 255, .9); }
 /* CCTV 괴이 효과 (2026-10-21 사용자, ui/cctvfx.ts가 fx-* 클래스를 잠깐 붙인다) */
 .gx-optear, .gx-oplost, .gx-opshade { position: absolute; inset: 0; pointer-events: none; display: none; }
 .gx-optear { z-index: 1; }

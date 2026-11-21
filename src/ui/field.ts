@@ -404,8 +404,9 @@ function teamPanel(x: Ctx, goal: string | null, action: string, label: string, b
   const ready = !!goal && validTeam(field.team.length, field.support) && !busy;
   const go = `<button class="gx-start" data-action="${action}" ${ready ? '' : 'disabled'}>${busy ? '보내는 중…' : esc(label)}</button>`;
   lastGo = go;
+  // 편성 상한은 TEAM_MAX(+ 나)로 (박힌 「/ 4」, 전수점검 사소-24)
   return `<section class="gx-team">
-    <div class="gx-goal"><span>목표</span><b${goal ? '' : ' class="none"'}>${goal ? esc(goal) : '미정'}</b><em>${used + 1} / 4</em></div>
+    <div class="gx-goal"><span>목표</span><b${goal ? '' : ' class="none"'}>${goal ? esc(goal) : '미정'}</b><em>${used + 1} / ${TEAM_MAX + 1}</em></div>
     ${roster.length || support ? `<div class="gx-acards pick">${chips}${support}</div>` : '<p class="gx-none">편성할 수 있는 요원이 없어요.</p>'}
     ${roster.length ? '' : support ? '<p class="gx-none">편성할 수 있는 요원이 없어요.</p>' : ''}
     ${narrow() ? '' : noteBox()}
@@ -446,7 +447,7 @@ function stepBar(goal: string | null, swap?: 'map' | 'mission'): string {
   const sw = swap
     ? `<button class="gx-stepswap" data-action="tab" data-value="${swap}" aria-label="${swap === 'map' ? '임무로 전환' : '커스텀으로 전환'}">${ICONS.swap}<span>${swap === 'map' ? '임무' : '커스텀'}</span></button>`
     : '';
-  return `<div class="gx-stepbar${sw ? ' has-swap' : ''}">${b('goal', '1', '목표', goal ?? '고르기')}${b('team', '2', '편성', `${used} / 4`)}${sw}</div>`;
+  return `<div class="gx-stepbar${sw ? ' has-swap' : ''}">${b('goal', '1', '목표', goal ?? '고르기')}${b('team', '2', '편성', `${used} / ${TEAM_MAX + 1}`)}${sw}</div>`;
 }
 
 /** 단계를 바꾸면 맨 위부터 보이게 */
@@ -478,9 +479,13 @@ export function mapTab(ctx: ChatContext, env: FieldEnv, notice: string, busy: bo
   </main>${fieldDrawer(x, true)}`;
 }
 
+/** 영어 부제는 제목 꼴로만 보인다 (영어 이름은 그림 열쇠라 자료는 그대로). 하나만 전부 소문자·첫 낱말만 대문자라 제각각이었다 (전수점검 눌러-사소-4) */
+const SMALL_WORDS = new Set(['a', 'an', 'the', 'of', 'with', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'by', 'from']);
+const titleCase = (s: string): string => s.replace(/[A-Za-z][\w']*/g, (w, i: number) => (i > 0 && SMALL_WORDS.has(w.toLowerCase()) ? w : w[0].toUpperCase() + w.slice(1)));
+
 function missionCatalog(c: Catalog, kind: MissionKind): { name: string; sub: string }[] {
-  if (kind === 'an') return c.anomalies.map((a) => ({ name: a.name, sub: a.english }));
-  if (kind === 'ms') return c.mysticSites.map((m) => ({ name: m.name, sub: m.english }));
+  if (kind === 'an') return c.anomalies.map((a) => ({ name: a.name, sub: titleCase(a.english) }));
+  if (kind === 'ms') return c.mysticSites.map((m) => ({ name: m.name, sub: titleCase(m.english) }));
   return c.landmarks.map((l) => ({ name: l.name, sub: placeWhere(l.sido, l.gu) }));
 }
 

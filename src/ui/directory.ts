@@ -641,8 +641,11 @@ export function appendixPanel(r: AppendixRow, ctx: ChatContext, d: Directory): s
   </div>`;
 }
 
+/** 부록 검색: 부록 탭과 통합 검색이 같은 칸(이름·본 항목·위치·요원)을 본다 (전수점검 보통-21: 통합 검색은 위치·요원을 안 봤다) */
+const appendixHit = (r: AppendixRow, q: string): boolean => !q || [r.lore, r.parent, ...r.places, ...r.agents].some((t) => t.toLowerCase().includes(q));
+
 function appendixList(ctx: ChatContext, d: Directory, q: string): string {
-  const rows = d.appendices.filter((r) => !q || [r.lore, r.parent, ...r.places, ...r.agents].some((t) => t.toLowerCase().includes(q)));
+  const rows = d.appendices.filter((r) => appendixHit(r, q));
   if (!rows.length) {
     return q ? '<p class="gx-muted dir-empty">맞는 부록이 없어요.</p>'
       : '<p class="gx-muted dir-empty">부록이 없어요. 로어북에 <code>📎부록</code> 폴더를 만들고 「본 항목 이름 · 설명」으로 항목을 넣으면 여기 들어와요.</p>';
@@ -665,7 +668,7 @@ function searchAll(ctx: ChatContext, d: Directory, q: string, names: Record<stri
     ['agent', '요원', d.agents.filter((r) => matches(r, q)).map((r) => jump('agent', agentRow(r, ctx, d, names)))],
     ['org', '조직', d.orgs.filter((o) => [o.name, o.spec.english].some((t) => t && t.toLowerCase().includes(q))).map((o) => jump('org', orgRow(o, ctx, d, names)))],
     ['base', '거점', d.bases.filter((b) => [b.name, b.label, b.english, b.org, b.gu, ...b.aliases].some((t) => t && t.toLowerCase().includes(q))).map((b) => jump('base', baseRow(b, ctx, d)))],
-    ['appendix', '부록', d.appendices.filter((r) => [r.lore, r.parent].some((t) => t.toLowerCase().includes(q))).map((r) => jump('appendix', appendixRow(r, ctx, d)))],
+    ['appendix', '부록', d.appendices.filter((r) => appendixHit(r, q)).map((r) => jump('appendix', appendixRow(r, ctx, d)))],
   ];
   const hit = groups.filter(([, , rows]) => rows.length);
   if (!hit.length) return '<p class="gx-muted dir-empty">맞는 항목이 없어요.</p>';
@@ -1161,6 +1164,8 @@ export async function handleDirectory(action: string, value: string | undefined,
         dirUi.notice = `「${name}」 거점이 이미 있어요.`;
         break;
       }
+      // 「거점에서 넣기」로 부록 위치에 넣어 둔 옛 이름도 같이 바꾼다 (전수점검 보통-22: 옛 이름이 남아 위치 조건이 조용히 안 먹었다)
+      for (const r of d.appendices) if (r.places.includes(b.name)) r.places = [...new Set(r.places.map((p) => (p === b.name ? name : p)))];
       b.name = name;
       dirUi.open = name;
       dirUi.notice = '';

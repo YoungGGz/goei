@@ -302,7 +302,8 @@ function opsFeed(c: OpsCard | undefined, clock: string, empty: string): string {
 /** CCTV 큰 보기 한 장 (상황판 왼쪽, 상세 창 공통). cls: 바깥 div에 덧붙일 클래스(와 속성) */
 function feedView(c: EvCard, clock: string, cls = ''): string {
   const name = esc(c.name);
-  const btns = evBtns(c);
+  // 상세 창(cls 있음)은 단추 줄 맨 끝에 닫기. 닫기 자리에 휴지통만 있어 닫으려다 종료를 누를 수 있었다 (전수점검 눌러-보통-3)
+  const btns = evBtns(c) + (cls ? `<button class="gx-evbtn gx-evx" data-action="ev-pop" title="닫기" aria-label="닫기">${ICONS.close}</button>` : '');
   const pic = c.art?.pic ? `<img class="gx-opfeed" src="${esc(c.art.pic)}" alt="">` : `<span class="gx-evart-ico">${MARK[c.kind]}</span>`;
   const desc = c.art?.desc ? `<span class="gx-evc-desc">${esc(c.art.desc)}</span>` : '';
   const loc = c.locCode ?? '';
@@ -344,6 +345,29 @@ function opsMap(cards: OpsCard[], sel: string, url: string | null, clock: string
   const focus = sAt ? `--px:${sAt[2]};--py:${sAt[3] + sN * 4.2}` : '--px:55;--py:50';
   return `<div class="gx-opview map"><div class="gx-opmap">${url ? `<div class="gx-opmapi" style="${focus}"><img src="${esc(url)}" alt="전국 지도">${cross}${pins}</div>` : ''}</div>${url ? SKY : ''}
     <div class="gx-opbar">${osd('<span class="rec sat"><i></i>LIVE</span>', `SAT-02 · TRK ${track(sAt ? sAt[2] : 55, sAt ? sAt[3] + sN * 4.2 : 50)}`, clock)}${s ? `<span class="gx-evart-act">${opsPick(s)}${evBtns(s)}</span>` : ''}</div></div>`;
+}
+
+/** 위성 지도 이름표가 서로 덮으면 뒤엣것을 아래로 내린다. 고른 상황이 먼저 자리를 잡는다 (render 뒤에 부른다)
+ *  (전수점검 눌러-보통-6: 붙어 있는 창원·함안 이름표가 겹쳐 하나가 가려졌다. 폰은 지도가 작아 % 간격이 이름표 높이보다 좁다) */
+export function declutterOps(root: HTMLElement): void {
+  const map = root.querySelector<HTMLElement>('.gx-opmapi');
+  if (!map) return;
+  const pins = [...map.querySelectorAll<HTMLElement>('.gx-oppin')];
+  for (const p of pins) p.style.removeProperty('--dy');
+  const order = pins.map((el, i) => ({ el, i, r: el.getBoundingClientRect() }))
+    .sort((a, b) => Number(b.el.classList.contains('sel')) - Number(a.el.classList.contains('sel')) || a.r.top - b.r.top || a.i - b.i);
+  const placed: { l: number; r: number; t: number; b: number }[] = [];
+  for (const { el, r } of order) {
+    let dy = 0;
+    for (let k = 0; k < 12; k++) {
+      const t = r.top + dy, b = r.bottom + dy;
+      const hit = placed.filter((q) => r.left < q.r && q.l < r.right && t < q.b && q.t < b);
+      if (!hit.length) break;
+      dy = Math.max(...hit.map((q) => q.b)) - r.top + 2;
+    }
+    if (dy) el.style.setProperty('--dy', `${dy}px`);
+    placed.push({ l: r.left, r: r.right, t: r.top + dy, b: r.bottom + dy });
+  }
 }
 
 /** 관제실 상황판 본문. counts: 일지 제목줄 숫자 (html) */

@@ -60,10 +60,11 @@ export function stripLabel(v: string | undefined): string {
 }
 
 export function normGrade(v: string | undefined): string {
-  const s = stripLabel(v).toUpperCase();
-  // 따로 떨어진 등급 글자 먼저 (Grade B → B, B급 → B). 없을 때만 남은 첫 글자 (전수검사 11-13)
-  const alone = /(?:^|[^A-Z])([FEDCBAS])(?![A-Z])/.exec(s);
-  return alone ? alone[1] : s.replace(/[^FEDCBAS]/g, '').charAt(0);
+  // 「Grade」「Class」 같은 이름표 낱말은 먼저 뗀다: 그 안의 A·D·E·C 를 등급으로 읽어 「Grade SS」가 A 로 보였다 (전수점검 사소-22)
+  const s = stripLabel(v).toUpperCase().replace(/\b(?:GRADE|CLASS|RANK|LEVEL|TIER)\b/g, ' ');
+  // 따로 떨어진 등급 글자 (Grade B → B, B급 → B). 규격 밖 겹글자(SS·AA)는 그 글자로. 둘 다 아니면 비운다 (전수검사 11-13)
+  const alone = /(?:^|[^A-Z])([FEDCBAS])\1*(?![A-Z])/.exec(s);
+  return alone ? alone[1] : '';
 }
 
 export function normAnState(v: string | undefined): AnState {
@@ -79,12 +80,17 @@ export function normAgState(v: string | undefined): AgState | null {
   // 「상태: 휴게」처럼 라벨을 붙여도 (전수검사 11-13)
   const s = stripLabel(v);
   if ((AG_STATES as readonly string[]).includes(s)) return s as AgState;
-  const hit = AG_ALIAS[s] ?? AG_ALIAS[s.toLowerCase().replace(/\s+/g, ' ')];
+  const hit = agAlias(s) ?? agAlias(s.toLowerCase().replace(/\s+/g, ' '));
   if (hit) return hit;
   // 「작전 투입」「휴게 (On-duty break)」「외근 중」「사망.」처럼 지침 글을 베끼거나 띄어 쓴 값
   const bare = s.replace(/[(（][^)）]*[)）]/g, '').replace(/[\s.。!]/g, '').replace(/중$/, '');
   if ((AG_STATES as readonly string[]).includes(bare)) return bare as AgState;
-  return AG_ALIAS[bare] ?? null;
+  return agAlias(bare) ?? null;
+}
+
+/** 별칭 표는 제 키만 본다 (「constructor」 같은 낱말이 객체 기본 속성을 집어 상태값이 깨지던 것, 전수점검 사소-23) */
+function agAlias(k: string): AgState | undefined {
+  return Object.hasOwn(AG_ALIAS, k) ? AG_ALIAS[k] : undefined;
 }
 
 function fields(text: string, kind: string): string[][] {

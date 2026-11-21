@@ -59,7 +59,7 @@ import { applyAdvanced } from '../core/advanced';
 import { booksInput, defaultsState, handleAdvanced } from './advanced';
 import { guardHiddenScroll, rememberPanel, scrollInside } from './panels';
 import { startCctvFx, stopCctvFx } from './cctvfx';
-import { elapsedText, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
+import { declutterOps, elapsedText, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
 import { evArt } from './evpic';
 import { agentContact, handlePhone, openAgentDm, openCheck, phone, phoneContent, phoneInput, phonePickList, phoneTab, phoneUnread, resetPhone, type PhoneEnv } from './phone';
 import { boardMapUrl, field, handleField, mapTab, mapSuggestFor, missionList, missionTab, newMessage, resetField, showOnMap, type FieldEnv } from './field';
@@ -1569,6 +1569,7 @@ function renderPicker(): void {
     facs[i].className = b.className;
     facs[i].setAttribute('aria-pressed', b.getAttribute('aria-pressed') ?? 'false');
   });
+  showPickedFac();
   const sections = main.querySelectorAll(':scope > section');
   const fresh = tpl.content.querySelectorAll('.gx-body > section');
   if (sections.length !== fresh.length) return render();
@@ -1577,6 +1578,18 @@ function renderPicker(): void {
   const nfoot = tpl.content.querySelector('.gx-foot');
   if (foot && nfoot) foot.replaceWith(nfoot);
   else return render();
+}
+
+/** 세력 카드 가로 줄: 고른 카드가 보이게 (전수점검 눌러-중대-5: 옆으로 밀어 고르면 줄이 맨 앞으로 되감겨 고른 카드가 화면 밖으로 밀렸다) */
+function showPickedFac(left?: number): void {
+  const row = root?.querySelector<HTMLElement>('.gx-facs');
+  if (!row) return;
+  if (left !== undefined) row.scrollLeft = left;
+  const on = row.querySelector<HTMLElement>('.gx-fac.on');
+  if (!on || row.scrollWidth <= row.clientWidth) return;
+  const l = on.offsetLeft - row.offsetLeft;
+  if (l < row.scrollLeft) row.scrollLeft = l;
+  else if (l + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = l + on.offsetWidth - row.clientWidth;
 }
 
 const INNER_SCROLL = '.gx-acards, .gx-sidecol, .gx-mbox, .gx-sits, .gx-bd-col > .gx-evcs, .nw-groups, .gx-lookg';
@@ -1604,6 +1617,7 @@ function render(): void {
   const keep = scroller && root.dataset.tab === tab ? scroller.scrollTop : 0;
   // 안쪽 스크롤 칸(편성 요원 목록·사이드 칸 등)도 같은 탭이면 자리를 지킨다
   const inner = root.dataset.tab === tab ? [...root.querySelectorAll<HTMLElement>(INNER_SCROLL)].map((el) => el.scrollTop) : [];
+  const facLeft = root.querySelector<HTMLElement>('.gx-facs')?.scrollLeft;
   // 설정 기능 페이지·위키 문서 칸: 진단 행 펼치기·📌·취소처럼 전체를 다시 그려도 그 칸의 자리를 지킨다 (맨 위로 튀던 문제, 2026-10-26)
   const pageKeep = root.dataset.pk === pageKey() ? [...root.querySelectorAll<HTMLElement>(PAGE_SCROLL)].map((el) => el.scrollTop) : [];
   // 같은 위키 문서면 펼쳐 둔 스포일러 접기도 그대로 (전수검사 11-13)
@@ -1689,6 +1703,7 @@ function render(): void {
   const next = root.querySelector('.gx-body');
   if (next && keep) next.scrollTop = keep;
   if (inner.length) root.querySelectorAll<HTMLElement>(INNER_SCROLL).forEach((el, i) => inner[i] && (el.scrollTop = inner[i]));
+  if (view.kind === 'picker') showPickedFac(facLeft);
   root.dataset.pk = pageKey();
   if (openKeep.length) root.querySelectorAll<HTMLDetailsElement>('.wk .wsc details').forEach((d, i) => openKeep[i] && (d.open = true));
   if (pageKeep.length) root.querySelectorAll<HTMLElement>(PAGE_SCROLL).forEach((el, i) => pageKeep[i] && (el.scrollTop = pageKeep[i]));
@@ -1724,6 +1739,7 @@ function render(): void {
   root.querySelectorAll<HTMLElement>('[data-sh-log]').forEach((el) => (el.scrollTop = el.scrollHeight));
   labelSwitches(root);
   bindMapZoom(root);
+  declutterOps(root);
   const setDrawer = (open: boolean) => {
     if (cdrOpen === open) return;
     cdrOpen = open;
@@ -2173,7 +2189,9 @@ function goSite(site: SiteId | ''): void {
 
 /** 설정 창(폰)에 주는 하단 바: 본 창과 같은 항목, 지금 탭 표시 */
 function mobileNavHtml(): string {
-  const ctx = view.kind === 'started' ? view.ctx : null;
+  // 시작 전(새 작전 준비·첫 장면)은 본 창에도 하단 바가 없다: 설정 창에도 게임 메뉴를 두지 않는다. 갈래는 ☰ 목록, 닫기는 머리의 × (전수점검 눌러-중대-6: 메뉴를 눌러도 새 작전 준비로만 돌아갔다)
+  if (view.kind !== 'started') return '';
+  const ctx = view.ctx;
   const unreadPhone = view.kind === 'started' && phoneUnread(view.ctx);
   const cur: Tab = tab === 'mission' ? 'map' : tab;
   const item: NavItem = (id, label, icon, cls = '', badge = '') =>

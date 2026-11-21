@@ -90,7 +90,7 @@ export function agentPopup(hasRecord?: (name: string) => boolean): string {
     .join('');
   return `<button class="ev-scrim" data-action="agent-info" data-value="${esc(a.id)}" aria-label="닫기"></button>
     <div class="gx-agcard ${a.side}" role="dialog" aria-label="${esc(a.name)}">
-      <div class="gx-agcard-band">AGENT ID<b>${esc(org)}</b><button class="gx-agcard-x" data-action="agent-info" data-value="${esc(a.id)}" aria-label="닫기">✕</button></div>
+      <div class="gx-agcard-band">AGENT ID<b>${esc(org)}</b><button class="gx-agcard-x" data-action="agent-info" data-value="${esc(a.id)}" aria-label="닫기">${ICONS.close}</button></div>
       <div class="gx-agcard-main"><span class="gx-agcard-ph">${a.photo ? `<img src="${esc(a.photo)}" alt="">` : a.face}</span>
         <span class="gx-agcard-t"><span class="nm">${esc(a.name)}</span>${a.english ? `<span class="en">${esc(a.english)}</span>` : ''}<dl>${rows}</dl></span></div>
       <div class="gx-agcard-foot"><span class="code">NO. ${esc(a.id.replace(/^([A-Z]+)(\d)/, '$1-$2'))}<u></u></span>${btns}</div>
