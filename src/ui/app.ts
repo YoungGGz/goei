@@ -1415,6 +1415,9 @@ async function handle(action: string, value?: string): Promise<void> {
       walletTabUi.edit = false;
       return refresh();
     }
+    case 'menu-fold':
+      await savePrefs((p) => ({ ...p, navFold: getPrefs().navFold === true ? undefined : true }));
+      return render();
     case 'id-fold':
       await savePrefs((p) => ({ ...p, idFold: getPrefs().idFold === true ? undefined : true }));
       return render();
@@ -1872,9 +1875,11 @@ function navState(): NavState {
 
 /** PC 메뉴 맨 아래: ‹ 뒤로 · 앞으로 › (모바일 쓸기와 같은 기록) */
 function navHistBar(): string {
+  const folded = getPrefs().navFold === true;
   return `<div class="gx-navhist">
     <button class="gx-nh" data-action="nav-back" aria-label="뒤로" title="뒤로">${ICONS.back}</button>
-    <button class="gx-nh fwd" data-action="nav-fwd" aria-label="앞으로" title="앞으로">${ICONS.back}</button></div>`;
+    <button class="gx-nh fwd" data-action="nav-fwd" aria-label="앞으로" title="앞으로">${ICONS.back}</button>
+    <button class="gx-nh gx-navfold" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}">${ICONS.side}</button></div>`;
 }
 
 function applyNav(s: NavState): void {
@@ -2093,7 +2098,7 @@ function tabs(): string {
   const item = (id: Tab, label: string, icon: string, cls = '', badge = '') =>
     `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" title="${label}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
   const ctx = view.kind === 'started' ? view.ctx : null;
-  return `<nav class="gx-nav" aria-label="주요 화면">
+  return `<nav class="gx-nav${ctx && getPrefs().navFold === true ? ' folded' : ''}" aria-label="주요 화면">
     ${ctx ? brand(ctx) : ''}
     ${item('board', '상황판', ICONS.board)}
     ${item('map', '임무', ICONS.map, 'desk')}
@@ -2243,6 +2248,12 @@ function mobileNavHtml(): string {
 
 /** 왼쪽 위: 표지 + 세로 ID카드 */
 function brand(ctx: ChatContext): string {
+  // 메뉴를 접으면 카드 대신 얼굴만 작게, 누르면 카드가 작은 창으로 (11-22 사용자)
+  if (getPrefs().navFold === true) {
+    const pa = playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
+    const url = pa ? imageUrl(ctx.char, facePic(ctx.char, pa, true)) : userInfo().photo;
+    return `<div class="gx-nav-brand"><button class="gx-nav-face" data-action="id-card" aria-label="내 ID카드" title="내 ID카드">${url ? `<img src="${esc(url)}" alt="">` : ICONS.idcard}</button></div>`;
+  }
   return `<div class="gx-nav-brand">
       ${idCard(ctx, true)}
     </div>`;
