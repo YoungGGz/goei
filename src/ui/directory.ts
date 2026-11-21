@@ -278,8 +278,8 @@ export function photoBlock(key: string, ctx: ChatContext): string {
       <button class="gx-mini" data-action="dir-photo-pick" data-value="${esc(`${slot}>${key}`)}">${picking ? '닫기' : '고르기'}</button>
     </div>`;
   };
-  const mainWhy = p.photo ? '직접 고름' : main ? `자동: ${esc(main)}` : '「영문명_default」·「영문명」 이미지가 없어요';
-  const faceWhy = p.face ? '직접 고름' : cut ? '대표 사진에서 잘라요' : face ? `자동: ${esc(splitPic(face).name)}` : '「영문명」 이미지가 없어요';
+  const mainWhy = p.photo ? '직접 고름' : main ? `자동: 「${esc(main)}」 이미지` : '「영문명_default」·「영문명」 이미지가 없어요';
+  const faceWhy = p.face ? '직접 고름' : cut ? '대표 사진에서 잘라요' : face ? `자동: 「${esc(splitPic(face).name)}」 이미지` : '「영문명」 이미지가 없어요';
   const cropping = cut && dirUi.crop === key;
   const cropBtn = cut ? `<button class="gx-mini" data-action="dir-crop" data-value="${esc(key)}">${cropping ? '완료' : '틀 맞추기'}</button>` : '';
   const picking = dirUi.pick ? pickOf(dirUi.pick) : null;
@@ -631,7 +631,7 @@ export function appendixPanel(r: AppendixRow, ctx: ChatContext, d: Directory): s
     </div></div>
     <p class="gx-muted">호출 단어: ${keys.length ? esc(keys.join(', ')) : '없음'} · 세계 편집기의 부록 기록에서 고쳐요.</p>
     ${input(k('places'), r.places.join(', '), '위치', '상태창의 「위치」 칸에 이 말이 들어 있으면 보내요(주인공이 그 장소에 있을 때). 쉼표로 나눠 적어요')}
-    ${bases.length ? `<div class="dir-line"><span>거점에서 넣기</span><small>등록된 거점(본부·지사 같은 장소) 이름을 위 「위치」 칸에 바로 넣는 단추예요</small><div class="dir-chips">${bases.slice(0, 24).map((n) => chip('dir-app-place', `${n}|${r.lore}`, `＋ ${n}`, false)).join('')}</div></div>` : ''}
+    ${bases.length ? `<div class="dir-line"><span>거점에서 넣기</span><small>등록된 거점(본부·지사 같은 장소) 이름을 위 「위치」 칸에 바로 넣는 버튼이에요</small><div class="dir-chips">${bases.slice(0, 24).map((n) => chip('dir-app-place', `${n}|${r.lore}`, `＋ ${n}`, false)).join('')}</div></div>` : ''}
     ${input(k('agents'), r.agents.join(', '), '동행·투입 요원', '적은 요원이 주인공과 동행 중이거나(상태창 동행 칸) 상황판에서 작전에 투입돼 있으면 보내요. 쉼표로 나눠 적어요')}
     <div class="dir-line"><span>보내지 않는 조건</span><div class="dir-chips">${toggle('needParent', '본 항목을 보내지 않는 요청에는 이 부록도 빼기', r.needParent)}</div></div>
     ${area(k('unlock'), r.unlock, '해금 조건', '비우면 위 조건만 맞으면 바로 보내요. 적으면 해금 전에는 본문 대신 이 조건 한 줄만 모델에게 알리고, 이야기에서 조건이 이루어지면 모델이 응답 끝에 해금 표시를 남겨요. 그 다음 요청부터 본문이 들어가요')}
@@ -941,6 +941,16 @@ function setPlayable(d: Directory, o: OrgRow, on: boolean): void {
   dirUi.notice = '';
 }
 
+/** 시작 화면에서 펼친 칸의 편집 칸(목록 아래)으로 화면을 옮긴다. 추가·켜기로 펼쳐도 같이 (반응이 없어 보였다, 전수점검 눌러-보통-45) */
+// 누른 칩이 사라지면 다음 칩이 초점 테두리를 물려받아 고른 것처럼 보였다 → 초점을 놓는다 (눌러2-보통-29)
+const showSel = (): void => {
+  requestAnimationFrame(() => {
+    const a = document.activeElement;
+    if (a instanceof HTMLElement && a.closest('.gw')) a.blur();
+    document.querySelector('.gw .st-sel')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  });
+};
+
 export async function handleDirectory(action: string, value: string | undefined, ctx: ChatContext, env: DirectoryEnv): Promise<boolean> {
   if (!action.startsWith('dir-')) return false;
   const v = value ?? '';
@@ -1185,7 +1195,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       stUi.sel = stUi.sel === v ? '' : v;
       stUi.confirm = '';
       // 펼친 칸의 상세는 목록 아래에 그려져서, 열면 그 자리로 내려간다 (안 내려가면 눌러도 바뀐 게 안 보인다)
-      if (stUi.sel) requestAnimationFrame(() => document.querySelector('.gw .st-sel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+      if (stUi.sel) showSel();
       break;
     case 'dir-start-show': {
       const [on, code] = v.split('|');
@@ -1234,6 +1244,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       d.usedCodes = [...d.usedCodes, code];
       stUi.sel = code;
       dirUi.done = '';
+      showSel();
       break;
     }
     case 'dir-group-del': {
@@ -1303,7 +1314,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       else if (!o.faction) {
         setPlayable(d, o, arg === '1');
         // 시작 화면 페이지에서 켰으면 그 칸을 바로 펼친다
-        if (arg === '1' && o.spec.playable && o.spec.code) stUi.sel = o.spec.code;
+        if (arg === '1' && o.spec.playable && o.spec.code) { stUi.sel = o.spec.code; showSel(); }
         else if (arg === '0' && stUi.sel === o.spec.code) stUi.sel = '';
       }
       dirUi.done = '';

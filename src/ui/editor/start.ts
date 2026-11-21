@@ -19,10 +19,11 @@ export const stUi = {
   confirm: '',
 };
 
-const input = (key: string, value: string, label: string, help = '') =>
-  `<label class="dir-in"><span>${label}</span><input data-input="dir" data-key="${esc(key)}" value="${esc(value)}" autocomplete="off">${help ? `<small>${help}</small>` : ''}</label>`;
-const area = (key: string, value: string, label: string, rows = 6, help = '') =>
-  `<label class="dir-in"><span>${label}</span><textarea data-input="dir" data-key="${esc(key)}" rows="${rows}">${esc(value)}</textarea>${help ? `<small>${help}</small>` : ''}</label>`;
+// 빈 칸에 무엇을 적는지 안내 (안내 없는 빈칸이었다, 전수점검 눌러2-사소-33)
+const input = (key: string, value: string, label: string, help = '', ph = '') =>
+  `<label class="dir-in"><span>${label}</span><input data-input="dir" data-key="${esc(key)}" value="${esc(value)}" autocomplete="off"${ph ? ` placeholder="${esc(ph)}"` : ''}>${help ? `<small>${help}</small>` : ''}</label>`;
+const area = (key: string, value: string, label: string, rows = 6, help = '', ph = '') =>
+  `<label class="dir-in"><span>${label}</span><textarea data-input="dir" data-key="${esc(key)}" rows="${rows}"${ph ? ` placeholder="${esc(ph)}"` : ''}>${esc(value)}</textarea>${help ? `<small>${help}</small>` : ''}</label>`;
 const seg = (action: string, value: string, on: boolean, a: string, b: string) =>
   `<div class="gx-segs gx-segs-sm"><button class="gx-seg${on ? ' on' : ''}" data-action="${action}" data-value="${esc(`1|${value}`)}">${a}</button><button class="gx-seg${!on ? ' on' : ''}" data-action="${action}" data-value="${esc(`0|${value}`)}">${b}</button></div>`;
 
@@ -109,8 +110,8 @@ function slotDetail(s: StartSlot, ctx: ChatContext, d: Directory): string {
       ? `<div class="gx-hint">「${esc(g.name)}」 묶음을 지울까요? 구성원 요원과 첫 장면 글은 남아요. <button class="gx-mini danger" data-action="dir-group-del" data-value="${esc(`yes|${g.code}`)}">지우기</button><button class="gx-mini" data-action="dir-group-del" data-value="${esc(`no|${g.code}`)}">취소</button></div>`
       : `<button class="gx-mini danger" data-action="dir-group-del" data-value="${esc(`ask|${g.code}`)}">${ICONS.trash} 묶음 지우기</button>`;
     return `<div class="dir-panel">
-      ${input(k('name'), g.name, '이름')}
-      ${area(k('blurb'), g.blurb, '시작 화면 설명', 3)}
+      ${input(k('name'), g.name, '이름', '', '시작 화면 칸 이름')}
+      ${area(k('blurb'), g.blurb, '시작 화면 설명', 3, '', '이 칸을 고를 때 보이는 한두 줄 소개')}
       ${input(k('english'), g.english, '영문명', '사진 이름(「영문명」 이미지)과 영어 응답에서 써요')}
       ${photoBlock(`group:${g.code}`, ctx)}
       ${membersBlock(g.code, d)}
@@ -125,7 +126,7 @@ function slotDetail(s: StartSlot, ctx: ChatContext, d: Directory): string {
   return `<div class="dir-panel">
     ${off}
     ${input(k('title'), o.spec.title ?? '', '시작 화면 이름', s.kind === 'builtin' ? '비우면 원래 이름' : '비우면 조직 이름')}
-    ${area(k('blurb'), o.spec.blurb ?? '', '시작 화면 설명', 3)}
+    ${area(k('blurb'), o.spec.blurb ?? '', '시작 화면 설명', 3, '', '이 칸을 고를 때 보이는 한두 줄 소개')}
     ${photoBlock(`org:${o.name}`, ctx)}
     ${scenesBlock(s.code, d)}
     <p class="gx-muted">부르는 이름·괴담톡 탭·함께 넣을 로어북·모델용 설명은 조직 기록의 「기본 정보」에서 고쳐요.</p>
@@ -143,7 +144,7 @@ export function startPage(ctx: ChatContext): string {
   return `<div class="gw-page gw-startpage">
     <header class="gw-head"><h2>시작 화면</h2><p class="gx-muted">새 채팅의 「어느 쪽에 설까요?」에 보이는 칸이에요. 순서와 보임을 정하고, 칸을 열어 이름·설명·사진·첫 장면을 고쳐요. 묶음은 조직이 아니라 여러 조직의 인물을 한 칸에 모은 거예요.</p></header>
     <div class="dir-list st-slots">${slots.map((s) => slotRow(s)).join('')}</div>
-    <div class="dir-line"><button class="gx-mini" data-action="dir-group-add">${ICONS.plus} 묶음 추가</button></div>
+    <div class="st-addrow"><button class="gx-mini" data-action="dir-group-add">${ICONS.plus}묶음 추가</button></div>
     ${addOrg}
     ${sel ? `<h3 class="st-sel"><span>${esc(sel.name)}</span><small>${esc(sel.code)}</small></h3>${slotDetail(sel, ctx, d)}` : ''}
   </div>`;

@@ -1,7 +1,7 @@
 // 「고급 설정」 접는 칸 (v0.16.27, 사용자 설계): 각 기능 설정 맨 아래, 기본은 닫힘. 손대지 않아도 원본 기본값으로 돈다.
 // 바꾼 항목은 이름 앞 점과 되돌리기 버튼으로 보이고, 닫힌 칸 제목에 바꾼 개수가 뜬다.
 import { stepOf } from '../core/stepval';
-import { groupStep, numSet, setRow, setSeg, stepSize } from './setrow';
+import { groupStep, numSet, setRow, setSeg, stepSize, numTxt, numType } from './setrow';
 import { ADV, advChanged, advItem, advValue, advVar, type AdvFeature, type AdvItem } from '../core/advanced';
 import { ACTIVE_BOOKS_VAR, activeBooks, bookNames, toggleActiveBook, type RefSource } from '../core/refs';
 import { getPrefs } from '../core/settings';
@@ -36,7 +36,7 @@ function control(f: AdvFeature, item: AdvItem, cur: string): string {
   const down = Math.max(min, n - step);
   const up = Math.min(max, n + step);
   return `<div class="st-step adv-step${stepSize(max === Number.MAX_SAFE_INTEGER ? 9999999 : max, item.unit ?? '', item.zero ?? '')}"><button class="gx-step" data-action="adv-set" data-value="${id}=${down}" ${n <= min ? 'disabled' : ''} aria-label="${esc(item.label)} 줄이기">−</button>
-    <input class="adv-val" type="number" inputmode="numeric" min="${min}" max="${item.max ?? ''}" step="${step}" data-change="adv-set" data-key="${id}" value="${zero ? '' : n}"${item.zero ? ` placeholder="${esc(item.zero)}"` : ''} aria-label="${esc(item.label)}">${item.unit ? `<span>${esc(item.unit)}</span>` : ''}
+    <input class="adv-val" ${numType(max)} min="${min}" max="${item.max ?? ''}" step="${step}" data-change="adv-set" data-key="${id}" value="${zero ? '' : numTxt(n, max)}"${item.zero ? ` placeholder="${esc(item.zero)}"` : ''} aria-label="${esc(item.label)}">${item.unit && !zero ? `<span>${esc(item.unit)}</span>` : ''}
     <button class="gx-step" data-action="adv-set" data-value="${id}=${up}" ${n >= max ? 'disabled' : ''} aria-label="${esc(item.label)} 늘리기">+</button></div>`;
 }
 

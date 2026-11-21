@@ -29,9 +29,9 @@ test('요원 기록 머리(이름 옆)에 목록 줄과 같은 ▲▼ 단추가 
 });
 
 test('같은 소속의 맨 위·맨 아래에서는 그쪽 단추가 꺼진다', () => {
-  assert.match(R.headMove('agent', d, '가'), /aria-label="가 요원 위로" title="위로" disabled/);
-  assert.doesNotMatch(R.headMove('agent', d, '가'), /아래로" title="아래로" disabled/);
-  assert.match(R.headMove('agent', d, '다'), /aria-label="다 요원 아래로" title="아래로" disabled/);
+  assert.match(R.headMove('agent', d, '가'), /aria-label="가 요원 위로" title="같은 소속의 맨 위예요" disabled/);
+  assert.doesNotMatch(R.headMove('agent', d, '가'), /아래로" title="같은 소속의 맨 아래예요" disabled/);
+  assert.match(R.headMove('agent', d, '다'), /aria-label="다 요원 아래로" title="같은 소속의 맨 아래예요" disabled/);
 });
 
 test('요원이 아니거나 명부에 없는 이름이면 단추가 없다', () => {

@@ -307,7 +307,7 @@ function cell(it: Item, left: number | undefined, over: boolean, w: When, queued
 const WHAT: Record<ItemLog['what'], string> = { get: '획득', use: '사용', drop: '버림', gone: '없어짐', destroy: '파괴', merge: '합침', sell: '팖', left: '없어짐', off: '해제' };
 /** 기록 한 줄의 말 (시험이 부른다) */
 export const logWhatLabel = (l: Pick<ItemLog, 'what' | 'hand'>): string => (l.what === 'off' && l.hand ? '넣기' : WHAT[l.what] ?? l.what);
-const BY: Record<ItemLog['by'], string> = { story: '본문', manual: '직접', use: '사용 단추', store: '상점' };
+const BY: Record<ItemLog['by'], string> = { story: '본문', manual: '직접', use: '사용 버튼', store: '상점' };
 const WEEK = '일월화수목금토';
 /** 「2025.05.10 15:41」 → 「2025.05.10 (토)」 (가계부 날짜 줄과 같은 꼴) */
 function dayOf(when: string): string {

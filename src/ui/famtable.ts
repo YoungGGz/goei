@@ -17,7 +17,7 @@ import { advValue } from '../core/advanced';
 import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopAmountNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
 import { siteLogo } from './browser';
 import { ICONS } from './icons';
-import { ckWide, helpBox, mxGrid, numCtl, numSet, setGroup, setRow, setSeg, stepSize, type CkBand } from './setrow';
+import { ckWide, helpBox, mxGrid, numCtl, numSet, setGroup, setRow, setSeg, stepSize, numTxt, numType, type CkBand } from './setrow';
 import type { ShopCol } from './settings';
 
 type State = Record<string, unknown> | undefined;
@@ -77,7 +77,7 @@ export function boardTable(state: State, busy = false): string {
     ['보호 대상', '「사생활」이 지켜 줄 사람의 이름이에요. 비우면 주인공이에요.'],
   ]), '주제와 말투');
   const cnt = (n: number, k: CountKey) => ({ n, lo: COUNT_RANGE[k][0], hi: COUNT_RANGE[k][1] });
-  const amount: CkBand = { title: '양', groups: [
+  const amount: CkBand = { title: '생성량', groups: [
     { name: '게시글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '새 글 댓글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '활동 댓글 수', opts: ['최소', '최대'], kind: 'num' },
@@ -268,7 +268,7 @@ export function shopTable(vars: State, busy = false): string {
       ['스티커·상담원', '망상홈쇼핑에서 들춰 본 스티커 밑 글과 전화 주문 상담원의 말이에요.'],
       ['진열', '사지 않은 물건까지 진열대 전체와, 진열과 함께 온 주인의 말이나 쇼핑몰 공지예요. 쇼핑몰은 진열을 받은 턴에만 붙어요.'],
     ]) };
-  const numBox = (key: string, n: number, lo: number, hi: number, unit: string, label: string) => `<div class="st-step adv-step${stepSize(hi, unit, '제한 없음')}"><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.max(lo, n - stepOf(hi))}" ${n <= lo || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 줄이기">−</button><input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="fam-num" data-key="${key}" value="${n === 0 ? '' : n}" placeholder="제한 없음" aria-label="최대 양 ${label}"${busy ? ' disabled' : ''}><span>${unit}</span><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.min(hi, n + stepOf(hi))}" ${n >= hi || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 늘리기">+</button></div>`;
+  const numBox = (key: string, n: number, lo: number, hi: number, unit: string, label: string) => `<div class="st-step adv-step${stepSize(hi, unit, '제한 없음')}"><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.max(lo, n - stepOf(hi))}" ${n <= lo || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 줄이기">−</button><input class="adv-val" ${numType(hi)} min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="fam-num" data-key="${key}" value="${n === 0 ? '' : numTxt(n, hi)}" placeholder="제한 없음" aria-label="최대 양 ${label}"${busy ? ' disabled' : ''}>${n === 0 ? '' : `<span>${unit}</span>`}<button class="gx-step" data-action="fam-num" data-value="${key}=${Math.min(hi, n + stepOf(hi))}" ${n >= hi || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 늘리기">+</button></div>`;
   const HT = HS_MAIN_SET.tokens;
   const HU = HS_MAIN_SET.turns;
   const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [hsN, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, hsN)], ['시청 기록', numBox('s:hs:main_turns', hm.turns, HU.lo, HU.hi, HU.unit, '시청 기록')]]), helpBox('', [

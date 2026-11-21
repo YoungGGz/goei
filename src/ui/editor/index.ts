@@ -1,6 +1,7 @@
 // 세계 편집 창 (docs/설계안_세계편집.md 5장): 패널과 별도의 창. 왼쪽 트리 + 오른쪽 편집기.
 // 저장은 전부 카드 명부(Directory)로: 명부 줄(기존 dirUi 초안)과 세계 덧쓰기(edUi.over)를 한 번에 쓴다.
 import { loreCheckBox } from '../lorecheck';
+import { invOn } from '../../core/items';
 import { bindNeedFill } from '../needfill';
 import { directoryData, withDirectory, readDirectoryData, type Directory, type DirectoryData } from '../../core/world/directory';
 import { renameOrgOverrides, type WorldOverrides } from '../../core/world/records';
@@ -426,7 +427,7 @@ function touched(): void {
 export const isKind = (n: string): n is WorldKind => ['agent', 'org', 'anomaly', 'site', 'appendix'].includes(n);
 
 const SET_LABEL: Record<SetPage, string> = { screen: '화면', image: '캐릭터 이미지', board: '상황판', status: '상태창', gnet: '괴담넷', gal: '괴담갤', wpf: '세정게', sm: '연어 마켓', cos: '우주 쇼핑몰', bm: '백일몽 포인트몰', hs: '망상홈쇼핑', phone: '괴담톡', wiki: '위키', journal: '일지', wallet: '가계부', items: '소지품', shop: '상점', people: '인물', factions: '세력', lore: '로어북 호출', adv: '생성 공통', update: '업데이트', net: '인터넷' };
-const SET_ICON: Record<SetPage, string> = { screen: ICONS.settings, image: ICONS.cctv, board: ICONS.grid, status: ICONS.list, gnet: siteLogo('gn'), gal: siteLogo('gal'), wpf: siteLogo('wpf'), sm: siteLogo('sm'), cos: siteLogo('cos'), bm: siteLogo('bm'), hs: siteLogo('hs'), phone: ICONS.phone, wiki: ICONS.wiki, journal: ICONS.records, wallet: ICONS.wallet, items: ICONS.bag, shop: ICONS.swap, people: ICONS.group, factions: ICONS.org, lore: ICONS.book, adv: ICONS.pen, update: ICONS.refresh, net: ICONS.net };
+const SET_ICON: Record<SetPage, string> = { screen: ICONS.settings, image: ICONS.cctv, board: ICONS.grid, status: ICONS.list, gnet: siteLogo('gn'), gal: siteLogo('gal'), wpf: siteLogo('wpf'), sm: siteLogo('sm'), cos: siteLogo('cos'), bm: siteLogo('bm'), hs: siteLogo('hs'), phone: ICONS.phone, wiki: ICONS.wiki, journal: ICONS.records, wallet: ICONS.wallet, items: ICONS.bag, shop: ICONS.tag, people: ICONS.group, factions: ICONS.org, lore: ICONS.search, adv: ICONS.pen, update: ICONS.refresh, net: ICONS.net };
 /** [노드, 이름, 아이콘, 배지?, 하위 항목?]. 노드가 `label:…` 이면 누를 수 없는 소제목 줄 (설정 「기록」 아래 하위 메뉴, 2026-11-05 사용자) */
 type TreeItem = [EditorNode | `label:${string}`, string, string, string?, boolean?];
 const setItem = (p: SetPage): TreeItem => [`set:${p}`, SET_LABEL[p], SET_ICON[p]];
@@ -478,6 +479,8 @@ function featureState(ctx: ChatContext | null): Partial<Record<EditorNode, boole
     'set:board': host?.canChat?.() ? worldOn(ctx.chat) : basic.anomalyOn,
     'set:image': basic.assetOn,
     'set:people': ppValue(ss, 'on') === '1',
+    // 사용 켬/끔이 있는 소지품도 같은 표시 (일부 기능에만 「끔」이 붙었다, 전수점검 눌러-사소-22)
+    'set:items': invOn(ss),
   };
 }
 
@@ -505,7 +508,7 @@ const FEATURE_INFO: Partial<Record<SetPage, { desc: string; example: string; off
   net: { desc: '괴담넷·괴담갤·세정게·연어 마켓의 설정이에요.', example: '' },
   factions: { desc: '세력(관리국·백일몽·협회…)이 주인공을 어떻게 보는지를 인물 기록 갱신기가 −100~100 값으로 매겨요. 켤지를 여기서 정해요.', example: '' },
   lore: { desc: '세력·괴이·파밍·요원·부록 로어북을 요청에 넣을지 누가 고를지 정해요. 다음 요청에 어떤 로어북이 들어가는지는 아래에서 바로 볼 수 있어요.', example: '' },
-  adv: { desc: '괴담넷·괴담톡·위키·상점(쇼핑몰·망상홈쇼핑 포함) 생성에 공통으로 쓰는 값이에요(재시도는 AI 상담도). 생성 언어, 형식이 틀렸을 때 다시 부르는 횟수, 요청 하나의 토큰 상한(괴담넷·괴담톡·위키).', example: '' },
+  adv: { desc: '괴담넷·괴담톡·위키·상점(쇼핑몰·망상홈쇼핑 포함) 생성에 공통으로 쓰는 값이에요. 생성 언어, 형식이 틀렸을 때 다시 부르는 횟수(AI 상담에도 써요), 요청 하나의 토큰 상한(괴담넷·괴담톡·위키).', example: '' },
 };
 
 /** 설정 페이지: 패널 설정의 묶음을 그대로 (지침은 지침 탭) */
@@ -555,14 +558,14 @@ function settingsPage(ctx: ChatContext, page: SetPage): string {
   // 「기본값으로 저장」「기본값 불러오기」는 설정 전부를 한 번에 다루므로 페이지마다 두지 않고 창 머리(render)에 한 번만 둔다 (2026-10-29 사용자). 확인 띠는 어느 페이지에서든 그 자리에
   const chatPage = page !== 'screen' && page !== 'update';
   act = act.replace(/<span class="ps-defaults">[\s\S]*?<\/span>/, '').trim();
-  const right = chatPage && !canChat ? `<span class="gw-tokens">${chatOnly ? '이 채팅 설정 (시작 전)' : '새 채팅 기본값 (시작 전)'}</span>${act}` : act;
+  const right = chatPage && !canChat ? `<i class="gx-scope ${chatOnly ? 'chat' : 'defaults'}">${chatOnly ? '이 채팅 설정 (시작 전)' : '새 채팅 기본값 (시작 전)'}</i>${act}` : act;
   const info = FEATURE_INFO[page];
   const on = featureState(ctx)[`set:${page}`];
   const badge = on === undefined ? '' : `<span class="gw-state${on ? '' : ' off'}">${on ? '켬' : '끔'}</span>`;
   // 기능 판 안의 머리 설명은 여기 설명과 겹치니 뺀다 (인물 기록 소개)
   if (info) body = body.replace(/<p class="ps-note">메인 응답이 끝날 때마다[\s\S]*?<\/p>/, '');
   // 인물 페이지는 맨 위에 자기 도식이 있으니 「호출 흐름 →」 단추만 (callSummary 안에서)
-  const calls = callSummary(ctx, page);
+  const calls = callSummary(ctx, page, !!info);
   const lead = info
     ? `<p class="gx-muted">${esc(info.desc)}${info.example ? ` <span class="gw-eg">예) ${esc(info.example)}</span>` : ''}${on === false && info.off ? ` <span class="gw-off-note">${esc(info.off)}</span>` : ''}</p>${calls}</header>`
     : `${calls}</header>`;
@@ -720,19 +723,20 @@ function worldFindResults(ctx: ChatContext | null): string {
     .join('')}</div>`;
 }
 
-function tree(ctx: ChatContext | null): string {
+/** 왼쪽 열: [위에 붙는 머리(찾기 칸), 목록]. 머리는 갈래 탭과 함께 위에 붙어, 목록을 내려도 다른 갈래로 바로 간다 (전수점검 눌러-보통-41) */
+function tree(ctx: ChatContext | null): [string, string] {
   const counts = treeCounts(ctx);
   const on = featureState(ctx);
   const tab = tabOf(edUi.node);
   const find = tab === 'set'
     ? `<input class="gw-find" type="search" data-input="ed-sq" value="${esc(edUi.sq)}" placeholder="설정 찾기 (예: 테마, 새로고침)" aria-label="설정 찾기" autocomplete="off">`
     : tab === 'world'
-      ? `<input class="gw-find" type="search" data-input="ed-wq" value="${esc(edUi.wq)}" placeholder="세계 검색 (요원·조직·괴이·파밍·부록)" aria-label="세계 검색" autocomplete="off">`
+      ? `<input class="gw-find" type="search" data-input="ed-wq" value="${esc(edUi.wq)}" placeholder="세계 검색" title="요원·조직·괴이·파밍·부록에서 찾아요" aria-label="세계 검색 (요원·조직·괴이·파밍·부록)" autocomplete="off">`
       : '';
-  if (tab === 'set' && edUi.sq.trim()) return `${find}<div class="gw-find-out">${findResults(ctx)}</div>`;
-  if (tab === 'world' && edUi.wq.trim()) return `${find}<div class="gw-find-out">${worldFindResults(ctx)}</div>`;
+  if (tab === 'set' && edUi.sq.trim()) return [find, `<div class="gw-find-out">${findResults(ctx)}</div>`];
+  if (tab === 'world' && edUi.wq.trim()) return [find, `<div class="gw-find-out">${worldFindResults(ctx)}</div>`];
   const wrap = tab === 'set' || tab === 'world';
-  return find + (wrap ? '<div class="gw-find-out">' : '') + treeGroups(counts, on) + (wrap ? '</div>' : '');
+  return [find, (wrap ? '<div class="gw-find-out">' : '') + treeGroups(counts, on) + (wrap ? '</div>' : '')];
 }
 
 function treeGroups(counts: Partial<Record<EditorNode, number>>, on: Partial<Record<EditorNode, boolean>>): string {
@@ -750,7 +754,7 @@ function guideNodePage(ctx: ChatContext, n: GuideNode): string {
   const g = n.slice(6) as GuideName | 'Image';
   // 길 표시는 메뉴의 묶음 이름 그대로 (전에는 인물 기록 지침도 「기능별 지침」으로 나왔다)
   const crumb = `지침 / ${treeOf('guide').find((gr) => gr.items.some((i) => i[0] === n))?.title ?? '기능별 지침'}`;
-  if (g === 'Image') return `<div class="gw-page gw-set"><header class="gw-head"><h2>이미지(메인 모델)</h2><p class="gx-muted">카드 로어북 대신 플러그인이 만드는 이미지 태그 지침이에요. 지침 틀, 출력 대상 캐릭터(명부에서 자동), 표정 세트를 여기서 관리해요.</p></header><div class="gx-settings gw-setbody gw-imgp">${imgPromptPane(ctx)}</div></div>`;
+  if (g === 'Image') return `<div class="gw-page gw-set"><header class="gw-head"><h2>이미지(메인 모델)<small>${esc(crumb)} · 이 기기 공통</small></h2><p class="gx-muted">카드 로어북 「Asset」 대신 플러그인이 만드는 이미지 태그 지침이에요. 지침 틀, 출력 대상 캐릭터(명부에서 자동), 표정 세트를 여기서 관리해요.</p></header><div class="gx-settings gw-setbody gw-imgp">${imgPromptPane(ctx)}</div></div>`;
   return guidePage(g, crumb);
 }
 
@@ -846,9 +850,10 @@ export function render(): void {
   // 폰: 갈래 넷과 닫기는 설정 창 전용 서랍에 (늘 떠 있지 않는다). 상황판 서랍과 같은 틀(.gx-cdr)·같은 손짓: 하단 바를 위로 쓸면 올라오고 아래로 쓸면 내려간다 (11-15 사용자)
   const cdr = `<div class="gx-cdr gw-cdr${edCdr ? ' open' : ''}"><div class="gx-cslide"><span class="gx-cgrip" aria-hidden="true"><i></i></span><div class="gx-cpanel ph-tools">${tabTools}<button class="ph-tool" data-action="ed-close" aria-label="설정 닫기" title="설정 닫기">${ICONS.close}<span class="ph-tool-l">닫기</span></button></div></div></div>`;
   const foot = phone ? (host.mobileNav?.() ?? '').replace(/^(\s*<nav\b[^>]*>)/, `$1${cdr}`) : '';
+  const [treeTop, treeList] = tree(ctx);
   const html = `<div class="gw-win${edUi.drawer ? ' drawer' : ''}${phone ? ' phone' : ''}">
     ${top}
-    <nav class="gw-tree"><div class="gw-tabs" role="tablist">${tabs}</div>${tree(ctx)}</nav>
+    <nav class="gw-tree"><div class="gw-tree-top"><div class="gw-tabs" role="tablist">${tabs}</div>${treeTop}</div>${treeList}</nav>
     <main class="gw-body">${ctx ? body(ctx) : '<p class="gx-err">채팅 정보를 읽지 못했어요. 창을 닫고 다시 열어 주세요.</p>'}</main>
     ${tab === 'set' ? `<button class="gw-totop" data-action="ed-top" aria-label="맨 위로" title="맨 위로">${ICONS.up}</button>` : ''}
     ${foot}
@@ -889,10 +894,21 @@ export function render(): void {
   }
 }
 
-/** 기능 설정 우하단 「맨 위로」 (2026-11-08 사용자): 조금 내려갔을 때만 보인다 */
+/** 기능 설정 우하단 「맨 위로」 (2026-11-08 사용자): 조금 내려갔을 때만 보인다.
+ *  늘 떠 있으면 그 자리의 지우기 ×·입력값·펼침 화살표를 덮어 잘못 눌렸다 (전수점검 눌러-보통-32) → 위로 올리는 중에만 보이고, 손을 떼고 2초 뒤 사라진다 */
+let topLast = 0;
+let topHide: ReturnType<typeof setTimeout> | null = null;
 function syncTop(): void {
   const b = root?.querySelector<HTMLElement>('.gw-totop');
-  if (b) b.classList.toggle('show', (root?.querySelector<HTMLElement>('.gw-body')?.scrollTop ?? 0) > 240);
+  const y = root?.querySelector<HTMLElement>('.gw-body')?.scrollTop ?? 0;
+  const up = y < topLast;
+  topLast = y;
+  if (!b) return;
+  if (topHide) clearTimeout(topHide);
+  topHide = null;
+  const show = y > 240 && up;
+  b.classList.toggle('show', show);
+  if (show) topHide = setTimeout(() => root?.querySelector<HTMLElement>('.gw-totop')?.classList.remove('show'), 2000);
 }
 
 const boundOnce = new WeakSet<HTMLElement>();

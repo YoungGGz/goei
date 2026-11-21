@@ -91,8 +91,12 @@ const STEP_SM_ROOM = 29;
 const textPx = (t: string): number => [...t].reduce((n, ch) => n + (/[0-9]/.test(ch) ? 7.6 : ch === ' ' ? 3.6 : /[.,%]/.test(ch) ? 9 : ch.charCodeAt(0) > 0x2e7f ? 12.4 : 8), 0);
 export const stepSize = (hi: number, unit = '', zero = ''): '' | ' lg' => {
   const u = unit ? textPx(unit) + 3 : 0;
-  return Math.max(textPx(String(Math.abs(Math.trunc(hi)))), zero ? textPx(zero) : 0) + u > STEP_SM_ROOM ? ' lg' : '';
+  return Math.max(textPx(numTxt(Math.abs(Math.trunc(hi)), hi)), zero ? textPx(zero) : 0) + u > STEP_SM_ROOM ? ' lg' : '';
 };
+/** 수 칸의 값 글: 1만 이상인 큰 수는 자릿점을 찍는다 (시작 잔고 「140,000」과 같은 꼴, 전수점검 눌러-사소-39).
+ *  자릿점을 보이려고 큰 수 칸은 글 칸(type=text)으로 둔다. 보낼 때 자릿점은 panelChange 가 뗀다 */
+export const numTxt = (n: number, hi: number): string => (hi >= 10000 ? n.toLocaleString('en-US') : String(n));
+export const numType = (hi: number): string => (hi >= 10000 ? 'type="text" inputmode="numeric"' : 'type="number" inputmode="numeric"');
 /** 글로 보이는 수 상자(<b>값단위</b>)의 크기: 보일 수 있는 가장 긴 글로 정한다 */
 export const stepSizeText = (...texts: string[]): '' | ' lg' => (Math.max(...texts.map(textPx)) > STEP_SM_ROOM ? ' lg' : '');
 /** 한 묶음(같은 줄·같은 격자)의 수 상자는 같은 크기: 하나라도 큰 것이면 모두 큰 것 */
@@ -102,14 +106,14 @@ const sameStep0 = (html: string): string => (/class="st-step[^"]* lg"/.test(html
  *  zero = 0일 때 수 대신 보이는 말 */
 export const stepIn = (action: string, key: string, n: number, lo: number, hi: number, unit: string, aria: string, busy = false, zero = ''): string => {
   const b = (dir: '-' | '+', on: boolean, name: string) => `<button class="gx-step" data-action="${action}" data-value="${esc(key ? `${key}:${dir}` : dir)}" ${on && !busy ? '' : 'disabled'} aria-label="${esc(aria)} ${name}">${dir === '-' ? '−' : '+'}</button>`;
-  return `<div class="st-step adv-step${stepSize(hi, unit, zero)}">${b('-', n > lo, '줄이기')}<input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="${action}"${key ? ` data-key="${esc(key)}"` : ''} value="${zero && n === 0 ? '' : n}"${zero ? ` placeholder="${esc(zero)}"` : ''} aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit ? `<span>${esc(unit)}</span>` : ''}${b('+', n < hi, '늘리기')}</div>`;
+  return `<div class="st-step adv-step${stepSize(hi, unit, zero)}">${b('-', n > lo, '줄이기')}<input class="adv-val" ${numType(hi)} min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="${action}"${key ? ` data-key="${esc(key)}"` : ''} value="${zero && n === 0 ? '' : numTxt(n, hi)}"${zero ? ` placeholder="${esc(zero)}"` : ''} aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit && !(zero && n === 0) ? `<span>${esc(unit)}</span>` : ''}${b('+', n < hi, '늘리기')}</div>`;
 };
 export const stepBox = (action: string, key: string, cur: string | number, lo: number, hi: number, unit: string, aria: string, busy = false): string => {
   const raw = String(cur ?? '').trim();
   const n = Math.max(lo, Math.min(hi, Number(raw) || 0));
   const st = stepOf(hi);
   const b = (to: number, on: boolean, sign: string, name: string) => `<button class="gx-step" data-action="${action}" data-value="${esc(key)}=${to}" ${on && !busy ? '' : 'disabled'} aria-label="${esc(aria)} ${name}">${sign}</button>`;
-  return `<div class="st-step adv-step${stepSize(hi, unit)}">${b(Math.max(lo, n - st), n > lo, '−', '줄이기')}<input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="${st}" data-change="${action}" data-key="${esc(key)}" value="${raw === '' ? '' : n}" aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit ? `<span>${esc(unit)}</span>` : ''}${b(Math.min(hi, n + st), n < hi, '+', '늘리기')}</div>`;
+  return `<div class="st-step adv-step${stepSize(hi, unit)}">${b(Math.max(lo, n - st), n > lo, '−', '줄이기')}<input class="adv-val" ${numType(hi)} min="${lo}" max="${hi}" step="${st}" data-change="${action}" data-key="${esc(key)}" value="${raw === '' ? '' : numTxt(n, hi)}" aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit ? `<span>${esc(unit)}</span>` : ''}${b(Math.min(hi, n + st), n < hi, '+', '늘리기')}</div>`;
 };
 
 function control(page: SetPage, d: SetDef, w: Wire): { ctl: string; cur: string } {
@@ -156,7 +160,7 @@ function ckCols(isNum: boolean[], lg: boolean[]): string {
   const nums = isNum.filter(Boolean).length;
   const wide = nums > 0 && isNum.length - nums > nums;
   return isNum
-    .map((n, i) => (!n ? 'minmax(0, 1fr)' : lg[i] ? 'minmax(calc(var(--step-lg) + 6px), 1fr)' : wide ? 'minmax(126px, 1.35fr)' : 'minmax(calc(var(--step-sm) + 6px), 1fr)'))
+    .map((n, i) => (!n ? 'minmax(min-content, 1fr)' : lg[i] ? 'minmax(calc(var(--step-lg) + 6px), 1fr)' : wide ? 'minmax(126px, 1.35fr)' : 'minmax(calc(var(--step-sm) + 6px), 1fr)'))
     .join(' ');
 }
 
@@ -174,7 +178,7 @@ export function defRow(page: SetPage, d: SetDef, w: Wire): string {
   }
   if (d.ctl.t === 'area' && d.ctl.labeled) {
     const help = w.help?.[d.key]?.() ?? (typeof d.help === 'string' ? d.help : '');
-    return setRow(d.label, `<textarea class="gx-search ${d.ctl.cls}" rows="${d.ctl.rows}" data-change="${act(page, 'text')}" data-key="${sk(w, d.key)}" placeholder="${esc(d.ctl.ph)}">${esc(w.cur(d.key))}</textarea>`, help);
+    return setRow(d.label, `<textarea class="gx-search ${d.ctl.cls}" rows="${d.ctl.rows}" data-change="${page.flat ? `${page.id}-${d.key}"` : `${act(page, 'text')}" data-key="${sk(w, d.key)}"`} placeholder="${esc(d.ctl.ph)}">${esc(w.cur(d.key))}</textarea>`, help);
   }
   if (d.ctl.t === 'area') {
     return `<div class="ps-row"><textarea class="gx-search ${d.ctl.cls}" data-change="${page.id}-${d.key}" rows="${d.ctl.rows}" placeholder="${esc(d.ctl.ph)}">${esc(w.cur(d.key))}</textarea></div>`;
@@ -243,7 +247,7 @@ const ckCtl = (m: CkMark | undefined, act: string | null | undefined, aria: stri
   if (typeof m === 'boolean') return `<button class="ck-m ${round ? 'round' : 'box'}${m ? ' on' : ''}" data-action="${ckActs.set}" data-value="${esc(act)}" aria-pressed="${m}" aria-label="${aria}"${off}></button>`;
   const st = stepOf(m.hi);
   const b = (to: number, on: boolean, sign: string, name: string) => `<button class="gx-step" data-action="${ckActs.num}" data-value="${esc(act)}${ckActs.rel ? `:${sign === '+' ? '+' : '-'}` : `=${to}`}" ${on && !busy ? '' : 'disabled'} aria-label="${aria} ${name}">${sign}</button>`;
-  return `<div class="st-step adv-step${inGrid ? (m.lg ? ' lg' : '') : stepSize(m.hi, ckUnit)}">${b(Math.max(m.lo, m.n - st), m.n > m.lo, '−', '줄이기')}<input class="adv-val" type="number" inputmode="numeric" min="${m.lo}" max="${m.hi}" step="${st}" data-change="${ckActs.num}" data-key="${esc(act)}" value="${m.n}" aria-label="${aria}"${off}>${b(Math.min(m.hi, m.n + st), m.n < m.hi, '+', '늘리기')}</div>`;
+  return `<div class="st-step adv-step${inGrid ? (m.lg ? ' lg' : '') : stepSize(m.hi, ckUnit)}">${b(Math.max(m.lo, m.n - st), m.n > m.lo, '−', '줄이기')}<input class="adv-val" ${numType(m.hi)} min="${m.lo}" max="${m.hi}" step="${st}" data-change="${ckActs.num}" data-key="${esc(act)}" value="${numTxt(m.n, m.hi)}" aria-label="${aria}"${off}>${b(Math.min(m.hi, m.n + st), m.n < m.hi, '+', '늘리기')}</div>`;
 };
 /** 수 조작 하나 (격자 밖 줄에서도 같은 모양·같은 처리기) */
 export const numCtl = (act: string, m: CkNum, aria: string, unit = '', busy = false, acts: CkActs = FAM_ACTS): string => {
@@ -260,7 +264,8 @@ export const ckGrid = (groups: CkGroup[], rows: CkRow[], foot = '', title = '', 
   const flat = groups.flatMap((g) => g.opts.map((o, i) => ({ g, o, first: i === 0, band: i === 0 && !!g.band, pair: g.kind === 'num' && g.opts.length === 2 ? (i === 0 ? ' ck-pl' : ' ck-pr') : '' })));
   const named = groups.some((g) => g.name);
   const head1 = named ? `<div class="ck-line ck-h1"><span></span>${groups.map((g) => `<b class="ck-first${g.band ? ' ck-band' : ''}" style="grid-column: span ${g.opts.length}">${esc(g.name)}</b>`).join('')}</div>` : '';
-  const head2 = `<div class="ck-line ck-h2${named ? '' : ' solo'}"><span></span>${flat.map((c) => `<span class="${c.first ? 'ck-first' : ''}${c.band ? ' ck-band' : ''}">${esc(c.o)}</span>`).join('')}</div>`;
+  // 켬/끔 하나뿐인 묶음은 단위 줄에 「켬」을 적지 않는다 (단위가 아니다, 전수점검 눌러-사소-14·눌러2-보통-35)
+  const head2 = `<div class="ck-line ck-h2${named ? '' : ' solo'}"><span></span>${flat.map((c) => `<span class="${c.first ? 'ck-first' : ''}${c.band ? ' ck-band' : ''}">${named && c.g.opts.length === 1 && c.o === '켬' ? '' : esc(c.o)}</span>`).join('')}</div>`;
   const body = rows.map((r) => `<div class="ck-line ck-row"><b class="ck-name">${r.label}</b>${flat.map((c, i) =>
     `<span class="ck-cell${c.first ? ' ck-first' : ''}${c.band ? ' ck-band' : ''}${c.pair}">${ckCtl(r.marks[i], r.acts[i], `${esc(c.g.name)} ${esc(c.o)}`, c.g.kind === 'one', busy)}</span>`).join('')}</div>`).join('');
   // 수 칸인지는 묶음 종류가 아니라 칸에 든 값으로 (선쪽지 확률은 check 묶음인데 수가 든다, 전수검사 11-13)
@@ -290,7 +295,8 @@ const ckWide0 = (bands: CkBand[], labels: string[], busy = false): string => {
     const cols = b.groups.map((g) => ({ g, from: (at += g.opts.length) - g.opts.length }));
     return `<div class="mx mx-grid ck-ph" style="--mx-n:${cols.length}"><section class="ps-group"><h3>${esc(b.title)}</h3><div class="ps-rows">${labels.map((label, r) => `<div class="mx-row"><b class="mx-label">${label}</b>${cols.map(({ g, from }) => `<div class="mx-cell"><span class="mx-site">${esc(g.name)}</span><span class="fam-set">${g.opts.map((o, i) => {
       const m = b.marks[r][from + i];
-      return m === null || m === undefined ? '' : `<span class="fam-set1">${g.opts.length > 1 || o !== '켬' ? `<span>${esc(o)}</span>` : ''}${ckCtl(m, b.acts[r][from + i], `${esc(g.name)} ${esc(o)}`, false, busy)}</span>`;
+      // 쓰지 않는 칸은 PC 표처럼 「–」 (비워 두면 이름만 남아 고장처럼 보였다, 전수점검 눌러-보통-52)
+      return m === null || m === undefined ? '<span class="fam-set1"><span class="ck-x" aria-label="없음">–</span></span>' : `<span class="fam-set1">${g.opts.length > 1 || o !== '켬' ? `<span>${esc(o)}</span>` : ''}${ckCtl(m, b.acts[r][from + i], `${esc(g.name)} ${esc(o)}`, false, busy)}</span>`;
     }).join('')}</span></div>`).join('')}</div>`).join('')}</div>${b.foot ? `<small class="mx-foot">${b.foot}</small>` : ''}</section></div>`;
   };
   const hasNum = (b: CkBand) => b.marks.some((row) => row.some((m) => m !== null && typeof m === 'object'));

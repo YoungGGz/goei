@@ -57,18 +57,16 @@ export const THEME_KEY = '$st_fixed_theme';
 
 export const settingsUi = {
   page: '' as '' | 'phone' | 'gnet' | 'gal' | 'wpf' | 'sm' | 'cos' | 'bm' | 'hs' | 'wiki' | 'people' | 'journal' | 'factions',
-  confirmOff: false,
   busy: false,
   notice: '',
   info: '',
   scope: 'chat' as SettingsScope,
   confirm: '' as '' | 'save' | 'load' | 'reset',
   /** 「기본값 불러오기」 직전에 보관해 둔 이 채팅의 값 (2026-11-06 사용자 승인, 전수점검 9-7). 불러온 뒤 「되돌리기」 한 번. 없던 키는 undefined */
-  undo: null as null | { charIndex: number; chatIndex: number; before: Record<string, string | number | boolean | undefined> },
+  undo: null as null | { charIndex: number; chatIndex: number; before: Record<string, string | number | boolean | undefined>; from: 'load' | 'reset' },
 };
 
 export function resetSettings(): void {
-  settingsUi.confirmOff = false;
   settingsUi.page = '';
   settingsUi.notice = '';
   settingsUi.scope = 'chat';
@@ -110,12 +108,12 @@ function ownShopsField(vars: Record<string, unknown> | undefined, busy: boolean)
   const text = (o: OwnShop, key: 'name' | 'alias', ph: string, len: number) =>
     `<input class="st-text" type="text" maxlength="${len}" value="${esc(o[key])}" data-change="set-own" data-key="${esc(o.id)}:${key}" placeholder="${ph}" aria-label="${ph}"${busy ? ' disabled' : ''}>`;
   const rows = list.map((o) => `<div class="ms-fx${o.on ? '' : ' off'}">
-      <div class="ms-fx-head">${text(o, 'name', '상점 이름 (로어 이름 그대로)', 30)}${switchHtml({ action: 'set-own-on', value: o.on ? `${o.id}:0` : `${o.id}:1`, on: o.on, disabled: busy, label: `${o.name || '고유 상점'} 켜고 끄기` })}<button class="gx-mini danger" data-action="set-own-del" data-value="${esc(o.id)}" aria-label="지우기"${busy ? ' disabled' : ''}>×</button></div>
+      <div class="ms-fx-head">${text(o, 'name', '상점 이름 (로어 이름 그대로)', 30)}${switchHtml({ action: 'set-own-on', value: o.on ? `${o.id}:0` : `${o.id}:1`, on: o.on, disabled: busy, label: `${o.name || '고유 상점'} 켜고 끄기` })}<button class="gx-mini danger" data-action="set-own-del" data-value="${esc(o.id)}" aria-label="${esc(o.name || '고유 상점')} 지우기"${busy ? ' disabled' : ''}>${ICONS.trash}지우기</button></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>다른 이름</span>${text(o, 'alias', '쉼표로 나눠서 (예: 포인트몰, 복지몰)', 120)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>인터넷 접속</span>${seg('set-own-web', `${o.id}:${o.web || 'none'}`, ownWeb().map(([v, l]) => [`${o.id}:${v}`, l]), busy)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>직접 가면</span>${seg('set-own-visit', `${o.id}:${o.visit || 'none'}`, OWN_VISIT.map(([v, l]) => [`${o.id}:${v}`, l]), busy)}</span></div>
     </div>`).join('');
-  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini primary" data-action="set-own-add"${list.length >= OWN_MAX || busy ? ' disabled' : ''}>고유 상점 추가</button><button class="gx-mini" data-action="set-own-reset"${busy ? ' disabled' : ''}>기본 표로 되돌리기</button></div>`;
+  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini primary" data-action="set-own-add"${list.length >= OWN_MAX || busy ? ' disabled' : ''}>고유 상점 추가</button><button class="gx-mini" data-action="set-own-reset"${busy ? ' disabled' : ''}>초기값으로</button></div>`;
   return field('고유 상점', '', `로어에 있는, 자기 창이 따로 있는 상점이에요. 켜진 줄은 상점 판단 기준에 들어가요. 주인공이 그 사이트·앱에 실제로 접속해 있으면 응답 아래 「접속하기」가 붙고, 누르면 상황판 없이 인터넷 창만 그 사이트로 열려요. 직접 매장에 가 있으면 「직접 가면」에 고른 창이 열려요(열지 않음이면 안 열림). 표에 없는 편의점 같은 곳은 그대로 기본 상점창이에요.`) + rows + foot;
 }
 
@@ -139,6 +137,10 @@ function recentControl(key: string, v: number | undefined, label: string, busy: 
 }
 
 const group = setGroup;
+/** 두 갈래 짝 표의 몸: 줄이 있으면 머리를 두 번(왼쪽·오른쪽 갈래, 폰은 둘째를 숨김) 둬서 첫 줄이 왼쪽 머리 아래에 온다.
+ *  줄이 없으면 머리 대신 안내 한 줄 (한 줄일 때 오른쪽 머리 자리로 밀리고, 빈 표엔 머리뿐이었다, 전수점검 눌러-보통-46) */
+const pairGrid = (head: string, body: string, n: number): string =>
+  n ? `<div class="ms-pg">${head}${head}${body}</div>` : '<p class="ps-note ms-empty">아직 줄이 없어요. 「추가」로 한 줄씩 넣어요.</p>';
 const RULES_TABLE = pairTable(ITEM_RULES_DEFAULT);
 /** 판정 표: 그림 대체 말과 같은 접는 양식·같은 칸 (「종류·물건말 → 판정」) */
 function rulesBlock(stored: unknown, busy: boolean): string {
@@ -162,9 +164,9 @@ function rulesBlock(stored: unknown, busy: boolean): string {
     </div>`;
   }).join('');
   const changed = RULES_TABLE.changed(stored);
-  const foot = `<div class="ms-tb-foot"><button class="gx-mini primary" data-action="set-items-rules-add"${busy || !RULES_TABLE.canAdd(stored) ? ' disabled' : ''}>추가</button>${changed ? `<button class="gx-mini" data-action="set-items-rules-reset"${dis}>기본값으로</button>` : ''}</div>`;
+  const foot = `<div class="ms-tb-foot"><button class="gx-mini primary" data-action="set-items-rules-add"${busy || !RULES_TABLE.canAdd(stored) ? ' disabled' : ''}>추가</button>${changed ? `<button class="gx-mini" data-action="set-items-rules-reset"${dis}>초기값으로</button>` : ''}</div>`;
   const help = typeof def.help === 'string' ? def.help : '';
-  return `<details class="ps-adv${changed ? ' ps-changed' : ''}" data-keep="items-rules"${keepOpen('items-rules')}><summary class="ps-adv-sum"><b>${esc(def.label)}</b><span class="adv-count">${rows.length}줄</span></summary><div class="ps-adv-body"><div class="ms-tb ms-pairs"><div class="ms-pg">${head}${rows.length > 1 ? head : ''}${body}</div>${foot}</div>${help ? `<p class="ps-note">${help}</p>` : ''}</div></details>`;
+  return `<details class="ps-adv${changed ? ' ps-changed' : ''}" data-keep="items-rules"${keepOpen('items-rules')}><summary class="ps-adv-sum"><b>${esc(def.label)}</b><span class="adv-count">${rows.length}줄</span></summary><div class="ps-adv-body"><div class="ms-tb ms-pairs">${pairGrid(head, body, rows.length)}${foot}</div>${help ? `<p class="ps-note">${help}</p>` : ''}</div></details>`;
 }
 const wordsText = (v: string): string => v.replace(/\s+/g, ' ').trim().slice(0, ITEM_WORDS_MAX);
 /** 그림 대체 말 표: 접는 덩어리 안에 줄마다 「끝 말 → 바꿀 말」 칸. PC 는 한 줄에 두 쌍, 폰은 한 쌍 (배치는 CSS .ms-pairs) */
@@ -184,9 +186,9 @@ function aliasBlock(stored: unknown, busy: boolean): string {
     </div>`;
   }).join('');
   const changed = aliasChanged(stored);
-  const foot = `<div class="ms-tb-foot"><button class="gx-mini primary" data-action="set-items-alias-add"${busy || !aliasCanAdd(stored) ? ' disabled' : ''}>추가</button>${changed ? `<button class="gx-mini" data-action="set-items-alias-reset"${dis}>기본값으로</button>` : ''}</div>`;
+  const foot = `<div class="ms-tb-foot"><button class="gx-mini primary" data-action="set-items-alias-add"${busy || !aliasCanAdd(stored) ? ' disabled' : ''}>추가</button>${changed ? `<button class="gx-mini" data-action="set-items-alias-reset"${dis}>초기값으로</button>` : ''}</div>`;
   const help = typeof def.help === 'string' ? def.help : '';
-  return `<details class="ps-adv${changed ? ' ps-changed' : ''}" data-keep="items-alias"${keepOpen('items-alias')}><summary class="ps-adv-sum"><b>${esc(def.label)}</b><span class="adv-count">${rows.length}줄</span></summary><div class="ps-adv-body"><div class="ms-tb ms-pairs"><div class="ms-pg">${head}${rows.length > 1 ? head : ''}${body}</div>${foot}</div>${help ? `<p class="ps-note">${help}</p>` : ''}</div></details>`;
+  return `<details class="ps-adv${changed ? ' ps-changed' : ''}" data-keep="items-alias"${keepOpen('items-alias')}><summary class="ps-adv-sum"><b>${esc(def.label)}</b><span class="adv-count">${rows.length}줄</span></summary><div class="ps-adv-body"><div class="ms-tb ms-pairs">${pairGrid(head, body, rows.length)}${foot}</div>${help ? `<p class="ps-note">${help}</p>` : ''}</div></details>`;
 }
 
 
@@ -200,14 +202,14 @@ function statusColsTable(cfg: ColConfig, busy: boolean, vars: Record<string, unk
     const use = seg('set-col', auto ? 'a' : m === 'off' ? '0' : '1', useOpts, busy || c.locked).replace(/data-value="([a\d])"/g, `data-value="${c.id}:use:$1"`);
     const showOn = auto ? vars?.[colVar('points')] !== AUTO_HIDE : m === 'on';
     const show = seg('set-col', showOn ? '1' : '0', [['1', '표시'], ['0', '숨김']], busy || (m === 'off' && !auto)).replace(/data-value="(\d)"/g, `data-value="${c.id}:show:$1"`);
-    const hint = c.locked ? '늘 사용' : c.id === 'points' ? '자동: 신분이 백일몽일 때만 사용' : c.feature ? `끄면 ${c.feature}도 꺼져요` : '';
+    const hint = c.locked ? '늘 사용해요.' : c.id === 'points' ? '자동: 신분이 백일몽일 때만 사용해요.' : c.feature ? `끄면 ${c.feature}도 꺼져요.` : '';
     return `<div class="st-col-row${m === 'off' ? ' off' : ''}"><div class="st-col-name"><b>${c.label}</b>${hint ? `<small>${hint}</small>` : ''}</div>${use}${show}</div>`;
   });
   // 사용 중인 칸 전부 표시·숨김 (2026-11-08 사용자: 칸별 표시에 더해 일괄)
   const used = STATUS_COLS.filter((c) => cfg[c.id] !== 'off');
   const allCur = used.every((c) => cfg[c.id] === 'on') ? '1' : used.every((c) => cfg[c.id] === 'hide') ? '0' : '';
   const all = seg('set-col', allCur, [['1', '전부 표시'], ['0', '전부 숨김']], busy || !used.length).replace(/data-value="(\d)"/g, 'data-value="all:show:$1"');
-  const head = `<div class="st-col-row st-col-all"><div class="st-col-name"><b>모든 칸</b><small>사용 중인 칸을 한 번에 표시하거나 숨겨요</small></div>${all}</div>`;
+  const head = `<div class="st-col-row st-col-all"><div class="st-col-name"><b>모든 칸</b><small>사용 중인 칸을 한 번에 표시하거나 숨겨요.</small></div>${all}</div>`;
   return `<div class="st-cols ps-row-block">${head}${rows.join('')}</div>`;
 }
 
@@ -317,7 +319,7 @@ function scopeBar(scope: SettingsScope, canChat: boolean, ctx?: ChatContext): st
 export function undoBar(ctx: ChatContext): string {
   const u = settingsUi.undo;
   if (!u || u.charIndex !== ctx.charIndex || u.chatIndex !== ctx.chatIndex || settingsUi.confirm) return '';
-  return `<div class="st-confirm st-undobar ps-defconfirm"><p>불러오기·초기화 전 채팅 설정을 보관해 뒀어요. 되돌리면 그때 값으로 돌아가요. (기본값·지침은 되돌아오지 않아요)</p><div class="gx-row-btns"><button class="gx-mini ps-save" data-action="set-bar-undo" ${settingsUi.busy ? 'disabled' : ''}>${ICONS.back}그 전으로 되돌리기</button><button class="gx-mini" data-action="set-bar-undo-drop">보관한 것 버리기</button></div></div>`;
+  return `<div class="st-confirm st-undobar ps-defconfirm"><p>${u.from === 'reset' ? '초기화' : '불러오기'} 전 채팅 설정을 보관해 뒀어요. 되돌리면 그때 값으로 돌아가요. (기본값·지침은 되돌아오지 않아요)</p><div class="gx-row-btns"><button class="gx-mini ps-save" data-action="set-bar-undo" ${settingsUi.busy ? 'disabled' : ''}>${ICONS.back}그 전으로 되돌리기</button><button class="gx-mini" data-action="set-bar-undo-drop">보관한 것 버리기</button></div></div>`;
 }
 /** 페이지 안: 되돌리기 띠만. 확인은 팝업(mainDefaultsPopup) — 11-07 사용자: 전체 설정에 관한 확인이 괴담넷 같은 한 페이지 안에 뜨면 안 된다 */
 export function mainDefaultsConfirm(ctx?: ChatContext): string {
@@ -327,7 +329,7 @@ export function mainDefaultsConfirm(ctx?: ChatContext): string {
 export function mainDefaultsPopup(): string {
   const c = settingsUi.confirm ? CONFIRM.chat[settingsUi.confirm] : null;
   if (!c) return '';
-  return `<div class="gw-confirm"><div class="gw-confirm-box"><p>${c[0]}</p><div class="gx-row-btns"><button class="gx-mini${settingsUi.confirm === 'load' || settingsUi.confirm === 'reset' ? ' danger' : ' ps-save'}" data-action="set-bar-yes" data-value="${settingsUi.confirm}">${c[1]}</button><button class="gx-mini" data-action="set-bar-no">취소</button></div></div></div>`;
+  return `<div class="gw-confirm"><div class="gw-confirm-box"><p>${c[0]}</p><div class="gx-row-btns"><button class="gx-mini danger" data-action="set-bar-yes" data-value="${settingsUi.confirm}">${c[1]}</button><button class="gx-mini" data-action="set-bar-no">취소</button></div></div></div>`;
 }
 
 const BACK = `<button class="ph-tool ph-back" data-action="set-feat-back" aria-label="설정으로">${ICONS.back}</button>`;
@@ -394,12 +396,8 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       ...(o.help !== undefined ? { help: { [key]: () => o.help! } } : {}),
     });
   };
-  const anomaly = settingsUi.confirmOff && scope === 'chat'
-    ? `<div class="st-confirm"><p>끄면 지금 상황판의 괴이·사건·특수·요원 상태를 비워요. 다시 켜도 이전 상태는 돌아오지 않아요.</p>
-        <div class="gx-row-btns"><button class="gx-mini danger" data-action="set-anomaly" data-value="off-yes" ${busy ? 'disabled' : ''}>끄기</button>
-        <button class="gx-mini" data-action="set-anomaly" data-value="off-no">취소</button></div></div>`
-    // 이 채팅에서 끄면 상황판 상태를 비우고(되돌릴 수 없음) 한 번 묻는다 → AI 상담은 이 조작을 누르지 않는다 (ui/editor/catalog.ts)
-    : scope === 'chat' ? `<span data-consult="no" style="display:contents">${seg('set-anomaly', on ? 'on' : 'off', [['on', 'ON'], ['off', 'OFF']], busy)}</span>` : seg('set-anomaly', on ? 'on' : 'off', [['on', 'ON'], ['off', 'OFF']], busy);
+  // 이 채팅에서 끄면 상황판 상태를 비운다(되돌릴 수 없음). 설정에 확인 칩은 두지 않는다(사용자 결정, 전수점검 사소-64) → AI 상담은 이 조작을 누르지 않는다 (ui/editor/catalog.ts)
+  const anomaly = scope === 'chat' ? `<span data-consult="no" style="display:contents">${seg('set-anomaly', on ? 'on' : 'off', [['on', 'ON'], ['off', 'OFF']], busy)}</span>` : seg('set-anomaly', on ? 'on' : 'off', [['on', 'ON'], ['off', 'OFF']], busy);
   const note = String(ctx.chat.scriptstate?.[ASSET_NOTE] ?? '');
   // 상태창 칸 구성·시작 잔고 (채팅 변수 또는 새 채팅 기본값)
   const colCfg = colConfig(scope === 'chat' ? ctx.chat.scriptstate : getPrefs().vars);
@@ -455,7 +453,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       D('status', getPrefs().status ?? 'auto'),
     ].join(''))}
     ${group(`칸 <small>${usedCols(colCfg).length}칸 사용</small>`, statusColsTable(colCfg, busy, scope === 'chat' ? ctx.chat.scriptstate : getPrefs().vars),
-      `응답 끝의 상태 태그 <code>[▣|…]</code>에 들어가는 칸이에요. 「안 씀」으로 하면 태그에서 그 칸이 빠지고(모델에 모양을 알려 줘요), 「숨김」은 태그에는 두고 채팅 속 상태창 상자에서만 가려요.${scope === 'chat' ? ' 바꾼 구성은 이 채팅에 바로 적용되고 바뀐 시점이 기록돼요.' : ' 새 채팅의 기본 구성이에요.'}`)}
+      `응답 끝의 상태 태그 <code>[▣|…]</code>에 들어가는 칸이에요. 「사용 안 함」으로 하면 태그에서 그 칸이 빠지고(모델에 모양을 알려 줘요), 「숨김」은 태그에는 두고 채팅 속 상태창 상자에서만 가려요.${scope === 'chat' ? ' 바꾼 구성은 이 채팅에 바로 적용되고 바뀐 시점이 기록돼요.' : ' 새 채팅의 기본 구성이에요.'}`)}
 `,
     // 가계부(시작 잔고·잔고 직접 수정): 설정 「기록」 페이지 안의 묶음 (2026-11-05 사용자: 가계부가 기록 하위 탭이니 상태창에는 잔고 칸 표시만)
     // 2026-11-07 사용자: 가계부·소지품·상점 설정을 「소지품」 한 페이지로, 켜고 끄기는 따로 (가계부 = 상태창 잔고 칸 $st_col_wallet)
@@ -483,7 +481,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
           D('items-state', itemStateOn(itVars) ? '1' : '0'),
           ...(!itemAutoOn(itVars) ? [] : [
             D('items-scope', itemScope(itVars)),
-            D('items-skip', '', { ctl: `<input class="st-text" type="text" maxlength="${ITEM_SKIP_MAX}" value="${esc(itemSkip(itVars))}" data-change="set-items-skip" aria-label="만들지 않을 것"${busy ? ' disabled' : ''}>` }),
+            D('items-skip', '', { ctl: `<input class="st-text" type="text" maxlength="${ITEM_SKIP_MAX}" value="${esc(itemSkip(itVars))}" data-change="set-items-skip" placeholder="예: 지급받은 옷, 명함, 영수증" aria-label="만들지 않을 것"${busy ? ' disabled' : ''}>` }),
           ]),
         ]),
       ].join('')),
@@ -509,7 +507,7 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
         // 그림 대체 말은 줄이 많아(기본 32줄) 접어 둔다 (11-12 사용자). 묶음의 줄들 아래, 고급 설정과 같은 접는 양식
         `<section class="ps-group"><h3>물건 그림</h3><div class="ps-rows">${[
           D('items-pool', itemIconPoolOn(itVars) ? '1' : '0'),
-          ...(scope === 'chat' ? [D('items-misses', '', { ctl: (() => { const m = readIconMisses(); return m.length ? `<div class="st-misses">${m.slice().reverse().map((x) => `<div>${esc(x.name)}${x.icon ? ` <small>(${esc(x.icon)})</small>` : ''} → 상자</div>`).join('')}</div>` : '<small>이번에 켠 뒤로 없어요.</small>'; })() })] : []),
+          ...(scope === 'chat' ? [D('items-misses', '', { ctl: (() => { const m = readIconMisses(); return m.length ? `<div class="st-misses">${m.slice().reverse().map((x) => `<div>${esc(x.name)}${x.icon ? ` <small>(${esc(x.icon)})</small>` : ''} → 상자</div>`).join('')}</div>` : '<div class="st-misses">없음</div>'; })() })] : []),
         ].join('')}</div>${aliasBlock(itVars?.[ITEM_ICON_ALIAS_VAR], busy)}</section>`,
       ]),
     ].join(''),
@@ -780,7 +778,8 @@ export async function handleSettings(action: string, value: string | undefined, 
     return true;
   }
   if (action === 'set-bar') {
-    settingsUi.confirm = v === 'save' || v === 'load' || v === 'reset' ? v : '';
+    // 시작 전(범위 = 새 채팅 기본값)에는 셋 다 막는다: 시작 전 채팅 값으로 저장하면 정해 둔 기본값이 지워졌다 (전수점검 중대-11)
+    settingsUi.confirm = scope !== 'defaults' && (v === 'save' || v === 'load' || v === 'reset') ? v : '';
     env.render();
     return true;
   }
@@ -824,7 +823,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       await dropShopTags(ctx);
     }
     await redrawIfCard(ctx, card[0], card[1]);
-    if (!settingsUi.notice) settingsUi.info = '기본값을 불러오기 전 설정으로 되돌렸어요.';
+    if (!settingsUi.notice) settingsUi.info = u.from === 'reset' ? '초기화 전 설정으로 되돌렸어요.' : '기본값을 불러오기 전 설정으로 되돌렸어요.';
     env.render();
     return true;
   }
@@ -872,7 +871,7 @@ export async function handleSettings(action: string, value: string | undefined, 
         await dropShopTags(ctx);
       }
       await redrawIfCard(ctx, card[0], card[1]);
-      if (!settingsUi.notice && before) settingsUi.undo = { charIndex: ctx.charIndex, chatIndex: ctx.chatIndex, before };
+      if (!settingsUi.notice && before) settingsUi.undo = { charIndex: ctx.charIndex, chatIndex: ctx.chatIndex, before, from: 'load' };
       if (!settingsUi.notice) settingsUi.info = '기본값을 지금 채팅에 불러왔어요.';
       env.render();
     } else if (what === 'reset') {
@@ -921,7 +920,7 @@ export async function handleSettings(action: string, value: string | undefined, 
         imgUi.keywords = null;
         for (const f of resetHooks) f();
       }
-      if (!settingsUi.notice && before) settingsUi.undo = { charIndex: ctx.charIndex, chatIndex: ctx.chatIndex, before };
+      if (!settingsUi.notice && before) settingsUi.undo = { charIndex: ctx.charIndex, chatIndex: ctx.chatIndex, before, from: 'reset' };
       if (!settingsUi.notice) settingsUi.info = '지금 채팅 설정·기본값·지침·세계를 플러그인 원래 값으로 초기화했어요. 추가 규칙은 그대로 둬요.';
       env.render();
     } else env.render();
@@ -994,7 +993,6 @@ export async function handleSettings(action: string, value: string | undefined, 
   }
   if (action === 'set-scope') {
     settingsUi.scope = v === 'defaults' || v === 'card' ? v : 'chat';
-    settingsUi.confirmOff = false;
     settingsUi.confirm = '';
     env.render();
     return true;
@@ -1224,7 +1222,7 @@ export async function handleSettings(action: string, value: string | undefined, 
       return true;
     case 'set-col':
       // 상태창 칸 사용·표시: 채팅 변수 + 바뀐 시점 기록 (파서가 옛 응답을 옛 구성으로 읽게)
-      // 잔고 칸을 「안 씀」으로 하면 가계부가 꺼진 것이라 상점도 꺼진다: 「가계부」 OFF(set-wallet-on 0)와 같이 이번 방문을 닫고 남은 표식을 지운다
+      // 잔고 칸을 「사용 안 함」으로 하면 가계부가 꺼진 것이라 상점도 꺼진다: 「가계부」 OFF(set-wallet-on 0)와 같이 이번 방문을 닫고 남은 표식을 지운다
       {
         let walletOff = false;
         await save(ctx, env, (chat) => {
@@ -1353,18 +1351,6 @@ export async function handleSettings(action: string, value: string | undefined, 
       return true;
     case 'set-anomaly':
       if (v === 'off') {
-        if (!worldOn(ctx.chat)) return true;
-        settingsUi.confirmOff = true;
-        env.render();
-        return true;
-      }
-      if (v === 'off-no') {
-        settingsUi.confirmOff = false;
-        env.render();
-        return true;
-      }
-      settingsUi.confirmOff = false;
-      if (v === 'off-yes') {
         await save(ctx, env, (chat) => (worldOn(chat) ? worldOffVars() : null));
         return true;
       }

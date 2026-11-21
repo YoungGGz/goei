@@ -71,13 +71,13 @@ export function relationsPage(ctx: ChatContext, over: WorldOverrides, rulesOnly:
     })
     .join('');
   const basic = `<section class="ps-group"><h3>기본</h3><div class="ps-rows">
-      <div class="ps-row"><div class="ps-label"><b>세력 관계도에 포함</b><small>${selOff ? '관계 표·Faction 표·평판 시작값에서 빠져요 (민간인처럼 세력이 아닌 조직).' : 'Faction 지침의 관계 표에 들어가요. 조직 기록에서도 켜고 끌 수 있어요.'}</small></div>
+      <div class="ps-row"><div class="ps-label"><b>세력 관계도에 포함</b><small>${selOff ? '관계 표·세력 지침·평판 시작값에서 빠져요 (민간인처럼 세력이 아닌 조직).' : '세력 지침(📜Faction)의 관계 표에 들어가요. 조직 기록에서도 켜고 끌 수 있어요.'}</small></div>
         <div class="ps-ctl">${switchHtml({ action: 'ed-rel-org', value: sel, on: !selOff })}</div></div>
     </div></section>`;
   const stages = selOff
     ? ''
     : `<section class="ps-group"><h3>${esc(sel)} → 다른 조직 <small>단계는 세력 평판 5단계와 같고 평판 시작값이 돼요. 설명 줄은 반대 방향.</small></h3><div class="ps-rows gw-rel-rows">${rows || '<p class="ps-note">관계도에 든 다른 조직이 없어요.</p>'}</div></section>`;
-  const rules = `<section class="ps-group"><h3>공통 규칙 <small>쌍 관계가 아닌 세력 전체 규칙. Faction 지침 끝에 그대로. {A00} 같은 자리표는 그 코드 조직의 이름으로.</small></h3><div class="ps-rows">
+  const rules = `<section class="ps-group"><h3>공통 규칙 <small>쌍 관계가 아닌 세력 전체 규칙. 세력 지침 끝에 그대로. {A00} 같은 자리표는 그 코드 조직의 이름으로.</small></h3><div class="ps-rows">
       <div class="ps-row gw-copyto gw-copybox"><textarea class="gw-rules" data-input="ed-rules" rows="8">${esc(rel.common)}</textarea>${copyBtn()}</div>
       <div class="ps-row gw-rel-foot"><span class="gw-tokens">${tokenizerName() ? '' : '약 '}${tokens(rel.common).toLocaleString()}토큰</span></div>
     </div></section>`;
@@ -87,8 +87,8 @@ export function relationsPage(ctx: ChatContext, over: WorldOverrides, rulesOnly:
       <header class="gw-head"><h2>${esc(sel)}</h2>
         <div class="gw-head-act"><span class="gw-tokens">Faction ${tokenizerName() ? '' : '약 '}${tokens(fac).toLocaleString()}토큰</span>
           <button class="gx-chip${sym() ? ' on' : ''}" data-action="ed-rel-sym" aria-pressed="${sym()}">대칭</button>
-          <button class="gx-mini${relUi.preview ? ' on' : ''}" data-action="ed-rel-preview">${ICONS.book}Faction 지침 보기</button></div>
-        <p class="gx-muted">고른 조직이 다른 조직을 어떻게 보는지 한 줄씩 정해요. 「대칭」이 켜져 있으면 반대 방향도 같이 바뀌어요. 표 하나가 Faction 지침에 들어가고, 메모를 쓴 줄만 표 아래 한 줄로 붙어요.</p></header>
+          <button class="gx-mini${relUi.preview ? ' on' : ''}" data-action="ed-rel-preview">${ICONS.book}세력 지침 보기</button></div>
+        <p class="gx-muted">고른 조직이 다른 조직을 어떻게 보는지 한 줄씩 정해요. 「대칭」이 켜져 있으면 반대 방향도 같이 바뀌어요. 표 하나가 세력 지침에 들어가고, 메모를 쓴 줄만 표 아래 한 줄로 붙어요.</p></header>
       ${relUi.preview ? `<div class="gw-copyto gw-copybox"><pre class="gw-preview">${esc(fac)}</pre>${copyBtn('조립 글 복사')}</div>` : ''}
       ${basic}
       ${stages}

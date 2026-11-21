@@ -1,4 +1,5 @@
 // 공통 기록 편집기: 목록 → 상세. 기본 칸(종류별 schema) + 추가 칸 + 순서 + 글로 가져오기 + 칸별 토큰·합계 + 조립 글 보기 + 읽기 전용.
+import { josa } from '../../core/josa';
 import { switchHtml } from '../controls';
 import type { Directory } from '../../core/world/directory';
 import { tokenizerName } from '../../core/tokenizer';
@@ -14,6 +15,7 @@ import { facePic } from '../../host/assets';
 import { picAvatar } from '../images';
 import { ICONS } from '../icons';
 import { copyBtn } from '../copy';
+import { needAttr } from '../needfill';
 import { agentSceneFields, agentSceneState } from './start';
 import { edUi, overridesOf, setOverrides } from './index';
 
@@ -59,7 +61,7 @@ function presetOf(d: Directory, kind: WorldKind, name: string): boolean | null {
 
 /** 발생 후보 ON/OFF 토글 (목록 줄·제목 옆). 명부 preset 을 바꾼다 (저장은 창의 저장 단추) */
 const presetToggle = (kind: WorldKind, name: string, on: boolean | null) =>
-  on === null ? '' : `<button class="gw-pre${on ? ' on' : ''}" data-action="dir-set" data-value="${esc(`preset|${on ? 0 : 1}|${name}`)}" title="무작위 발생 후보 ${on ? 'ON → OFF' : 'OFF → ON'}" aria-pressed="${on}">${on ? '발생 ON' : '발생 OFF'}</button>`;
+  on === null ? '' : `<button class="gw-pre${on ? ' on' : ''}" data-action="dir-set" data-value="${esc(`preset|${on ? 0 : 1}|${name}`)}" title="무작위 발생 후보 ${on ? '켬 → 끔' : '끔 → 켬'}" aria-pressed="${on}">${on ? '발생 켬' : '발생 끔'}</button>`;
 
 /** 종류별 기록 이름·부제 (목록용) */
 export function rowsOf(ctx: ChatContext, kind: WorldKind, over: WorldOverrides): { name: string; sub: string; state: 'default' | 'edited' | 'new' | 'deleted'; preset: boolean | null }[] {
@@ -92,8 +94,8 @@ export function agentMoveButtons(d: Directory, name: string): string {
   if (!a) return '';
   const same = d.agents.filter((x) => agentGroup(x) === agentGroup(a));
   const i = same.indexOf(a);
-  return `<button class="gx-mini icon" data-action="dir-move" data-value="${esc(`up|${a.lore}`)}" aria-label="${esc(a.name)} 위로" title="위로" ${i <= 0 ? 'disabled' : ''}>${ICONS.up}</button>`
-    + `<button class="gx-mini icon" data-action="dir-move" data-value="${esc(`down|${a.lore}`)}" aria-label="${esc(a.name)} 아래로" title="아래로" ${i >= same.length - 1 ? 'disabled' : ''}>${ICONS.down}</button>`;
+  return `<button class="gx-mini icon" data-action="dir-move" data-value="${esc(`up|${a.lore}`)}" aria-label="${esc(a.name)} 위로" title="${i <= 0 ? '같은 소속의 맨 위예요' : '위로'}" ${i <= 0 ? 'disabled' : ''}>${ICONS.up}</button>`
+    + `<button class="gx-mini icon" data-action="dir-move" data-value="${esc(`down|${a.lore}`)}" aria-label="${esc(a.name)} 아래로" title="${i >= same.length - 1 ? '같은 소속의 맨 아래예요' : '아래로'}" ${i >= same.length - 1 ? 'disabled' : ''}>${ICONS.down}</button>`;
 }
 /** 폰·좁은 창: 목록이 드롭다운 한 줄로 바뀌어 목록 줄의 ▲▼가 안 보이므로, 요원 기록 머리의 이름 옆에 같은 단추를 둔다 (11-14 사용자 B-11). 넓은 창에서는 CSS 가 숨긴다 */
 export const headMove = (kind: WorldKind, d: Directory, name: string): string => {
@@ -108,8 +110,11 @@ export function recordList(ctx: ChatContext, kind: WorldKind, over: WorldOverrid
   // 요원 순서 ▲▼ (전수검사 11-13, 사용자 승인): 명부 순서대로 「요원 표시 인원」을 자르므로 여기서 바꾼다. 같은 소속 안에서만(moveAgent), 검색 중에는 없음
   const d = kind === 'agent' && !q ? directoryDraft(ctx) : null;
   const move = (name: string): string => (d ? agentMoveButtons(d, name) : '');
+  // 순서는 같은 소속 안에서만 바뀌므로 소속이 바뀌는 줄에 금을 긋는다 (맨 위·아래 화살표가 왜 꺼졌는지 보이게, 전수점검 눌러-사소-16)
+  const grpOf = (name: string) => { const a = d?.agents.find((x) => x.lore === name); return a ? agentGroup(a) : ''; };
+  const groupStart = (name: string, prev: string | undefined): boolean => !!d && prev !== undefined && grpOf(name) !== grpOf(prev);
   return rows.length
-    ? rows.map((r) => `<div class="gw-rowbox${r.name === sel ? ' on' : ''}${r.state === 'deleted' ? ' deleted' : ''}"><button class="gw-row" data-action="ed-sel" data-value="${esc(r.name)}"><b>${esc(r.name)}</b>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}${badge[r.state]}</button>${presetToggle(kind, r.name, r.preset)}${move(r.name)}</div>`).join('')
+    ? rows.map((r, i) => `<div class="gw-rowbox${r.name === sel ? ' on' : ''}${groupStart(r.name, rows[i - 1]?.name) ? ' gw-grp' : ''}${r.state === 'deleted' ? ' deleted' : ''}"><button class="gw-row" data-action="ed-sel" data-value="${esc(r.name)}"><b>${esc(r.name)}</b>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}${badge[r.state]}</button>${presetToggle(kind, r.name, r.preset)}${move(r.name)}</div>`).join('')
     : '<p class="gx-muted">맞는 기록이 없어요.</p>';
 }
 
@@ -164,8 +169,8 @@ function basicCard(ctx: ChatContext, kind: WorldKind, sel: string, d: Directory,
   const panel = basicPanel(ctx, kind, sel, d);
   const onoff = (action: string, on: boolean) => switchHtml({ action, value: '', on });
   let first = '';
-  if (rec && kind === 'agent') first = `<div class="dir-line"><span>Roster 지침에 포함</span>${onoff('ed-roster-toggle', !rec.rosterOff)}<small>${rec.rosterOff ? '명부 지침(🙂Roster)에 들어가지 않아요. 로어 칸은 그대로 모델에게 가요.' : '명부 지침에 소개 한 줄로 들어가요. 기본은 전원 포함.'}</small></div>`;
-  if (rec && kind === 'org') first = `<div class="dir-line"><span>세력 관계도에 포함</span>${onoff('ed-rel-member-toggle', !rec.relOff)}<small>${rec.relOff ? '관계 표·Faction 표·평판 시작값에서 빠져요 (민간인처럼 세력이 아닌 조직).' : 'Faction 지침의 관계 표에 들어가요. 세력 관계 화면에서도 켜고 끌 수 있어요.'}</small></div>`;
+  if (rec && kind === 'agent') first = `<div class="dir-line"><span>명부 지침에 포함</span>${onoff('ed-roster-toggle', !rec.rosterOff)}<small>${rec.rosterOff ? '명부 지침(🙂Roster)에 들어가지 않아요. 로어 칸은 그대로 모델에게 가요.' : '명부 지침에 소개 한 줄로 들어가요. 기본은 전원 포함.'}</small></div>`;
+  if (rec && kind === 'org') first = `<div class="dir-line"><span>세력 관계도에 포함</span>${onoff('ed-rel-member-toggle', !rec.relOff)}<small>${rec.relOff ? '관계 표·세력 지침·평판 시작값에서 빠져요 (민간인처럼 세력이 아닌 조직).' : '세력 지침(📜Faction)의 관계 표에 들어가요. 세력 관계 화면에서도 켜고 끌 수 있어요.'}</small></div>`;
   const body = panel ? (first ? panel.replace('<div class="dir-panel">', `<div class="dir-panel">${first}`) : panel) : `<div class="dir-panel"><p class="gx-muted">명부 줄이 없어요. 저장하면 생겨요.</p></div>`;
   return `<section class="gw-sec gw-basic"><h3>기본 정보</h3>${body}</section>`;
 }
@@ -196,14 +201,15 @@ function membersCard(ctx: ChatContext, sel: string, d: Directory): string {
 export function recordPage(ctx: ChatContext, kind: WorldKind, over: WorldOverrides, q: string, sel: string): string {
   const d = directoryDraft(ctx);
   // 폰(760px 이하)에서는 목록 대신 드롭다운 하나 (목록이 화면을 다 먹지 않게). CSS 가 폭에 따라 하나만 보여 준다
-  const pick = `<select class="gw-list-pick" data-change="ed-sel" aria-label="${WORLD_KIND_LABEL[kind]} 고르기">${rowsOf(ctx, kind, over)
+  // 고른 것이 없으면 첫 줄이 고른 것처럼 보이지 않게 빈 안내 줄을 고른 채로 둔다 (본문은 비었는데 첫 항목이 떠 있었다, 전수점검 눌러-중대-21)
+  const pick = `<select class="gw-list-pick" data-change="ed-sel" aria-label="${WORLD_KIND_LABEL[kind]} 고르기">${sel ? '' : `<option value="" selected disabled>${josa(WORLD_KIND_LABEL[kind], '을', '를')} 고르세요</option>`}${rowsOf(ctx, kind, over)
     .map((r) => `<option value="${esc(r.name)}"${r.name === sel ? ' selected' : ''}>${esc(r.name)}${r.sub ? ` · ${esc(r.sub)}` : ''}${r.state === 'deleted' ? ' (지움)' : r.state === 'new' ? ' (추가)' : r.state === 'edited' ? ' (고침)' : ''}</option>`)
     .join('')}</select>`;
   // 괴이·파밍: 다른 폴더의 로어북을 발생 후보로 넣는 칸 (예전 명부 「후보 추가」. 2026-10-27 명부를 기록 화면에 합치며 빠졌던 것, 2026-10-28 QC 되살림)
   const ext = kind === 'anomaly' || kind === 'site';
   const list = `<aside class="gw-list-pane">
     <div class="gw-list-tools">${pick}<input class="dir-search" type="search" data-input="ed-q" value="${esc(q)}" placeholder="${WORLD_KIND_LABEL[kind]} 검색" aria-label="검색">
-      <button class="gx-mini" data-action="ed-add-toggle" aria-expanded="${recUi.adding}">${ICONS.plus}추가</button>${ext ? `<button class="gx-mini${dirUi.adding ? ' on' : ''}" data-action="dir-add-toggle" aria-expanded="${dirUi.adding}" title="다른 폴더의 로어북을 발생 후보로">${ICONS.plus}폴더 밖</button>` : ''}</div>
+      <button class="gx-mini" data-action="ed-add-toggle" aria-expanded="${recUi.adding}">${ICONS.plus}추가</button>${ext ? `<button class="gx-mini${dirUi.adding ? ' on' : ''}" data-action="dir-add-toggle" aria-expanded="${dirUi.adding}" title="다른 폴더의 로어북을 발생 후보로">${ICONS.plus}다른 폴더에서 추가</button>` : ''}</div>
     ${ext && dirUi.adding ? `<div class="gw-add dir-ext"><input class="gx-search" data-input="dir-ext-q" value="${esc(dirUi.addQ)}" placeholder="다른 폴더의 로어북 이름·폴더 검색" aria-label="후보로 넣을 로어북 검색" autocomplete="off"><div class="dir-ext-list">${directoryExtList(ctx)}</div></div>` : ''}
     ${recUi.adding ? `<div class="gw-add"><input name="ed-new-name" placeholder="새 ${WORLD_KIND_LABEL[kind]} 이름 (한글)" data-enter="ed-add" autocomplete="off"><button class="gx-mini" data-action="ed-add" data-take="ed-new-name">만들기</button>
       <p class="gx-muted">${kind === 'agent' ? '요원은 만든 뒤 「기본 정보」에서 영문명·소속·부서를 채워요. 영문명은 그림 에셋 이름과 같아야 해요.' : kind === 'org' ? '조직은 만든 뒤 「기본 정보」에서 영문명·코드를 정해요.' : '만든 뒤 기본 정보에서 영문명·별칭을 채워요.'}</p></div>` : ''}
@@ -212,7 +218,7 @@ export function recordPage(ctx: ChatContext, kind: WorldKind, over: WorldOverrid
   const rec = sel ? worldRecord(kind, sel, over) : null;
   const bucket = (over[kind] ?? {}) as Record<string, Partial<WorldRecord> & { deleted?: boolean }>;
   let detail: string;
-  if (!sel) detail = `<div class="gw-detail empty"><p class="gx-muted">왼쪽에서 ${WORLD_KIND_LABEL[kind]}을(를) 고르세요.</p></div>`;
+  if (!sel) detail = `<div class="gw-detail empty"><p class="gx-muted">목록에서 ${josa(WORLD_KIND_LABEL[kind], '을', '를')} 고르세요.</p></div>`;
   else if (bucket[sel]?.deleted) detail = `<div class="gw-detail"><header class="gw-head"><h2>${esc(sel)}</h2><p class="gx-muted">기본 세계의 이 기록을 지웠어요. 모델에게 가지 않아요.</p></header><button class="gx-mini" data-action="ed-restore">되살리기</button></div>`;
   else if (!rec) detail = `<div class="gw-detail"><header class="gw-head"><h2>${esc(sel)}${headMove(kind, d, sel)}<small>명부에만 있음</small></h2><div class="gw-head-act"><button class="gx-mini" data-action="ed-make-rec">${ICONS.plus}로어 칸 만들기</button>${kind === 'org' && d.orgs.some((o) => o.name === sel && !o.faction) && !d.agents.some((a) => a.affiliation === sel) ? delBtn(kind, sel, '삭제') : ''}</div><p class="gx-muted">이 기록에는 로어 칸이 없어요. 명부 줄(이름·사진·소속 같은 것)만 있어요.</p></header>${basicCard(ctx, kind, sel, d, null)}${kind === 'agent' ? sceneCard(sel, d) : ''}${kind === 'org' ? membersCard(ctx, sel, d) : ''}</div>`;
   else {
@@ -276,9 +282,10 @@ export function recordPage(ctx: ChatContext, kind: WorldKind, over: WorldOverrid
 function importPane(kind: WorldKind): string {
   const r = recUi.importResult;
   return `<div class="gw-import"><p class="gx-muted">다른 봇의 캐릭터 로어북 글을 붙여 넣으면 제목(#·**굵게**)으로 절을 나눠 칸에 배정해요. 안 맞는 절은 그 제목 그대로 추가 칸이 돼요. 기존 칸 글은 뒤에 이어 붙여요.</p>
-    <textarea data-input="ed-import" rows="8" placeholder="여기에 붙여 넣기">${esc(recUi.importText)}</textarea>
-    <div class="gx-row-btns"><button class="gx-mini" data-action="ed-import-parse">배정 보기</button>${r ? '<button class="gx-mini" data-action="ed-import-apply">이대로 넣기</button>' : ''}</div>
-    ${r ? `<table class="gw-map"><thead><tr><th>절</th><th>→ 칸</th></tr></thead><tbody>${r.map.map(([t, id]) => `<tr><td>${esc(t)}</td><td>${esc(id.startsWith('x:') ? `추가 칸 「${id.slice(2)}」` : FIELDS[kind].find((f) => f.id === id)?.label ?? id)}</td></tr>`).join('')}</tbody></table>` : ''}
+    <textarea name="ed-import" data-input="ed-import" rows="8" placeholder="여기에 붙여 넣기">${esc(recUi.importText)}</textarea>
+    <div class="gx-row-btns"><button class="gx-mini" data-action="ed-import-parse"${needAttr('ed-import', recUi.importText)}>배정 보기</button>${r ? `<button class="gx-mini" data-action="ed-import-apply"${r.map.length ? '' : ' disabled'}>이대로 넣기</button>` : ''}</div>
+    ${r && !r.map.length ? '<p class="gx-muted">배정할 절이 없어요. 붙여 넣은 글을 확인해 주세요.</p>' : ''}
+    ${r && r.map.length ? `<table class="gw-map"><thead><tr><th>절</th><th>→ 칸</th></tr></thead><tbody>${r.map.map(([t, id]) => `<tr><td>${esc(t)}</td><td>${esc(id.startsWith('x:') ? `추가 칸 「${id.slice(2)}」` : FIELDS[kind].find((f) => f.id === id)?.label ?? id)}</td></tr>`).join('')}</tbody></table>` : ''}
   </div>`;
 }
 
@@ -339,6 +346,13 @@ export function recordInput(name: string, key: string, value: string, ctx: ChatC
     const i = Number(id);
     if (!rec.extra[i]) return false;
     const old = rec.extra[i].name;
+    // 빈 이름·다른 칸과 같은 이름은 적지 않고 옛 이름을 둔다: 겹치는 동안 순서가 어긋나거나 칸 하나가 편집기에서 사라졌다 (전수점검 보통-69)
+    const t = value.trim();
+    if (!t || rec.extra.some((e, j) => j !== i && e.name.trim() === t)) {
+      edUi.notice = t ? '같은 이름의 칸이 있어요. 다른 이름을 적어 주세요.' : '칸 이름을 적어 주세요.';
+      return true;
+    }
+    if (edUi.notice === '같은 이름의 칸이 있어요. 다른 이름을 적어 주세요.' || edUi.notice === '칸 이름을 적어 주세요.') edUi.notice = '';
     rec.extra[i] = { ...rec.extra[i], name: value };
     if (rec.order) rec.order = rec.order.map((o) => (o === `x:${old}` ? `x:${value}` : o));
   } else return false;
@@ -390,12 +404,13 @@ export async function recordAction(action: string, value: string | undefined, ct
       recUi.importOpen = !recUi.importOpen;
       return true;
     case 'ed-import-parse':
-      recUi.importResult = parseImport(kind, recUi.importText);
+      // 빈 칸이면 배정하지 않는다 (빈 글로 「넣었어요」가 떴다, 전수점검 눌러-보통-47)
+      recUi.importResult = recUi.importText.trim() ? parseImport(kind, recUi.importText) : null;
       return true;
     case 'ed-import-apply': {
       const cur = current(ctx, kind);
       const r = recUi.importResult;
-      if (!cur || !r) return true;
+      if (!cur || !r || !r.map.length) return true;
       for (const [id, v] of Object.entries(r.fields)) cur.rec.fields[id] = cur.rec.fields[id] ? `${cur.rec.fields[id]}\n\n${v}` : v;
       cur.rec.extra = [...cur.rec.extra, ...r.extra];
       setOverrides(putRecord(over, kind, cur.name, cur.rec));
