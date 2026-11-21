@@ -109,6 +109,8 @@ export const PP_DEFAULTS: Record<string, string> = {
   batch_turns: '6',
   /** 인물마다 메인 요청에 넣는 승인 전 성격 관찰 수, 「이 인물이 모르는 사실」 줄 수 */
   observed_max: '4', unknown_max: '5',
+  /** 갱신 한 번에 받는 인물당 기록 항목 수(정리 대상 인물은 따로), 인물당 호감 계기 수, 변경 기록 줄 상한(넘으면 오래된 계기를 접는다). 지침의 <<ENTRY_CAP>> 등 자리에 같은 값이 들어간다 (전수점검 사소-20) */
+  entry_cap: '8', tidy_entry_cap: '24', cue_cap: '2', log_cap: '800',
 };
 
 /** 수 상한 설정의 범위 [최소, 최대] */
@@ -119,6 +121,10 @@ export const PP_NUM: Record<string, readonly [number, number]> = {
   batch_turns: [1, 20],
   observed_max: [1, 10],
   unknown_max: [1, 20],
+  entry_cap: [1, 30],
+  tidy_entry_cap: [4, 60],
+  cue_cap: [1, 6],
+  log_cap: [200, 5000],
 };
 
 export interface PeopleSettings {
@@ -204,6 +210,11 @@ export interface PeopleSettings {
   /** 인물마다 넣는 승인 전 성격 관찰 수 · 모르는 사실 줄 수 */
   observedMax: number;
   unknownMax: number;
+  /** 갱신 한 번에 받는 인물당 항목 수 · 정리 대상 인물의 항목 수 · 인물당 호감 계기 수 · 변경 기록 줄 상한 */
+  entryCap: number;
+  tidyEntryCap: number;
+  cueCap: number;
+  logCap: number;
   /** 갱신 기록 보관 건수 (성공·실패) */
 }
 
@@ -299,6 +310,10 @@ export function peopleSettings(state: Record<string, unknown> | undefined): Peop
     batchTurns: ppNum(state, 'batch_turns'),
     observedMax: ppNum(state, 'observed_max'),
     unknownMax: ppNum(state, 'unknown_max'),
+    entryCap: ppNum(state, 'entry_cap'),
+    tidyEntryCap: ppNum(state, 'tidy_entry_cap'),
+    cueCap: ppNum(state, 'cue_cap'),
+    logCap: ppNum(state, 'log_cap'),
   };
 }
 

@@ -201,8 +201,9 @@
 .gw .gx-row-btns { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--gap); }
 .gw .gx-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
 /* 단계 선택 (들어간 면 위에 고른 칸만 색) */
-.gw .gx-segs, .gw .gx-segs.gx-segs-sm { display: inline-flex; align-items: stretch; gap: 2px; padding: 2px; }
-.gw .gx-seg { height: calc(var(--h) - 6px); min-height: 0; min-width: 0; padding: 0 12px; border: 0; border-radius: calc(var(--r) - 2px); background: transparent; color: var(--dim); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+/* 고르기 칸은 틀 안을 꽉 채워 단추 높이도 옆 조작(34)과 맞춘다 (기준 11-09: 두세 개 고르기 34. 전수점검 눌러2-보통-32: 틀 안 여백 2px 때문에 단추가 28이었다) */
+.gw .gx-segs, .gw .gx-segs.gx-segs-sm { display: inline-flex; align-items: stretch; gap: 2px; padding: 0; }
+.gw .gx-seg { height: calc(var(--h) - 2px); min-height: 0; min-width: 0; padding: 0 12px; border: 0; border-radius: calc(var(--r) - 2px); background: transparent; color: var(--dim); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .gw .gx-seg.on { background: var(--accent-bg); color: var(--text); }
 /* 숫자 스테퍼 (−·값·+ 한 상자). 11-09 사용자: 따로 떨어진 단추보다 이전 한 상자가 낫다 → 그대로 */
 /* 수 상자 「− 값 +」: 앱 전체에 두 크기뿐 (작은 것 --step-sm, 큰 것 --step-lg .lg). 폭은 자릿수와 무관. 크기는 src/ui/setrow.ts stepSize 한 곳에서 정한다 */

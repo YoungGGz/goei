@@ -235,7 +235,8 @@ export function snapshotRun(store: PeopleStore): RunSnapshot {
     for (const c of Object.values(p.candidates ?? {})) for (const o of c.evidence) observations.add(`${p.name}|${c.id}|${o.id}`);
   }
   const docs = new Set<string>();
-  for (const d of Object.values(store.docs)) for (const e of d.entries) docs.add(`${d.key}|${e.id}`);
+  // 문서 열쇠는 저장 열쇠(`${type}:${key}`)로: 이름이 같은 다른 종류 문서를 가른다 (전수점검 사소-12)
+  for (const [k, d] of Object.entries(store.docs)) for (const e of d.entries) docs.add(`${k}|${e.id}`);
   return { entries, docs, changes: new Set(store.log.map((c) => c.id)), observations, people: new Set(Object.keys(store.people)) };
 }
 /** 갱신 뒤: 전과 비교해 새로 생긴 것을 lastRun 에 적는다 (하나도 없으면 지움).
@@ -277,7 +278,7 @@ export function undoLastRun(store: PeopleStore): number {
     if (e && !e.void) { e.void = true; n++; }
   }
   for (const x of run.docs) {
-    const e = Object.values(store.docs).find((d) => d.key === x.key)?.entries.find((e) => e.id === x.id);
+    const e = store.docs[x.key]?.entries.find((e) => e.id === x.id);
     if (e && !e.void) { e.void = true; n++; }
   }
   for (const id of run.changes) {
@@ -470,17 +471,18 @@ export function dropGoneChanges(store: PeopleStore, chat: Chat): number {
 
 // ── 접기 ──
 
-export const LOG_CAP = 800;
+/** 변경 기록 줄 상한 기본값 (설정 「변경 기록 상한」 log_cap) */
+export const LOG_CAP = Number(PP_DEFAULTS.log_cap);
 /** 합치지 않고 줄로 남겨 두는 채팅 뒤쪽 메시지 수 (이 안의 응답은 지우거나 다시 굴리면 값이 정확히 되돌아간다) */
 export const FOLD_KEEP_MSGS = 200;
 /** 변경 기록 줄이기. 갱신 저장 때 부른다 (2026-11-17 사용자: 원본처럼 오래된 호감 계기는 숫자 하나로 합친다. 원본은 호감 숫자를 저장하고 이력은 60개만 둔다).
  *  ① 사라진 응답이 만든 변경은 버린다 (dropGoneChanges).
  *  ② 상한을 넘으면 오래된(최근 200개 메시지 밖) 살아 있는 계기를 사람별 값으로 접는다. refold(그 사람, 접을 계기(순서대로), 지금 접힌 값) → 새 접힌 값, null 이면 그 사람은 접지 않는다.
  *  고정(pin)이 든 사람, 묶음이 경계에 걸친 사람은 값이 달라질 수 있어 접지 않는다. 접은 것은 되돌릴 수 없다 */
-export function foldLog(store: PeopleStore, chat: Chat, refold: (who: string, cues: Change[], folded: number) => number | null, keepMsgs = FOLD_KEEP_MSGS): void {
+export function foldLog(store: PeopleStore, chat: Chat, refold: (who: string, cues: Change[], folded: number) => number | null, keepMsgs = FOLD_KEEP_MSGS, logCap = LOG_CAP): void {
   dropGoneChanges(store, chat);
   const live = liveness(chat);
-  if (store.log.length <= LOG_CAP) return;
+  if (store.log.length <= logCap) return;
   const cut = msgs(chat).length - keepMsgs;
   if (cut <= 0) return;
   const key = (c: Change) => c.group ?? c.anchor;

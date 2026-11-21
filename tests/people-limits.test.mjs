@@ -54,7 +54,7 @@ test('설정 줄: 다른 상한 줄처럼 값 셋 가운데 고르고, 기본값
     assert.ok(vals.every((n) => n >= lo && n <= hi), k);
   }
   const tidy = Def.PEOPLE_SET.groups.find((g) => g.title === '정리').rows.map((r) => r.key);
-  assert.deepEqual(tidy.slice(tidy.indexOf('keep_msgs')), ['keep_msgs', 'keep_scene', 'patterns_cap', 'evidence_cap']);
+  assert.deepEqual(tidy.slice(tidy.indexOf('keep_msgs')), ['keep_msgs', 'keep_scene', 'patterns_cap', 'evidence_cap', 'entry_cap', 'tidy_entry_cap', 'cue_cap', 'log_cap']);
 });
 
 test('한 번에 읽는 응답 수', () => {

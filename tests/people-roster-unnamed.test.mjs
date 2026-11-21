@@ -814,7 +814,7 @@ test('호스트: 장면 인물이 없는 응답도 여느 갱신은 모델을 �
   const store = T.emptyStore();
   store.pending[name] = { anchor: 'c1', aliases: [] };
   S.markRead(store, c, [1]);
-  const c2 = { ...chat(['user', '역으로 갔다', 'u1'], ['char', '모자 쓴 남자가 길을 막았다.', 'c1'], ['user', '이름을 물었다', 'u2'], ['char', `"${name}." 남자가 말했다.`, 'c2']), scriptstate: { ...HOST_VARS, $pp_newpeople: 'confirm' }, [T.PEOPLE_KEY]: store };
+  const c2 = { ...chat(['user', '역으로 갔다', 'u1'], ['char', '모자 쓴 남자가 길을 막았다.', 'c1'], ['user', '이름을 물었다', 'u2'], ['char', `"${name}." 남자가 말했다.`, 'c2']), scriptstate: { ...HOST_VARS, $pp_newpeople: 'auto' }, [T.PEOPLE_KEY]: store };
   r = await hostRun(c2, (data) => {
     assert.deepEqual(data.people.map((p) => p.name), [name]);
     assert.equal(data.held_names, undefined);
@@ -824,6 +824,20 @@ test('호스트: 장면 인물이 없는 응답도 여느 갱신은 모델을 �
   st = S.peopleStore(r.chat);
   assert.ok(st.people[name]);
   assert.deepEqual(st.pending, {});
+  // 「확인 뒤 등록」이면 명부 인물도 기록을 만들지 않고 대기 줄에 둔다 (설정 설명대로, 전수점검 보통-17)
+  const c3 = { ...c2, scriptstate: { ...HOST_VARS, $pp_newpeople: 'confirm' }, [T.PEOPLE_KEY]: JSON.parse(JSON.stringify(store)) };
+  r = await hostRun(c3, () => ({}), { lore: LORE });
+  st = S.peopleStore(r.chat);
+  assert.equal(st.people[name], undefined);
+  assert.ok(st.pending[name]);
+  // 무시한 이름은 명부에 있어도 기록·대기 줄을 만들지 않는다
+  const ig = T.emptyStore();
+  ig.ignored.push(name);
+  S.markRead(ig, c, [1]);
+  r = await hostRun({ ...c2, scriptstate: { ...HOST_VARS, $pp_newpeople: 'auto' }, [T.PEOPLE_KEY]: ig }, () => ({}), { lore: LORE });
+  st = S.peopleStore(r.chat);
+  assert.equal(st.people[name], undefined);
+  assert.equal(st.pending[name], undefined);
 });
 
 test('설정 세 줄: 기본 켬, 끄면 지침 절이 바뀐다', () => {

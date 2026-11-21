@@ -290,6 +290,7 @@ export interface FactionRecord {
 export interface LastRun {
   at: string;
   entries: { who: string; slot: string; id: string }[];
+  /** key = 저장 열쇠 `${type}:${key}` */
   docs: { key: string; id: string }[];
   changes: string[];
   observations: { who: string; cand: string; id: string }[];

@@ -2257,8 +2257,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
    칸 크기는 창 크기와 상관없이 고정이고, 요원이 많으면(최대 20명) 상자 안에서 스크롤 */
 .gx-body .gx-agbox { display: flex; flex-direction: column; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
 .gx-agbox > h2 { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 46px; margin: 0; padding: 0 6px 0 14px; border-bottom: 1px solid var(--line); font-size: 14px; }
-.gx-hseg { display: flex; gap: 2px; margin-left: -6px; padding: 2px; border-radius: 9px; background: var(--void); box-shadow: inset 0 0 0 1px var(--line); }
-.gx-hseg button { display: grid; place-items: center; width: 34px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: none; color: var(--dim); cursor: pointer; }
+.gx-hseg { display: flex; gap: 2px; margin-left: -6px; padding: 1px; border-radius: 9px; background: var(--void); box-shadow: inset 0 0 0 1px var(--line); }
+.gx-hseg button { display: grid; place-items: center; width: 34px; height: 32px; /* 틀 34 (눌러2-보통-32) */ padding: 0; border: 0; border-radius: 7px; background: none; color: var(--dim); cursor: pointer; }
 .gx-hseg button:hover { color: var(--text); }
 .gx-hseg button.on { background: var(--accent-bg); color: var(--signal); }
 .gx-hseg svg { width: 19px; height: 19px; }
@@ -2685,13 +2685,22 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .pp-addr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pp-addr b { font-size: 15px; }
 .pp-addr .gx-badge svg { width: 12px; height: 12px; vertical-align: -2px; }
-.pp-edit { display: flex; flex-direction: column; gap: 8px; }
-.pp-edit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pp-edit-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--sub); }
-.pp-edit-row .gx-search { width: auto; flex: 1 1 160px; }
+.pp-edit { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* 좁은 카드에서 입력칸·말투 고르기가 카드 밖으로 넘치지 않게: 줄·칸이 카드 폭 아래로 줄어들고, 고르기는 칸이 모자라면 다음 줄로 (전수점검 눌러-중대-15) */
+.pp-edit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.pp-edit-row > * { min-width: 0; max-width: 100%; }
+.pp-edit-row .gx-segs { flex-wrap: wrap; }
+/* 고르기가 두 줄로 꺾이면 틀도 같이 늘어난다 (높이 고정 34를 이 줄만 풀고, 단추는 34 틀 안 높이 그대로) */
+.pp-edit-row .gx-segs, .gw .pp-edit-row .gx-segs { height: auto; min-height: var(--ctl-sm); max-height: none; }
+.pp-edit-row .gx-seg { min-height: calc(var(--ctl-sm) - 2px); }
+/* 이름표(단계·숫자)는 낱말 가운데서 꺾이지 않게 (전수점검 눌러-보통-26) */
+.pp-edit-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--sub); word-break: keep-all; }
+.pp-edit-row .gx-search { width: auto; flex: 1 1 160px; min-width: 0; }
 .pp-check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .pp-check input { accent-color: var(--signal); width: 18px; height: 18px; }
 .pp-slot { display: flex; flex-direction: column; gap: 6px; }
+/* 칸 이름표(이상성욕·성적 욕망 등)는 한 줄로 (전수점검 눌러-보통-24: 단추 줄이 폭을 가져가 「이상성 / 욕」으로 끊겼다) */
+.pp-slot h4 { white-space: nowrap; }
 .pp-entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
 .pp-entry { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
 .pp-entry + .pp-entry { border-top: 1px solid var(--panel2); }
@@ -2754,6 +2763,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .pp-entry-meta { padding-left: 0; }
   .pp-evidence { margin-left: 0; }
   .pp-entry-btns { margin-left: 0; width: 100%; justify-content: flex-end; }
+  .pp-slot h4 .pp-entry-btns { width: auto; margin-left: auto; }
+  .pp-edit-row .gx-segs .gx-seg { flex: 1 0 auto; min-width: auto; padding: 0 4px; }
   .pp-diag-who { flex-basis: 100%; }
 }
 /* 인물 기록: 지난 항목(대체·요약·취소·사라짐) 접기 */
@@ -2794,7 +2805,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 
 .pp-upgrp { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pp-backfill { margin-left: auto; }
-.pp-reread-sel { margin-left: 6px; }
+.pp-reread-sel { margin: 0 6px; } /* 오른쪽 「다시 읽기」와도 띄운다 (전수점검 눌러-사소-12) */
 
 /* 이미지 지침 페이지 */
 /* 이미지 지침 (설정 → 캐릭터 이미지 아래): 칸마다 카드, 안쪽 여백·간격 (2026-11-05 사용자: 다닥다닥 붙음) */
@@ -2868,7 +2879,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-chip { background: var(--panel2); color: var(--sub); border-radius: 8px; }
 .gx-chip.on { background: var(--accent-bg); border-color: var(--accent-line); color: var(--text); }
 .gx-select { padding-right: 28px; background-color: var(--void); color: var(--text); }
-.gx-segs { box-sizing: border-box; height: var(--ctl-sm); padding: 2px; border-radius: 8px; gap: 2px; align-items: stretch; background: var(--void); }
+/* 고르기 단추가 틀 안을 꽉 채워 옆 조작(34)과 같은 높이로 (기준 11-09: 두세 개 고르기 34. 전수점검 눌러2-보통-32: 틀 안 여백 2px 때문에 단추가 28이었다) */
+.gx-segs { box-sizing: border-box; height: var(--ctl-sm); padding: 0; border-radius: 8px; gap: 2px; align-items: stretch; background: var(--void); }
 .gx-seg { min-width: 0; height: auto; min-height: 0; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: var(--dim); font-size: 13px; font-weight: 600; }
 .gx-seg.on { background: var(--accent-bg); color: var(--text); }
 .gx-step { width: var(--ctl-sm); height: var(--ctl-sm); padding: 0; border-radius: 8px; background: var(--panel2); font-size: 16px; }
@@ -3258,7 +3270,7 @@ button.gx-op-ln::before { content: ''; position: absolute; left: 0; right: 0; to
 .it-cnt svg { width: 16px; height: 16px; color: var(--signal); }
 .it-cnt b { font-size: 15px; color: var(--text); }
 .it-cnt small { font-size: 12px; color: var(--dim); }
-.it-tools .gx-segs { padding: 2px; border-radius: 8px; }
+.it-tools .gx-segs { padding: 0; border-radius: 8px; } /* 눌러2-보통-32: 단추 34 */
 .it-tools .gx-seg { font-size: 13px; }
 .it-right { display: inline-flex; gap: 8px; margin-left: auto; }
 .it-act { display: inline-flex; align-items: center; gap: 6px; height: var(--ctl-sm); padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel2); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; }
