@@ -2698,9 +2698,11 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 /* 고르기가 두 줄로 꺾이면 틀도 같이 늘어난다 (높이 고정 34를 이 줄만 풀고, 단추는 34 틀 안 높이 그대로) */
 .pp-edit-row .gx-segs, .gw .pp-edit-row .gx-segs { height: auto; min-height: var(--ctl-sm); max-height: none; }
 .pp-edit-row .gx-seg { min-height: calc(var(--ctl-sm) - 2px); }
-/* 이름표(단계·숫자)는 낱말 가운데서 꺾이지 않게 (전수점검 눌러-보통-26) */
-.pp-edit-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--sub); word-break: keep-all; }
+/* 이름표(단계·숫자)는 꺾이지 않게 한 줄 (전수점검 눌러-보통-26, 눌러3: keep-all 로는 「숫/자」로 꺾였다) */
+.pp-edit-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--sub); white-space: nowrap; }
 .pp-edit-row .gx-search { width: auto; flex: 1 1 160px; min-width: 0; }
+/* 이름표 안 숫자 칸은 정해진 폭: 이름표 폭이 칸 기본 폭보다 좁게 잡혀 글자와 칸이 같이 눌렸다 (눌러3) */
+.pp-edit-row label > .gx-search { flex: 0 1 96px; width: 96px; }
 .pp-check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .pp-check input { accent-color: var(--signal); width: 18px; height: 18px; }
 .pp-slot { display: flex; flex-direction: column; gap: 6px; }
@@ -3350,6 +3352,8 @@ button.gx-op-ln::before { content: ''; position: absolute; left: 0; right: 0; to
 .it-btns .gx-chip { flex: 1 0 calc(33.333% - 4px); justify-content: center; } /* 단추가 많으면 세 개씩 줄바꿈 (장착·사용 취소가 붙어 넘침) */
 .it-btns .gx-chip.on { background: var(--accent-bg); }
 .it-btns .gx-chip.red { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 60%, transparent); }
+/* 단추가 꼭 넷이면 둘씩 두 줄 (눌러3: 넷째 「합치기」 혼자 한 줄을 다 차지했다) */
+.it-pop .it-btns:not(.it-formfoot):has(> .gx-chip:nth-child(4):last-child) > .gx-chip { flex-basis: calc(50% - 3px); }
 .it-btns.it-btns-end { margin-top: 6px; } /* 버리기는 늘 맨 아래 한 줄 (눌러-사소-11: 물건마다 자리가 달랐다) */
 .it-fhead { min-height: 36px; } /* 입력 창 제목 줄: 닫기가 첫 입력칸 위에 얹히지 않게 (눌러-중대-13) */
 .it-form { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
@@ -3635,7 +3639,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .it-btns .gx-chip:disabled { opacity: .45; }
 /* 직접 넣기·고치기의 주 단추는 다른 입력 창(전화 걸기·연락처 추가)과 같은 폭 넓은 민트 (전수점검 눌러2-보통-39) */
 .it-formfoot { flex-direction: column; }
-.it-formfoot .gx-start { width: 100%; min-height: 44px; border-radius: 12px; font-size: 16px; letter-spacing: .08em; display: inline-flex; align-items: center; justify-content: center; }
+/* 높이는 바로 아래 「취소」와 같은 조작 기준 34 (눌러3: 한 창에서 44·34로 갈렸다) */
+.it-formfoot .gx-start { width: 100%; height: var(--ctl-sm); min-height: var(--ctl-sm); border-radius: 8px; font-size: 14px; letter-spacing: .08em; display: inline-flex; align-items: center; justify-content: center; }
 .it-formfoot .gx-chip { flex: none; width: 100%; }
 .sh-det .gx-agpop-x, .sh-wrap-card .gx-agpop-x { border-radius: var(--ri, 8px); } /* X 36px (사용자 11-13 14-1) */
 .sh-det .gx-agpop-x { top: 16px; right: 16px; } /* 카드 안쪽 여백과 같게 (2026-11-08 사용자: X 가 치우침) */
@@ -3772,6 +3777,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 /* ── 소지품 고침 (2026-11-08 사용자): 무게·격자만 스크롤·장착 띠 여백 ── */
 /* 도구 줄 (2026-11-08 사용자: 단추 모양 X, 깔끔하게): 왼쪽 물건|기록 글자 탭, 오른쪽 직접 넣기·합치기는 글자 단추, 찾기는 밑줄 칸. 테두리·바탕 없음 */
 .gx-items .it-tools { justify-content: space-between; align-items: center; gap: 16px; min-height: 34px; }
+.gx-items .it-tools .it-segs .gx-seg.on { color: var(--signal); } /* 고른 쪽 글자는 상황판 전환·왼쪽 메뉴와 같은 민트 (눌러3) */
 .gx-items .it-tools .it-segs { height: 34px; box-sizing: border-box; padding: 2px; border: 1px solid var(--line2); border-radius: 10px; background: var(--panel); } /* 물건|기록은 단추 그대로 (사용자) */
 .gx-items .it-tools .gx-seg { font-size: 13px; }
 .gx-items .it-right { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; min-width: 0; }
