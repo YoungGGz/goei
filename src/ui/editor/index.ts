@@ -925,8 +925,8 @@ function syncTop(): void {
   if (!b || !body) return;
   const top = body.scrollTop, was = topLast;
   topLast = top;
-  // 본문이 좁으면(760 이하, style.css 와 같은 값) 빈 띠가 없다 → 내려 읽는 동안은 숨고, 위로 올릴 때만 보인다 (11-21 눌러 보기 3차)
-  if (body.clientWidth <= 760) { if (top <= 240 || top > was) b.classList.remove('show'); else if (top < was) b.classList.add('show'); }
+  // 본문이 좁으면(760 이하, style.css 와 같은 값) 빈 띠가 없다 → 내려 읽는 동안은 숨고, 위로 올릴 때만 보인다 (11-21 눌러 보기 3차). 폰은 0.21.24 그대로(띠 있음, 240 넘으면 보임)
+  if (body.clientWidth <= 760 && !isPhone()) { if (top <= 240 || top > was) b.classList.remove('show'); else if (top < was) b.classList.add('show'); }
   else b.classList.toggle('show', top > 240);
 }
 
