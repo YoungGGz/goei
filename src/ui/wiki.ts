@@ -31,7 +31,7 @@ import { readWorld } from '../core/world/output';
 import { placeWhere } from '../core/world/geo';
 import { factionList } from '../core/factions';
 import { updateChat, type ChatContext } from '../host/risu';
-import { isPhone } from './media';
+import { isPhone, zpx, zrect } from './media';
 
 /** 위키는 문서만 (2026-10-29: 이 채팅의 인물·개인 기록·세력·기록 문서 화면은 왼쪽 메뉴 「기록」으로 옮겼다, ui/records.ts) */
 type WikiView = 'home' | 'compose' | 'doc' | 'settings' | 'new' | 'find';
@@ -836,14 +836,14 @@ export function bindFootnotes(root: HTMLElement): void {
     pop.innerHTML = `<b>[${sup.dataset.fn}]</b> ${(li.querySelector<HTMLElement>('.nw-fn-t') ?? li).innerHTML}`;
     pop.hidden = false;
     // 문서 칸 안에서 번호 바로 아래 (아래가 모자라면 위), 좌우는 칸 밖으로 안 나가게
-    const box = doc.getBoundingClientRect();
-    const r = sup.getBoundingClientRect();
+    const box = zrect(doc);
+    const r = zrect(sup);
     const w = Math.min(360, box.width - 24);
     pop.style.width = `${w}px`;
     const left = Math.max(12, Math.min(r.left - box.left - w / 2 + r.width / 2, box.width - w - 12));
     let top = r.bottom - box.top + doc.scrollTop + 6;
     // 위·아래 판단은 보이는 영역(.wsc) 기준. 문서 칸은 스크롤 칸이 아니라 문서 전체 길이다 (전수검사 11-13)
-    const view = (doc.closest<HTMLElement>('.wsc') ?? doc).getBoundingClientRect();
+    const view = zrect((doc.closest<HTMLElement>('.wsc') ?? doc));
     if (r.bottom + pop.offsetHeight + 12 > view.bottom && r.top - pop.offsetHeight - 12 > view.top) top = r.top - box.top + doc.scrollTop - pop.offsetHeight - 6;
     pop.style.left = `${left}px`;
     pop.style.top = `${top}px`;
@@ -891,7 +891,7 @@ export function bindWikiSide(root: HTMLElement, act: (value: string) => void): v
   // 손가락·마우스가 세로바 밖에서 떨어져도 알 수 있게 창 전체에서 받는다
   const up = (e: PointerEvent) => {
     if (x0 === null) return;
-    const dx = e.clientX - x0;
+    const dx = zpx(e.clientX) - x0;
     x0 = null;
     if (Math.abs(dx) < 30) return;
     dragged = true;
@@ -901,7 +901,7 @@ export function bindWikiSide(root: HTMLElement, act: (value: string) => void): v
     else if (d < 0 && wiki.listOpen) act('close');
   };
   bar?.addEventListener('pointerdown', (e) => {
-    x0 = e.clientX;
+    x0 = zpx(e.clientX);
     dragged = false;
     window.addEventListener('pointerup', up, { once: true });
   });
@@ -930,7 +930,7 @@ export function bindWikiSide(root: HTMLElement, act: (value: string) => void): v
       const box = panel.querySelector<HTMLElement>('.wls');
       const sec = box?.querySelector<HTMLElement>(`[data-ksec="${k}"]`);
       // offsetTop 은 서랍(.wdr) 기준이라 검색칸·탭 줄만큼 지나쳤다. 목록 칸 기준으로 맞춘다 (전수검사 11-13)
-      if (box && sec) box.scrollTop += sec.getBoundingClientRect().top - box.getBoundingClientRect().top;
+      if (box && sec) box.scrollTop += zrect(sec).top - zrect(box).top;
       grid.hidden = true;
       return;
     }

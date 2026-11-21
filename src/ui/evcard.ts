@@ -1,5 +1,6 @@
 // 괴이·사건·특수 카드 한 장. 상황판과 임무 탭이 같은 모양을 쓴다 (v0.16.17, 사용자 요청: 두 곳 모양 통일).
 // 차이는 카드를 눌렀을 때 하는 일뿐이다. 종류(괴이·사건·특수)는 두 곳 모두 상태 딱지 왼쪽에 같은 모양 딱지로 (v0.16.18).
+import { zrect } from './media';
 import type { CharacterSnapshot } from '../host/risu';
 import { locName, NATION_PINS, type EndedEntry } from '../core/world';
 import { reportBadge } from '../core/journal';
@@ -167,7 +168,7 @@ export function aimMark(on: boolean, action: string, value: string, key = value)
 export const AIM_LOCK_MS = 1500;
 export const AIM_RELEASE_MS = 900;
 export async function aimFlash(key: string): Promise<void> {
-  const b = [...document.querySelectorAll<HTMLElement>('.gx-aim')].find((x) => x.dataset.key === key && x.getBoundingClientRect().width > 0);
+  const b = [...document.querySelectorAll<HTMLElement>('.gx-aim')].find((x) => x.dataset.key === key && zrect(x).width > 0);
   if (!b || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const on = !b.classList.contains('on');
   b.classList.toggle('on', on);
@@ -362,9 +363,9 @@ export function declutterOps(root: HTMLElement): void {
     for (const e of labs) e.style.removeProperty('--dy'), e.style.removeProperty('--dx');
     // 남의 점도 피한다: 점이 고른 상황 이름표를 덮어 「QC 지점」이 가려졌다 (눌러3-PC 상황판 위성 지도).
     // 보이는 지도 칸 오른쪽 끝을 넘는 이름표는 점 왼쪽으로 돌린다 (「인류의 신비전」이 「인류의 신비」로 잘렸다)
-    const R = (map.closest('.gx-opmap') ?? map).getBoundingClientRect().right - 4;
-    const dots = labs.map((el) => { const d = el.parentElement!.querySelector('i')!.getBoundingClientRect(); return { l: d.left - 3, r: d.right + 3, t: d.top - 3, b: d.bottom + 3 }; });
-    const order = labs.map((el, i) => ({ el, i, r: el.getBoundingClientRect() }))
+    const R = zrect((map.closest('.gx-opmap') ?? map)).right - 4;
+    const dots = labs.map((el) => { const d = zrect(el.parentElement!.querySelector('i')!); return { l: d.left - 3, r: d.right + 3, t: d.top - 3, b: d.bottom + 3 }; });
+    const order = labs.map((el, i) => ({ el, i, r: zrect(el) }))
       .sort((a, b) => Number(b.el.parentElement?.classList.contains('sel')) - Number(a.el.parentElement?.classList.contains('sel')) || a.r.top - b.r.top || a.i - b.i);
     const placed: typeof dots = [];
     for (const { el, i, r: q0 } of order) {

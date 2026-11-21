@@ -36,7 +36,7 @@ import { siteLogo } from '../browser';
 import { basicSettings } from '../../core/settings';
 import { worldOn } from '../../core/world';
 import { ppValue } from '../../core/people/settings';
-import { foldStyle, isPhone, syncFoldStyles } from '../media';
+import { foldStyle, isPhone, syncFoldStyles, zpx, zrect, zrectQ } from '../media';
 import { consultAction, consultAfterRender, consultAside, consultButton, consultClose, consultUi } from './consult';
 import { setCatalogHost } from './catalog';
 import { markCommitted, morph } from '../morph';
@@ -192,10 +192,10 @@ function ensureRoot(): HTMLElement {
     // 거점: 지역 지도를 누른 자리가 거점 위치 (%) — 패널(app.ts)과 같은 처리
     const pickMap = t.closest<HTMLElement>('[data-base-pick]');
     if (pickMap) {
-      const img = pickMap.querySelector('img')?.getBoundingClientRect();
+      const img = zrectQ(pickMap.querySelector('img'));
       if (!img || !img.width || !img.height) return;
-      const x = ((ev as MouseEvent).clientX - img.left) / img.width * 100;
-      const y = ((ev as MouseEvent).clientY - img.top) / img.height * 100;
+      const x = (zpx((ev as MouseEvent).clientX) - img.left) / img.width * 100;
+      const y = (zpx((ev as MouseEvent).clientY) - img.top) / img.height * 100;
       if (x < 0 || x > 100 || y < 0 || y > 100) return;
       return void run('dir-base-xy', `${x.toFixed(1)}|${y.toFixed(1)}|${pickMap.dataset.basePick}`);
     }
@@ -395,9 +395,9 @@ function ensureRoot(): HTMLElement {
       let best: typeof drop = null;
       let gap = Infinity;
       for (const r of rows) {
-        const b = r.getBoundingClientRect();
+        const b = zrect(r);
         const d = Math.abs(e.clientY - (b.top + b.height / 2));
-        if (d < gap) [gap, best] = [d, { el: r, after: e.clientY > b.top + b.height / 2 }];
+        if (d < gap) [gap, best] = [d, { el: r, after: zpx(e.clientY) > b.top + b.height / 2 }];
       }
       if (best?.el !== drop?.el || best?.after !== drop?.after) mark(best);
     };
@@ -895,9 +895,9 @@ export function render(): void {
     if (panel && !boundOnce.has(panel)) {
       boundOnce.add(panel);
       let y0: number | null = null;
-      panel.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+      panel.addEventListener('pointerdown', (e) => { y0 = zpx(e.clientY); });
       panel.addEventListener('pointermove', (e) => {
-        if (y0 === null || e.clientY - y0 < 18) return;
+        if (y0 === null || zpx(e.clientY) - y0 < 18) return;
         y0 = null;
         setCdr(false);
       });
@@ -1032,14 +1032,14 @@ function showHint(btn: HTMLElement): void {
   p.setAttribute('role', 'tooltip');
   p.textContent = text;
   root.appendChild(p);
-  const r = btn.getBoundingClientRect();
-  const w = Math.min(320, window.innerWidth - 24);
+  const r = zrect(btn);
+  const w = Math.min(320, zpx(window.innerWidth) - 24);
   p.style.width = `${w}px`;
-  p.style.left = `${Math.max(12, Math.min(r.left, window.innerWidth - w - 12))}px`;
+  p.style.left = `${Math.max(12, Math.min(r.left, zpx(window.innerWidth) - w - 12))}px`;
   p.style.top = `${r.bottom + 6}px`;
   // 아래가 모자라면 위로
-  const h = p.getBoundingClientRect().height;
-  if (r.bottom + 6 + h > window.innerHeight - 8) p.style.top = `${Math.max(8, r.top - 6 - h)}px`;
+  const h = zrect(p).height;
+  if (r.bottom + 6 + h > zpx(window.innerHeight) - 8) p.style.top = `${Math.max(8, r.top - 6 - h)}px`;
   hintEl = p;
   hintFor = btn;
   hintAt = Date.now();

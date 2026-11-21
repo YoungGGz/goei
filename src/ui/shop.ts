@@ -46,7 +46,7 @@ const liveShop = (chat: ChatContext['chat']): ShopState | null => {
 const pic = (name: string, icon?: string): string => itemPic({ name, icon });
 /** 판정 글: 「손 · 소모 3」 · 「사용」 (상점 물건·팔 물건) */
 const traitsOf = (x: { use: boolean; uses?: number; equip?: 'weapon' | 'gear' }) => [x.equip ? EQUIP_LABEL[x.equip] : '', x.uses ? `소모 ${x.uses}` : x.use ? '사용' : ''].filter(Boolean).join(' · ');
-import { isPhone } from './media';
+import { isPhone, zrect, zrectQ } from './media';
 import { toast } from './toast';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -408,8 +408,8 @@ function revealSel(): void {
   const body = document.querySelector<HTMLElement>('.sh-body');
   const sel = body?.querySelector<HTMLElement>('.sh-mine .sh-c.sel');
   if (!body || !sel) return;
-  const b = body.getBoundingClientRect();
-  const r = sel.getBoundingClientRect();
+  const b = zrect(body);
+  const r = zrect(sel);
   if (r.bottom > b.bottom) body.scrollTop += r.bottom - b.bottom + 8;
   else if (r.top < b.top) body.scrollTop -= b.top - r.top + 8;
 }
@@ -542,7 +542,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       return true;
     case 'shop-pick':
       if (!st || st.closed || !st.loaded) return true;
-      if (!shopUi.pick) shopUi.lockH = document.querySelector('.sh-body')?.getBoundingClientRect().height ?? 0;
+      if (!shopUi.pick) shopUi.lockH = zrectQ(document.querySelector('.sh-body'))?.height ?? 0;
       shopUi.pick = !shopUi.pick;
       shopUi.detail = '';
       env.render();
@@ -551,7 +551,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
         const body = document.querySelector<HTMLElement>('.sh-body');
         const cell = body?.querySelector<HTMLElement>('.sh-mine .sh-grid > *');
         if (!body || !cell) return;
-        const over = cell.getBoundingClientRect().bottom - body.getBoundingClientRect().bottom;
+        const over = zrect(cell).bottom - zrect(body).bottom;
         if (over > 0) body.scrollTop += over + 8;
       });
       return true;

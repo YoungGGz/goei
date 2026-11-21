@@ -53,3 +53,15 @@ export function syncFoldStyles(): boolean {
   for (const s of styles) if (s.mode !== m) { s.el.textContent = foldCss(s.css); s.mode = m; changed = true; }
   return changed;
 }
+
+/** 줄여 넣은 화면(zoom)에서 getBoundingClientRect·clientX 는 화면 px, style·offsetWidth·scrollTop 은 안쪽 px 다.
+ *  화면 좌표로 style 을 정하는 코드는 아래 셋으로 안쪽 px 를 받는다 (줄이지 않았으면 그대로) */
+export function zrect(el: Element): { left: number; top: number; right: number; bottom: number; width: number; height: number } {
+  const r = el.getBoundingClientRect();
+  const k = zoomK();
+  return k === 1 ? r : { left: r.left / k, top: r.top / k, right: r.right / k, bottom: r.bottom / k, width: r.width / k, height: r.height / k };
+}
+/** 화면 px 길이·좌표(clientX, innerWidth 등)를 안쪽 px 로 */
+export const zpx = (n: number): number => n / zoomK();
+/** zrect 의 「없으면 undefined」 꼴 (a?.getBoundingClientRect() 자리) */
+export const zrectQ = (el: Element | null | undefined): ReturnType<typeof zrect> | undefined => (el ? zrect(el) : undefined);

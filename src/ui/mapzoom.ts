@@ -1,3 +1,4 @@
+import { zpx, zrect } from './media';
 // 지도 확대: 지도 칸(.gx-canvas)은 그대로 두고 안쪽 그림(.gx-mapzoom)만 키우고 옮긴다.
 // 휴대폰은 두 손가락 벌리기·한 손가락 끌기, PC는 Ctrl+휠(트랙패드 오므리기)·끌기, 어디서나 +/− 버튼.
 // 핀은 그림과 함께 자리를 옮기고, 크기는 조금만 커지도록 되돌려 줄인다(--pz).
@@ -30,7 +31,7 @@ function clamp(v: View, cw: number, ch: number, lw: number, lh: number): View {
 
 type Box = { l: number; t: number; r: number; b: number };
 const hit = (a: Box, b: Box) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
-const box = (el: Element): Box => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+const box = (el: Element): Box => { const r = zrect(el); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
 const grow = (b: Box, n: number): Box => ({ l: b.l - n, t: b.t - n, r: b.r + n, b: b.b + n });
 /** 이름표와 남의 점 사이 최소 틈(px) */
 const DOT_GAP = 5;
@@ -148,7 +149,7 @@ export function bindMapZoom(root: HTMLElement): void {
     apply();
   };
   const local = (px: number, py: number) => {
-    const r = canvas.getBoundingClientRect();
+    const r = zrect(canvas);
     return [px - r.left - canvas.clientLeft, py - r.top - canvas.clientTop] as const;
   };
   if (img && !img.complete) img.addEventListener('load', apply, { once: true });
@@ -179,8 +180,8 @@ export function bindMapZoom(root: HTMLElement): void {
     if ((e.target as HTMLElement).closest('.gx-zoom')) return (start = null);
     if (t.length === 2) {
       const [mx, my] = local((t[0].clientX + t[1].clientX) / 2, (t[0].clientY + t[1].clientY) / 2);
-      start = { d: dist(t), mx, my, v: { ...v }, x: t[0].clientX, y: t[0].clientY };
-    } else if (t.length === 1) start = { d: 0, mx: 0, my: 0, v: { ...v }, x: t[0].clientX, y: t[0].clientY };
+      start = { d: dist(t), mx, my, v: { ...v }, x: zpx(t[0].clientX), y: zpx(t[0].clientY) };
+    } else if (t.length === 1) start = { d: 0, mx: 0, my: 0, v: { ...v }, x: zpx(t[0].clientX), y: zpx(t[0].clientY) };
   }, { passive: true });
   canvas.addEventListener('touchmove', (e) => {
     const t = e.touches;
@@ -196,7 +197,7 @@ export function bindMapZoom(root: HTMLElement): void {
     } else if (t.length === 1 && canPan() && !start.d) {
       // 확대했을 때만 한 손가락으로 지도를 옮긴다(아니면 화면 스크롤)
       e.preventDefault();
-      const dx = t[0].clientX - start.x, dy = t[0].clientY - start.y;
+      const dx = zpx(t[0].clientX) - start.x, dy = zpx(t[0].clientY) - start.y;
       if (Math.hypot(dx, dy) > MOVE) dragged = true;
       v = { ...start.v, x: start.v.x + dx, y: start.v.y + dy };
       apply();
@@ -205,7 +206,7 @@ export function bindMapZoom(root: HTMLElement): void {
   canvas.addEventListener('touchend', (e) => {
     // 두 손가락 중 하나를 떼면 남은 손가락으로 이어서 옮기기
     const t = e.touches;
-    start = t.length === 1 ? { d: 0, mx: 0, my: 0, v: { ...v }, x: t[0].clientX, y: t[0].clientY } : null;
+    start = t.length === 1 ? { d: 0, mx: 0, my: 0, v: { ...v }, x: zpx(t[0].clientX), y: zpx(t[0].clientY) } : null;
   }, { passive: true });
 
   // PC: Ctrl+휠(트랙패드 오므리기)로만 확대·축소, 마우스 끌기.
@@ -218,10 +219,10 @@ export function bindMapZoom(root: HTMLElement): void {
   }, { passive: false });
   canvas.addEventListener('pointerdown', (e) => {
     if (e.pointerType !== 'mouse' || e.button !== 0 || !canPan() || (e.target as HTMLElement).closest('.gx-zoom')) return;
-    const sx = e.clientX, sy = e.clientY, sv = { ...v };
+    const sx = zpx(e.clientX), sy = zpx(e.clientY), sv = { ...v };
     dragged = false;
     const move = (m: PointerEvent) => {
-      const dx = m.clientX - sx, dy = m.clientY - sy;
+      const dx = zpx(m.clientX) - sx, dy = zpx(m.clientY) - sy;
       if (Math.hypot(dx, dy) > MOVE) dragged = true;
       if (dragged) (v = { ...sv, x: sv.x + dx, y: sv.y + dy }), apply();
     };
@@ -230,3 +231,4 @@ export function bindMapZoom(root: HTMLElement): void {
     window.addEventListener('pointerup', up);
   });
 }
+

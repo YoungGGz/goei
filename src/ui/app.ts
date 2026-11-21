@@ -79,7 +79,7 @@ import { walletHeadButton, walletList, walletUi as walletTabUi } from './wallet'
 import { parsePoints, pointsOn, pointsVars, readPoints } from '../core/points';
 import { guideTxt } from '../core/guides';
 import { applyRecordsNav, closeToastHtml, endedReport, holdToast, releaseToast, syncCloseToast, handleRecords, journalList, rec, recordsInput, recordsNav, recordsTab, resetRecords, type RecordsEnv } from './records';
-import { foldStyle, isPhone, PHONE_WATCH, syncFoldStyles } from './media';
+import { PHONE_WATCH, foldStyle, isPhone, syncFoldStyles, zpx, zrect, zrectQ } from './media';
 
 /** ID카드 잔고 칩 → 장부 창 (열림·입력 알림) */
 
@@ -316,10 +316,10 @@ function ensureRoot(): HTMLElement {
     // 명부 거점: 지역 지도를 누른 자리가 거점 위치 (%)
     const pickMap = t.closest<HTMLElement>('[data-base-pick]');
     if (pickMap) {
-      const img = pickMap.querySelector('img')?.getBoundingClientRect();
+      const img = zrectQ(pickMap.querySelector('img'));
       if (!img || !img.width || !img.height) return;
-      const x = ((ev as MouseEvent).clientX - img.left) / img.width * 100;
-      const y = ((ev as MouseEvent).clientY - img.top) / img.height * 100;
+      const x = (zpx((ev as MouseEvent).clientX) - img.left) / img.width * 100;
+      const y = (zpx((ev as MouseEvent).clientY) - img.top) / img.height * 100;
       if (x < 0 || x > 100 || y < 0 || y > 100) return;
       return void run('dir-base-xy', `${x.toFixed(1)}|${y.toFixed(1)}|${pickMap.dataset.basePick}`);
     }
@@ -376,9 +376,9 @@ function ensureRoot(): HTMLElement {
       let best: typeof drop = null;
       let gap = Infinity;
       for (const r of rows) {
-        const b = r.getBoundingClientRect();
+        const b = zrect(r);
         const d = Math.abs(e.clientY - (b.top + b.height / 2));
-        if (d < gap) [gap, best] = [d, { el: r, after: e.clientY > b.top + b.height / 2 }];
+        if (d < gap) [gap, best] = [d, { el: r, after: zpx(e.clientY) > b.top + b.height / 2 }];
       }
       if (best?.el !== drop?.el || best?.after !== drop?.after) mark(best);
     };
@@ -600,12 +600,12 @@ function showTip(cell: HTMLElement, tip: HTMLElement): void {
   tipLayer.style.left = '0px';
   tipLayer.style.top = '0px';
   tipLayer.classList.add('on');
-  const r = cell.getBoundingClientRect();
+  const r = zrect(cell);
   const w = tipLayer.offsetWidth;
   const h = tipLayer.offsetHeight;
   const gap = 8;
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
+  const vw = zpx(window.innerWidth);
+  const vh = zpx(window.innerHeight);
   let x = r.right + gap;
   if (x + w > vw - gap) x = r.left - gap - w;
   if (x < gap) x = Math.max(gap, Math.min(vw - gap - w, r.left));
@@ -1760,7 +1760,7 @@ function render(): void {
   if (gnFail && root.dataset.gnf !== gnFailKey) {
     const sc = gnFail.closest<HTMLElement>('.bs');
     if (sc) {
-      const top = gnFail.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+      const top = zrect(gnFail).top - zrect(sc).top;
       if (top < 0 || top > sc.clientHeight - 40) sc.scrollTop = Math.max(0, sc.scrollTop + top - 12);
     }
   }
@@ -1794,9 +1794,9 @@ function render(): void {
   const cpanel = root.querySelector<HTMLElement>('.gx-cpanel');
   if (cpanel) {
     let y0: number | null = null;
-    cpanel.addEventListener('pointerdown', (e) => { y0 = e.clientY; });
+    cpanel.addEventListener('pointerdown', (e) => { y0 = zpx(e.clientY); });
     cpanel.addEventListener('pointermove', (e) => {
-      if (y0 === null || e.clientY - y0 < 18) return;
+      if (y0 === null || zpx(e.clientY) - y0 < 18) return;
       y0 = null;
       setDrawer(false);
     });

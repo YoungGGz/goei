@@ -1,3 +1,4 @@
+import { zpx, zrect } from './media';
 // 팝업창 공통 (11-09 사용자: 우주 쇼핑몰 질문 창처럼 — 제목줄을 끌어 옮기고, 오른쪽 아래 모서리로 크기를 바꾸고, 창 밖을 누르면 닫힌다).
 // 우주 쇼핑몰 질문 창·게시판(괴담넷·괴담갤·세정게·연어 마켓) 쪽지함이 같이 쓴다. PC 에서만 (폰은 아래에서 올라오는 판·전체 화면 그대로).
 export interface WinBox {
@@ -50,9 +51,9 @@ export function bindPopWins(root: HTMLElement, render: () => void, specs: PopSpe
       const grip = t.closest(sp.grip) && !t.closest('button, input, select, textarea, a') ? 'move' : t.closest(sp.size) ? 'size' : '';
       if (!grip) return;
       ev.preventDefault();
-      const hr = host.getBoundingClientRect();
-      const r = win.getBoundingClientRect();
-      const start = { px: ev.clientX, py: ev.clientY, x: r.left - hr.left, y: r.top - hr.top, w: r.width, h: r.height };
+      const hr = zrect(host);
+      const r = zrect(win);
+      const start = { px: zpx(ev.clientX), py: zpx(ev.clientY), x: r.left - hr.left, y: r.top - hr.top, w: r.width, h: r.height };
       const cur = { ...start };
       const [minW, minH] = sp.min;
       const apply = () => {
@@ -64,8 +65,8 @@ export function bindPopWins(root: HTMLElement, render: () => void, specs: PopSpe
         win.style.bottom = 'auto';
       };
       const move = (e: PointerEvent) => {
-        const dx = e.clientX - start.px;
-        const dy = e.clientY - start.py;
+        const dx = zpx(e.clientX) - start.px;
+        const dy = zpx(e.clientY) - start.py;
         if (grip === 'move') {
           cur.x = Math.min(Math.max(0, start.x + dx), Math.max(0, hr.width - start.w));
           cur.y = Math.min(Math.max(0, start.y + dy), Math.max(0, hr.height - 40));
@@ -89,3 +90,4 @@ export function bindPopWins(root: HTMLElement, render: () => void, specs: PopSpe
     }
   });
 }
+
