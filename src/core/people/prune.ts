@@ -79,7 +79,7 @@ export function pruneNotes(store: PeopleStore, chat: Chat, keepScene = SCENE_KEE
 /** 오래된 호감·세력 평판 계기를 사람(세력)마다 숫자 하나(store.folded)로 합치고 줄은 버린다 (store.ts foldLog 의 규칙 그대로).
  *  합친 값은 지금 화면·요청이 쓰는 계산과 같게 낸다: 인물은 성격 계수 + 설정 속도·상한, 세력은 설정 속도·상한 (affinity.ts affinityOf·factionOf).
  *  합친 뒤에는 그 구간의 응답을 지워도 값이 되돌아가지 않는다 (원본도 이력 60개 밖은 같다) */
-export function foldCues(store: PeopleStore, chat: Chat, o: { speed: number; speedDown: number; turnCap: number }, temperOf: (name: string) => Temper | undefined, keepMsgs = FOLD_KEEP_MSGS): void {
+export function foldCues(store: PeopleStore, chat: Chat, o: { speed: number; speedDown: number; turnCap: number; logCap?: number }, temperOf: (name: string) => Temper | undefined, keepMsgs = FOLD_KEEP_MSGS): void {
   const uf = userFactionOf(store, chat);
   foldLog(store, chat, (who, cues, folded) => {
     const code = factionOfWho(who);
@@ -90,13 +90,15 @@ export function foldCues(store: PeopleStore, chat: Chat, o: { speed: number; spe
     }
     const p = store.people[who];
     if (!p) return null;
-    const opts: AffinityOpts = { ...o, temper: temperOf(who) };
+    const opts: AffinityOpts = { speed: o.speed, speedDown: o.speedDown, turnCap: o.turnCap, temper: temperOf(who) };
     return sumCues(who, p.affinity.base, cues, folded, AFF_MIN, AFF_MAX, opts) - p.affinity.base;
-  }, keepMsgs);
+  }, keepMsgs, o.logCap);
 }
 
 /** 오래된 음란도 변화 줄을 인물마다 시작값 줄 하나로 합친다 (호감 계기 합치기와 같은 경계: 채팅 뒤쪽 FOLD_KEEP_MSGS 밖).
  *  합친 줄은 기준 '#0'(늘 살아 있음)의 시작값(init)이라 계산(affinity.ts opennessOf)은 그대로다. 버린 줄 수 */
+/** 접은 음란도 줄의 표식 (다시 읽기 비우기가 이 줄을 찾는다) */
+export const OPENNESS_FOLD_REASON = '오래된 변화를 합친 값';
 export function foldOpenness(store: PeopleStore, chat: Chat, keepMsgs = FOLD_KEEP_MSGS): number {
   const cut = (Array.isArray(chat.message) ? chat.message.length : 0) - keepMsgs;
   if (cut <= 0) return 0;
@@ -114,7 +116,7 @@ export function foldOpenness(store: PeopleStore, chat: Chat, keepMsgs = FOLD_KEE
     // 같은 사람의 오래된 죽은 줄도 함께 버린다
     for (const c of store.log) if (c.who === who && c.kind === 'openness' && !isAlive(c, live) && (live.at.get(c.anchor) ?? cut) < cut) gone.add(c.id);
     store.log = store.log.filter((c) => !gone.has(c.id));
-    store.log.push({ id: changeId(who, 'openness', '#0', 0, `fold${value}`), anchor: '#0', seq: 0, src: 'seed', who, kind: 'openness', init: value, reason: '오래된 변화를 합친 값' });
+    store.log.push({ id: changeId(who, 'openness', '#0', 0, `fold${value}`), anchor: '#0', seq: 0, src: 'seed', who, kind: 'openness', init: value, reason: OPENNESS_FOLD_REASON });
     dropped += gone.size - 1;
   }
   return dropped;

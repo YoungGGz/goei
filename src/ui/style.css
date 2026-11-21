@@ -2655,13 +2655,19 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .pp-addr { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pp-addr b { font-size: 15px; }
 .pp-addr .gx-badge svg { width: 12px; height: 12px; vertical-align: -2px; }
-.pp-edit { display: flex; flex-direction: column; gap: 8px; }
-.pp-edit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pp-edit-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--sub); }
-.pp-edit-row .gx-search { width: auto; flex: 1 1 160px; }
+.pp-edit { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+/* 좁은 카드에서 입력칸·말투 고르기가 카드 밖으로 넘치지 않게: 줄·칸이 카드 폭 아래로 줄어들고, 고르기는 칸이 모자라면 다음 줄로 (전수점검 눌러-중대-15) */
+.pp-edit-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.pp-edit-row > * { min-width: 0; max-width: 100%; }
+.pp-edit-row .gx-segs { flex-wrap: wrap; }
+/* 이름표(단계·숫자)는 낱말 가운데서 꺾이지 않게 (전수점검 눌러-보통-26) */
+.pp-edit-row label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--sub); word-break: keep-all; }
+.pp-edit-row .gx-search { width: auto; flex: 1 1 160px; min-width: 0; }
 .pp-check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .pp-check input { accent-color: var(--signal); width: 18px; height: 18px; }
 .pp-slot { display: flex; flex-direction: column; gap: 6px; }
+/* 칸 이름표(이상성욕·성적 욕망 등)는 한 줄로 (전수점검 눌러-보통-24: 단추 줄이 폭을 가져가 「이상성 / 욕」으로 끊겼다) */
+.pp-slot h4 { white-space: nowrap; }
 .pp-entries { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
 .pp-entry { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
 .pp-entry + .pp-entry { border-top: 1px solid var(--panel2); }
@@ -2724,6 +2730,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .pp-entry-meta { padding-left: 0; }
   .pp-evidence { margin-left: 0; }
   .pp-entry-btns { margin-left: 0; width: 100%; justify-content: flex-end; }
+  .pp-slot h4 .pp-entry-btns { width: auto; margin-left: auto; }
+  .pp-edit-row .gx-segs .gx-seg { flex: 1 0 auto; min-width: auto; padding: 0 4px; }
   .pp-diag-who { flex-basis: 100%; }
 }
 /* 인물 기록: 지난 항목(대체·요약·취소·사라짐) 접기 */
@@ -2764,7 +2772,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 
 .pp-upgrp { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pp-backfill { margin-left: auto; }
-.pp-reread-sel { margin-left: 6px; }
+.pp-reread-sel { margin: 0 6px; } /* 오른쪽 「다시 읽기」와도 띄운다 (전수점검 눌러-사소-12) */
 
 /* 이미지 지침 페이지 */
 /* 이미지 지침 (설정 → 캐릭터 이미지 아래): 칸마다 카드, 안쪽 여백·간격 (2026-11-05 사용자: 다닥다닥 붙음) */

@@ -176,7 +176,8 @@ export function personBlock(p: Person, store: PeopleStore, live: Liveness, chang
   if (be.length) out.push(main('PEOPLE.BLOCK.BEHAVIOR') + '\n' + lines(be));
   const th = slot('threads');
   if (th.length) out.push(main('PEOPLE.BLOCK.THREADS') + '\n' + lines(th));
-  const su = o.qual?.has('suspicion') ? [] : suspicionShown(slot('suspicion'));
+  // 의심 기능을 끄면 남아 있는 의심 줄도 싣지 않는다 (전수점검 보통-13: 본편·Director 기록에 계속 실렸다)
+  const su = o.qual?.has('suspicion') || (o.features && !o.features.has('suspicion')) ? [] : suspicionShown(slot('suspicion'));
   if (su.length) out.push(main('PEOPLE.BLOCK.SUSPICION') + '\n' + su.map((e) => `- ${e.target ? main('PEOPLE.BLOCK.SUSPICION_ABOUT', { target: e.target === '@user' ? user : e.target }) : ''}${e.kind ? ` [${e.kind}]` : ''}: ${plain(e.text, 200)}`).join('\n'));
   const hi = slot('history');
   if (hi.length) out.push(main('PEOPLE.BLOCK.HISTORY') + '\n' + lines(hi));

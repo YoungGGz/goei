@@ -39,7 +39,7 @@ import { guideSections, guideTxt } from '../core/guides';
 /** Router 기본 지침: 지침 탭 「Router」의 ROLE·RULES 절 */
 const routerBase = () => { const g = guideSections('Router'); return [g.ROLE, g.RULES].filter((x) => x?.trim()).join('\n'); };
 import { parseIdentity, rankLevel } from '../core/people/identity';
-import type { Identity, PeopleStore } from '../core/people/types';
+import type { Identity, PeopleStore, Person } from '../core/people/types';
 import { factionList } from '../core/factions';
 import type { LoreEntry } from '../core/types';
 import { readDirectory } from '../core/world/directory';
@@ -160,16 +160,27 @@ function userFaction(chat: Chat): string {
 /** 처음 등장한 인물의 기록을 만든다 (시트 → 시작값). 확정 구간 글에 이름이 나온, 아직 기록이 없는 사람.
  *  이름 표는 미리 만든 표 ∪ 명부(roster)라, 명부 인물은 초상 태그(<img=영문_표정>)만 떠도 등장으로 본다.
  *  유저가 연기하는 요원(exclude)은 기록하지 않는다 (있던 기록은 지운다). 호칭 시작값은 유저 신분(identity)으로 고른다 */
-export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[], sheet: (name: string) => string | null, o: { exclude?: string[]; identity?: Identity; roster?: RosterRow[] } = {}): string[] {
+export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[], sheet: (name: string) => string | null, o: { exclude?: string[]; identity?: Identity; roster?: RosterRow[]; confirm?: boolean; held?: string[] } = {}): string[] {
   const list = Array.isArray(chat.message) ? chat.message : [];
   const exclude = new Set(o.exclude ?? []);
-  const match = nameMatcher(allNames(o.roster).filter((n) => !store.people[n.name] && !exclude.has(n.name)));
-  const texts = indexes.flatMap((i) => [list[i - 1], list[i]]).filter(Boolean).map((m) => messageText(String(m!.data ?? '')));
-  const found = new Set<string>();
-  for (const t of texts) for (const n of match(t)) found.add(n);
+  // 사용자가 무시한 이름은 다시 올리지 않는다 (전수점검 보통-17)
+  const match = nameMatcher(allNames(o.roster).filter((n) => !store.people[n.name] && !exclude.has(n.name) && !store.ignored.includes(n.name)));
+  const found = new Map<string, string>();
+  for (const i of indexes) {
+    const anchor = list[i] ? messageKey(list[i], i) : '';
+    for (const m of [list[i - 1], list[i]]) if (m) for (const n of match(messageText(String(m.data ?? '')))) if (!found.has(n)) found.set(n, anchor);
+  }
   const faction = userFaction(chat);
   const made: string[] = [];
-  for (const name of found) {
+  for (const [name, anchor] of found) {
+    // 설정 「새 인물」이 확인 뒤 등록이면 기록을 만들지 않고 등록 대기에 올린다 (인물 화면에서 고를 때까지)
+    if (o.confirm) {
+      if (!store.pending[name] && anchor) {
+        store.pending[name] = { anchor, aliases: [] };
+        o.held?.push(name);
+      }
+      continue;
+    }
     // 같은 이름으로 등록을 기다리던 줄(2턴 규칙·확인 뒤 등록)은 기록이 생기니 없앤다 (별명은 받는다). 남겨 두면 그 줄을 지울 길이 없다
     const pend = store.pending[name];
     const base = seedBaseFor(name, faction, o.identity ?? store.identity, o.roster?.find((r) => r.name === name));
@@ -279,8 +290,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   const exclude = excludedNames(ctx);
   const dropped = dropExcluded(store, exclude);
   const roster = rosterOf(ctx.char.globalLore);
-  const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity, roster });
-  if (seeded.length || idChanged || dropped.length) {
+  const held: string[] = [];
+  const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity, roster, confirm: settings.newPeople === 'confirm', held });
+  if (seeded.length || held.length || idChanged || dropped.length) {
     await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
       const s = peopleStore(cur);
       dropExcluded(s, exclude);
@@ -288,6 +300,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         if (!s.people[n]) s.people[n] = store.people[n];
         delete s.pending[n];
       }
+      for (const n of held) if (!s.people[n] && !s.pending[n]) s.pending[n] = store.pending[n];
       if (identity && idChanged) s.identity = identity;
       return withPeople(cur, s);
     }).catch(() => null);
@@ -297,6 +310,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   // 다시 읽기의 비우기는 첫 성공 저장과 함께 한다. 그 전엔 자료용 사본에서만 비운다 (전수검사 11-13)
   let pendingClear = o.scope?.clear;
   let clearedNow = 0;
+  // 여러 묶음 다시 읽기는 한 덩어리: 한 묶음이라도 실패하면 비우기 전 기록으로 되돌린다 (전수점검 보통-18: 그 구간 기록이 빈 채 남았다)
+  let clearUndo: ClearUndo | null = null;
+  let batchFailed = false;
   for (let b = 0; b < batches.length; b++) {
     setStatus({ busy: true, label: batches.length > 1 ? `관계 갱신 중… (${b + 1}/${batches.length})` : '관계 갱신 중…' });
     const t0 = Date.now();
@@ -307,6 +323,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         diag.stage = 'skip';
         diag.error = '채팅이 바뀌어 중단';
         result.skipped.push(diag.error);
+        batchFailed = true;
         break;
       }
       const curStore = peopleStore(fresh.chat);
@@ -359,6 +376,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         diag.error = `입력 상한 넘김(${settings.spanCap.toLocaleString()}자, ${input.overBudget.length}개 응답): 보내지 않음. 설정 「응답 길이 상한」을 올리거나 긴 응답을 나눠 읽기`;
         result.skipped.push(diag.error);
         console.log(`[goei] 인물 기록 갱신 거부: ${diag.error}`);
+        batchFailed = true;
         continue;
       }
       // 장면 인물이 없어도 소지품·가계부는 이 갱신기가 읽는다 (11-08 전수점검: 혼자 있는 장면에서 얻은 물건·쓴 돈이 기록되지 않았다).
@@ -396,7 +414,10 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         if (chatId({ ...fresh, chat: cur }) !== id) return null;
         for (const [i, k] of keys) if (!cur.message[i] || messageKey(cur.message[i], i) !== k) return null;
         const s = peopleStore(cur);
-        if (pendingClear) clearedNow = clearStoryRecords(s, pendingClear);
+        if (pendingClear) {
+          if (!clearUndo && s.people[pendingClear]) clearUndo = takeClearUndo(s, pendingClear);
+          clearedNow = clearStoryRecords(s, pendingClear);
+        }
         const before = snapshotRun(s);
         const report = applyUpdate(s, cur, input, value, {
           settings,
@@ -492,6 +513,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         diag.stage = 'save';
         diag.error = '저장 직전에 채팅이 달라져 이번 결과를 버림';
         result.skipped.push(diag.error);
+        batchFailed = true;
         continue;
       }
       if (pendingClear) {
@@ -507,12 +529,26 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       diag.stage = error instanceof LlmError ? 'model' : diag.raw ? 'parse' : 'build';
       diag.error = error instanceof Error ? error.message : String(error);
       result.errors.push(diag.error);
+      batchFailed = true;
       console.log(`[goei] 인물 기록 갱신 실패: ${diag.error}`);
     } finally {
       diag.ms = Date.now() - t0;
       await pushDiag(diag, settings.keepRaw);
     }
     if (result.errors.length >= 3) break;
+  }
+  if (clearUndo && batchFailed) {
+    const undo: ClearUndo = clearUndo;
+    const back = await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
+      if (chatId({ ...ctx, chat: cur }) !== id) return null;
+      const s = peopleStore(cur);
+      restoreClearUndo(s, undo);
+      return withPeople(cur, s);
+    }).catch(() => null);
+    if (back) {
+      result.cleared = 0;
+      result.skipped.push('실패한 묶음이 있어 다시 읽기 전 기록으로 되돌렸어요');
+    }
   }
   // 정리: 별도 호출 설정이면 저장 상한을 넘긴 인물마다 정리 호출 1회
   if (settings.tidy === 'separate' && result.ran) {
@@ -526,6 +562,19 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   const after = await loadContext().catch(() => null);
   setStatus({ busy: false, label: '', unread: after ? unreadIndexes(after.chat, peopleStore(after.chat)).length : 0 });
   return result;
+}
+
+interface ClearUndo { who: string; person: Person; log: PeopleStore['log']; folded: number | undefined }
+/** 다시 읽기 비우기 전의 이 인물 기록 (실패 때 되돌리기용) */
+function takeClearUndo(s: PeopleStore, who: string): ClearUndo {
+  return { who, person: JSON.parse(JSON.stringify(s.people[who])) as Person, log: JSON.parse(JSON.stringify(s.log.filter((c) => c.who === who))) as PeopleStore['log'], folded: s.folded[who] };
+}
+function restoreClearUndo(s: PeopleStore, u: ClearUndo): void {
+  if (!s.people[u.who]) return;
+  s.people[u.who] = u.person;
+  s.log = [...s.log.filter((c) => c.who !== u.who), ...u.log];
+  if (u.folded === undefined) delete s.folded[u.who];
+  else s.folded[u.who] = u.folded;
 }
 
 /** 별도 정리 호출을 이미 해 본 입력 (채팅마다, 인물 이름 → 그때의 정리 자료 글자 수). 이 기기 메모리에만 둔다 */
@@ -548,7 +597,7 @@ function updaterSystem(settings: PeopleSettings, sections: Set<string>, vars: Re
   const base = promptFor(settings);
   if (shop) sections.add('shop');
   if (pickup) sections.add('pickup');
-  let system = assemblePrompt(base, sections, settings.rules, settings.lang, speechVarietyBlock(settings, 'writer'), sexualWriterSection(settings));
+  let system = assemblePrompt(base, sections, settings.rules, settings.lang, speechVarietyBlock(settings, 'writer'), sexualWriterSection(settings), settings);
   if (shop && !base.includes('<<SECTION:shop>>')) {
     const def = settings.prompt === 'compact' ? UPDATER_COMPACT : UPDATER_DETAILED;
     system += `\n\n${sectionBody(def, 'shop') ?? ''}\n${shopKeyLine()}`;
@@ -583,15 +632,8 @@ export async function rereadPerson(name: string, turns: number): Promise<RunResu
   const p = store.people[name];
   if (!p) return { ran: 0, applied: 0, skipped: ['기록이 없는 인물'], errors: [], cleared: 0 };
   const indexes = mentionIndexes(ctx.chat, name, [...p.aliases, ...(allNames(rosterOf(ctx.char.globalLore)).find((n) => n.name === name)?.aliases ?? [])], turns);
-  if (!indexes.length) {
-    let cleared = 0;
-    await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
-      const s = peopleStore(cur);
-      cleared = clearStoryRecords(s, name);
-      return withPeople(cur, s);
-    });
-    return { ran: 0, applied: 0, skipped: ['최근 응답에 이 인물이 나오지 않아요 (기록만 비움)'], errors: [], cleared };
-  }
+  // 범위 안에 나온 응답이 없으면 다시 채울 근거가 없다: 기록을 비우지 않고 그대로 둔다 (전수점검 보통-12)
+  if (!indexes.length) return { ran: 0, applied: 0, skipped: ['이 범위의 응답에 이 인물이 나오지 않아요 (기록은 그대로)'], errors: [], cleared: 0 };
   // 비우기는 다시 읽기가 저장될 때 같이 한다 — 모델이 실패하면 기록이 그대로 남는다 (전수검사 11-13)
   const r = await requestPeopleUpdate('reread', { manual: true, scope: { indexes, only: [name], clear: name } });
   return { ...r, cleared: r.cleared ?? 0 };
