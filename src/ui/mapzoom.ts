@@ -1,3 +1,4 @@
+import { isPhone } from './media';
 // 지도 확대: 지도 칸(.gx-canvas)은 그대로 두고 안쪽 그림(.gx-mapzoom)만 키우고 옮긴다.
 // 휴대폰은 두 손가락 벌리기·한 손가락 끌기, PC는 Ctrl+휠(트랙패드 오므리기)·끌기, 어디서나 +/− 버튼.
 // 핀은 그림과 함께 자리를 옮기고, 크기는 조금만 커지도록 되돌려 줄인다(--pz).
@@ -157,6 +158,17 @@ export function bindMapZoom(root: HTMLElement): void {
       const cap = span && span.r > span.l ? (cw - PIN_PAD * 2) / (span.r - span.l) : Number.POSITIVE_INFINITY;
       const w = Math.max(cw, Math.min((ch * img.naturalWidth) / img.naturalHeight, cap));
       layer.style.width = `${Math.floor(w)}px`;
+    }
+    // PC 칸의 높이 상한(CSS max-content)이 줄어든 겹 높이를 따라가 칸이 다시 커지지 못하지 않게, 상한을 칸 폭에 맞춘 그림 높이로 박아 둔다
+    const pcFit = !fill && !isPhone() && !!img?.naturalWidth && !!img.naturalHeight;
+    if (pcFit) canvas.style.maxHeight = `${Math.ceil((cw * img!.naturalHeight) / img!.naturalWidth)}px`;
+    else canvas.style.removeProperty('max-height');
+    if (fill) {
+      if (!img?.naturalWidth || !img.naturalHeight) layer.style.removeProperty('width');
+    } else if (pcFit && (cw * img!.naturalHeight) / img!.naturalWidth > ch + 1) {
+      // PC(861 이상): 칸 폭에 맞추면 그림이 칸보다 높아 아래(제주·남해 핀)가 잘렸다 → 처음 화면에 그림 전체가 들어오게 겹 폭을 칸 높이에 맞춘다.
+      // 칸 크기는 그대로, 남는 좌우는 칸 배경색. 자세히 볼 땐 확대해서 끈다 (검수 4차, 0.21.24 부터 잘림)
+      layer.style.width = `${Math.floor((ch * img!.naturalWidth) / img!.naturalHeight)}px`;
     } else layer.style.removeProperty('width');
     if (Number.isNaN(v.y)) v = { ...v, y: (ch - layer.offsetHeight) / 2 };
     // 처음엔 좌우도 가운데: 그림이 칸보다 넓으면 그림 가운데가 아니라 핀 범위 가운데를 칸 가운데에
