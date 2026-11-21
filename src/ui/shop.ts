@@ -130,7 +130,8 @@ export function shopPopup(ctx: ChatContext): string {
       ${phone ? '' : `<button class="it-act sh-x" data-action="shop-close" aria-label="닫기">${ICONS.close}</button>`}
     </span>
   </div>`;
-  const lock = shopUi.pick && shopUi.lockH > 0 && !phone ? ` style="min-height:${Math.round(shopUi.lockH)}px"` : '';
+  // 판매 화면은 구매 화면(진열대) 높이에 딱 고정하고 넘치면 그 안에서 스크롤 (11-21 사용자: 「판매를 진열대 높이만큼 고정」. 창이 뛰지 않게)
+  const lock = shopUi.pick && shopUi.lockH > 0 && !phone ? ` style="height:${Math.round(shopUi.lockH)}px;min-height:${Math.round(shopUi.lockH)}px;flex:none"` : '';
   const body = `<div class="sh-body"${lock}>${bodyHtml(ctx, st, bal)}</div>`;
   const note = toast('shop', shopUi.info, (t) => {
     if (shopUi.info === t) shopUi.info = '';
