@@ -538,8 +538,10 @@
 .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 44px; }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gw-totop { width: 36px; height: 36px; margin: 0 8px 14px 0; }
-  .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 34px; }
 }
+/* 본문이 좁으면(폰 344·폴드 펼침 673) 빈 띠를 두지 않는다 (11-21 눌러 보기 3차: 카드가 296/570에서 끝나 표 머리가 한 글자씩 꺾이고 +·지우기·마지막 칸이 잘렸다).
+   덮는 문제는 보임 규칙으로 푼다: 좁을 때 단추는 위로 올리는 동안에만 보인다 (index.ts syncTop, 760 을 같이 바꾼다) */
+@container gwbody (max-width: 760px) { .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 0; } }
 /* 조작 없이 설명만 있는 줄 (2026-11-08 사용자: 소지품 「넘기는 것·남는 것」 글 위 쓸데없는 여백) — 빈 조작 칸(높이 34)을 접고 설명을 이름 옆 첫 줄부터 */
 .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label hint'; }
 .gw .ps-row:has(> .ps-ctl:empty) > .ps-ctl { display: none; }
@@ -1064,3 +1066,143 @@
 .gw .gw-anote > summary::-webkit-details-marker { display: none; }
 .gw .gw-anote > summary::after { content: ''; flex: none; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: translateY(-2px) rotate(45deg); }
 .gw .gw-anote[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
+
+/* ── 눌러 보기 3차 고침 · 설정 (2026-11-21) ── */
+/* 본문 칸이 좁은 PC 배치(폴드 펼침 673: 왼쪽 목록 옆 본문 343): 표가 PC 모양 그대로라 머리글이 한 글자씩 꺾이고 오른쪽 칸이 잘렸다.
+   → 본문 폭 600 이하면 표·수 묶음은 폰 모양. 아래는 위 폰 @media 규칙 가운데 표(.ck·.mx·.fam-set) 것을 그대로 옮긴 것 (@media 와 @container 는 규칙을 나눠 쓸 수 없다). 폰 규칙을 고치면 여기도 같이 고친다 */
+@container gwbody (max-width: 600px) {
+  .gw .mx-head { display: flex; gap: 4px; top: 0; margin: 0 0 10px; padding: 4px; }
+  .gw .mx-head > span { display: none; }
+  .gw .mx-head label { flex: 1 1 0; flex-direction: column; justify-content: center; gap: 3px; min-height: 48px; padding: 4px 2px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--dim); text-align: center; cursor: pointer; }
+  .gw .mx-head label > span { white-space: normal; line-height: 1.2; }
+  .gw .mx-r:nth-of-type(1):checked ~ .mx-head label:nth-of-type(1), .gw .mx-r:nth-of-type(2):checked ~ .mx-head label:nth-of-type(2),
+  .gw .mx-r:nth-of-type(3):checked ~ .mx-head label:nth-of-type(3), .gw .mx-r:nth-of-type(4):checked ~ .mx-head label:nth-of-type(4) { background: var(--accent-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent-line); }
+  .gw .mx-r:nth-of-type(1):checked ~ .ps-group .mx-cell:not(.mx-c0):not(.mx-all), .gw .mx-r:nth-of-type(2):checked ~ .ps-group .mx-cell:not(.mx-c1):not(.mx-all),
+  .gw .mx-r:nth-of-type(3):checked ~ .ps-group .mx-cell:not(.mx-c2):not(.mx-all), .gw .mx-r:nth-of-type(4):checked ~ .ps-group .mx-cell:not(.mx-c3):not(.mx-all) { display: none; }
+  .gw .mx-row { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; }
+  .gw .mx-label { grid-column: 1; white-space: nowrap; }
+  .gw .mx-cell { grid-column: 2; justify-content: flex-end; box-shadow: none; }
+  .gw .mx-cell + .mx-cell { box-shadow: none; }
+  .gw .mx-cell .gx-chips { justify-content: flex-end; }
+  .gw .mx-cell.wide, .gw .mx-cell.mx-all { grid-column: 1 / -1; justify-content: flex-start; }
+  .gw .mx-help { grid-column: 1 / -1; }
+  .gw .ck-pc { display: none; }
+  .gw .hl-i { grid-template-columns: 1fr; padding: 4px 0; }
+  .gw .ck-ph { display: block; }
+  .gw .ck-line { grid-template-columns: var(--gname-ph, 74px) repeat(var(--ck-n), minmax(0, 1fr)); padding: 0 6px; }
+  .gw .fn-wide { --gname-ph: 92px; }
+  .gw .ck-name .mx-name svg, .gw .ck-name .mx-name img { width: 15px; height: 15px; }
+  .gw .ck-name { font-size: 12.5px; letter-spacing: -.3px; }
+  .gw .ck-h1 b { padding-left: 4px; font-size: 12px; text-align: center; white-space: normal; }
+  .gw .ck-h2 { font-size: 10.5px; letter-spacing: -.3px; }
+  .gw .ck-name { font-size: 13px; }
+  .gw .ck-name .mx-name { gap: 5px; }
+  .gw .ck-m { width: 24px; height: 24px; }
+  .gw .ck-n { flex-direction: column-reverse; width: 100%; max-width: 46px; margin: 6px 0; }
+  .gw .ck-n b { min-width: 0; padding: 3px 0; font-size: 12px; letter-spacing: -.3px; }
+  .gw .ck-s { width: 100%; height: 24px; }
+  .gw .ck-h1 b { padding: 2px 1px; font-size: 11px; letter-spacing: -.3px; }
+  .gw .ck-h2 > span { padding: 0 1px; }
+  .gw .mx-grid .mx-head { display: none; }
+  .gw .mx-grid .mx-row { display: block; padding: 12px var(--pad); }
+  .gw .mx-grid .mx-label { margin-bottom: 6px; font-size: 15px; }
+  .gw .mx-grid .mx-cell { display: flex; flex-wrap: nowrap; justify-content: space-between; gap: 10px; padding: 4px 0; }
+  .gw .mx-grid .mx-site { display: block; flex: 0 0 auto; white-space: nowrap; color: var(--dim); font-size: 13px; }
+  .gw .mx-help { margin-top: 6px; }
+  .gw .ps-ctl > .fam-set, .gw .ps-ctl > .fam-set:has(.st-step.lg) { grid-template-columns: minmax(0, 1fr); width: 100%; gap: 8px; }
+  .gw .ps-ctl > .fam-set > .fam-set1 { grid-template-columns: minmax(0, 1fr) max-content; }
+  .gw .ps-ctl > .fam-set .fam-l { white-space: normal; word-break: keep-all; line-height: 1.3; }
+  .gw .mx-grid.ck-ph { display: block; }
+  .gw .mx-grid.ck-ph .mx-cell { flex-wrap: wrap; align-items: center; }
+  .gw .mx-grid.ck-ph .fam-set { display: flex; flex-wrap: nowrap; gap: 8px 12px; justify-content: flex-end; width: auto; }
+  .gw .mx-grid.ck-ph .fam-set1 { display: inline-flex; align-items: center; gap: 6px; }
+  .gw .mx-grid.ck-ph .fam-set1 > span { font-size: 13px; color: var(--text); white-space: nowrap; }
+  .gw .ck > .ps-rows { grid-template-columns: max-content repeat(var(--ck-n), minmax(min-content, 1fr)); padding-inline: 6px; }
+  .gw .ck > .ps-rows .ck-name { min-width: var(--gname-ph, 74px); }
+  .gw .ck-h1 b { font-size: 12px; letter-spacing: -.2px; }
+  .gw .ck-h2 { font-size: 12px; letter-spacing: -.2px; }
+  .gw .ck-h2 > span { padding: 0 3px; }
+  .gw .ck-m { position: relative; }
+  .gw .ck-m::before { content: ''; position: absolute; inset: -10px; }
+  .gw .mx-grid .mx-cell:has(> input.gx-search) > .mx-site { flex: 0 0 6.5em; }
+  .gw .mx-grid .mx-cell:has(> input.gx-search) > input.gx-search { flex: 1 1 0; min-width: 0; }
+}
+/* 표 머리 낱말이 중간에서 꺾였다(「컨텍/스트/포함」「이목집/중」「언급금/지」「창을/열/때」): 물려받은 overflow-wrap: anywhere 가 칸 최소 폭을 한 글자로 만들었다
+   → 머리 낱말은 안 끊는다. 칸은 가장 긴 낱말만큼 넓어지고(min-content), 판보다 넓어지면 표를 옆으로 밀어 본다 */
+.gw .ck-h1 b, .gw .ck-h2 > span { overflow-wrap: normal; }
+/* 좁은 본문의 고르기 줄: 폰 규칙(ui/style.css 「.ps-ctl .gx-segs」)처럼 칸 여백을 줄여 줄 안에 (673 에서 괴담톡 「주요 인물·장면 안·자율」, 인물 Director 방식, 상태창 칸, 호출 흐름 Director 가 본문 밖으로 나갔다) */
+@container gwbody (max-width: 600px) {
+  .gw .ps-ctl .gx-segs { flex-wrap: nowrap; max-width: 100%; }
+  .gw .ps-ctl .gx-seg { flex: 0 1 auto; min-width: 0; padding: 0 9px; }
+  .gw .st-col-row > .gx-segs > .gx-seg, .gw .flc-c > .gx-segs > .gx-seg { padding: 0 9px; }
+  /* 고유 상점 카드(ui/style.css .ms-fx 폰 규칙과 같게): 고르기 줄은 카드 폭 */
+  .gw .ms-fx { padding-left: 6px; padding-right: 6px; }
+  .gw .ms-fx .ph-inline:has(> .gx-segs) { width: 100%; }
+  .gw .ms-fx .ph-inline > .gx-segs { display: flex; width: 100%; min-width: 0; }
+  .gw .ms-fx .ph-inline > .gx-segs > .gx-seg { flex: 1 1 auto; min-width: 0; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }
+  /* 값 등급 줄(ui/style.css .ms-tiers 폰 규칙과 같게): 「이름·가중치·× / 하한·상한 / 설명」 — 673 에서 금액 칸 132px 둘이 안 들어가 가중치 +·지우기가 잘렸다 */
+  .gw .ms-tb.ms-tiers > .ms-tb-r { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px; grid-template-areas: "n w x" "lo hi ." "d d d"; align-items: end; }
+}
+/* 고유 상점 「인터넷 접속」 네 칸(없음·우주 쇼핑몰·백일몽 포인트몰·망상홈쇼핑): 본문 380 이하(폰 344·360, 폴드 펼침 673 의 본문 343)에서는 한 줄에 안 들어가 글자가 붙고 잘렸다 → 두 줄 두 칸씩, 칸 여백은 규격(12px) 그대로 */
+@container gwbody (max-width: 380px) {
+  .gw .ms-fx .ms-fx-web > .gx-segs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); height: auto; max-height: none; }
+  .gw .ms-fx .ms-fx-web > .gx-segs > .gx-seg { padding: 0 12px; }
+}
+/* 카드 머리(고유 상점·시그니처 상품): 좁으면 지우기만 혼자 다음 줄 왼쪽에 떨어지고 「켬」이 카드 끝에 닿았다 → 이름 칸이 한 줄, 그 아래 켬/끔 … 지우기(오른쪽 끝).
+   시그니처 확률 칸은 원래 뜻대로 64px(.ms-fx .ph-inline .ms-num 110px 가 더 세서 안 먹었다) */
+.gw .ms-fx-head > .gx-mini.danger { margin-left: auto; }
+.gw .ms-fx-head .ph-inline .ms-num { width: 64px; }
+@container gwbody (max-width: 600px) { .gw .ms-fx-head > input:first-child { flex-basis: 100%; } }
+/* 괴이·파밍 목록 머리: 「+ 추가」「+ 다른 폴더에서 추가」에 밀려 검색칸이 48px(「괴」 한 자), 좁은 본문의 고르기 상자도 「괴이를…」에서 잘렸다 → 줄바꿈 허용, 검색칸·고르기 상자는 120px 아래로 안 줄어든다 */
+.gw-list-tools { flex-wrap: wrap; }
+.gw-list-tools .dir-search, .gw-list-pane .gw-list-tools .gw-list-pick { flex: 1 1 120px; }
+/* 괴이 공통 머리말(목록 칸 안): 펼치면 글 상자 아래 여백이 없어 마지막 줄이 칸 끝에 붙었다. 폰·좁은 본문에서는 좌우를 위 줄(14px)에 맞춘다(10px 규칙이 더 세서 4px씩 넓었다) */
+.gw .gw-list-pane > .gw-anote[open] { padding-bottom: 12px; }
+@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) { .gw .gw-list-pane > .gw-anote { margin: 0 14px 10px; } }
+@container gwbody (max-width: 600px) { .gw .gw-list-pane > .gw-anote { margin: 0 14px 10px; } }
+@container gwbody (max-width: 600px) { .gw-list-tools { padding: 10px 14px; } .gw-list-pane .gw-add { padding: 0 14px 10px; } }
+/* 확인 창의 어두운 덮개가 왼쪽 위 고정 머리(갈래 탭·찾기 칸, z 2)와 「맨 위로」(z 5) 밑에 깔려 그것만 밝게 떠 보였다 (PC·673, 20여 곳 공통) → 덮개를 맨 위 겹으로 */
+.gw-win > .gw-confirm { z-index: 20; }
+/* 넓은 줄(.wide)에 조작이 비면(인물 기록 점검 「갱신 기록」에 기록이 없을 때) 「설명만 있는 줄」 규칙이 한 열 격자에 'label hint' 두 칸을 넣어 이름이 한 글자 폭에 끼었다(「갱/신/기/록」) → 넓은 줄은 이름 위·설명 아래 */
+.gw .ps-row.wide:has(> .ps-ctl:empty) { grid-template-areas: 'label' 'hint'; }
+/* 줄이 한 열로 쌓인 좁은 본문·상세 칸: 카드 안 설명 단락이 이름 칸 폭(200)만큼 들여 써져 오른쪽 좁은 띠에 몰리고 왼쪽이 비었다(요원 「소속 조직」 아래, 무작위 발생 후보, 묶음 지우기 위) → 폰처럼 왼쪽부터 */
+@container gwbody (max-width: 600px) { .gw .ps-rows > .ps-note, .gw .ps-rows > .gx-muted, .gw .dir-panel > p.gx-muted, .gw .dir-fac > p.gx-muted { padding-left: var(--pad); } }
+@container gwdetail (max-width: 600px) { .gw .ps-rows > .ps-note, .gw .ps-rows > .gx-muted, .gw .dir-panel > p.gx-muted, .gw .dir-fac > p.gx-muted { padding-left: var(--pad); } }
+/* 절 머리 「?」 도움말: 그림은 18px 그대로, 누르는 칸만 34px (폰에서 18×18 이라 옆 복사 단추를 누르기 쉬웠다) */
+.gw .gw-fhint { position: relative; }
+.gw .gw-fhint::before { content: ''; position: absolute; inset: -8px; }
+/* 이름 바꾸기 줄(거점·조직): 좁은 본문·상세 칸(673)에서 「이름 바꾸기」「지우기」가 창 오른쪽 밖(670~846)에 놓였다 → 폰처럼 이름 위, 입력칸·단추 한 줄 */
+@container gwbody (max-width: 600px) {
+  .gw .dir-rename { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .gw .dir-rename > .dir-in > span:first-child { grid-column: 1 / -1; }
+  .gw .dir-rename > .dir-in > input { grid-row: 2; grid-column: 1; width: 100%; }
+  .gw .dir-rename > .gx-mini { grid-row: 2; }
+}
+@container gwdetail (max-width: 600px) {
+  .gw .dir-rename { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .gw .dir-rename > .dir-in > span:first-child { grid-column: 1 / -1; }
+  .gw .dir-rename > .dir-in > input { grid-row: 2; grid-column: 1; width: 100%; }
+  .gw .dir-rename > .gx-mini { grid-row: 2; }
+}
+/* 낱말을 안 끊으니 칸 일곱인 「넘길 내용」 표가 좁은 본문에서 판보다 넓어졌다 → 좁을 때 머리 칸 좌우 여백·자간만 줄여 판 안에 (글자 크기 12px 는 그대로) */
+@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) { .gw .ck-h2 > span { padding: 0 1px; letter-spacing: -.5px; } }
+@container gwbody (max-width: 600px) { .gw .ck-h2 > span { padding: 0 1px; letter-spacing: -.5px; } }
+/* 그래도 넘치면(상점 「넘길 내용」: 줄 이름 「백일몽 포인트몰」이 길다) 줄 이름이 낱말 사이에서 두 줄로 접힌다: 이름 칸은 자리가 있으면 한 줄 폭, 모자라면 가장 긴 낱말 폭까지 */
+@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
+  .gw .ck > .ps-rows { grid-template-columns: minmax(min-content, max-content) repeat(var(--ck-n), minmax(min-content, 1fr)); padding-inline: 4px; }
+  .gw .ck .ck-name .mx-name > span { white-space: normal; word-break: keep-all; line-height: 1.25; }
+}
+@container gwbody (max-width: 600px) {
+  .gw .ck > .ps-rows { grid-template-columns: minmax(min-content, max-content) repeat(var(--ck-n), minmax(min-content, 1fr)); padding-inline: 4px; }
+  .gw .ck .ck-name .mx-name > span { white-space: normal; word-break: keep-all; line-height: 1.25; }
+}
+/* 표 고르기의 누름 칸(::before -10px)이 끝 칸에서 판 밖으로 나가 표가 5px쯤 옆으로 밀리는 것처럼 잡혔다(그림자·가로 막대가 괜히 생김) → 줄 밖으로 나간 누름 칸은 좌우만 자른다 */
+.gw .ck > .ps-rows > .ck-line { overflow-x: clip; }
+/* 폴드 펼침(673)처럼 본문 칸이 폰 폭(420 이하)이면 본문 좌우 여백도 폰과 같은 14px (24px 이면 내용 폭 294 라 「최소·최대」 두 상자가 카드 끝에 닿았다) */
+@container gwbody (max-width: 420px) { .gw-page, .gw-detail { padding: 14px 14px 60px; } }
+/* 호출 흐름 판도 본문이 좁으면 오른쪽 빈 띠(22px)를 두지 않는다 (673: Director 「방식」 네 칸이 여백 없이 붙어 한 덩어리로 읽혔다) */
+@container gwbody (max-width: 760px) { .gw .fl-page { padding-right: 0; } }
+/* 고르기 목록 줄(상시 로어북 등): 아랫줄 설명이 없으면 이름이 윗칸에만 놓여 체크칸보다 4~5px 위로 떴다 → 이름이 두 칸을 다 써서 가운데 */
+.gw .dir-ext-item > b:has(+ span) { grid-row: 1 / 3; }
+/* 손가락으로 누르는 기기: 누른 줄에 :hover 채움이 남아, 체크를 푼 상시 로어북 줄이 고른 것처럼 초록으로 보였다 → 마우스가 없으면 올림 채움을 안 쓴다 */
+@media (hover: none) { .gw .dir-ext-item:hover { background: none; } }

@@ -89,9 +89,12 @@ function sync(ctx: ChatContext): void {
 }
 /** 뽑기 설정 「기본값으로」를 한 번 누른 몰: 한 번 더 눌러야 되돌린다 (상황판 휴지통과 같은 두 번 누르기, 전수점검 눌러2-보통-38) */
 let rollResetArm = '';
+/** 1:1 상담 주사위 칸 「초기값으로」도 같은 두 번 누르기 (이것만 묻지 않고 바로 되돌렸다, 눌러 보기 3차) */
+let deskResetArm = false;
 export function resetMalls(): void {
   uiChat = '';
   rollResetArm = '';
+  deskResetArm = false;
   ui.cos = fresh();
   ui.bm = fresh();
 }
@@ -1088,7 +1091,7 @@ function deskGroup(ctx: ChatContext): string {
   const d = deskSettings(ctx.chat.scriptstate);
   const how = '<p class="ps-note">상담을 열 때마다 코드가 아래 칸마다 값을 하나씩 뽑고, 모델이 그 값으로 상담사(이름·직급·부서·소개·말투)를 한 번 만들어 둬요. 대화하는 동안은 그 카드를 매번 같이 보내서 사람이 바뀌지 않아요. 턴이 넘어가거나 「상담 종료」·「다른 상담사 연결」을 누르면 다음엔 새 상담사예요. 업무 지침과 말 규칙은 설정 → 지침 → 포인트몰 1:1 상담에서 고쳐요.</p>';
   const aSet = defChanged(d.axesText, deskAxesDefault(), axesNorm);
-  const reset = aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-desk-reset">초기값으로</button></div>` : '';
+  const reset = aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini${deskResetArm ? ' danger' : ''}" data-action="ms-desk-reset" title="${deskResetArm ? '한 번 더 누르면 초기값으로 되돌려요' : '주사위 칸을 초기값으로'}">${deskResetArm ? '정말 되돌리기' : '초기값으로'}</button></div>` : '';
   if (!d.on) return group('1:1 상담', how + row('사용', mseg('bm', 'desk_on', '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 왼쪽 메뉴에 「1:1 상담」이 안 보여요.'));
   return group('1:1 상담', how + [
     row('사용', mseg('bm', 'desk_on', d.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 왼쪽 메뉴에 「1:1 상담」이 안 보여요.'),
@@ -1135,6 +1138,7 @@ function cosFixedGroup(ctx: ChatContext): string {
 /** 설정 값 바꾸기: ms-cfg 「사이트:키=값」 · ms-step 「사이트:키:±」 · ms-num 「사이트:키=숫자」(상품 수) · ms-text (값 기준) */
 export async function mallSettingsAction(action: string, value: string | undefined, ctx: ChatContext, env: MallEnv): Promise<boolean> {
   if (action !== 'ms-roll-reset') rollResetArm = ''; // 다른 것을 만지면 「정말 되돌리기」를 거둔다
+  if (action !== 'ms-desk-reset') deskResetArm = false;
   if (await deskSettingsAction(action, value, ctx, env)) return true;
   if (await cosExtraAction(action, value, ctx, env)) return true;
   if (action !== 'ms-cfg' && action !== 'ms-step' && action !== 'ms-text' && action !== 'ms-num') return false;
@@ -1211,7 +1215,15 @@ async function deskSettingsAction(action: string, value: string | undefined, ctx
     const n = stepNext(value, d.keep, DESK_KEEP_RANGE[0], DESK_KEEP_RANGE[1]);
     return n === null ? true : set({ [DESK_KEY.keep]: String(n) });
   }
-  if (action === 'ms-desk-reset') return set({ [DESK_KEY.axes]: '' });
+  if (action === 'ms-desk-reset') {
+    if (!deskResetArm) {
+      deskResetArm = true;
+      env.render();
+      return true;
+    }
+    deskResetArm = false;
+    return set({ [DESK_KEY.axes]: '' });
+  }
   return false;
 }
 
