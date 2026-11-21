@@ -5856,9 +5856,6 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .ph-app .ph-room-head .ph-act .ph-tool { width: 32px; height: 32px; }
   .ph-app .ph-room-head .ph-act .ph-tool svg { width: 18px; height: 18px; }
   .ph-app .ph-msg { max-width: 88%; }
-  /* 기록 › 인물 머리: 단추 셋을 다음 줄로 내려 이름 아래 설명이 4~5줄로 꺾이지 않게 */
-  .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) { flex-wrap: wrap; }
-  .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) > .ph-act { flex: 1 0 100%; justify-content: flex-end; }
 }
 
 /* 폴드 펼침 임무 (커스텀 줄·목록 제목) */
@@ -5922,7 +5919,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
    상담 창: 창 높이에서 위 108px 를 비워 677×674 에서 대화 칸이 290px 였다 → 위 여백을 줄인다 */
 @media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
   .br-bms { padding: 0 2px; gap: 0; }
-  .br .br-bm { padding: 0 3px; gap: 3px; letter-spacing: -.03em; } /* 여덟 개(포인트몰·망상홈쇼핑 포함)가 582px 한 줄에 들어오게 */
+  .br .br-bm { padding: 0 3px; gap: 3px; font-size: 11px; letter-spacing: -.04em; } /* 여덟 개(포인트몰·망상홈쇼핑 포함)가 582px 한 줄에 들어오게 */
   .ms-cos .cs-fr { grid-template-columns: 124px minmax(0, 1fr); }
   .ms-cos .cs-lf { padding: 10px 6px; }
   .ms-cos .cs-lt { font-size: 12.5px; }
