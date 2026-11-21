@@ -402,7 +402,8 @@ function ensureRoot(): HTMLElement {
   // 물건 설명 팝업 (2026-11-08 사용자: 특가 구획에서 잘리고, 진열대에서 스크롤바가 생겼다 사라지며 움찔거렸다).
   // 칸 안의 .it-tip 은 내용만 들고, 보여 주기는 창 맨 위 층 하나(.it-tipfloat)가 맡는다. 칸 옆에 띄우고 화면 끝에 닿으면 반대쪽으로
   root.addEventListener('pointerover', (ev) => {
-    if (ev.pointerType && ev.pointerType !== 'mouse') return;
+    // 폰 배치는 설명 말풍선이 없다 (style.css 폰 .it-tip 숨김과 같게, 눌러3: 폰에서 옆 칸을 덮고 남았다)
+    if ((ev.pointerType && ev.pointerType !== 'mouse') || isPhone()) return;
     const cell = (ev.target as HTMLElement | null)?.closest?.<HTMLElement>('.it-c:not(.empty), .it-slot:not(.empty)');
     const tip = cell?.querySelector<HTMLElement>(':scope > .it-tip');
     if (!cell || !tip) return;
@@ -1638,6 +1639,9 @@ function render(): void {
   // 안쪽 스크롤 칸(편성 요원 목록·사이드 칸 등)도 같은 탭이면 자리를 지킨다
   const inner = root.dataset.tab === tab ? [...root.querySelectorAll<HTMLElement>(INNER_SCROLL)].map((el) => el.scrollTop) : [];
   const facLeft = root.querySelector<HTMLElement>('.gx-facs')?.scrollLeft;
+  // 상점 본문: 같은 화면(구매·판매)이면 다시 그려도 스크롤 자리를 지킨다 (눌러3: 판매 화면에서 물건을 고르면 맨 위로 튀어 고른 칸이 가려졌다)
+  const shKey = shopUi.open ? (shopUi.pick ? 'pick' : 'buy') : '';
+  const shKeep = shKey && root.dataset.shp === shKey ? root.querySelector<HTMLElement>('.sh-body')?.scrollTop ?? 0 : 0;
   // 설정 기능 페이지·위키 문서 칸: 진단 행 펼치기·📌·취소처럼 전체를 다시 그려도 그 칸의 자리를 지킨다 (맨 위로 튀던 문제, 2026-10-26)
   const pageKeep = root.dataset.pk === pageKey() ? [...root.querySelectorAll<HTMLElement>(PAGE_SCROLL)].map((el) => el.scrollTop) : [];
   // 같은 위키 문서면 펼쳐 둔 스포일러 접기도 그대로 (전수검사 11-13)
@@ -1724,6 +1728,10 @@ function render(): void {
   if (next && keep) next.scrollTop = keep;
   if (inner.length) root.querySelectorAll<HTMLElement>(INNER_SCROLL).forEach((el, i) => inner[i] && (el.scrollTop = inner[i]));
   if (view.kind === 'picker') showPickedFac(facLeft);
+  root.dataset.shp = shKey;
+  if (shKeep) { const b = root.querySelector<HTMLElement>('.sh-body'); if (b) b.scrollTop = shKeep; }
+  // 다시 그려 설명을 띄운 칸이 없어졌으면 설명도 닫는다 (눌러3: 새로고침 뒤에도 옆 칸을 덮은 채 남았다)
+  if (tipFor && !tipFor.isConnected) hideTip();
   root.dataset.pk = pageKey();
   if (openKeep.length) root.querySelectorAll<HTMLDetailsElement>('.wk .wsc details').forEach((d, i) => openKeep[i] && (d.open = true));
   if (pageKeep.length) root.querySelectorAll<HTMLElement>(PAGE_SCROLL).forEach((el, i) => pageKeep[i] && (el.scrollTop = pageKeep[i]));

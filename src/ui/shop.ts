@@ -71,10 +71,14 @@ export const shopUi = {
   info: '',
   /** 실패한 응답 원문 (다시 받기 안내) */
   failRaw: '',
+  /** 「원문 보기」를 눌러 원문을 펼쳤는가 */
+  rawOpen: false,
+  /** 답을 못 받은 내 말 (대화 칸에 보낸 말로 남겨 보인다, 눌러3) */
+  failSay: '',
 };
 
 export function resetShop(): void {
-  Object.assign(shopUi, { open: false, solo: false, loading: '', detail: '', drawer: false, chip: '', chipKind: '', pick: false, lockH: 0, input: '', notice: '', info: '', failRaw: '' });
+  Object.assign(shopUi, { open: false, solo: false, loading: '', detail: '', drawer: false, chip: '', chipKind: '', pick: false, lockH: 0, input: '', notice: '', info: '', failRaw: '', rawOpen: false, failSay: '' });
 }
 
 /** 지금 상점이 백일몽 포인트 상점인가 (2026-11-08 사용자: 포인트는 포인트 상점에서만). 그리기·동작 첫머리에서 맞춘다 */
@@ -135,7 +139,9 @@ export function shopPopup(ctx: ChatContext): string {
   const note = toast('shop', shopUi.info, (t) => {
     if (shopUi.info === t) shopUi.info = '';
   });
-  const notice = shopUi.notice ? `<div class="gx-err sh-err" role="alert">${esc(shopUi.notice)}${shopUi.failRaw ? ' <button class="gx-chip sh-raw" data-action="shop-raw">원문 보기</button>' : ''}</div>` : '';
+  // 폰에서 주인 서랍을 열었으면 알림은 서랍 대화 칸 안에 (어두운 막 뒤에 뜨면 못 누른다, 눌러3 중대)
+  const inDrawer = phone && shopUi.drawer;
+  const notice = inDrawer ? '' : noticeHtml();
   let inner: string;
   if (phone) {
     const foot = `<div class="sh-foot">
@@ -150,6 +156,13 @@ export function shopPopup(ctx: ChatContext): string {
     inner = `${tools}${notice}${body}${note}<div class="sh-owner">${ownerHtml(ctx, st, false)}</div>`;
   }
   return shell(inner, 'sh-wrap', 'shop-close', 'shop-keep', st.shop) + detailHtml(ctx, st, bal);
+}
+
+/** 실패 알림 띠: 글 + 「원문 보기」(누르면 원문을 따로 펼친 칸에, 눌러3: 원문이 알림 둘째 줄과 같으면 바뀐 게 안 보였다) */
+function noticeHtml(): string {
+  if (!shopUi.notice) return '';
+  const raw = shopUi.failRaw ? (shopUi.rawOpen ? `<pre class="sh-rawtx">${esc(shopUi.failRaw.slice(0, 1500))}</pre>` : ' <button class="gx-chip sh-raw" data-action="shop-raw">원문 보기</button>') : '';
+  return `<div class="gx-err sh-err" role="alert">${esc(shopUi.notice)}${raw}</div>`;
 }
 
 function bodyHtml(ctx: ChatContext, st: ShopState, bal: number): string {
@@ -229,17 +242,32 @@ function ownerHtml(ctx: ChatContext, st: ShopState, drawer: boolean): string {
   const lines = st.talk.length
     ? st.talk.map((l) => (l.who === 'me' ? `<p class="me">${esc(l.text)}</p>` : `<p>「${esc(l.text)}」</p>`)).join('')
     : `<p class="dim">${shopUi.loading === 'shelf' ? '…' : st.loaded ? '' : '진열대를 받으면 주인이 말을 걸어요.'}</p>`;
-  const box = `<div class="sh-dlg-box" data-sh-log>${lines}${shopUi.loading === 'talk' ? '<p class="dim">…</p>' : ''}</div>`;
-  const talk = talkbox(st);
+  // 답을 못 받은 내 말은 대화에 남겨 보이고, 폰 서랍이면 실패 알림도 그 아래 대화 칸 안에
+  const failed = shopUi.failSay && shopUi.notice && !shopUi.loading ? `<p class="me">${esc(shopUi.failSay)}</p>` : '';
+  const box = `<div class="sh-dlg-box" data-sh-log>${lines}${failed}${shopUi.loading === 'talk' ? '<p class="dim">…</p>' : ''}${drawer ? noticeHtml() : ''}</div>`;
+  const talk = talkbox(ctx, st);
   if (drawer) return `<div class="sh-ov-head">${face}${name}</div>${box}${talk}`;
   return `${face}<div class="sh-dlg">${name}${box}${talk}</div>`;
 }
 
-function talkbox(st: ShopState): string {
+/** 판매 칩 이름: 같은 이름 물건이 둘 이상이면 카드에 적힌 산 값으로, 없으면 몇째인지로 가른다 (눌러3: 손전등 둘이 같은 칩) */
+function sellChipName(ctx: ChatContext, st: ShopState): string {
+  const o = st.sell;
+  if (!o || o.name !== shopUi.chip) return shopUi.chip;
+  const same = gridItems(liveItemsOf(readItems(ctx.chat.scriptstate), ctx.chat)).filter((x) => x.name === o.name);
+  if (same.length < 2) return shopUi.chip;
+  const paid = same.find((x) => x.id === o.itemId)?.price;
+  if (Number.isSafeInteger(paid) && same.filter((x) => x.price === paid).length === 1) return `${shopUi.chip} (산 값 ${amt(paid!)})`;
+  const n = same.findIndex((x) => x.id === o.itemId);
+  return n < 0 ? shopUi.chip : `${shopUi.chip} ${n + 1}`;
+}
+
+function talkbox(ctx: ChatContext, st: ShopState): string {
   const off = st.closed || !!shopUi.loading || !st.loaded;
   const sell = shopUi.chipKind === 'sell';
+  const chipName = sell ? sellChipName(ctx, st) : shopUi.chip;
   // 칩: 「판매: 이름」·「묻기: 이름」 같은 꼴, 떼기 ×는 따로 누르는 단추 (누름 칸 34, 전수점검 눌러2-보통-18)
-  const chip = shopUi.chip ? `<span class="sh-ref${sell ? ' sell' : ''}"><span class="sh-ref-nm">${sell ? '판매' : '묻기'}: ${esc(shopUi.chip)}</span><button type="button" class="sh-ref-x" data-action="shop-chip-x" aria-label="${esc(shopUi.chip)} 빼기">×</button></span>` : '';
+  const chip = shopUi.chip ? `<span class="sh-ref${sell ? ' sell' : ''}"><span class="sh-ref-nm">${sell ? '판매' : '묻기'}: ${esc(chipName)}</span><button type="button" class="sh-ref-x" data-action="shop-chip-x" aria-label="${esc(chipName)} 빼기">×</button></span>` : '';
   const ph = st.closed ? '거래가 끊겼어요' : sell ? (typeof st.sell?.price === 'number' ? '값을 다시 불러 보기' : '값을 부르거나 그냥 보내기') : shopUi.chip ? '이 물건에 대해 묻기' : '주인에게 말하기';
   // 폼 제출은 플러그인 iframe(allow-forms 없음)에서 안 오므로 Enter(data-enter)·단추(data-action+data-take)로 보낸다
   return `<div class="sh-talk" data-sh-talk="1">
@@ -375,13 +403,26 @@ function saleDone<C extends ChatContext['chat']>(chat: C, shop: string, itemId: 
   return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...ledgerVars(w, p), ...itemsVars(items), ...shopVars(nextShop), ...use } };
 }
 
+/** 판매 화면: 고른 소지품 칸이 본문 밖(주인 칸 뒤)에 걸리면 다 보이게 본문만 움직인다 (눌러3: 고른 칸이 가려졌다) */
+function revealSel(): void {
+  const body = document.querySelector<HTMLElement>('.sh-body');
+  const sel = body?.querySelector<HTMLElement>('.sh-mine .sh-c.sel');
+  if (!body || !sel) return;
+  const b = body.getBoundingClientRect();
+  const r = sel.getBoundingClientRect();
+  if (r.bottom > b.bottom) body.scrollTop += r.bottom - b.bottom + 8;
+  else if (r.top < b.top) body.scrollTop -= b.top - r.top + 8;
+}
+
 /** 모델에 묻고 상태를 저장한다. 같은 채팅을 보고 있을 때만 */
-async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: ShopState): Promise<void> {
+async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: ShopState, undo?: { chip: string; chipKind: '' | 'ask' | 'sell' }): Promise<void> {
   const key = chatKey(ctx);
   const s = shopSettings(ctx.chat.scriptstate);
   shopUi.loading = kind;
   shopUi.notice = '';
   shopUi.failRaw = '';
+  shopUi.rawOpen = false;
+  shopUi.failSay = '';
   // 말을 걸었으면 방금 저장한 내 말이 응답을 기다리는 동안 바로 보이게 채팅을 다시 읽어 그린다 (ui/malls.ts ask 와 같음, 11-11 사용자)
   if (kind === 'talk') await env.refresh();
   else env.render();
@@ -434,6 +475,10 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
     shopUi.notice = error instanceof Error ? error.message : String(error);
     shopUi.failRaw = String((error as { raw?: string }).raw ?? '');
     if (kind === 'talk') {
+      // 보낸 말은 대화 칸에 남겨 보이고, 떼어 낸 칩(판매·묻기)은 되돌려 다시 보낼 수 있게 (눌러3: 실패하면 고른 물건·칩이 사라졌다)
+      const last = st0.talk[st0.talk.length - 1];
+      shopUi.failSay = last?.who === 'me' ? last.text : '';
+      if (undo?.chip && !shopUi.chip) { shopUi.chip = undo.chip; shopUi.chipKind = undo.chipKind; }
       // 내 말은 적어 뒀으니 답이 안 왔으면 되돌린다
       await updateChat(cur.charIndex, cur.chatIndex, (chat) => {
         const now = readShop(chat.scriptstate);
@@ -445,6 +490,7 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
     shopUi.loading = '';
   }
   await env.refresh();
+  if (kind === 'talk' && shopUi.pick) revealSel();
 }
 
 /** 상점 팝업의 data-action. 처리했으면 true. 'shop-say' 의 value 는 입력칸 글 */
@@ -466,6 +512,8 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       shopUi.drawer = false;
       shopUi.pick = false;
       shopUi.notice = '';
+      shopUi.failSay = '';
+      shopUi.rawOpen = false;
       // 팔던 물건이 남아 있으면 칩을 되살린다
       if (st?.sell) { shopUi.chip = st.sell.name; shopUi.chipKind = 'sell'; } else if (shopUi.chipKind === 'sell') { shopUi.chip = ''; shopUi.chipKind = ''; }
       env.render();
@@ -525,7 +573,8 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       shopUi.detail = '';
       if (isPhone()) shopUi.drawer = true;
       await env.refresh();
-      (document.querySelector('[data-input="shop-say"]') as HTMLInputElement | null)?.focus();
+      (document.querySelector('[data-input="shop-say"]') as HTMLInputElement | null)?.focus({ preventScroll: true });
+      revealSel();
       return true;
     }
     case 'shop-sell-haggle':
@@ -593,8 +642,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       await env.refresh();
       return true;
     case 'shop-raw':
-      if (shopUi.failRaw) shopUi.notice = `${shopUi.notice.split('\n')[0]}\n${shopUi.failRaw.slice(0, 1500)}`;
-      shopUi.failRaw = '';
+      if (shopUi.failRaw) shopUi.rawOpen = true;
       env.render();
       return true;
     case 'shop-say': {
@@ -604,10 +652,11 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       // 주인에게 가는 내 말 꼴은 지침 「상점」의 ASK_SELL · ASK_SELL_BARE · ASK_CHIP 절
       const text = sell ? (said ? guideTxt('Shop', 'ASK_SELL', { item: st!.sell!.name, said }) : guideTxt('Shop', 'ASK_SELL_BARE', { item: st!.sell!.name })) : (shopUi.chip ? guideTxt('Shop', 'ASK_CHIP', { item: shopUi.chip, said }) : said).trim();
       if (!st || !text || (!sell && !said) || st.closed || shopUi.loading || !st.loaded) return true;
+      // 판매 화면은 그대로 둔다 (눌러3: 보내면 구매 목록으로 돌아가 고른 물건이 안 보였다)
+      const undo = { chip: shopUi.chip, chipKind: shopUi.chipKind };
       shopUi.input = '';
       shopUi.chip = '';
       shopUi.chipKind = '';
-      shopUi.pick = false;
       const next = sayToOwner(st, text, shopLimits(ctx.chat.scriptstate));
       const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
         const now = readShop(chat.scriptstate);
@@ -615,7 +664,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...shopVars({ ...next, key: now.key }) } };
       });
       if (!saved) return true;
-      await ask({ ...ctx, chat: saved }, env, 'talk', next);
+      await ask({ ...ctx, chat: saved }, env, 'talk', next, undo);
       return true;
     }
     case 'shop-buy': {
