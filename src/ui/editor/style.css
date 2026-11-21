@@ -562,6 +562,11 @@
   /* 복사 단추가 늘어 폰에서 ▲▼가 다음 줄로 밀리지 않게 머리 줄 간격만 줄인다 */
   .gw .gw-field-head { column-gap: 6px; }
   .gw .gw-fmove .gx-mini.icon { width: 36px; }
+  /* 한 줄 로어 칸(나이·성별·소속 표기…)의 글칸도 글상자처럼 머리 아래 한 줄을 다 쓴다.
+     자리를 안 정하면 머리 옆 칸에 들어가 344 폭에서 이름 칸이 0px 로 눌려 글자가 세로로 한 자씩 꺾이고 글칸이 상자 밖으로 나갔다 (11-21 폴드 커버 점검) */
+  .gw .gw-field > input { grid-area: ctl; }
+  /* 호출 흐름 Director 「방식」 네 칸은 폰에서 두 줄로 꺾이는데(ui/style.css .pp-fn-ctl), 고르기 높이가 한 줄(34px)로 묶여 둘째 줄 「사실형·연출형」이 카드 밖 다음 칸(메인) 위로 넘쳤다 (11-21 폴드 커버 점검) */
+  .gw .pp-fn-ctl .gx-segs { height: auto; max-height: none; }
 }
 /* 맨 위로 단추가 맨 아래 줄(예: 인물 설정 전용 모델 ID 「저장」)을 덮지 않게 끝에 단추 높이만큼 여백 (11-08 눌러 보기 점검) */
 .gw-body:has(~ .gw-totop)::after { content: ''; display: block; height: 72px; }
