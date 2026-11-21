@@ -27,14 +27,17 @@ test('같은 이름이 또 들어오면 새 줄 없이 갱신, 둘 다 소모성
   it = addItem(it, alive, { name: '소금봉지', desc: '새로 샀다', uses: 3, from: 'story', anchor: 'c2' });
   assert.equal(it.list.length, 1);
   assert.equal(it.list[0].desc, '새로 샀다');
-  assert.equal(it.list[0].uses, 5);
+  // 더한 수는 c2 에 묶인 획득 기록 (전수점검 중대-5): 처음 횟수는 그대로, 남은 횟수가 5. c2 를 다시 굴리면 2 로 돌아온다
+  assert.equal(it.list[0].uses, 2);
+  assert.equal(itemLeft(it, it.list[0], alive), 5);
+  assert.equal(itemLeft(it, it.list[0], new Set(['c1'])), 2, '다시 굴리면 더한 수가 빠진다');
   assert.equal(it.list[0].anchor, 'c1');
   it = addItem(it, alive, { name: '소금 봉지', from: 'story', anchor: 'c2' });
   assert.equal(it.list[0].desc, '새로 샀다', '빈 설명은 있던 설명을 지우지 않는다');
   // 상점·쇼핑몰에서 산 것(store)은 같은 이름이 있어도 새 줄로 (전수검사 11-13)
   const st = addItem(it, alive, { name: '소금봉지', uses: 3, from: 'store', anchor: 'c2' });
   assert.equal(st.list.length, 2);
-  assert.deepEqual([st.list[0].uses, st.list[1].from, st.list[1].anchor, st.list[1].uses], [5, 'store', 'c2', 3]);
+  assert.deepEqual([itemLeft(st, st.list[0], alive), st.list[1].from, st.list[1].anchor, st.list[1].uses], [5, 'store', 'c2', 3]);
 });
 
 test('쓰임 글 읽기·쓰기', () => {
@@ -148,17 +151,22 @@ test('버리기·합치기·파괴는 기록 한 줄. 합치기는 둘 다 소�
   assert.equal(canMerge(b, charm), false, '같은 낱말 없음');
   assert.equal(mergeItems(it, alive, b.id, charm.id), it);
   it = mergeItems(it, alive, b.id, a.id, 'c1');
-  assert.equal(it.list.length, 3);
+  // 합쳐 들어간 줄은 지우지 않고 숨긴다 (전수점검 보통-24): 남은 횟수는 그 줄의 응답이 살아 있는 동안 남는 줄에 더해진다
+  assert.equal(it.list.length, 4);
+  assert.equal(liveItems(it, alive).length, 3);
+  assert.equal(it.list.find((x) => x.id === a.id).mergedInto, b.id);
   assert.equal(it.list.find((x) => x.id === b.id).name, '소금 봉지');
   assert.equal(it.list.find((x) => x.id === b.id).desc, '새 봉지');
-  assert.equal(it.list.find((x) => x.id === b.id).uses, 5);
+  assert.equal(itemLeft(it, it.list.find((x) => x.id === b.id), alive), 5);
+  assert.equal(itemLeft(it, it.list.find((x) => x.id === b.id), new Set(['c2'])), 3, '합쳐 들어간 줄의 응답(c1)을 다시 굴리면 그 몫만 빠진다');
   assert.equal(it.list.find((x) => x.id === b.id).weight, 0.5, '1개당 무게는 남는 쪽 그대로');
   assert.equal(it.list.find((x) => x.id === b.id).anchor, '');
+  assert.equal(it.log.at(-1).note, '소금 봉지와 합침');
   assert.equal(it.log.at(-1).what, 'merge');
   assert.deepEqual(mergedNow(it, 'c1'), ['combined 소금 into 소금 봉지']);
   assert.deepEqual(mergedNow(it, 'c2'), []);
   it = removeItem(it, b.id, 'destroy', 'story', 'c1');
-  assert.equal(it.list.length, 3, '줄은 지우지 않고 숨긴다 (11-12)');
+  assert.equal(it.list.length, 4, '줄은 지우지 않고 숨긴다 (11-12)');
   assert.equal(liveItems(it, alive).length, 2);
   assert.deepEqual(it.log.filter((l) => l.what !== 'get').map((l) => l.what), ['merge', 'destroy']);
   assert.equal(removeItem(it, 'nope', 'drop', 'manual'), it);
@@ -175,16 +183,16 @@ test('무게: 1개당 무게 × 개수·합계(장착 포함)·소지 한도(명
   it = addItem(it, alive, { name: '물병', uses: 2, weight: 1, from: 'manual', anchor: '' });
   it = addItem(it, alive, { name: '물병', uses: 1, weight: 0.5, from: 'manual', anchor: '' });
   assert.equal(it.list.find((x) => x.name === '물병').weight, 1, '무게는 1개당: 더 들어와도 그대로');
-  assert.equal(it.list.find((x) => x.name === '물병').uses, 3);
-  assert.equal(totalWeight(it.list), 4.2, '1개당 × 개수 (1.2 + 1×3)');
+  assert.equal(itemLeft(it, it.list.find((x) => x.name === '물병'), alive), 3);
+  assert.equal(totalWeight(it.list, (e) => itemLeft(it, e, alive)), 4.2, '1개당 × 개수 (1.2 + 1×3)');
   assert.equal(totalWeight(it.list, (e) => (e.uses !== undefined ? 1 : undefined)), 2.2, '남은 개수만큼만');
   assert.equal(itemCarry({}), ITEM_CARRY_DEFAULT);
   assert.equal(itemCarry({ $it_carry: '40' }), 40);
   assert.equal(itemCarry({ $it_carry: '40', $it_carry_pc: '18' }), 18);
   assert.equal(itemCarry({ $it_carry: '40', $it_carry_pc: '' }), 40);
-  const under = itemsBlock(it.list, { slots: 16, limit: '가방', carry: 10 });
+  const under = itemsBlock(it.list, { slots: 16, limit: '가방', carry: 10, left: (e) => itemLeft(it, e, alive) });
   assert.match(under, /^Weight: 4\.2 kg \/ 10 kg$/m);
-  const over = itemsBlock(it.list, { slots: 16, limit: '가방', carry: 4 });
+  const over = itemsBlock(it.list, { slots: 16, limit: '가방', carry: 4, left: (e) => itemLeft(it, e, alive) });
   assert.match(over, /^Weight: 4\.2 kg \/ 4 kg \(0\.2 kg over\)$/m);
   assert.doesNotMatch(over, /heavy/i);
   assert.equal(itemEditOn({}), false);

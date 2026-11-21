@@ -1387,16 +1387,30 @@ async function handle(action: string, value?: string): Promise<void> {
       if (view.kind !== 'started' || !walletEditable(view.ctx.chat.scriptstate)) return;
       const pts = walletTabUi.kind === 'p';
       const n = pts ? parsePoints(value ?? '') : parseWon(value ?? '');
-      if (n === null || (pts && Math.abs(n) > WALLET_MAX)) {
+      if (n === null) {
         walletTabUi.notice = pts ? '포인트를 읽을 수 없어요. 숫자 또는 「1만」처럼 적어 주세요.' : '금액을 읽을 수 없어요. 숫자 또는 「120만」처럼 적어 주세요.';
         return render();
       }
+      // 범위는 원·포인트 같이 본다 (전수점검 사소-29: 원은 1조가 넘어도 안내 없이 창이 닫히고 잔고는 그대로였다). 맞춤 거래(차액)가 범위를 넘어도 같은 안내
+      let over = Math.abs(n) > WALLET_MAX;
       const ctx = view.ctx;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-        if (pts) return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(adjustWallet(readPoints(chat.scriptstate), aliveAnchors(chat), n, guideTxt('Main', 'WALLET.MEMO.POINTS_ADJUST'))) } };
+      if (!over) await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+        const alive = aliveAnchors(chat);
+        if (pts) {
+          const p = readPoints(chat.scriptstate);
+          const next = adjustWallet(p, alive, n, guideTxt('Main', 'WALLET.MEMO.POINTS_ADJUST'));
+          if (next === p && walletBalance(p, alive) !== n) { over = true; return null; }
+          return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(next) } };
+        }
         const w = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
-        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(adjustWallet(w, aliveAnchors(chat), n)) } };
+        const next = adjustWallet(w, alive, n);
+        if (next === w && walletBalance(w, alive) !== n) { over = true; return null; }
+        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(next) } };
       });
+      if (over) {
+        walletTabUi.notice = `${pts ? '포인트가' : '금액이'} 너무 커요. ${WALLET_MAX.toLocaleString('en-US')} 안쪽으로 적어 주세요.`;
+        return render();
+      }
       walletTabUi.notice = '';
       walletTabUi.edit = false;
       return refresh();

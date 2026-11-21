@@ -61,5 +61,7 @@ export const ICONS = {
   check: stroke('<path d="m5 12.5 4.5 4.5L19 7.5"/>'),
   up: stroke('<path d="m6 15 6-6 6 6"/>'),
   down: stroke('<path d="m6 9 6 6 6-6"/>'),
+  /** 합치기: 두 갈래가 하나로 (소지품 합치기, 전수점검 눌러2-사소-19 — 새로고침 그림을 쓰던 것) */
+  merge: stroke('<path d="M6 3v3a6 6 0 0 0 6 6 6 6 0 0 0 6-6V3"/><path d="M12 12v9M8.5 17.5 12 21l3.5-3.5"/>'),
   grip: '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg>',
 };

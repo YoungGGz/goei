@@ -152,7 +152,8 @@ test('소지품 창, 보내기 전 버리기: 사용 목록에서도 빠진다 (
 const nOf = (t) => U.readItemUse(t.store.chat.scriptstate).find((u) => u.id === t.id)?.n ?? 0;
 test('소지품 창, 보내기 전: 「한 번 더」를 누르면 ×2', async () => {
   const t = seed(10);
-  assert.match(popupHtml(t), /한 번 더 \(×2\)/);
+  // 단추 글은 늘 지금 넣은 수(사용 ×1), 더 넣을 수 있으면 title 로 알린다 (전수점검 눌러2-보통-24: 「한 번 더 (×2)」와 「사용 ×1」의 셈법이 달랐다)
+  assert.match(popupHtml(t), /title="누르면 한 번 더 넣어요">사용 ×1</);
   await U.itemsAction('items-use', t.id, t.ctx(), t.env);
   assert.equal(nOf(t), 2);
 });

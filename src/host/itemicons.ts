@@ -9,6 +9,11 @@ export const ITEMS_KEY = 'goei:data-items';
 let pack: ItemIconPack | null = null;
 let loading: Promise<void> | null = null;
 let failed = '';
+/** 실패한 때 (ms): 이만큼 지나면 그림을 찾을 때 다시 받는다 (전수점검 사소-28: 갱신기가 물건을 읽지 않는 채팅은 한 번 실패하면 플러그인을 다시 올릴 때까지 기본 아이콘이었다) */
+let failedAt = 0;
+const RETRY_MS = 30_000;
+/** 실패한 뒤 다시 받아도 되나 */
+const canRetry = () => !failed || Date.now() - failedAt >= RETRY_MS;
 let progress = '';
 let redraw: () => void = () => {};
 const urls = new Map<string, string>();
@@ -69,6 +74,7 @@ export function ensureItemIcons(): Promise<void> {
       }
     } catch (error) {
       failed = error instanceof DataPackError || error instanceof Error ? error.message : String(error);
+      failedAt = Date.now();
       console.log(`[goei] 소지품 그림 팩: ${failed}`);
     } finally {
       progress = '';
@@ -82,7 +88,7 @@ export function ensureItemIcons(): Promise<void> {
 /** 이름(+모델이 쓴 그림 찾기 낱말)에 맞는 그림 data URL. 맞는 게 없으면 공통 그림. 팩이 없으면 받기 시작하고 null */
 export function itemIconUrl(name: string, icon?: string, seed?: string, more?: ItemPicMore): string | null {
   if (!pack) {
-    if (!failed) void ensureItemIcons();
+    if (canRetry()) void ensureItemIcons();
     return null;
   }
   const p = pack;
@@ -94,7 +100,7 @@ export const itemPictures = (name: string, icon?: string): string[] | null => (p
 /** 글 제목 → 그림 (연어 마켓 매물). 맞는 그림이 없으면 소지품과 같이 공통 그림 */
 export function titleIconUrl(title: string): string | null {
   if (!pack) {
-    if (!failed) void ensureItemIcons();
+    if (canRetry()) void ensureItemIcons();
     return null;
   }
   const p = pack;

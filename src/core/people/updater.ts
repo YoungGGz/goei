@@ -600,6 +600,8 @@ export interface ItemChange {
   /** 판정 (new 에서만 — 갈래는 들어올 때 정한다. update 에서는 받지 않는다). uses: new 는 처음 횟수, update 는 지금 남은 횟수 */
   use?: boolean;
   uses?: number;
+  /** 가진 소모품을 또 얻은 수 (갱신기의 new 가 가진 물건이라 update 로 바꾼 것): 남은 횟수에 더한다 (전수점검 중대-5) */
+  got?: number;
   /** null = 장착 갈래 없음 */
   equip?: ItemEquip | null;
   state?: ItemState;
@@ -1607,7 +1609,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       if (nameCut.cut.length || descCut.cut.length) drop('items', t, `본문에 없는 등급 말을 뺌: ${[...nameCut.cut, ...descCut.cut].join(', ')}`, name);
       const outName = act === 'new' ? nameCut.text || name : listed ?? name;
       const place = plain(t.place, 30);
-      // 가진 물건을 또 얻은 new(→ update): uses 는 「받은 수」라 남은 횟수로 덮지 않는다. 설명의 두고 옴·벗음 말이 안전망에 걸리지 않게 그 설명도 뺀다 (전수검사 11-13)
+      // 가진 물건을 또 얻은 new(→ update): uses 는 「받은 수」라 남은 횟수로 덮지 않고 got 으로 넘겨 더한다 (전수점검 중대-5). 설명의 두고 옴·벗음 말이 안전망에 걸리지 않게 그 설명도 뺀다 (전수검사 11-13)
       const more = action === 'new' && !!listed;
       const desc = more && (leftWordIn(descCut.text) || offWordIn(descCut.text)) ? '' : descCut.text;
       report.items.push({
@@ -1616,6 +1618,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         // 사용·장착 갈래는 새로 얻을 때만 받는다 (update 의 「equip: none」에 갈래가 지워지던 것)
         ...(act !== 'new' ? {} : typeof t.usable === 'boolean' ? { use: t.usable } : /^(true|false)$/i.test(str(t.usable).trim()) ? { use: /^true$/i.test(str(t.usable).trim()) } : {}),
         ...(uses !== undefined && !more ? { uses } : {}),
+        ...(more && uses ? { got: uses } : {}),
         ...(act === 'new' && eq !== undefined ? { equip: eq ?? null } : {}),
         ...(cond === 'ok' || cond === 'damaged' || cond === 'broken' ? { state: itemState(cond) } : {}),
         ...(icon ? { icon } : {}),

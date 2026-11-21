@@ -28,7 +28,11 @@ import { toast } from './toast';
 import { walletOn, walletPane, walletTools, walletUi } from './wallet';
 import { pointsOn } from '../core/points';
 import { boxButton } from './homeshop';
+import { josa } from '../core/josa';
+import { statusClock24 } from '../core/world/status';
 
+/** 「이름」 + 받침에 맞는 조사 (전수점검 보통-26: 「라이터」은·「마스크」을) */
+const named = (n: string, withBatchim: string, without: string) => `「${n}」${josa(n, withBatchim, without).slice(n.length)}`;
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export type ItemsSub = 'wallet' | 'points' | 'items';
@@ -81,7 +85,7 @@ export function itemPic(it: { name: string; icon?: string; id?: string; desc?: s
 
 /** 판정 글: 「손 · 사용 · 남은 3 · 1.2kg · 손상」 */
 export function traitsLine(it: Item, left: number | undefined): string {
-  return [it.equip ? EQUIP_LABEL[it.equip] : '', left !== undefined ? `남은 ${left}` : it.use ? '사용' : '', it.weight !== undefined ? (it.uses !== undefined ? `${weightText(lineWeight(it, left)!)} (1개 ${weightText(it.weight)})` : weightText(it.weight)) : '', it.state !== 'ok' ? STATE_LABEL[it.state] : ''].filter(Boolean).join(' · ');
+  return [it.equip ? EQUIP_LABEL[it.equip] : '', left !== undefined ? `남은 ${left}회` : it.use ? '사용' : '', it.weight !== undefined ? (it.uses !== undefined ? `${weightText(lineWeight(it, left)!)} (1개 ${weightText(it.weight)})` : weightText(it.weight)) : '', it.state !== 'ok' ? STATE_LABEL[it.state] : ''].filter(Boolean).join(' · ');
 }
 
 const FROM_NAME: Record<Item['from'], string> = { store: '상점', story: '본문', manual: '직접' };
@@ -105,7 +109,7 @@ function whenOf(ctx: ChatContext): When {
       const t = tags[tags.length - 1];
       const d = /(\d{4})\D+(\d{1,2})\D+(\d{1,2})/.exec(t.date ?? '');
       const date = d ? `${d[1]}.${d[2].padStart(2, '0')}.${d[3].padStart(2, '0')}` : (t.date ?? '').trim();
-      const next = [date, (t.time ?? '').trim()].filter(Boolean).join(' ');
+      const next = [date, statusClock24(t.time)].filter(Boolean).join(' ');
       if (next) cur = next;
     }
     at.set(messageKey(m, i), cur);
@@ -122,7 +126,9 @@ const realOf = (iso: string) => {
 };
 /** 줄의 때: 기준 메시지의 RP 날짜·시각 → 없으면(직접 넣기·버리기) 마지막 RP 시각 → 상태창이 없으면 현실 시각 */
 const whenLabel = (w: When, anchor: string, iso: string) => (anchor ? w.at.get(anchor) : '') || w.last || realOf(iso);
-const sourceLine = (it: Item, w: When) => [FROM_NAME[it.from], whenLabel(w, it.anchor, it.at), Number.isSafeInteger(it.price) ? `₩ ${it.price!.toLocaleString('en-US')}` : ''].filter(Boolean).join(' · ');
+/** 값: 원으로 치른 값 · 원이 아닌 대가 (물건으로만 치른 것은 「₩ 0」 대신 그 대가, 전수점검 사소-27 — 획득 기록 paidNote 와 같은 셈) */
+const paidLine = (it: Item) => [Number.isSafeInteger(it.price) && (it.price! > 0 || !it.paidWith) ? `₩ ${it.price!.toLocaleString('en-US')}` : '', it.paidWith ?? ''].filter(Boolean).join(' + ');
+const sourceLine = (it: Item, w: When) => [FROM_NAME[it.from], whenLabel(w, it.anchor, it.at), paidLine(it)].filter(Boolean).join(' · ');
 
 /** 이 채팅의 「사용」 자리 (이미 보낸 턴의 것은 비어 보인다) */
 export function useQueue(ctx: ChatContext): ItemUse[] {
@@ -152,7 +158,9 @@ export function itemsTab(ctx: ChatContext): string {
   const drawer = isPhone() ? drawerHtml(`${addButton('ph-tool')}${mergeButton(ctx, 'ph-tool')}`, '', 'gx-idrawer') : '';
   // PC 격자: 탭·도구 줄·장착 띠는 고정하고 격자만 스크롤 (it-fix, 2026-11-08 사용자)
   const fix = !isPhone() && itemsUi.view === 'grid' ? ' it-fix' : '';
-  return `<main class="gx-body gx-records gx-items${fix}">${tabs}${notice}${itemsPane(ctx)}${note}</main>${popup(ctx)}${drawer}`;
+  // 물건 창이 떠 있으면 알림은 창 막 위에, 입력 잘못 안내는 입력 창 안 제목 밑에 (전수점검 눌러-보통-18: 막 밑에 깔려 흐렸다)
+  const pop = popup(ctx);
+  return `<main class="gx-body gx-records gx-items${fix}">${tabs}${pop ? '' : notice}${itemsPane(ctx)}${pop ? '' : note}</main>${pop && note ? pop.replace(/<\/div>$/, `${note}</div>`) : pop}${drawer}`;
 }
 
 const addButton = (cls: string) => `<button class="${cls} it-add" data-action="items-add" aria-label="직접 넣기">${ICONS.plus}<span class="${cls === 'ph-tool' ? 'ph-tool-l' : ''}">직접 넣기</span></button>`;
@@ -162,7 +170,7 @@ function mergeButton(ctx: ChatContext, cls: string): string {
   // 살아 있는 목록은 한 번만 구해 그 안에서 짝을 본다 (전수검사 11-13)
   const live = liveOf(ctx);
   const any = live.some((a) => live.some((b) => canMerge(a, b)));
-  return `<button class="${cls} it-merge" data-action="items-merge-start" aria-label="합치기" title="같은 소모품끼리 합쳐요 (이름에 같은 낱말)" ${any ? '' : 'disabled'}>${ICONS.refresh}<span class="${cls === 'ph-tool' ? 'ph-tool-l' : ''}">합치기</span></button>`;
+  return `<button class="${cls} it-merge" data-action="items-merge-start" aria-label="합치기" title="같은 소모품끼리 합쳐요 (이름에 같은 낱말)" ${any ? '' : 'disabled'}>${ICONS.merge}<span class="${cls === 'ph-tool' ? 'ph-tool-l' : ''}">합치기</span></button>`;
 }
 
 /** 칸 수·넘침·무게 (장착 칸 위 한 줄). 모두 같은 꼴의 칸(.it-stat), 넘치면 붉은 칸 */
@@ -178,7 +186,7 @@ function itemsPane(ctx: ChatContext): string {
   // 도구 줄 (2026-11-08 사용자): 왼쪽 물건|기록, 오른쪽 직접 넣기·합치기·찾기. 칸 수·넘침·무게는 장착 띠의 장착 칸 위로 (equipBox)
   const tools = `<div class="gx-rec-tools gx-wt-tools it-tools">
     <div class="gx-segs gx-segs-sm it-segs">${seg('grid', '물건')}${seg('log', '기록')}</div>
-    <span class="it-right">${isPhone() ? '' : `${addButton('it-act')}${mergeButton(ctx, 'it-act')}`}<input class="gx-wt-q it-q" type="search" data-input="items-q" value="${esc(itemsUi.q)}" placeholder="찾기: 물건·기록" aria-label="물건·기록 찾기"></span>
+    <span class="it-right">${isPhone() ? '' : `${addButton('it-act')}${mergeButton(ctx, 'it-act')}`}<input class="gx-wt-q it-q" type="search" data-input="items-q" value="${esc(itemsUi.q)}" placeholder="물건·기록 검색" aria-label="물건·기록 검색"></span>
   </div>`;
   // 그림 팩(host/itemicons.ts): 처음 열 때 받는다. 받는 동안·실패는 한 줄로만 알리고, 그림은 선 아이콘으로 대신한다
   const st = itemIconStatus();
@@ -252,7 +260,7 @@ const WAIT_UNUSE_NOTE = '답을 기다리는 중이라 지금은 사용을 취�
 /** 답을 기다리는 동안 사용에 넣은 물건을 합치려 할 때 */
 const WAIT_MERGE_NOTE = '사용에 넣은 물건은 답이 온 뒤에 합칠 수 있어요.';
 const lockedHere = (ctx: { charIndex: number; chatIndex: number }) => useLocked(ctx.charIndex, ctx.chatIndex);
-const useNote = (why: UseHeld, it: Item) => (why === 'wait' ? WAIT_NOTE : `「${it.name}」은 지금 보내는 중이라 답이 온 뒤에 더 쓸 수 있어요.`);
+const useNote = (why: UseHeld, it: Item) => (why === 'wait' ? WAIT_NOTE : `${named(it.name, '은', '는')} 지금 보내는 중이라 답이 온 뒤에 더 쓸 수 있어요.`);
 
 /** 「사용」칸 (장착 띠 오른쪽, PC만): 다음 메시지에 같이 보낼 물건 (칸 수 정하지 않음, 같은 물건 또 놓으면 ×2). 비면 안내 한 줄 */
 function useBox(ctx: ChatContext): string {
@@ -357,11 +365,11 @@ function logList(ctx: ChatContext): string {
 // ── 팝업 ──
 
 function popup(ctx: ChatContext): string {
-  if (itemsUi.mode === 'add') return shell('직접 넣기', form(null));
+  if (itemsUi.mode === 'add') return shell('직접 넣기', `${formHead('직접 넣기')}${form(null)}`);
   if (!itemsUi.open) return '';
   const it = liveOf(ctx).find((x) => x.id === itemsUi.open);
   if (!it) return '';
-  if (itemsUi.mode === 'edit' && itemEditOn(ctx.chat.scriptstate)) return shell('고치기', form(it, leftOf(ctx, it)));
+  if (itemsUi.mode === 'edit' && itemEditOn(ctx.chat.scriptstate)) return shell('고치기', `${formHead('고치기')}${form(it, leftOf(ctx, it))}`);
   if (itemsUi.mode === 'merge') return shell('합치기', mergePick(ctx, it));
   const head = `<div class="it-ph"><span class="it-ic">${itemPic(it)}</span><div><b>${esc(it.name)}</b><small>${esc([traitsLine(it, leftOf(ctx, it)), sourceLine(it, whenOf(ctx))].filter(Boolean).join(' · '))}</small></div></div>`;
   if (itemsUi.mode === 'drop') {
@@ -383,20 +391,25 @@ function popup(ctx: ChatContext): string {
     ${it.text ? `<div class="it-note">${esc(it.text)}</div>` : ''}
     ${it.quote ? `<p class="qt">근거 「${esc(it.quote)}」</p>` : ''}
     <div class="it-btns">
-      ${it.use ? `<button class="gx-chip${queued ? ' on' : ''}" data-action="items-use" data-value="${esc(it.id)}" ${more || queued ? '' : 'disabled'}${needsEquip(ctx, it) ? ' title="장착해야 쓸 수 있어요"' : ''}>${queued ? (more ? `한 번 더 (×${queued + 1})` : `사용 ×${queued}`) : '사용'}</button>` : ''}
+      ${it.use ? `<button class="gx-chip${queued ? ' on' : ''}" data-action="items-use" data-value="${esc(it.id)}" ${more || queued ? '' : 'disabled'}${needsEquip(ctx, it) ? ' title="장착해야 쓸 수 있어요"' : queued && more ? ' title="누르면 한 번 더 넣어요"' : ''}>${queued ? `사용 ×${queued}` : '사용'}</button>` : ''}
       ${queued && !sending ? `<button class="gx-chip" data-action="items-unuse" data-value="${esc(it.id)}">사용 취소</button>` : ''}
       ${boxButton(ctx, it.id)}
       <button class="gx-chip" data-action="${equipped ? 'items-unequip' : 'items-equip'}" data-value="${esc(it.id)}"${!equipped && !it.equip ? ' title="손 칸에 들어가요"' : ''}>${equipLabel(it, equipped)}</button>
       ${itemEditOn(ctx.chat.scriptstate) ? '<button class="gx-chip" data-action="items-edit">고치기</button>' : ''}
       ${it.uses !== undefined ? `<button class="gx-chip" data-action="items-merge" ${mergeMates(ctx, it).length ? '' : 'disabled'} title="이름에 같은 낱말이 있는 소모품끼리 합쳐요">합치기</button>` : ''}
-      <button class="gx-chip red" data-action="items-drop-ask" data-value="${esc(it.id)}">버리기</button>
     </div>
+    <div class="it-btns it-btns-end"><button class="gx-chip" data-action="items-drop-ask" data-value="${esc(it.id)}" title="목록에서 빠지고 기록에 남아요">버리기</button></div>
     ${queued ? '<p class="dim">다음 메시지를 보낼 때 메인 요청에 「이번 턴 사용」으로 넘어가요.</p>' : ''}`;
   return shell(it.name, body, it.id);
 }
 
 /** del = 물건 id 를 주면 닫기 왼쪽에 빨간 휴지통(삭제) 단추 (2026-11-13 사용자) */
-const shell = (label: string, inner: string, del = '') => `<div class="gx-agpop it-pop" data-action="items-close" role="dialog" aria-label="${esc(label)}"><div class="gx-agpop-card it-card" data-action="items-keep">${del ? `<button class="gx-agpop-x it-del" data-action="items-purge-ask" data-value="${esc(del)}" aria-label="삭제" title="삭제">${ICONS.trash}</button>` : ''}<button class="gx-agpop-x" data-action="items-close" aria-label="닫기">${ICONS.close}</button>${inner}</div></div>`;
+// 버리기(기록에 남음)와 다르게 되돌릴 수 없는 쪽만 빨강, 설명은 title 에 (전수점검 눌러2-보통-25)
+const shell = (label: string, inner: string, del = '') => `<div class="gx-agpop it-pop" data-action="items-close" role="dialog" aria-label="${esc(label)}"><div class="gx-agpop-card it-card" data-action="items-keep">${del ? `<button class="gx-agpop-x it-del" data-action="items-purge-ask" data-value="${esc(del)}" aria-label="삭제 (되돌릴 수 없음)" title="삭제: 목록과 기록에서 지워지고 되돌릴 수 없어요">${ICONS.trash}</button>` : ''}<button class="gx-agpop-x" data-action="items-close" aria-label="닫기">${ICONS.close}</button>${inner}</div></div>`;
+
+/** 입력 창 제목 줄: 닫기가 첫 입력칸 위에 얹히지 않게 (전수점검 눌러-중대-13) */
+// 입력 잘못 안내(itemsUi.notice)는 제목 밑에: 본문에 두면 창 막 밑에 깔려 안 보였다 (전수점검 눌러-보통-18)
+const formHead = (label: string) => `<div class="it-ph it-fhead"><b>${esc(label)}</b></div>${itemsUi.notice ? `<div class="gx-err" role="alert">${esc(itemsUi.notice)}</div>` : ''}`;
 
 function form(it: Item | null, left?: number): string {
   const eq = it?.equip ?? '';
@@ -411,10 +424,10 @@ function form(it: Item | null, left?: number): string {
     <label><span>효과</span><input name="effect" maxlength="60" value="${esc(it?.effect ?? '')}" placeholder="있으면 (예: 저급 괴이의 접근을 늦춘다)"></label>
     <label><span>장착</span><select name="equip">${opt('', '없음')}${opt('weapon', '손')}${opt('gear', '장비')}</select></label>
     <label class="it-chk"><span>사용</span><span><input type="checkbox" name="use"${it?.use ? ' checked' : ''}> 쓸 수 있음</span></label>
-    <label><span>횟수</span><input name="uses" type="number" min="1" max="999" inputmode="numeric" value="${left ?? it?.uses ?? ''}" placeholder="소모성이면 남은 횟수 (비우면 닳지 않음)"></label>
+    <label><span>횟수</span><input name="uses" type="number" min="${left !== undefined ? 0 : 1}" max="999" inputmode="numeric" value="${left ?? it?.uses ?? ''}" placeholder="소모성이면 남은 횟수 (비우면 닳지 않음)"></label>
     <label><span>무게(1개)</span><input name="weight" type="number" min="0" step="0.001" inputmode="decimal" value="${it?.weight ?? ''}" placeholder="kg"></label>
 ${pics ? `<label><span>그림</span><select name="pic">${pics.some((n) => n === picNow) ? '' : '<option value="" selected>그대로</option>'}${pics.map((n) => `<option value="${esc(n)}"${n === picNow ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}
-    <div class="it-btns it-formfoot"><button type="button" class="gx-start" data-action="items-save" data-value="${esc(it?.id ?? '')}"${needAttr('name', it?.name ?? '')}>${it ? '저장' : '넣기'}</button><button type="button" class="gx-chip" data-action="${it ? 'items-back' : 'items-close'}">취소</button></div>
+    <div class="it-btns it-formfoot"><button type="button" class="gx-start" data-action="items-save" data-value="${esc(it?.id ?? '')}"${needAttr('name', it?.name ?? '')}>${it ? '저장' : '추가'}</button><button type="button" class="gx-chip" data-action="${it ? 'items-back' : 'items-close'}">취소</button></div>
   </div>`;
 }
 
@@ -599,10 +612,18 @@ export async function itemsAction(action: string, value: string | undefined, ctx
       const get = (n: string) => String(f.querySelector<HTMLInputElement | HTMLSelectElement>(`[name="${n}"]`)?.value ?? '').trim();
       const use = !!f.querySelector<HTMLInputElement>('[name="use"]')?.checked;
       const usesRaw = get('uses');
-      const uses = /^\d+$/.test(usesRaw) && Number(usesRaw) >= 1 ? Math.min(999, Number(usesRaw)) : undefined;
+      const usesN = /^\d+$/.test(usesRaw) ? Math.min(999, Number(usesRaw)) : undefined;
+      // 0 = 다 씀: 이미 소모성인 물건만 (전수점검 보통-28: 0 이 「비움」으로 읽혀 닳지 않는 물건이 됐다). 새 물건·비소모 물건은 1 이상
+      const was = value ? itemsOf(ctx).list.find((x) => x.id === value) : undefined;
+      const uses = usesN !== undefined && (usesN >= 1 || was?.uses !== undefined) ? usesN : undefined;
       const name = get('name');
       if (!name) {
         itemsUi.notice = '이름을 적어 주세요.';
+        env.render();
+        return true;
+      }
+      if (usesN === 0 && uses === undefined) {
+        itemsUi.notice = '횟수는 1 이상으로 적어 주세요. 비우면 닳지 않아요.';
         env.render();
         return true;
       }
@@ -611,11 +632,11 @@ export async function itemsAction(action: string, value: string | undefined, ctx
       const patch = { name, desc: get('desc'), effect: get('effect'), use, equip: get('equip'), ...(weight !== undefined ? { weight } : {}), ...(get('pic') ? { icon: get('pic') } : {}) };
       if (value) {
         // 횟수 칸: 소모성이면 「지금 남은 횟수」로 맞춘다. 비소모 ↔ 소모성 바꿈도 여기서
+        // 비소모 → 소모성으로 바꿀 때도 「남은 횟수」로 맞춘다 (전수점검 보통-27: 그동안 쓴 기록만큼 빠져 적은 수보다 적게 남았다)
         await write((it, alive) => {
           const cur = it.list.find((x) => x.id === value);
-          let next = updateItem(it, value, cur?.uses === undefined || uses === undefined ? { ...patch, uses: uses ?? '' } : patch);
-          if (cur?.uses !== undefined && uses !== undefined) next = setItemLeft(next, alive, value, uses);
-          return next;
+          const next = updateItem(it, value, uses === undefined ? { ...patch, uses: '' } : cur?.uses === undefined ? { ...patch, uses: Math.max(1, uses) } : patch);
+          return uses !== undefined ? setItemLeft(next, alive, value, uses) : next;
         });
       } else await write((it, alive) => addItem(it, alive, { ...patch, uses, from: 'manual', anchor: '' }));
       itemsUi.mode = 'view';
@@ -630,7 +651,7 @@ export async function itemsAction(action: string, value: string | undefined, ctx
       const it = liveOf(ctx).find((x) => x.id === value);
       if (!it) return true;
       if (needsEquip(ctx, it)) {
-        itemsUi.info = `「${it.name}」은 장착해야 쓸 수 있어요.`;
+        itemsUi.info = `${named(it.name, '은', '는')} 장착해야 쓸 수 있어요.`;
         env.render();
         return true;
       }
@@ -648,7 +669,7 @@ export async function itemsAction(action: string, value: string | undefined, ctx
         env.render();
         return true;
       }
-      itemsUi.info = canUse(it) ? `「${it.name}」을 다음 메시지에 같이 보내요.` : `「${it.name}」은 지금 쓸 수 없어요.`;
+      itemsUi.info = canUse(it) ? `${named(it.name, '을', '를')} 다음 메시지에 같이 보내요.` : `${named(it.name, '은', '는')} 지금 쓸 수 없어요.`;
       await env.refresh();
       return true;
     }
@@ -670,11 +691,19 @@ export async function itemsAction(action: string, value: string | undefined, ctx
     case 'items-unequip': {
       if (!value) return true;
       const was = liveOf(ctx).find((x) => x.id === value);
-      await write((it, alive) => (action === 'items-equip' ? equipItem(it, alive, value) : unequipItem(it, value)));
+      // 칸이 다 찼는지는 방금 쓴 소지품으로 본다 (전수점검 눌러-중대-12: 눌렀을 때의 옛 화면 자료로 봐서 들고 나서도 「다 찼어요」가 같이 떴다)
+      let fullK: ItemEquip | '' = '';
+      await write((it, alive) => {
+        if (action !== 'items-equip') return unequipItem(it, value);
+        const next = equipItem(it, alive, value);
+        const live = liveItems(next, alive);
+        const e = live.find((x) => x.id === value);
+        if (e && !isEquipped(e, live)) fullK = e.equip ?? 'weapon'; // 갈래 없는 물건은 손 칸 (사용자 2026-11-14)
+        return next;
+      });
       // 해제하면 사용 예정도 뺀다 (장착해야 쓴다, 사용자 2026-11-14). 들지 않아도 쓸 수 있는 물건은 손에서 넣어도 남긴다 (C-12 (나))
       if (action === 'items-unequip' && (!was || useNeedsSeat(was))) await dropFromUse(ctx, value);
-      const it = liveOf(ctx).find((x) => x.id === value);
-      if (action === 'items-equip' && it && !isEquipped(it, liveOf(ctx))) itemsUi.info = fullText(it.equip ?? 'weapon'); // 갈래 없는 물건은 손 칸 (사용자 2026-11-14)
+      if (fullK) itemsUi.info = fullText(fullK);
       await env.refresh();
       return true;
     }
@@ -687,7 +716,7 @@ export async function itemsAction(action: string, value: string | undefined, ctx
         const [, k, n] = to.split(':');
         // 손 칸에는 아무 물건이나, 장비 칸에는 장비만 (사용자 2026-11-14)
         if (k !== 'weapon' && it.equip !== k) {
-          itemsUi.info = `「${it.name}」은 입거나 차는 물건이 아니라 ${EQUIP_LABEL.gear} 칸에 들어가지 않아요.`;
+          itemsUi.info = `${named(it.name, '은', '는')} 입거나 차는 물건이 아니라 ${EQUIP_LABEL.gear} 칸에 들어가지 않아요.`;
           env.render();
           return true;
         }
@@ -725,7 +754,7 @@ export async function itemsAction(action: string, value: string | undefined, ctx
         }
       } else if (to === 'use') {
         if (!usableNow(ctx, it)) {
-          itemsUi.info = needsEquip(ctx, it) && canUse(it) ? `「${it.name}」은 장착해야 쓸 수 있어요.` : it.state === 'broken' ? `「${it.name}」은 고장 나서 쓸 수 없어요.` : `「${it.name}」은 쓰는 물건이 아니에요.`;
+          itemsUi.info = needsEquip(ctx, it) && canUse(it) ? `${named(it.name, '은', '는')} 장착해야 쓸 수 있어요.` : it.state === 'broken' ? `${named(it.name, '은', '는')} 고장 나서 쓸 수 없어요.` : `${named(it.name, '은', '는')} 쓰는 물건이 아니에요.`;
           env.render();
           return true;
         }
