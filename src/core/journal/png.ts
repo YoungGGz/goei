@@ -3,7 +3,8 @@
 // DOM(캔버스 만들기·글꼴 기다리기·그림 읽기·내려받기)은 ui/reportpng.ts.
 // 세로 예산 (전체 보고서, 요원 2명·경과 6줄·결과 3줄): 머리 52 · 그림 188 · 제목 90 · 타일 84 · 경과 ≤192 · 요원 ≤84 · 결과 ≤106 · 인물|가계부 두 열 ≤140 → 984 ≤ 1088 (바닥글 자리 전)
 import { locName } from '../world/geo';
-import { journalClock } from './line';
+import { formatWon } from '../wallet';
+import { durLabel, journalClock, reportBadge, reportEndLabel } from './line';
 import { JOURNAL_KIND_LABEL, type Report } from './types';
 
 export const PNG_W = 900;
@@ -81,13 +82,12 @@ function dayText(m: number | null, savedAt: string): string {
   if (!Number.isFinite(d.getTime())) return '';
   return `${d.getUTCFullYear()}.${two(d.getUTCMonth() + 1)}.${two(d.getUTCDate())} (${WEEK[d.getUTCDay()]})`;
 }
+/** 소요: 보고서 창·채팅 카드·연대기와 같은 「1시간 5분」 꼴 (전수점검 사소-57) */
 export function durShort(min: number | null): string {
-  if (min === null || !Number.isFinite(min)) return '—';
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return h ? `${h}h ${two(m)}m` : `${m}m`;
+  return durLabel(min) || '—';
 }
-const won = (n: number) => `₩ ${Math.abs(n).toLocaleString('en-US')}`;
+/** 잔고: 빚(음수)이면 − 를 붙인다 (기록 화면 formatWon 과 같은 꼴, 전수점검 보통-67) */
+const won = (n: number) => formatWon(n);
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toLocaleString('en-US')}`;
 
 /** 글자 단위 줄바꿈 (한국어는 어절 경계가 없다). 최대 줄 수를 넘으면 마지막 줄 끝에 … */
@@ -168,7 +168,15 @@ export function paintReport(g: PaintCtx, r: Report, o: PaintOpts): PaintResult {
 
   // 머리: 왼쪽 브랜드, 오른쪽 보고서 번호·날짜·소속
   let y = PAD;
-  text(g, o.brand ?? '괴이 ː ANOMALY', PAD, y, { size: 22, weight: 700, color: c.signal, family: sans });
+  if (o.brand) text(g, o.brand, PAD, y, { size: 22, weight: 700, color: c.signal, family: sans });
+  else {
+    // 창 머리 표기(ui/brand.ts)와 같게: 「괴이」 글자색 · 가는 「ː」 · 「ANOMALY」 신호색 (굵은 ː 는 보통 쌍점처럼 보인다, 전수점검 눌러2-보통-26)
+    let bx = PAD;
+    for (const [s, weight, color, after] of [['괴이', 700, c.text, 6], ['ː', 300, c.signal, 6], ['ANOMALY', 700, c.signal, 0]] as const) {
+      text(g, s, bx, y, { size: 22, weight, color, family: sans });
+      bx += g.measureText(s).width + after;
+    }
+  }
   text(g, `INCIDENT REPORT · ${r.no}`, PNG_W - PAD, y + 2, { size: 14, weight: 500, color: c.dim, family: mono, align: 'right' });
   const day = dayText(h.at, r.savedAt);
   text(g, [day, o.org].filter(Boolean).join('   '), PNG_W - PAD, y + 24, { size: 13, weight: 400, color: c.sub, family: sans, align: 'right' });
@@ -212,9 +220,10 @@ export function paintReport(g: PaintCtx, r: Report, o: PaintOpts): PaintResult {
   const mark = r.kind === 'an' && h.grade && /^[A-Za-z]+$/.test(h.grade) ? h.grade.toUpperCase() : r.kind === 'an' ? '?' : r.kind === 'in' ? '!' : r.kind === 'ms' ? '◇' : '▶';
   text(g, mark, PAD + 28, y + 14, { size: 26, weight: 700, color: gradeColor, family: mono, align: 'center' });
   const tx = PAD + 72;
-  const status = `${kindLabel} · 종료${h.cleared ? ' · 클리어' : ''}`;
+  // 종류·종료 줄과 딱지는 보고서 창과 같은 말 (전수점검 눌러2-보통-26)
+  const status = `${reportEndLabel(r)}${h.cleared ? ' · 클리어' : ''}`;
   text(g, status, tx, y, { size: 13, weight: 500, color: c.dim, family: mono });
-  const badge = r.mine ? '내가 출동' : '요원 처리';
+  const badge = reportBadge(r);
   g.font = `500 13px ${mono}`;
   const sw = g.measureText(status).width;
   const bw = g.measureText(badge).width + 20;
@@ -271,13 +280,22 @@ export function paintReport(g: PaintCtx, r: Report, o: PaintOpts): PaintResult {
       text(g, '상황판 기록이 없어요.', PAD, y, { size: 14, color: c.dim, family: sans });
       y += LH;
     }
-    for (const t of show) {
-      if (!room(LH)) break;
+    show.forEach((t, i) => {
+      if (!room(LH)) return;
       text(g, hhmm(t.m), PAD, y + 1, { size: 13, weight: 500, color: c.dim, family: mono });
+      // 첫 줄에는 보고서 창처럼 「발생」 딱지 (전수점검 눌러2-보통-26)
+      g.font = `500 12px ${sans}`;
+      const tag = i === 0 ? '발생' : '';
+      const tagW = tag ? g.measureText(tag).width + 10 : 0;
       g.font = `400 14px ${sans}`;
-      text(g, wrapText(g, t.text, W - 70, 1)[0] ?? '', PAD + 62, y, { size: 14, color: c.text, family: sans });
+      const line = wrapText(g, t.text, W - 70 - tagW, 1)[0] ?? '';
+      text(g, line, PAD + 62, y, { size: 14, color: c.text, family: sans });
+      if (tag) {
+        const lw = g.measureText(line).width;
+        text(g, tag, PAD + 62 + lw + 10, y + 2, { size: 12, weight: 500, color: c.amber, family: sans });
+      }
       y += LH;
-    }
+    });
     if (rest > 0 && room(20)) {
       text(g, `… 외 ${rest}건`, PAD + 62, y, { size: 13, color: c.dim, family: sans });
       y += 20;
@@ -311,8 +329,10 @@ export function paintReport(g: PaintCtx, r: Report, o: PaintOpts): PaintResult {
         text(g, Array.from(a.name)[0] ?? '?', x + 18, yy + 11, { size: 12, weight: 700, color: c.signal, family: sans, align: 'center' });
         text(g, a.name, x + 36, yy + 9, { size: 14, weight: 600, color: c.text, family: sans });
         const st = [a.st === '작전투입' ? '작전' : a.st, a.situation].filter(Boolean).join(' · ');
-        g.font = `400 12px ${sans}`;
+        // 이름 폭은 그린 글꼴(600 14px)로 잰다 (12px 로 재면 긴 이름 끝과 상태글이 겹친다, 전수점검 사소-55)
+        g.font = `600 14px ${sans}`;
         const nw = g.measureText(a.name).width;
+        g.font = `400 12px ${sans}`;
         text(g, wrapText(g, st, cw - 36 - nw - 24, 1)[0] ?? '', x + 36 + nw + 10, yy + 11, { size: 12, color: c.sub, family: sans });
       });
       y += rows * 44;
@@ -355,7 +375,7 @@ export function paintReport(g: PaintCtx, r: Report, o: PaintOpts): PaintResult {
       const d = `${signed(p.delta)}${p.stage ? ` → ${p.stage}` : ''}`;
       text(g, d, PAD + cw, ly + 1, { size: 13, weight: 700, color: p.delta < 0 ? c.danger : c.signal, family: mono, align: 'right' });
       if (p.quote) {
-        g.font = `400 12px ${sans}`;
+        g.font = `600 14px ${sans}`;
         const nw = g.measureText(p.who).width;
         g.font = `700 13px ${mono}`;
         const dw = g.measureText(d).width;

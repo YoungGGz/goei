@@ -888,7 +888,7 @@ async function refresh(): Promise<void> {
         lastChat = chatKey;
         navHist.clear();
         resetField(true);
-        resetWiki();
+        resetWiki(true);
         resetRecords();
         resetItems();
         resetShop();

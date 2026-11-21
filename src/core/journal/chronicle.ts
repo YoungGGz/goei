@@ -14,6 +14,7 @@ import { lastStatusFields } from '../world/tags';
 import { locName } from '../world/geo';
 import { readDirectory } from '../world/directory';
 import { readJournal } from './store';
+import { durLabel } from './line';
 import { JOURNAL_KIND_LABEL, type JournalKind } from './types';
 
 export type ChronKind = 'event' | 'person' | 'faction' | 'rank';
@@ -85,7 +86,7 @@ export function buildChronicle(chat: Chat, lore: LoreEntry[] | undefined): Chron
   for (const r of readJournal(chat).rows) {
     if (!r.mine || r.kind === 'fd') continue;
     const dur = r.at !== null && r.since !== null ? Math.max(0, r.at - r.since) : null;
-    const durText = dur === null ? '' : `소요 ${Math.floor(dur / 60) ? `${Math.floor(dur / 60)}시간 ` : ''}${dur % 60}분`;
+    const durText = dur === null ? '' : `소요 ${durLabel(dur)}`;
     const how = r.cleared ? '클리어' : r.cause === 'manual' ? '직접 종료' : r.cause === 'ttl' ? '시간 경과로 종료' : '종료';
     const kind = `${JOURNAL_KIND_LABEL[r.kind]}${r.grade ? ` ${r.grade}` : ''}`;
     // 지금 자리: 앞 메시지가 지워져도 어긋나지 않게 열쇠로 찾고, 없으면 저장 번호 (전수검사 11-13)

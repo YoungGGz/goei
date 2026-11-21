@@ -1405,7 +1405,7 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-board .gx-acard-txt small, .gx-acard.pick.wide .gx-acard-txt small, .gx-board .gx-acard-sit, .gx-acard.pick.wide .gx-acard-sit { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
   .gx-board .gx-acard { cursor: pointer; }
 }
-.gx-agpop { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; padding: 20px; background: var(--scrim); }
+.gx-agpop { position: fixed; inset: 0; z-index: 2147483647; display: grid; grid-template-columns: minmax(0, 1fr); place-items: center; padding: 20px; background: var(--scrim); }
 .gx-agpop-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; width: 340px; max-width: 100%; max-height: calc(100% - 8px); overflow-y: auto; box-sizing: border-box; padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); color: var(--text); }
 .gx-agpop-card .gx-ava { width: 200px; height: 200px; border-radius: 22px; flex: none; font-size: 64px; }
 /* 사진 아래 한 줄: 이름·상태 왼쪽, 부서·직급 오른쪽. 상황은 그 아래 전체 폭 */
@@ -3077,6 +3077,7 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
 }
 
 /* ── 기록 묶음 3 (2026-10-29): 보고서 PNG 미리보기 · 필드 출동 종료 시트 ── */
+/* 팝업 칸(.gx-agpop)은 한 열 minmax(0, 1fr): 카드의 max-width: 100% 가 화면 폭에 걸리게 (폴드 커버에서 420 카드가 오른쪽 밖으로 넘쳐 닫기가 안 보였다, 전수점검 눌러-중대-14) */
 .gx-pngpop .gx-pngcard { width: 420px; max-width: 100%; gap: 10px; align-items: stretch; }
 /* 보고서 팝업 (2026-11-05 사용자): PC 는 가운데 카드, 폰은 위에서 내려오는 판 — 아래 남는 여백을 누르면 닫힌다 (엄지로 X 까지 안 올라가게) */
 .gx-rptpop .gx-rptcard { width: 680px; max-width: 100%; max-height: calc(100% - 16px); gap: 0; align-items: stretch; padding: 18px 20px 24px; }
@@ -3090,7 +3091,7 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
   .gx-rec-pane .ph-room-head .ph-room-title { flex: 1 1 0; min-width: 0; }
   .gx-rec-pane .ph-room-head .ph-act { flex: 1 1 100%; justify-content: flex-end; }
   /* 폰: 위쪽에 떠 있는 카드 (가장자리에 붙이지 않고 사방 여백), 아래 남는 어두운 곳을 누르면 닫힌다 */
-  .gx-rptpop { padding: 14px 10px; align-items: start; }
+  .gx-rptpop { padding: 14px 20px; align-items: start; }
   .gx-rptpop .gx-rptcard { width: 100%; max-height: calc(100% - 28px); padding: 14px 14px 20px; border-radius: 18px; }
 }
 .gx-png-title { font-size: 14px; font-family: var(--mono); color: var(--dim); padding-right: 36px; }
@@ -3189,7 +3190,8 @@ button.gx-cr-row { cursor: pointer; } button.gx-cr-row:hover { border-color: var
   .gx-jr-tiles .gx-mon-cell:first-child { border-left: 0; }
   .gx-jr-tiles .gx-mon-cell b { font-size: 20px; }
   .gx-jr-tiles .gx-mon-cell small { font-size: 12px; letter-spacing: .04em; }
-  .gx-jr-tiles .gx-mon-cell > span { font-size: 12px; }
+  /* 설명은 말줄임 대신 줄바꿈: 넷이 한 줄이라 칸이 좁아 「참여 없이 …」로 잘려 뜻을 몰랐다 (전수점검 눌러-보통-23) */
+  .gx-jr-tiles .gx-mon-cell > span { font-size: 12px; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.35; }
   .gx-mon-cell b { font-size: 22px; } .gx-wt-tiles .gx-wt-balrow b { font-size: 26px; }
   .gx-wt-tiles .gx-mon-cells { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .gx-wt-tiles .gx-wt-tile.bal { grid-column: 1 / -1; }

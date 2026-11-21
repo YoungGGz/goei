@@ -632,6 +632,8 @@ export function acceptTitle(raw: string, candidates: string[]): string {
     title = '';
   }
   if (!title) title = text.replace(/^["'\s]+|["'\s]+$/g, '').split('\n')[0].trim();
+  // 빈 제목은 어느 후보에나 「포함」되어 첫 후보로 조용히 넘어가므로 빈 응답으로 본다 (전수점검 사소-58)
+  if (!title) throw new WikiError(guideTxt('Wiki', 'NW.ERR_EMPTY'));
   const hit = candidates.find((c) => c === title) ?? candidates.find((c) => c.includes(title) || title.includes(c));
   if (!hit) throw new WikiError(guideTxt('Wiki', 'NW.ERR_TITLE_NOT_CANDIDATE', { title: title.slice(0, 40) }));
   return hit;
