@@ -285,6 +285,8 @@ export function recordPage(ctx: ChatContext, kind: WorldKind, over: WorldOverrid
       ${readonly}
     </div>`;
   }
+  // 괴이 공통 머리말을 펼치면 글 칸은 넓은 오른쪽 칸 맨 위에 (긴 영어 지침을 좁은 목록 열에서 고쳐야 했다, 전수점검 눌러-사소-27)
+  if (kind === 'anomaly' && recUi.noteOpen) detail = detail.replace(/^<div class="gw-detail[^"]*">/, (m) => `${m}${anomalyNoteBox(over, true)}`);
   return `<div class="gw-page split">${list}${detail}</div>`;
 }
 
@@ -307,10 +309,13 @@ function current(ctx: ChatContext, kind: WorldKind): { name: string; rec: WorldR
 
 /** 입력칸: 칸 글·추가 칸 글·이름·가져오기 글 */
 /** 괴이 공통 머리말 (목록 위): 모든 괴이 앞에 한 번 들어가는 글. 카드에 저장 */
-function anomalyNoteBox(over: WorldOverrides): string {
+function anomalyNoteBox(over: WorldOverrides, wide = false): string {
   const note = worldAnomalyNote(over);
   const edited = over.anomalyNote !== undefined;
-  return `<details class="gw-anote"${recUi.noteOpen ? ' open' : ''}><summary data-action="ed-anote-toggle"><b>괴이 공통 머리말</b><small>${edited ? '고침 · ' : ''}${tokenizerName() ? '' : '약 '}${tokens(note).toLocaleString()}토큰</small></summary>
+  const sum = `<summary data-action="ed-anote-toggle"><b>괴이 공통 머리말</b><small>${edited ? '고침 · ' : ''}${tokenizerName() ? '' : '약 '}${tokens(note).toLocaleString()}토큰</small></summary>`;
+  // 목록 열에는 펼침 머리만 두고, 펼친 글 칸은 오른쪽 상세 칸에 (recordPage)
+  if (recUi.noteOpen && !wide) return `<details class="gw-anote" open>${sum}</details>`;
+  return `<details class="gw-anote${wide ? ' wide' : ''}"${recUi.noteOpen ? ' open' : ''}>${wide ? `<summary data-action="ed-anote-toggle"><b>괴이 공통 머리말</b></summary>` : sum}
     <p class="gx-muted">모든 괴이 로어 앞에 한 번만 들어가는 공통 지침이에요 (괴이마다 붙지 않아요).</p>
     <div class="gw-copyto gw-copybox"><textarea data-input="ed-anote" rows="5">${esc(note)}</textarea>${copyBtn()}</div></details>`;
 }

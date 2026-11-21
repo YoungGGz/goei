@@ -27,6 +27,7 @@ import { startConfirmPopup, startPage } from './start';
 import { guidePage, guideAction, guideBarSync, guideInput, guideUi } from './guides';
 import { isRuleNode, ruleAction, ruleConfirmPopup, ruleInput, rulePage, ruleTreeItems } from './rules';
 import { callSummary } from './flow';
+import { askPopup } from './askpop';
 import { boardTable, shopTable } from '../famtable';
 import { ensureManage, isManageNode, manageAction, manageInput, managePage, manageConfirmPopup, manUi, type ManageNode, manageFile } from './manage';
 import { installAction, installPage, instUi, refreshInstall } from './install';
@@ -87,6 +88,8 @@ export const edUi = {
   info: '',
   drawer: false,
   confirm: '' as '' | 'close',
+  /** 표 줄 지우기를 묻는 중 (ROW_DEL) */
+  askDel: null as null | { action: string; value?: string; msg: string },
   /** 탭마다 마지막으로 보던 페이지 */
   last: {} as Partial<Record<Tab, EditorNode>>,
   /** 기능 탭 「설정 찾기」 칸에 적은 말 (2026-11-06 사용자 승인, 전수점검 8-10) */
@@ -816,6 +819,7 @@ export function render(): void {
   const confirm = edUi.confirm
     ? `<div class="gw-confirm"><div class="gw-confirm-box"><p>고친 것을 카드에 저장하지 못했어요${edUi.notice ? ` (${esc(edUi.notice)})` : ''}. 저장하지 않고 닫을까요?</p>
         <div class="gx-row-btns"><button class="gx-mini danger" data-action="ed-close-force">저장 안 하고 닫기</button><button class="gx-mini" data-action="ed-confirm-no">취소</button></div></div></div>`
+    : edUi.askDel ? askPopup(edUi.askDel.msg, { action: 'ed-askdel-yes' }, { action: 'ed-askdel-no' })
     : tabOf(edUi.node) === 'set' || tabOf(edUi.node) === 'manage' ? mainDefaultsPopup() || manageConfirmPopup()
     // 지우기 확인도 같은 가운데 팝업 (전수점검 눌러-보통-28)
     : isKind(edUi.node) ? recordConfirmPopup(edUi.node)
@@ -1036,8 +1040,29 @@ function showHint(btn: HTMLElement): void {
 const run = (action: string, value?: string): Promise<void> =>
   handle(action, value).catch((error: unknown) => console.log(`[goei] 편집 창 조작 실패(${action}): ${error instanceof Error ? error.message : String(error)}`));
 
+/** 설정 표의 줄 지우기: 누르면 바로 지워지고 다음 줄 지우기가 손가락 밑으로 올라와 연달아 지우기 쉬웠다 →
+ *  다른 지우기(기록·규칙·저장소)처럼 가운데 팝업으로 한 번 묻는다 (전수점검 눌러-보통-28·눌러-사소-38) */
+const ROW_DEL: Record<string, string> = {
+  'set-own-del': '이 고유 상점을 지울까요?',
+  'ms-tier-del': '이 값 등급 줄을 지울까요?',
+  'ms-ax-del': '이 주사위 칸을 지울까요?',
+  'ms-fx-del': '이 시그니처 상품을 지울까요?',
+  'set-items-rules-del': '이 판정 표 줄을 지울까요?',
+  'set-items-alias-del': '이 그림 대체 말 줄을 지울까요?',
+};
+
 export async function handle(action: string, value?: string): Promise<void> {
   const ctx = host?.ctx() ?? null;
+  if (ROW_DEL[action]) {
+    edUi.askDel = { action, value, msg: ROW_DEL[action] };
+    return render();
+  }
+  if (action === 'ed-askdel-yes' || action === 'ed-askdel-no') {
+    const ask = edUi.askDel;
+    edUi.askDel = null;
+    if (action === 'ed-askdel-yes' && ask) await host?.handle?.(ask.action, ask.value);
+    return render();
+  }
   if (action.startsWith('ai-')) {
     return consultAction(action, value, { render: () => render(), ctx: () => host?.ctx() ?? null, started: () => host?.canChat?.() ?? true, panel: async (a, v) => { await host?.handle?.(a, v); }, editor: (a, v) => handle(a, v), phone: () => isPhone() });
   }

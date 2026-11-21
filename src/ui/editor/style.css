@@ -189,6 +189,8 @@
 .gw .gx-chip small { font-size: 11.5px; color: var(--dim); }
 .gw .gx-mini:hover:not(:disabled), .gw .gx-chip:hover:not(:disabled), .gw .gw-pre:hover:not(:disabled) { border-color: var(--accent-line); }
 .gw .gx-mini.on, .gw .gx-chip.on, .gw .gw-pre.on { background: var(--accent-bg); border-color: var(--accent-line); color: var(--text); }
+/* 켜고 끄는 칩(aria-pressed)은 켠 칩 앞에 체크: 모두 켜져 있으면 색만으로는 켠 것인지 그냥 단추인지 몰랐다 (전수점검 눌러2-사소-21) */
+.gw .gx-chip[aria-pressed="true"]::before { content: ''; flex: none; width: 9px; height: 5px; margin: -3px 1px 0 0; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
 .gw .gx-mini.primary { background: var(--signal); border-color: var(--signal); color: var(--on-signal); font-weight: 600; }
 .gw .gx-mini.danger { color: var(--danger); }
 .gw .gx-mini.danger:hover:not(:disabled) { border-color: var(--danger); }
@@ -269,6 +271,9 @@
 .gw .gw-map th, .gw .gw-map td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--hair); }
 .gw .gw-preview { display: block; max-height: 420px; margin: 0 0 20px; padding: 12px var(--pad); overflow: auto; font: 12.5px/1.55 var(--mono); white-space: pre-wrap; }
 .gw .gw-anote { margin: 0 0 20px; padding: 0 var(--pad) 12px; }
+/* 펼친 괴이 공통 머리말은 오른쪽 상세 칸 맨 위 (눌러-사소-27). 비어 있는 상세 칸(가운데 정렬)에서도 폭을 다 쓴다 */
+.gw .gw-detail > .gw-anote.wide { align-self: stretch; width: 100%; }
+.gw-detail.empty:has(> .gw-anote.wide) { display: block; }
 .gw .gw-list-pane > .gw-anote { flex: none; margin: 0 10px 8px; padding: 0 12px; }
 .gw .gw-list-pane > .gw-anote:not([open]) { padding-bottom: 0; }
 .gw .gw-list-pane > .gw-anote summary { min-height: var(--h); font-size: 13px; }
@@ -486,7 +491,8 @@
 /* 폰: 이름 줄과 단추 줄을 나눈다 (한 줄에 다 넣으면 이름이 꺾이고 종류·코드가 잘린다, 2026-11-05 캡처) */
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw .gw-startpage .st-slot { flex-wrap: wrap; row-gap: 6px; }
-  .gw .gw-startpage .st-slot .dir-name { flex: 1 0 100%; }
+  /* 이름은 손잡이 옆 첫 줄에 (100%면 손잡이가 혼자 한 줄을 차지해 카드가 길어졌다, 전수점검 눌러2-사소-24). 고르기·화살표만 둘째 줄 */
+  .gw .gw-startpage .st-slot .dir-name { flex: 1 0 calc(100% - 40px); }
   .gw .gw-startpage .st-slot .gx-segs, .gw .gw-startpage .st-slot .st-always { margin-right: auto; }
   /* 고르기가 없는 줄(플레이 조직)도 펼침 화살표는 오른쪽 끝 (왼쪽 아래에 붙었다, 전수점검 눌러-보통-45) */
   .gw .gw-startpage .st-slot .st-caret { margin-left: auto; }
