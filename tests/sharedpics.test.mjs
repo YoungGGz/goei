@@ -141,14 +141,12 @@ test('bases and orgs pick by name words', () => {
   assert.equal(orgShared('아무개').at(-1), 'Shared Org Office');
 });
 
-test('agents pick outfit by org, gender, one of three by name', () => {
-  const a = agentShared('관리국', 'A00', 'F', '쟈알디');
-  assert.match(a[0], /^Shared Agent Suit Female [123]$/);
-  assert.equal(new Set(a.slice(0, 3)).size, 3);
-  assert.deepEqual(agentShared('관리국', 'A00', 'F', '쟈알디'), a);
-  assert.match(agentShared('백일몽', 'C00', 'M', 'x')[0], /^Shared Agent Masked Male/);
-  assert.match(agentShared('관리국', 'A00', '', 'x')[0], /^Shared Agent Religious/);
-  assert.match(agentShared('발푸르기스', '', 'F', 'x')[0], /^Shared Agent Occult/);
+test('agents: one shared picture per gender, unknown gender picks one of the two by name (11-21)', () => {
+  assert.deepEqual(agentShared('F', '쟈알디'), ['Shared Agent Female']);
+  assert.deepEqual(agentShared('M', 'x'), ['Shared Agent Male']);
+  const u = agentShared('', '쟈알디');
+  assert.deepEqual([...u].sort(), ['Shared Agent Female', 'Shared Agent Male']);
+  assert.deepEqual(agentShared('', '쟈알디'), u);
 });
 
 test('gender: directory field first, then the lorebook Gender line', () => {

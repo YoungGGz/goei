@@ -895,10 +895,7 @@ export function readDirectory(lore: LoreEntry[] | undefined): Directory {
   const ag = agents();
   // 사진이 없을 때의 공용 그림 후보: 조직은 유형·이름, 요원은 소속 조직·성별 (2026-10-21)
   for (const o of ag.orgs) o.shared = orgShared(o.name, o.spec.type, o.spec.title ?? '');
-  for (const r of ag.rows) {
-    const o = orgOf(ag.orgs, r.affiliation);
-    r.shared = agentShared(o?.name ?? r.affiliation, o?.faction ?? '', agentGender(r, books), r.lore);
-  }
+  for (const r of ag.rows) r.shared = agentShared(agentGender(r, books), r.lore);
   const savedRefill = data && Number.isInteger(data.refill) && (data.refill as number) >= 0 ? (data.refill as number) : null;
   const dir: Directory = {
     anomalies: places('anomaly'),

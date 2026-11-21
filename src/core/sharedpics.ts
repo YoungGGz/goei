@@ -290,25 +290,11 @@ export function orgShared(name: string, type = 'org', text = ''): string[] {
   return [...head, ...hits.map((k) => `Shared Org ${k}`), 'Shared Org Office'];
 }
 
-/** 같은 묶음 3장(1~3)을 대상 이름으로 돌린 순서: 첫째가 그 대상의 그림, 나머지는 그 그림이 없을 때 */
-const three = (prefix: string, seed: string) => {
-  const n = pick(seed, 3);
-  return [0, 1, 2].map((i) => `${prefix} ${((n + i) % 3) + 1}`);
-};
-
-/** 요원 공용 그림 후보: 소속 조직으로 옷, 성별로 남녀, 묶음 3장 중 하나는 요원 이름으로. 성별을 모르면 성별이 안 드러나는 후드 그림 */
-export function agentShared(org: string, faction: string, gender: 'F' | 'M' | '', seed: string): string[] {
-  const o = `${faction} ${org}`;
-  const look =
-    /B00|A00|관리국/.test(o) ? 'Suit'
-    : /C00|백일몽/.test(o) ? 'Masked'
-    : /D00|민간/.test(o) ? 'Civilian'
-    : /E00|프리랜서|협회|중림/.test(o) ? 'Freelancer'
-    : /교황청|이슬람|교회|성원/.test(o) ? 'Religious'
-    : /발푸르기스|마녀|교단|찬란/.test(o) ? 'Occult'
-    : 'Suit';
-  const hood = [...three('Shared Agent Religious', seed), ...three('Shared Agent Occult', seed)];
-  if (look === 'Religious' || look === 'Occult') return three(`Shared Agent ${look}`, seed);
-  const sex = gender === 'F' ? 'Female' : gender === 'M' ? 'Male' : '';
-  return sex ? [...three(`Shared Agent ${look} ${sex}`, seed), ...hood] : hood;
+/** 요원 공용 그림 후보 (사진 없는 요원의 임시 그림, 11-21 사용자: 세력과 상관없이 남녀 한 장씩).
+ *  성별을 알면 그 그림, 미정이면 두 장 중 하나를 요원 이름으로 정한다(그림이 도중에 바뀌지 않게) */
+export function agentShared(gender: 'F' | 'M' | '', seed: string): string[] {
+  const both = ['Shared Agent Female', 'Shared Agent Male'];
+  if (gender === 'F') return [both[0]];
+  if (gender === 'M') return [both[1]];
+  return pick(seed, 2) ? [both[1], both[0]] : both;
 }
