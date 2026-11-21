@@ -486,6 +486,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .gx-mapcol .gx-segs { align-self: stretch; display: flex; }
   .gx-mapcol .gx-seg { flex: 1; min-width: 0; padding: 0 8px; }
 }
+/* 넓은 폰 배치 (설정 「펼친 폴드 화면 배치 = 모바일」의 601~860): 폭이 늘어도 지도가 비율대로 세로까지 커지지 않게 높이 상한을 둔다 (사용자 11-22).
+   머리의 max-width: 600px 는 foldCss 가 모바일 설정일 때만 860 으로 올리므로 이 묶음은 그때 601px 이상에서만 걸린다 (진짜 폰·PC 배치에는 안 걸림) */
+@media (min-width: 600.5px) and (max-width: 600px) and (min-height: 500px) {
+  .gx-map > .gx-mapcol > .gx-canvas:not(.ph) { width: fit-content; max-width: 100%; margin: 0 auto; }
+  .gx-map .gx-mapimg { width: auto; max-width: 100%; max-height: 45vh; }
+}
+
 /* 위키 */
 .nw { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; padding-bottom: 20px; }
 .nw-search { display: flex; gap: 8px; }
@@ -3775,7 +3782,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-cpanel .ph-tool-l { font-size: 11px; }
   .gx-cpanel .gx-nbadge.dot { position: absolute; top: 4px; left: calc(50% + 8px); }
   /* 폰 소지품: 4열, 찾기는 둘째 줄, 토글은 오른쪽 끝, 말풍선 없음 */
-  .it-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .it-grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; } /* 344 는 4열. 폭이 넓어지면 칸이 커지지 않고 한 줄에 들어가는 칸이 는다 (사용자 11-22) */
   .it-tools { flex-wrap: wrap; }
   .it-tools .gx-segs { margin-left: auto; }
   .it-tools .it-q { width: auto; flex: 1 1 100%; }
