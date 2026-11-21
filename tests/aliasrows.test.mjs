@@ -46,7 +46,11 @@ test('추가·지우기·기본값으로', () => {
   assert.equal(m.aliasEdit('', 'del', '999'), null);
   let s = '';
   for (let i = n - 1; i >= 0; i--) s = m.aliasEdit(s, 'del', String(i)) ?? s;
-  assert.equal(s, '', '다 지우면 기본 표');
+  // 전수점검 사소-31: 다 지우면 빈 표로 남는다 (빈 값은 기본 표라 기본 줄이 다시 나왔다)
+  assert.equal(s, m.ALIAS_EMPTY, '다 지우면 빈 표 표시');
+  assert.equal(m.aliasShown(s).length, 0, '빈 표는 줄이 없다');
+  assert.equal(Object.keys(parseIconAliases(s)).length, 0, '읽는 쪽도 빈 표');
+  assert.equal(m.aliasEdit(s, 'reset'), '', '기본값으로 되돌리면 기본 표');
 });
 test('붉은 글 조건 = 읽는 쪽이 버리는 줄', () => {
   assert.ok(m.aliasRowBad({ a: '', b: '코트' })); assert.ok(m.aliasRowBad({ a: '외투', b: '' })); assert.ok(m.aliasRowBad({ a: '코트', b: '코트' }));

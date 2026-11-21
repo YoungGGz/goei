@@ -28,7 +28,9 @@ export const aliasChanged = (stored: unknown): boolean => { const s = String(sto
 export const aliasRowBad = (r: AliasRow): string => (!r.a ? '끝 말이 비어 있어 이 줄은 안 쓰여요.' : !r.b ? '바꿀 말이 비어 있어 이 줄은 안 쓰여요.' : r.a === r.b ? '두 말이 같아 이 줄은 안 쓰여요.' : '');
 
 const clean = (v: string): string => v.replace(/→|=>|->|[=:\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, ALIAS_WORD_MAX);
-const store = (rows: AliasRow[]): string => { const t = aliasText(rows); return !rows.length || t === aliasText(aliasRows(ICON_ALIAS_DEFAULT)) ? '' : t; };
+/** 줄을 다 지운 표의 저장 글: 빈 글('')은 「기본 표」라 따로 표시를 둔다 (가운데 표시가 없는 줄이라 읽는 쪽은 줄이 없는 표로 읽는다). 전수점검 사소-31: 다 지우면 기본 줄들이 다시 나왔다 */
+export const ALIAS_EMPTY = '-';
+const store = (rows: AliasRow[]): string => { const t = aliasText(rows); return !rows.length ? ALIAS_EMPTY : t === aliasText(aliasRows(ICON_ALIAS_DEFAULT)) ? '' : t; };
 /** 줄을 더 넣을 수 있나 (저장 글 상한) */
 export const aliasCanAdd = (stored: unknown): boolean => aliasText(aliasShown(stored)).length + 4 <= ALIAS_TEXT_MAX;
 

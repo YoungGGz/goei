@@ -1,6 +1,6 @@
 // 「왼쪽 → 오른쪽」 표를 줄 단위로 고치는 공통 도우미 (그림 대체 말 core/aliasrows.ts 와 같은 조작·같은 저장 꼴, 기본 표만 다르다).
 // 소지품 「판정 표」($it_rules)가 쓴다. 기본 표 그대로면 빈 값으로 저장해 기본 표가 바뀌면 따라간다.
-import { aliasRows, aliasText, ALIAS_TEXT_MAX, ALIAS_WORD_MAX, type AliasRow } from './aliasrows';
+import { aliasRows, aliasText, ALIAS_EMPTY, ALIAS_TEXT_MAX, ALIAS_WORD_MAX, type AliasRow } from './aliasrows';
 
 const clean = (v: string): string => v.replace(/→|=>|->|[=:\n]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, ALIAS_WORD_MAX);
 
@@ -15,7 +15,8 @@ export interface PairTable {
 export function pairTable(def: string): PairTable {
   const defText = aliasText(aliasRows(def));
   const shown = (stored: unknown): AliasRow[] => { const s = String(stored ?? ''); return aliasRows(s.trim() ? s : def); };
-  const store = (rows: AliasRow[]): string => { const t = aliasText(rows); return !rows.length || t === defText ? '' : t; };
+  // 줄을 다 지우면 빈 표 표시(ALIAS_EMPTY): 빈 값은 「기본 표」라 기본 줄이 다시 나왔다 (전수점검 사소-31, 그림 대체 말과 같은 뿌리). 기본 표가 비어 있으면 빈 값 그대로
+  const store = (rows: AliasRow[]): string => { const t = aliasText(rows); return !rows.length ? (defText ? ALIAS_EMPTY : '') : t === defText ? '' : t; };
   const canAdd = (stored: unknown): boolean => aliasText(shown(stored)).length + 4 <= ALIAS_TEXT_MAX;
   return {
     shown,

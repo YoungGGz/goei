@@ -248,16 +248,19 @@ export function formatDelta(n: number): string {
 export function parseWon(text: string): number | null {
   const t = String(text ?? '').replace(/\s+/g, '');
   if (!t) return null;
-  const sign = /^[-−]/.test(t) ? -1 : 1;
-  const body = t.replace(/^[-−+]/, '').replace(/^₩/, '').replace(/(원|won|KRW)$/i, '');
+  // 부호는 ₩ 앞·뒤 어느 쪽이든 (「−₩5,000」「₩-5,000」, 전수점검 사소-30)
+  const u = t.replace(/^([-−+]?)₩/, '$1');
+  const sign = /^[-−]/.test(u) ? -1 : 1;
+  const body = u.replace(/^[-−+]/, '').replace(/(원|won|KRW)$/i, '');
   if (/^\d[\d,]*$/.test(body)) {
     const n = Number(body.replace(/,/g, ''));
     return Number.isSafeInteger(n) ? sign * n : null;
   }
-  // 한국어 단위: 억·만·천·백
-  const m = /^(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)만)?(?:(\d+)천)?(?:(\d+)백)?(\d+)?$/.exec(body.replace(/,/g, ''));
+  // 한국어 단위: 억·만·천·백. 단위 앞 숫자가 없으면 1 (「만원」「천원」, 전수점검 사소-30)
+  const m = /^(?:(\d+(?:\.\d+)?)?(억))?(?:(\d+(?:\.\d+)?)?(만))?(?:(\d+)?(천))?(?:(\d+)?(백))?(\d+)?$/.exec(body.replace(/,/g, ''));
   if (!m || m.slice(1).every((x) => x === undefined)) return null;
-  const n = Math.round((Number(m[1] ?? 0) * 1e8) + (Number(m[2] ?? 0) * 1e4) + Number(m[3] ?? 0) * 1000 + Number(m[4] ?? 0) * 100 + Number(m[5] ?? 0));
+  const unit = (num: string | undefined, mark: string | undefined, mul: number) => (mark ? Number(num ?? 1) * mul : 0);
+  const n = Math.round(unit(m[1], m[2], 1e8) + unit(m[3], m[4], 1e4) + unit(m[5], m[6], 1000) + unit(m[7], m[8], 100) + Number(m[9] ?? 0));
   return Number.isSafeInteger(n) && n > 0 ? sign * n : null;
 }
 

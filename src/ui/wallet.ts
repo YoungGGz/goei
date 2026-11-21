@@ -7,7 +7,7 @@ import { aliveAnchors, formatDelta, formatWon, liveWallet, readWallet, walletBal
 import { formatPoints, readPoints } from '../core/points';
 import type { Wallet } from '../core/wallet';
 import { colConfig } from '../core/world/statuscols';
-import { findStatusTags } from '../core/world/status';
+import { findStatusTags, statusClock24 } from '../core/world/status';
 import { getPrefs } from '../core/settings';
 import { messageKey } from '../core/people/store';
 import { ICONS } from './icons';
@@ -50,7 +50,7 @@ function datesOf(ctx: ChatContext): { at: Map<string, string>; time: Map<string,
   let curTime = '';
   (ctx.chat.message ?? []).forEach((m, i) => {
     const tags = findStatusTags(String((m as { data?: unknown }).data ?? ''));
-    if (tags.length) { cur = tags[tags.length - 1].date.trim() || cur; curTime = (tags[tags.length - 1].time ?? '').trim() || curTime; }
+    if (tags.length) { cur = tags[tags.length - 1].date.trim() || cur; curTime = statusClock24(tags[tags.length - 1].time) || curTime; } // 시각은 24시간 「HH:MM」 (소지품 창과 같게, 눌러-보통-22)
     at.set(messageKey(m, i), cur);
     time.set(messageKey(m, i), curTime);
   });
@@ -149,8 +149,11 @@ export function walletList(ctx: ChatContext): string {
 export function walletTools(ctx: ChatContext): string {
   if (walletUi.kind === 'won' && !walletOn(ctx)) return '';
   const chip = (v: typeof walletUi.filter, label: string) => `<button class="gx-chip${walletUi.filter === v ? ' on' : ''}" data-action="wallet-filter" data-value="${v}" aria-pressed="${walletUi.filter === v}">${label}</button>`;
-  return `<div class="gx-rec-tools gx-wt-tools">${chip('all', '전체')}${chip('in', '수입')}${chip('out', '지출')}<input class="gx-wt-q" type="search" data-input="wallet-q" value="${esc(walletUi.q)}" placeholder="찾기: 메모·근거" aria-label="거래 찾기"></div>`;
+  return `<div class="gx-rec-tools gx-wt-tools">${chip('all', '전체')}${chip('in', '수입')}${chip('out', '지출')}<input class="gx-wt-q" type="search" data-input="wallet-q" value="${esc(walletUi.q)}" placeholder="메모·근거 검색" aria-label="거래 검색"></div>`;
 }
+
+/** 금액 글이 길면 글자를 줄인다 (전수점검 눌러-중대-11: 잔고가 「₩ 140,0…」으로 잘려 읽을 수 없었다). 칸 너비는 CSS 가 잔고 글 길이만큼 잡는다 */
+const fit = (text: string): string => (text.length > 14 ? ' fit2' : text.length > 10 ? ' fit1' : '');
 
 /** 가계부 화면 (2026-11-05 사용자: 따로 탭이 아니라 기록 › 가계부 하위 탭. 잔고 칩·사원증 잔고 줄은 여기로 온다) */
 export function walletPane(ctx: ChatContext, kind: 'won' | 'p' = 'won'): string {
@@ -177,10 +180,10 @@ export function walletPane(ctx: ChatContext, kind: 'won' | 'p' = 'won'): string 
     <section class="gx-mon gx-wt-tiles">
       <div class="gx-mon-osd"><span><span class="gx-mon-tag live"><i></i>${kind === 'p' ? '포인트' : '가계부'}</span></span>${today ? `<span>${esc(today)}</span>` : ''}</div>
       <div class="gx-mon-cells">
-        <div class="gx-mon-cell gx-wt-tile bal"><small>잔고</small><div class="gx-wt-balrow"><b class="mint">${esc(money(balance))}</b>${editable ? `<button class="gx-wt-pen" data-action="wallet-edit" aria-label="잔고 고치기" title="잔고 고치기">${ICONS.pen}</button>` : ''}</div>${edit}<span>시작 ${esc(money(start))} · 거래 ${rows.length}건</span></div>
-        <div class="gx-mon-cell gx-wt-tile"><small>수입</small><b class="mint">+${esc(income.toLocaleString('en-US'))}</b><span>${inN}건</span></div>
-        <div class="gx-mon-cell gx-wt-tile"><small>지출</small><b class="red">${spend ? `−${esc(Math.abs(spend).toLocaleString('en-US'))}` : '0'}</b><span>${outN}건</span></div>
-        <div class="gx-mon-cell gx-wt-tile"><small>오늘</small><b class="${todayNet < 0 ? 'red' : todayNet > 0 ? 'mint' : ''}">${esc(formatDelta(todayNet) || '0')}</b><span>${todayRows.length}건</span></div>
+        <div class="gx-mon-cell gx-wt-tile bal"><small>잔고</small><div class="gx-wt-balrow"><b class="mint${fit(money(balance))}">${esc(money(balance))}</b>${editable ? `<button class="gx-wt-pen" data-action="wallet-edit" aria-label="잔고 고치기" title="잔고 고치기">${ICONS.pen}</button>` : ''}</div>${edit}<span>시작 ${esc(money(start))} · 거래 ${rows.length}건</span></div>
+        <div class="gx-mon-cell gx-wt-tile"><small>수입</small><b class="mint${fit(`+${income.toLocaleString('en-US')}`)}">+${esc(income.toLocaleString('en-US'))}</b><span>${inN}건</span></div>
+        <div class="gx-mon-cell gx-wt-tile"><small>지출</small><b class="red${fit(`−${Math.abs(spend).toLocaleString('en-US')}`)}">${spend ? `−${esc(Math.abs(spend).toLocaleString('en-US'))}` : '0'}</b><span>${outN}건</span></div>
+        <div class="gx-mon-cell gx-wt-tile"><small>오늘</small><b class="${todayNet < 0 ? 'red' : todayNet > 0 ? 'mint' : ''}${fit(formatDelta(todayNet) || '0')}">${esc(formatDelta(todayNet) || '0')}</b><span>${todayRows.length}건</span></div>
       </div>
     </section>
     ${walletUi.notice ? `<div class="gx-err" role="alert">${esc(walletUi.notice)}</div>` : ''}

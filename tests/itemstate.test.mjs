@@ -119,10 +119,12 @@ test('사용자 「버리기」: 같은 응답·앞 응답을 근거로는 안 �
   assert.equal(liveItems(m, alive).length, 1);
 });
 
-test('다 쓴 소모품·상점 맞교환은 지금처럼 줄을 지운다', () => {
+test('다 쓴 소모품은 줄을 지우지 않고 그 응답의 사용 기록으로 0 (다시 굴리면 돌아온다, 전수점검 중대-6). 상점 맞교환은 지금처럼 줄을 지운다', () => {
   let s = addItem(empty, alive, { name: '소금', uses: 2, from: 'story', anchor: 'c1' });
   const r = applyItemChanges(s, alive, [ch({ anchor: 'c2', name: '소금', action: 'update', uses: 0 })], { order });
-  assert.equal(r.list.length, 0);
+  assert.equal(r.list.length, 1, '줄은 남는다');
+  assert.equal(liveItems(r, alive).length, 0, '다 써서 목록에서는 안 보인다');
+  assert.equal(liveItems(r, new Set([...alive].filter((k) => k !== 'c2'))).length, 1, 'c2 를 다시 굴리면 돌아온다');
   assert.deepEqual(movedNow(r, 'c2'), [], '다 쓴 것은 「no longer has」로 넘기지 않는다');
   assert.equal(removeItem(s, s.list[0].id, 'sell', 'store').list.length, 0);
 });

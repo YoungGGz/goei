@@ -185,6 +185,13 @@ export function statusClockMinute(st: { date?: string; time?: string } | null): 
   return h > 23 || m > 59 ? null : h * 60 + m;
 }
 
+/** 상태줄 시각 → 「HH:MM」 24시간 (「02:47 PM」→「14:47」). 읽지 못하면 받은 글 그대로. 사원증 카드 시각과 같은 꼴 (전수점검 눌러-보통-22: 소지품 창에만 「AM」이 붙었다) */
+export function statusClock24(time: string | undefined): string {
+  const t = (time ?? '').trim();
+  const m = t ? statusClockMinute({ time: t }) : null;
+  return m === null ? t : `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+}
+
 const DAY_MIN = 1440;
 
 /** 「오늘 오전 10:00」·「어제 오후 9:10」·「3월 12일 오후 9:10」 (지금 장면 기준) */

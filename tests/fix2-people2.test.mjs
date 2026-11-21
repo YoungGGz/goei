@@ -76,7 +76,7 @@ test('Director 재사용 열쇠: 입력이 같아도 최근 글이 달라지면 
   assert.equal(k1, k3);
 });
 
-test('소지품: 가진 물건을 new 로 또 얻으면 update 로 바꾸되 남은 횟수를 받은 수로 덮지 않는다', () => {
+test('소지품: 가진 물건을 new 로 또 얻으면 update 로 바꾸되 남은 횟수를 받은 수로 덮지 않고 got 으로 더한다 (전수점검 중대-5)', () => {
   const c = { scriptstate: {}, message: [['user', 'x', 'u1'], ['char', '생수 두 병을 더 받았다. 보관해 둔 생수와 합쳤다.', 'c1']].map(([role, data, chatId]) => ({ role, data, chatId })) };
   const store = T.emptyStore();
   store.people.쟈알디 = person('쟈알디');
@@ -87,6 +87,7 @@ test('소지품: 가진 물건을 new 로 또 얻으면 update 로 바꾸되 남
   assert.equal(rep.items.length, 1);
   assert.equal(rep.items[0].action, 'update');
   assert.equal(rep.items[0].uses, undefined);
+  assert.equal(rep.items[0].got, 2, '받은 수는 got 으로');
   assert.equal(rep.items[0].desc, R.leftWordIn(desc) || R.offWordIn(desc) ? '' : desc);
   const rep2 = U.applyUpdate(T.emptyStore(), c, input, { items: [{ name: '생수', action: 'update', uses: 1, desc: '', m: 'm2', quote: '생수 두 병을 더 받았다' }] }, { settings: s, items: true });
   assert.equal(rep2.items[0].uses, 1, '진짜 update 의 uses 는 그대로');
