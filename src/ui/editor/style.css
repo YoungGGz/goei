@@ -538,10 +538,12 @@
 .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 44px; }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gw-totop { width: 36px; height: 36px; margin: 0 8px 14px 0; }
+  .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 34px; }
 }
 /* 본문이 좁으면(폰 344·폴드 펼침 673) 빈 띠를 두지 않는다 (11-21 눌러 보기 3차: 카드가 296/570에서 끝나 표 머리가 한 글자씩 꺾이고 +·지우기·마지막 칸이 잘렸다).
    덮는 문제는 보임 규칙으로 푼다: 좁을 때 단추는 위로 올리는 동안에만 보인다 (index.ts syncTop, 760 을 같이 바꾼다) */
-@container gwbody (max-width: 760px) { .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 0; } }
+/* 폰(344 등)은 0.21.24 그대로(위 34px 띠) — 좁은 PC 창(601~)에서만 (11-22) */
+@media (min-width: 601px) and (min-height: 500px), (min-width: 601px) and (pointer: fine), (min-width: 601px) and (pointer: none) { @container gwbody (max-width: 760px) { .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 0; } } }
 /* 조작 없이 설명만 있는 줄 (2026-11-08 사용자: 소지품 「넘기는 것·남는 것」 글 위 쓸데없는 여백) — 빈 조작 칸(높이 34)을 접고 설명을 이름 옆 첫 줄부터 */
 .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label hint'; }
 .gw .ps-row:has(> .ps-ctl:empty) > .ps-ctl { display: none; }
@@ -562,11 +564,6 @@
   /* 복사 단추가 늘어 폰에서 ▲▼가 다음 줄로 밀리지 않게 머리 줄 간격만 줄인다 */
   .gw .gw-field-head { column-gap: 6px; }
   .gw .gw-fmove .gx-mini.icon { width: 36px; }
-  /* 한 줄 로어 칸(나이·성별·소속 표기…)의 글칸도 글상자처럼 머리 아래 한 줄을 다 쓴다.
-     자리를 안 정하면 머리 옆 칸에 들어가 344 폭에서 이름 칸이 0px 로 눌려 글자가 세로로 한 자씩 꺾이고 글칸이 상자 밖으로 나갔다 (11-21 폴드 커버 점검) */
-  .gw .gw-field > input { grid-area: ctl; }
-  /* 호출 흐름 Director 「방식」 네 칸은 폰에서 두 줄로 꺾이는데(ui/style.css .pp-fn-ctl), 고르기 높이가 한 줄(34px)로 묶여 둘째 줄 「사실형·연출형」이 카드 밖 다음 칸(메인) 위로 넘쳤다 (11-21 폴드 커버 점검) */
-  .gw .pp-fn-ctl .gx-segs { height: auto; max-height: none; }
 }
 /* 맨 위로 단추가 맨 아래 줄(예: 인물 설정 전용 모델 ID 「저장」)을 덮지 않게 끝에 단추 높이만큼 여백 (11-08 눌러 보기 점검) */
 .gw-body:has(~ .gw-totop)::after { content: ''; display: block; height: 72px; }
@@ -920,9 +917,13 @@
   .gw .flc-c > .gx-segs { display: flex; min-width: 0; }
   .gw .flc-c > .gx-segs > .gx-seg { flex: 0 1 auto; white-space: nowrap; }
   .gw .flc-c .fl-help { margin: 0; }
-  /* 칸보다 긴 고르기(Director 「방식」 네 칸)는 다음 줄로 넘긴다: 좁은 PC 창(폴드 펼침 673 폭)에서 글자가 서로 겹쳤다 (눌러보기 3차 fold_i) */
-  .gw .flc-c > .gx-segs { flex-wrap: wrap; height: auto; max-height: none; }
-  .gw .flc-c > .gx-segs > .gx-seg { flex: 0 0 auto; min-height: calc(var(--h) - 2px); }
+}
+/* 칸보다 긴 고르기(Director 「방식」 네 칸)는 다음 줄로 넘긴다: 좁은 PC 창(폴드 펼침 673 폭)에서 글자가 서로 겹쳤다 (눌러보기 3차 fold_i). 폰은 0.21.24 그대로 (11-22) */
+@media (min-width: 601px) and (min-height: 500px), (min-width: 601px) and (pointer: fine), (min-width: 601px) and (pointer: none) {
+  @container gwbody (max-width: 1001px) {
+    .gw .flc-c > .gx-segs { flex-wrap: wrap; height: auto; max-height: none; }
+    .gw .flc-c > .gx-segs > .gx-seg { flex: 0 0 auto; min-height: calc(var(--h) - 2px); }
+  }
 }
 
 /* 폴드 펼친 화면 같은 좁은 PC 창(601~860 폭, 11-21 사용자: 「PC로 띄울 거면 창을 키웠어야지」 「꽉 차게는 아니고」):
@@ -1096,6 +1097,9 @@
 .gw .gw-anote[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
 
 /* ── 눌러 보기 3차 고침 · 설정 (2026-11-21) ── */
+/* 11-22: 아래 고침은 모두 폰이 아닌 화면(601~)에서만. 폰(344 등)은 0.21.24 모양 그대로 두고(폰 @media 안에 넣었던 줄은 뺐다), 끝의 「폰 표(.ck-ph)」만 바꾼다.
+   본문 칸 @container 는 폰 본문(약 316)에서도 걸려서 바깥을 폰 아닌 @media 로 감쌌다. min-width 601 은 ui/media.ts foldCss 가 「모바일」 설정이면 861 로 올린다 */
+@media (min-width: 601px) and (min-height: 500px), (min-width: 601px) and (pointer: fine), (min-width: 601px) and (pointer: none) {
 /* 본문 칸이 좁은 PC 배치(폴드 펼침 673: 왼쪽 목록 옆 본문 343): 표가 PC 모양 그대로라 머리글이 한 글자씩 꺾이고 오른쪽 칸이 잘렸다.
    → 본문 폭 600 이하면 표·수 묶음은 폰 모양. 아래는 위 폰 @media 규칙 가운데 표(.ck·.mx·.fam-set) 것을 그대로 옮긴 것 (@media 와 @container 는 규칙을 나눠 쓸 수 없다). 폰 규칙을 고치면 여기도 같이 고친다 */
 /* 11-22 검수(폴드 펼침 = PC 배치, 폭·간격만 줄이기. 줄 이름 올리기·표 쪼개기 금지): 표를 폰 모양(띠마다 나눔·상점마다 카드·사이트 탭)으로 바꾸던 줄은 뺐다.
@@ -1163,7 +1167,6 @@
 .gw-list-tools .dir-search, .gw-list-pane .gw-list-tools .gw-list-pick { flex: 1 1 120px; }
 /* 괴이 공통 머리말(목록 칸 안): 펼치면 글 상자 아래 여백이 없어 마지막 줄이 칸 끝에 붙었다. 폰·좁은 본문에서는 좌우를 위 줄(14px)에 맞춘다(10px 규칙이 더 세서 4px씩 넓었다) */
 .gw .gw-list-pane > .gw-anote[open] { padding-bottom: 12px; }
-@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) { .gw .gw-list-pane > .gw-anote { margin: 0 14px 10px; } }
 @container gwbody (max-width: 600px) { .gw .gw-list-pane > .gw-anote { margin: 0 14px 10px; } }
 @container gwbody (max-width: 600px) { .gw-list-tools { padding: 10px 14px; } .gw-list-pane .gw-add { padding: 0 14px 10px; } }
 /* 확인 창의 어두운 덮개가 왼쪽 위 고정 머리(갈래 탭·찾기 칸, z 2)와 「맨 위로」(z 5) 밑에 깔려 그것만 밝게 떠 보였다 (PC·673, 20여 곳 공통) → 덮개를 맨 위 겹으로 */
@@ -1173,9 +1176,6 @@
 /* 줄이 한 열로 쌓인 좁은 본문·상세 칸: 카드 안 설명 단락이 이름 칸 폭(200)만큼 들여 써져 오른쪽 좁은 띠에 몰리고 왼쪽이 비었다(요원 「소속 조직」 아래, 무작위 발생 후보, 묶음 지우기 위) → 폰처럼 왼쪽부터 */
 @container gwbody (max-width: 600px) { .gw .ps-rows > .ps-note, .gw .ps-rows > .gx-muted, .gw .dir-panel > p.gx-muted, .gw .dir-fac > p.gx-muted { padding-left: var(--pad); } }
 @container gwdetail (max-width: 600px) { .gw .ps-rows > .ps-note, .gw .ps-rows > .gx-muted, .gw .dir-panel > p.gx-muted, .gw .dir-fac > p.gx-muted { padding-left: var(--pad); } }
-/* 절 머리 「?」 도움말: 그림은 18px 그대로, 누르는 칸만 34px (폰에서 18×18 이라 옆 복사 단추를 누르기 쉬웠다) */
-.gw .gw-fhint { position: relative; }
-.gw .gw-fhint::before { content: ''; position: absolute; inset: -8px; }
 /* 이름 바꾸기 줄(거점·조직): 좁은 본문·상세 칸(673)에서 「이름 바꾸기」「지우기」가 창 오른쪽 밖(670~846)에 놓였다 → 폰처럼 이름 위, 입력칸·단추 한 줄 */
 @container gwbody (max-width: 600px) {
   .gw .dir-rename { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -1190,13 +1190,8 @@
   .gw .dir-rename > .gx-mini { grid-row: 2; }
 }
 /* 낱말을 안 끊으니 칸 일곱인 「넘길 내용」 표가 좁은 본문에서 판보다 넓어졌다 → 좁을 때 머리 칸 좌우 여백·자간만 줄여 판 안에 (글자 크기 12px 는 그대로) */
-@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) { .gw .ck-h2 > span { padding: 0 1px; letter-spacing: -.5px; } }
 @container gwbody (max-width: 600px) { .gw .ck-h2 > span { padding: 0 1px; letter-spacing: -.5px; } }
 /* 그래도 넘치면(상점 「넘길 내용」: 줄 이름 「백일몽 포인트몰」이 길다) 줄 이름이 낱말 사이에서 두 줄로 접힌다: 이름 칸은 자리가 있으면 한 줄 폭, 모자라면 가장 긴 낱말 폭까지 */
-@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
-  .gw .ck > .ps-rows { grid-template-columns: minmax(min-content, max-content) repeat(var(--ck-n), minmax(min-content, 1fr)); padding-inline: 4px; }
-  .gw .ck .ck-name .mx-name > span { white-space: normal; word-break: keep-all; line-height: 1.25; }
-}
 @container gwbody (max-width: 600px) {
   .gw .ck > .ps-rows { grid-template-columns: minmax(min-content, max-content) repeat(var(--ck-n), minmax(min-content, 1fr)); padding-inline: 4px; }
   .gw .ck .ck-name .mx-name > span { white-space: normal; word-break: keep-all; line-height: 1.25; }
@@ -1211,7 +1206,29 @@
 .gw .dir-ext-item > b:has(+ span) { grid-row: 1 / 3; }
 /* 손가락으로 누르는 기기: 누른 줄에 :hover 채움이 남아, 체크를 푼 상시 로어북 줄이 고른 것처럼 초록으로 보였다 → 마우스가 없으면 올림 채움을 안 쓴다 */
 @media (hover: none) { .gw .dir-ext-item:hover { background: none; } }
-/* 폰 표(.ck-ph): 줄 이름은 한 줄(「망상홈쇼/핑」처럼 낱말 중간 꺾임 X, 0.21.24 처럼), 이름 칸은 글 폭만큼, 판보다 넓으면 표 안에서 옆으로 민다 (11-22) */
-.gw .ck-ph > .ps-rows { grid-template-columns: max-content repeat(var(--ck-n), minmax(min-content, 1fr)); }
-.gw .ck-ph .ck-name { white-space: nowrap; padding-right: 6px; min-width: max-content; }
-.gw .ck-ph .ck-name * { white-space: nowrap; overflow-wrap: normal; flex-shrink: 0; }
+}
+/* 폰 표(.ck-ph) 가운데 칸이 열 이상인 것(.ck-many, 상점 「메인 요청에 붙이는 것」)만: 다른 폰 표는 0.21.24 그대로(이름 칸 글 폭으로 넓히면 머리가 「수/동」처럼 꺾였다). 줄 이름은 한 줄(「망상홈쇼/핑」처럼 낱말 중간 꺾임 X, 0.21.24 처럼), 이름 칸은 글 폭만큼, 판보다 넓으면 표 안에서 옆으로 민다 (11-22) */
+.gw .ck-ph.ck-many > .ps-rows { grid-template-columns: max-content repeat(var(--ck-n), minmax(min-content, 1fr)); }
+.gw .ck-ph.ck-many .ck-name { white-space: nowrap; padding-right: 6px; min-width: max-content; }
+.gw .ck-ph.ck-many .ck-name * { white-space: nowrap; overflow-wrap: normal; flex-shrink: 0; }
+/* 폴드 펼침(601~860 폭, PC 배치)의 좁은 본문(600 이하) PC 표: 가로로 밀지 않고 첫 화면에 모든 열 (11-22 검수 3차).
+   표 하나·한 줄·PC 모양 그대로, 열 폭·칸 여백·−/+ 상자·글자만 줄인다. 머리 낱말은 낱말 단위로만 두 줄(낱말 중간 X), 낱말 사이 여백. 폰(600 이하 화면)에는 걸지 않는다 */
+@media (min-width: 601px) {
+  @container gwbody (max-width: 600px) {
+    .gw .gw-page { padding-left: 14px; padding-right: 14px; }
+    .gw .ck-pc > .ps-rows { padding-inline: 2px; }
+    .gw .ck-pc .ck-h1 b { white-space: normal; word-break: keep-all; overflow-wrap: normal; padding: 2px 3px; font-size: 11.5px; }
+    .gw .ck-pc .ck-h2 > span { white-space: normal; word-break: keep-all; overflow-wrap: normal; padding: 0 3px; font-size: 11px; letter-spacing: -.3px; }
+    .gw .ck-pc .ck-cell { padding-inline: 0; }
+    .gw .ck-pc .ck-h2 > span.ck-first { padding-left: 5px; }
+    .gw .ck-pc .ck-name { padding-right: 6px; font-size: 12px; letter-spacing: -.3px; }
+    .gw .ck-pc .ck-name .mx-name { gap: 4px; }
+    /* 글꼴이 달라 몇 px 넘쳐 옆으로 밀려도 어느 줄인지 보이게 이름 열은 고정 */
+    .gw .ck-pc .ck-row > .ck-name { position: sticky; left: 0; z-index: 1; background: var(--panel); }
+    .gw .ck-pc .st-step { width: 72px; }
+    .gw .ck-pc .st-step > .gx-step { flex-basis: 22px; width: 22px; font-size: 14px; }
+  }
+}
+/* 절 머리 「?」 도움말: 그림은 18px 그대로, 누르는 칸만 34px (폰에서 18×18 이라 옆 복사 단추를 누르기 쉬웠다). 보이는 모양은 그대로라 폰에도 둔다 */
+.gw .gw-fhint { position: relative; }
+.gw .gw-fhint::before { content: ''; position: absolute; inset: -8px; }
