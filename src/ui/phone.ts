@@ -51,6 +51,8 @@ interface PhoneUi {
   view: 'list' | 'room' | 'group' | 'settings' | 'notice' | 'view';
   /** 떠 있는 작은 창: 전화 걸기·연락처 추가 (보던 화면 위에 뜬다, 11-15 사용자) */
   pop: '' | 'call' | 'add';
+  /** 관전 단추를 한 번 누른 상태: 다시 눌러야 호출한다 (사용자 11-22: 잘못 눌러도 바로 호출돼 불편) */
+  viewArm?: boolean;
   /** 열어 둔 보기 전용 방 */
   viewId: string | null;
   /** 작성칸 + 버튼으로 연 첨부 메뉴 */
@@ -92,7 +94,7 @@ export function resetPhone() {
   Object.assign(phone, {
     sub: 'contacts', tab: '', query: '', view: 'list', room: null, invite: null, picked: [], topic: '', gname: '', draft: '', page: 1, call: '', callText: '',
     addName: '', addNote: '', openNotice: null, noticePage: 1, attach: [], confirm: null, notice: '', failure: null, attachMenu: false, pickQuery: '',
-    chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', pop: '',
+    chatFilter: 'all', noticeFilter: 'all', noticeFaction: '', pickTab: '', pop: '', viewArm: false,
   });
 }
 
@@ -1305,7 +1307,9 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
   const tools = [
     tool('ph-refresh', ICONS.refresh, '새 메시지 확인', busy ? 'disabled' : '', '새로고침'),
     tool('ph-group', ICONS.group, '단톡 만들기', busy ? 'disabled' : '', '단톡'),
-    tool('ph-view-new', ICONS.cctv, `${VIEW_PRESETS[viewSettings(ctx.chat.scriptstate).preset]} 보기 (내가 끼지 않는 방)`, busy ? 'disabled' : '', '관전'),
+    phone.viewArm && !busy
+      ? tool('ph-view-new', ICONS.play, '한 번 더 누르면 시작해요', 'aria-pressed="true"', '시작')
+      : tool('ph-view-new', ICONS.cctv, `${VIEW_PRESETS[viewSettings(ctx.chat.scriptstate).preset]} 보기 (내가 끼지 않는 방)`, busy ? 'disabled' : '', '관전'),
     tool('ph-add', ICONS.addUser, '연락처 추가', '', '추가'),
     tool('ph-call', ICONS.call, '전화 걸기', 'data-value=""', '전화'),
   ].join('');
@@ -1331,6 +1335,7 @@ export async function handlePhone(action: string, value: string | undefined, ctx
   if (action === 'ph-pop-stay') return true; // 작은 창 안의 빈 곳: 아무 일도 없다 (창 밖 누름과 가르려는 표시)
   liveEnv = env;
   const v = value ?? '';
+  if (action !== 'ph-view-new' || v) phone.viewArm = false; // 다른 것을 누르면 「시작」을 거둔다
   // 두 번 눌러 지우는 단추는 여기 다 적어야 한다 — 빠지면 두 번째 「정말 삭제」가 확인을 먼저 지워 버려 먹통이 된다 (11-09 사용자: 사이드스토리 방 삭제 안 됨)
   if (!['ph-room-del', 'ph-view-del', 'ph-contact-del', 'ph-notice-del'].includes(action)) phone.confirm = null;
   if (action.startsWith('ph-def-')) {
@@ -1451,6 +1456,12 @@ export async function handlePhone(action: string, value: string | undefined, ctx
       void refreshInbox(ctx, env);
       return true;
     case 'ph-view-new':
+      // 도구 줄의 관전 단추만 두 번 누르기 (방 안의 「이어 보기」는 그대로)
+      if (!v && !phone.viewArm) {
+        phone.viewArm = true;
+        break;
+      }
+      phone.viewArm = false;
       void makeView(ctx, env, false, v);
       return true;
     case 'ph-view-open': {
