@@ -2452,6 +2452,12 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   /* 칸 높이는 최소값. 목록이 짧으면 지도 칸이 남은 높이를 그림 높이까지 쓰고, 목록이 길면 목록이 줄어 스크롤 (전수점검 눌러-사소-1: 지도 아래 빈 자리) */
   .gx-map > .gx-mapcol > .gx-sits { flex: 0 1 auto; }
 }
+/* 폴드 펼침 폭 (752×749 실리수: 상황 목록이 짧으면 왼쪽 칸 아래 ~130px 가 비었다). 배치는 그대로, 크기만:
+   지도 칸이 남은 높이를 끝까지 쓰고(max-height 풀기), 그림은 칸 높이에 맞춰 키운다(mapzoom.ts 가 --gx-mapfill 을 보고 겹 폭을 정함).
+   목록이 길면 지금처럼 목록이 스크롤되고 지도 칸은 최소 높이로 줄어든다 */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  .gx-map > .gx-mapcol > .gx-canvas:not(.ph) { max-height: none; --gx-mapfill: 1; }
+}
 /* 카드 가운데 선택 과녁 (evcard.ts aimMark, 2026-10-29). 선은 늘 1px(크기와 무관), 중심은 고정(단추 크기 그대로, 그림만 scale).
    안 고름: 크고 얇고 흐리게, 바깥 눈금이 천천히 돌고 안 원이 숨 쉰다. 고름: 2/3 로 조여들며 붉게 잠김. 해제: 흰 고리와 함께 다시 커짐 */
 .gx-aim { position: absolute; left: 50%; top: 50%; z-index: 3; display: grid; place-items: center; width: 210px; height: 210px; padding: 0; border: 0; border-radius: 50%; background: none; color: #fff; transform: translate(-50%, -50%); cursor: pointer; -webkit-tap-highlight-color: transparent; }
