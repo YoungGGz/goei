@@ -372,7 +372,8 @@ export interface HsShow {
 }
 export const emptyShow = (): HsShow => ({ loaded: false, key: '', title: '', parts: [], chat: [], at: 0, prev: [] });
 
-const CUT_IN: [RegExp, CueCut][] = [[/^(a|와이드|wide|전체|스튜디오)/i, 'A'], [/^(b|바스트|bust|정면|진행자)/i, 'B'], [/^(c|상품|클로즈|close|product)/i, 'C'], [/^(d|전화|call|phone)/i, 'D']];
+// 전화 컷을 상품 컷보다 먼저 본다: 「call」이 C 의 머리 글자 c 에 먼저 걸려 상품 클로즈업이 되던 것 (전수점검 사소-42)
+const CUT_IN: [RegExp, CueCut][] = [[/^(a|와이드|wide|전체|스튜디오)/i, 'A'], [/^(b|바스트|bust|정면|진행자)/i, 'B'], [/^(d|전화|call|phone)/i, 'D'], [/^(c|상품|클로즈|close|product)/i, 'C']];
 /** 화면 사건 칸 → 사건. 매진은 칸 전체가 매진 낱말(sold·sold out·매진·완판)과 똑같을 때만 받는다:
  *  낱말 일부만 맞춰 「곧 매진」「매진 직전」「nearly sold out」까지 매진으로 읽던 것을 막는다 (11-15 사용자: 매진이 거의 모든 상품에 뜬다).
  *  다른 사건은 잘못 켜져도 주문을 막지 않으므로 전처럼 낱말이 들어 있으면 받는다 */
@@ -435,8 +436,9 @@ export function hsLine(line: string): { item: Omit<ShopItem, 'id'>; inst: number
   const cells = lineCells(line);
   if (cells.length < 2) return null;
   const inPrice = /\d+\s*회|시연/.exec(cells[1] ?? '');
-  const c7 = (cells[7] ?? '').trim();
-  const inst = inPrice || /^(o|○|yes|y)$/i.test(c7) || Number(/\d+/.exec(c7)?.[0] ?? 0) > 0 ? 1 : 0;
+  // 출연 칸: O 와 같은 뜻의 표기(전각 Ｏ·◯·〇·예)도 받는다 — 놓치면 시연 결제가 사라지고 값이 「-」인 상품은 통째로 빠졌다 (전수점검 사소-41)
+  const c7 = (cells[7] ?? '').trim().normalize('NFKC');
+  const inst = inPrice || /^(o|○|◯|〇|yes|y|예|네)$/i.test(c7) || Number(/\d+/.exec(c7)?.[0] ?? 0) > 0 ? 1 : 0;
   const price = inPrice ? 0 : costOf(cells[1] ?? '')?.price ?? 0;
   const c = [...cells];
   c[1] = String(price);
@@ -694,9 +696,11 @@ export function readOrders(vars: Vars): HsOrder[] {
 /** 새 주문을 넣을 때만 부른다. 넘치면 죽은 주문(주문한 응답이 지워진 것)과 다 끝난 연 주문부터 오래된 순으로 버린다. 남길 것만 남으면 수를 넘겨도 둔다.
  *  남기는 주문: 안 연 상자가 걸린 것(버리면 그 상자를 못 연다) · 시연 호출이 남은 것 · 연 응답이 마지막 응답인 것(다시 굴리면 상자가 미개봉으로 돌아온다).
  *  now: 살아 있는 응답 키 · 지금 턴 · 마지막 응답 키 */
-export function pruneOrders(list: HsOrder[], max: number, now: { alive: Set<string>; turn: number; last: string }): HsOrder[] {
+export function pruneOrders(list: HsOrder[], max: number, now: { alive: Set<string>; turn: number; last: string; boxHeld?: (id: string) => boolean }): HsOrder[] {
   const out = [...list];
-  const keep = (o: HsOrder): boolean => (!o.anchor || now.alive.has(o.anchor)) && (!orderOpened(o, now.alive) || o.dues.some((d) => d >= now.turn) || (o.owe ?? 0) >= now.turn || (!!o.openKey && o.openKey === now.last));
+  // 안 연 주문도 상자를 버리거나 팔아 소지품에 없으면 남길 까닭이 없다 (boxHeld: 상자가 소지품에 있거나 마지막 응답에서 빠진 것 — 다시 굴리면 돌아온다) (전수점검 보통-43)
+  const unopenedKept = (o: HsOrder): boolean => !now.boxHeld || !o.boxId || now.boxHeld(o.boxId);
+  const keep = (o: HsOrder): boolean => (!o.anchor || now.alive.has(o.anchor)) && ((!orderOpened(o, now.alive) && unopenedKept(o)) || o.dues.some((d) => d >= now.turn) || (o.owe ?? 0) >= now.turn || (!!o.openKey && o.openKey === now.last));
   while (out.length > Math.max(1, max)) {
     const i = out.findIndex((o) => !keep(o));
     if (i < 0) break;

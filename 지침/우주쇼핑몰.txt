@@ -85,7 +85,7 @@ The protagonist speaks to the owner. Read what they mean from context — do not
 @@END
 
 @@SECTION TALK_NO_STOCK
-In this reply the stock on the shelf is fixed: never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines). When the protagonist asks for something not on the shelf or for a different selection, the owner answers in words only. A custom-order quote, where this shop takes custom orders, is still allowed.
+In this reply the stock on the shelf is fixed: never add an item and never re-stock the shelf (no "+" lines, no mode all). Prices stay as listed (no "~" lines); an item may be withdrawn ("-" lines). When the protagonist asks for something not on the shelf or for a different selection, the owner answers in words only. A custom-order quote, where this shop takes custom orders, is still allowed.
 @@END
 
 @@SECTION ORDER_COLUMNS
@@ -93,7 +93,7 @@ Columns of the order line. 쓰임: how the item is handled, using only these wor
 @@END
 
 @@SECTION TALK_FEATURE
-Shelf lines end with 구분: 「희귀」 marks the one rare piece on display — the owner knows exactly what it is, where it came from and why it is special, and prizes it (discounts on it are rare and grudging). 「특가:N」 marks goods put out today below their usual price N — the owner knows why (재고 정리, 흠집, 유통기한 등) and can say so. When adding or re-stocking, keep 구분 the same way: at most one 희귀 on the shelf, 특가 only with the usual price.
+Shelf lines end with 구분: 「희귀」 marks the one rare piece on display — the owner knows exactly what it is, where it came from and why it is special, and prizes it. 「특가:N」 marks goods put out today below their usual price N — the owner knows why (재고 정리, 흠집, 유통기한 등) and can say so. When adding or re-stocking, keep 구분 the same way: at most one 희귀 on the shelf, 특가 only with the usual price.
 @@END
 
 @@SECTION TALK_PLAIN
@@ -120,7 +120,7 @@ the owner's reply, in character, Korean, 1–4 sentences, no stage directions
 </owner>
 <change mode="none|partial|all">
 none: empty.
-partial: one change per line — "+ {line}" to add, "~ 이름|새값" to change a price (won, or the agreed payment in words), "- 이름" to remove.
+partial: one change per line — "+ {line}" to add, "- 이름" to remove. Prices are fixed, so never change one.
 all: full new shelf, one item per line ({line}).
 </change>
 @@END
@@ -152,7 +152,7 @@ This mall also takes CUSTOM ORDERS, grudgingly. When the customer asks for somet
 
 @@SECTION THOUGHTS_TALK
 1. What did the player actually say or want (question, request, haggling, chat)?
-2. Given this owner's character and the shop identity, what is the honest reaction: answer only, fetch something, re-stock the whole shelf, lower a price, refuse, or end the dealing?
+2. Given this owner's character and the shop identity, what is the honest reaction: answer only, fetch something, re-stock the whole shelf, refuse, or end the dealing? (Prices are fixed: never lower one.)
 3. Pick exactly one change mode. Only things within the shop identity may be added.
 4. Write the owner's line in character.
 @@END
@@ -395,7 +395,7 @@ Item {n} — {unit}: {genre} | VALUE TIER: {tier} ({desc}), price {price} | ROLE
 @@END
 
 @@SECTION ROLL_GENRES
-classical martial arts, sci-fi, fantasy, cyberpunk, steampunk, ancient, occult, cosmic horror, creature, mythology, religious/sacred, post-apocalyptic, alien, folktale, fairy tale, alchemy, military, fiction, SCP, Cthulhu mythos
+classical martial arts, sci-fi, fantasy, cyberpunk, steampunk, ancient, occult, cosmic horror, creature, mythology, religious/sacred, post-apocalyptic, folktale, fairy tale, alchemy, military, fiction, SCP, Cthulhu mythos
 @@END
 
 @@SECTION ROLL_TIERS

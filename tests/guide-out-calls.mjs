@@ -112,7 +112,9 @@ export function calls(M) {
   put('shop.rule.shop', () => M.shop.shopRule({ [M.shop.SHOP_WHERE_VAR]: 'shop' }));
   put('shop.guide.any', () => M.shop.shopGuide({}));
   const seq = (...v) => { let i = 0; return () => v[i++ % v.length]; };
-  put('malls.assign.cos', () => M.malls.cosAssignment(5, true, M.malls.cosRoll({ $cos_roll_useful: '2' }), seq(0.1, 0.5, 0.9, 0.3, 0.7)));
+  // 장르는 옮기기 전 기본 목록(20종)을 직접 넣어 견준다: 기본 목록에서 alien 을 뺀 것(전수점검 보통-36)과 상관없이 배정 글의 꼴을 본다
+  const OLD_GENRES = 'classical martial arts, sci-fi, fantasy, cyberpunk, steampunk, ancient, occult, cosmic horror, creature, mythology, religious/sacred, post-apocalyptic, alien, folktale, fairy tale, alchemy, military, fiction, SCP, Cthulhu mythos';
+  put('malls.assign.cos', () => M.malls.cosAssignment(5, true, M.malls.cosRoll({ $cos_roll_useful: '2', $cos_roll_genres: OLD_GENRES }), seq(0.1, 0.5, 0.9, 0.3, 0.7)));
   put('malls.assign.bm', () => M.malls.cosAssignment(3, false, M.malls.mallRoll({}, 'bm'), () => 0.1, 'bm'));
 
   // ── Director ──

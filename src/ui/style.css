@@ -3375,9 +3375,11 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   /* 상점 팔기 (폰): 아바타 옆 2열 4줄이 상점 본문 폭(cqw) 안에 들어가게 */
   .sh-body .it-eqbox.sell .it-eqin { --slot: min(59px, calc((100cqw - 2 * var(--zp) - 2px - 128px - 10px - 8px) / 2)); flex-wrap: nowrap; }
 }
-/* 상점 팝업 (2026-11-07 사용자 설계, docs/인계/상점_1107/mock.mjs): 조작 34px·모서리 10, 칸·상자 12, 안쪽 8. 금액은 어디서나 같은 글꼴(mono 700 14), 색은 민트·흐림·빨강만 */
-.sh-wrap { --h: 34px; --r: 10px; --rc: 12px; --ri: 8px; --red: color-mix(in srgb, var(--danger) 80%, #fff); --red-bg: color-mix(in srgb, var(--danger) 12%, transparent); --red-ln: color-mix(in srgb, var(--danger) 55%, transparent); }
+/* 상점 팝업 (2026-11-07 사용자 설계, docs/인계/상점_1107/mock.mjs): 조작 34px·모서리 8(11-09 조작 기준, 전수점검 눌러2-보통-20), 칸·상자 12, 안쪽 8. 금액은 어디서나 같은 글꼴(mono 700 14), 색은 민트·흐림·빨강만 */
+.sh-wrap { --h: 34px; --r: 8px; --rc: 12px; --ri: 8px; --red: color-mix(in srgb, var(--danger) 80%, #fff); --red-bg: color-mix(in srgb, var(--danger) 12%, transparent); --red-ln: color-mix(in srgb, var(--danger) 55%, transparent); }
 .sh-wrap *, .sh-det * { box-sizing: border-box; }
+/* PC: 창을 위에 붙여 띄운다 — 구매↔판매로 높이가 바뀌어도 머리줄이 뛰지 않게 (전수점검 눌러2-중대-3). 폰은 아래 전체 화면 규칙 */
+.sh-wrap { place-items: start center; padding-top: max(20px, 5vh); }
 .sh-amt { font: 700 14px/1 var(--mono); font-style: normal; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sh-amt.big { font-size: 16px; color: var(--signal); }
 .sh-amt s { color: var(--dim); font-weight: 500; }
@@ -3464,7 +3466,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .sh-name b { overflow: hidden; text-overflow: ellipsis; }
 .sh-name svg { width: 18px; height: 18px; flex: none; color: var(--signal); }
 .sh-bal { padding: 0 12px; color: var(--text); font-size: 13.5px; font-weight: 600; }
-.sh-x { width: var(--h); padding: 0; justify-content: center; }
+.sh-x { width: 36px; height: 36px; padding: 0; justify-content: center; } /* 닫기 36 (위 물건 창 닫기와 같게, 전수점검 눌러2-보통-20) */
 .sh-x svg { color: var(--sub); }
 /* 주인 칸 (PC): 사진 128 · 이름 띠 · 대사 상자(4줄 넘으면 안에서 스크롤, 새 대사가 아래) · 입력창 */
 /* 주인 칸 (2026-11-07 사용자: 사진·이름·대화·입력이 따로 논다): 진열대 구획과 같은 틀 하나에, 사진은 오른쪽 칸 높이 그대로, 글자는 모두 안쪽 12px 줄에 맞춘다 */
@@ -3489,7 +3491,12 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .sh-talk-in { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; min-height: var(--h); padding: 0 10px 0 12px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel2); font-size: 13.5px; color: var(--text); cursor: text; }
 .sh-talk-in input { flex: 1; width: 0; min-width: 0; height: calc(var(--h) - 2px); padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: 13.5px; outline: none; }
 .sh-talk-in input::placeholder { color: var(--dim); }
-.sh-ref { display: inline-flex; align-items: center; flex: none; height: 24px; padding: 0 8px; border-radius: var(--ri); background: var(--accent-bg); border: 1px solid var(--accent-line); color: var(--signal); font: 600 12.5px/1 inherit; white-space: nowrap; cursor: pointer; }
+.sh-ref { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; min-width: 0; max-width: 60%; height: 24px; padding: 0 0 0 8px; border-radius: var(--ri); background: var(--accent-bg); border: 1px solid var(--accent-line); color: var(--signal); font: 600 12.5px/1 inherit; white-space: nowrap; }
+/* 칩 이름은 줄임표로 줄고, 떼기 ×는 따로: 보이는 칸 22, 누름 칸 34 (전수점검 눌러2-보통-18·19) */
+.sh-ref-nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sh-ref-x { position: relative; flex: none; display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; background: none; color: inherit; font: 700 15px/1 inherit; cursor: pointer; }
+.sh-ref-x::before { content: ''; position: absolute; inset: -6px; }
+.sh-talk-in input { text-overflow: ellipsis; }
 .sh-go { flex: none; width: var(--h); height: var(--h); border: 1px solid var(--accent-line); border-radius: var(--r); background: var(--accent-bg); color: var(--signal); font: 700 15px/1 inherit; cursor: pointer; }
 .sh-go:disabled, .sh-talk-in input:disabled { opacity: .45; }
 /* 칸: 그림 → 이름(13.5, 두 줄까지) → 값(숫자만, 민트 / 잔고 부족 빨강 / 깎인 값 ▾) */
@@ -3551,7 +3558,11 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .sh-det .gx-agpop-x { top: 16px; right: 16px; } /* 카드 안쪽 여백과 같게 (2026-11-08 사용자: X 가 치우침) */
 /* 폰: 조작 40 · 전체 화면 · 3열 · 아래 [문의][닫기] · 문의 → 2/3 높이 주인 서랍 */
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
-  .sh-wrap { --h: 40px; align-items: stretch; padding: 0; }
+  .sh-wrap { --h: 34px; align-items: stretch; padding: 0; } /* 폰도 조작 34 (11-09 조작 기준, 전수점검 눌러2-보통-20) */
+  /* 진열대가 남는 높이를 차지해 아래 [판매·문의·닫기] 줄이 구매·판매 어디서나 화면 맨 아래 같은 자리 (전수점검 눌러2-보통-22) */
+  .sh-body { flex: 1 1 auto; }
+  .sh-shelf > .sh-grid { padding: 0; } /* 격자를 위 잔고 줄·아래 단추 줄과 같은 선에 (전수점검 눌러2-사소-17) */
+  .sh-ov-head { padding-right: 44px; } /* 서랍 닫기 단추 자리 */
   .sh-wrap-card { position: relative; width: 100%; height: 100%; max-height: none; border: 0; border-radius: 0; padding: 12px; }
   .gx-panel.solo .sh-wrap-card { height: 100%; max-height: none; }
   .sh-tools { flex-wrap: wrap; }
@@ -4409,7 +4420,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .ms-cos .q-hd small { display: block; color: #060; }
 .ms-cos .q-card { display: flex; align-items: center; gap: 6px; margin: 6px 8px 0; padding: 3px 6px; background: #fff; border: 2px inset #c0c0c0; }
 .ms-cos .q-card > span { color: #555; font-size: 11px; white-space: nowrap; }
-.ms-cos .q-card .q-x { margin-left: auto; color: #888; }
+/* 떼기 ×: 붙인 상품 바로 옆, 창 단추 모양 34 (PC·폰, 전수점검 눌러-중대-10·눌러2-보통-18) */
+.ms-cos .q-card .q-x { flex: none; width: 34px; height: 34px; background: #c0c0c0; color: #000; border: 2px outset #fff; font: bold 16px Arial, sans-serif; }
 .ms-cos .q-card .q-th { flex: none; display: grid; place-items: center; width: 34px; height: 34px; background: #e0e0ff; border: 1px solid #888; }
 .ms-cos .q-card .q-th img, .ms-cos .q-card .q-th svg { width: 30px; height: 30px; image-rendering: pixelated; }
 .ms-cos .q-note { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 0; padding: 4px 8px; background: #ffffe0; border: 1px dashed #888; }
@@ -4464,6 +4476,16 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .ms-cos.ms-m .cs-pic img { width: 64px; height: 64px; }
 .ms-cos.ms-m .cs-bt { flex-wrap: wrap; }
 .ms-cos.ms-m .cs-askwin { top: auto; left: 0; right: 0; bottom: 0; width: auto; height: 78%; }
+/* 폰: 누름 칸 34·닫기 36 (전수점검 눌러-보통-13·눌러2-보통-14), 입력칸은 전송과 한 줄·붙이기·팔기는 아랫줄 (눌러2-보통-19) */
+.ms-cos.ms-m .cs-fr { grid-template-rows: auto 1fr; } /* 내용이 짧은 쪽(장바구니)에서 위 메뉴 띠가 늘어나지 않게 (눌러2-사소-10) */
+.ms-cos.ms-m .cs-top button { min-height: 34px; }
+.ms-cos.ms-m .cs-wt button { width: 36px; height: 36px; font-size: 16px; }
+.ms-cos.ms-m .cs-bt .cs-btn, .ms-cos.ms-m .q-in .cs-btn, .ms-cos.ms-m .q-in input, .ms-cos.ms-m .q-note .cs-btn, .ms-cos.ms-m .q-sell .cs-btn { min-height: 34px; }
+.ms-cos.ms-m .cs-bt .cs-ln { display: inline-flex; align-items: center; min-height: 34px; }
+.ms-cos.ms-m .q-in { flex-wrap: wrap; }
+.ms-cos.ms-m .q-in input { order: -1; flex: 1 1 calc(100% - 68px); }
+.ms-cos.ms-m .q-in [data-action="mall-say"] { order: -1; flex: none; width: 64px; }
+.ms-cos.ms-m .q-in [data-action="mall-pick"], .ms-cos.ms-m .q-in [data-action="mall-sell-open"] { flex: 1 1 0; }
 /* 백일몽 포인트몰: 사내 쇼핑몰 */
 .ms-bm { background: #eef0f4; color: #1f2430; font: 13.5px 'Pretendard', 'Noto Sans KR', sans-serif; }
 .ms-bm .bp-gnb { background: #1f2a44; height: 34px; display: flex; align-items: center; gap: 16px; padding: 0 24px; color: #aeb6c8; font-size: 12px; }
@@ -5163,6 +5185,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 /* 상품 칸 · 주문 단추 */
 .hs .hs-prod { display: flex; align-items: stretch; gap: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: linear-gradient(180deg, var(--card2), var(--card)); }
 .hs .hs-prod.none { padding: 16px; }
+.hs .hs-prod.none .hs-reload { margin-top: 10px; min-height: 34px; padding: 0 14px; border: 1px solid var(--line2); border-radius: 8px; font-weight: 700; font-size: 13px; } /* 편성 받기 (전수점검 보통-37) */
 .hs .hs-icon { position: relative; flex: none; width: 84px; height: 84px; display: grid; place-items: center; border: 1px solid var(--line2); border-radius: 6px; background: radial-gradient(circle at 50% 35%, #4a1a24, #1a0c0f 75%); overflow: hidden; }
 .hs .hs-icon img { max-width: 72px; max-height: 72px; }
 .hs .hs-icon svg { width: 34px; height: 34px; opacity: .6; }

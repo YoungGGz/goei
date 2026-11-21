@@ -446,7 +446,8 @@ export function readShop(vars: Vars, shelf = shelfCap(vars), keep = shopLimits(v
       },
       items: capShelf((Array.isArray(o.items) ? o.items.filter(isItem) : []).map((x) => {
         const { use: _u, uses: _n, equip: _e, icon: _i, weight: _w, ...rest } = x;
-        return { ...rest, ...traitsOf(x), desc: clean(x.desc, 120), effect: clean(x.effect, 60) };
+        // 모델이 낸 물건은 읽을 때(parseLine) 이미 120·60자로 잘린다. 여기서 또 자르면 설정에서 200자까지 적는 시그니처 상품 글이 중간에 끊긴다 (전수점검 눌러-보통-11)
+        return { ...rest, ...traitsOf(x), desc: clean(x.desc, 200), effect: clean(x.effect, 200) };
       }), shelf),
       talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-keep.talk),
       closed: !!o.closed,
@@ -780,7 +781,8 @@ export function parseTalk(raw: string): TalkReply {
         const c = costOf(price ?? '');
         if (name && c) out.reprice.push({ name: clean(name, 30), ...c });
       } else if (line.startsWith('-')) {
-        const name = clean(line.slice(1), 30);
+        // 「- 이름|값」처럼 값까지 적어도 이름만 (전수점검 사소-35)
+        const name = clean(line.slice(1).split('|')[0] ?? '', 30);
         if (name) out.remove.push(name);
       }
     }
@@ -793,8 +795,10 @@ export function parseTalk(raw: string): TalkReply {
 
 const itemId = (key: string, name: string, n: number) => `s_${hash(`${key}|${normName(name)}|${n}`)}`;
 
-function withIds(st: ShopState, list: Omit<ShopItem, 'id'>[], exclude: ShopItem[] = []): ShopItem[] {
+/** taken: 이름은 겹쳐도 되지만 id 는 겹치면 안 되는 물건 (산 물건: 같은 이름이 다시 진열돼도 「산 물건」 id 를 물려받지 않게, 전수점검 보통-29) */
+function withIds(st: ShopState, list: Omit<ShopItem, 'id'>[], exclude: ShopItem[] = [], taken: ShopItem[] = []): ShopItem[] {
   const out: ShopItem[] = [];
+  const used = new Set([...exclude, ...taken].map((x) => x.id));
   // 희귀는 진열대에 단 하나: 이미 걸린 희귀(안 팔린 것)가 있거나 앞에서 하나 받았으면 뒤의 것은 보통 물건으로
   let rare = exclude.some((x) => x.tag === 'rare' && !x.sold);
   for (const it0 of list) {
@@ -807,7 +811,11 @@ function withIds(st: ShopState, list: Omit<ShopItem, 'id'>[], exclude: ShopItem[
       rare = true;
     }
     if (out.some((x) => sameShopName(x.name, it.name)) || exclude.some((x) => sameShopName(x.name, it.name))) continue;
-    out.push({ ...it, id: itemId(st.key, it.name, out.length + exclude.length) });
+    let n = out.length + exclude.length;
+    while (used.has(itemId(st.key, it.name, n))) n++;
+    const id = itemId(st.key, it.name, n);
+    used.add(id);
+    out.push({ ...it, id });
   }
   return out;
 }
@@ -815,11 +823,24 @@ function withIds(st: ShopState, list: Omit<ShopItem, 'id'>[], exclude: ShopItem[
 /** 첫 호출·새로고침 결과를 상태에 */
 export function applyShelf(st: ShopState, r: ShelfReply, s: ShopSettings): ShopState {
   const base: ShopState = { ...st, identity: st.loaded ? st.identity : r.identity, loaded: true };
-  const items = withIds(base, r.items).slice(0, 40);
+  const items = withIds(base, r.items, [], st.items.filter((x) => x.sold)).slice(0, s.shelf);
   if (!items.length) throw new ShopError('받은 물건 줄이 모두 겹쳐서 버렸어요. 다시 받아 보세요.');
   const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-s.keep.prev);
   const talk = r.owner ? [...st.talk, { who: 'owner' as const, text: r.owner, ...keyOf(st) }] : st.talk;
   return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-s.keep.talk), prev, closed: false };
+}
+
+/** 답을 기다리는 동안 바뀐 것을 답 결과에 합친다 (전수검사 11-13): 그사이 산 물건은 팔린 채로, 그사이 취소한 판매는 취소된 채로.
+ *  now = 저장 직전 상태, next = 답으로 만든 상태, st0 = 요청 전 상태. 나머지는 next 그대로 */
+export function mergeLate(now: ShopState, next: ShopState, st0: ShopState, cap = SHELF_MAX): ShopState {
+  const late = now.items.filter((x) => x.sold && !st0.items.some((y) => y.id === x.id && y.sold));
+  const byId = new Map(late.map((x) => [x.id, x]));
+  let items = next.items.map((x) => byId.get(x.id) ?? x);
+  const missing = late.filter((x) => !next.items.some((y) => y.id === x.id));
+  // 진열대 물건 수(설정)는 읽을 때(capShelf)처럼 파는 것과 산 것을 따로 센다: 산 것 하나가 늘었다고 새 진열을 하나 자르지 않게 (전수점검 보통-31)
+  if (missing.length) items = capShelf([...missing, ...items], cap);
+  const sell = st0.sell && !now.sell ? null : next.sell;
+  return { ...next, items, sell };
 }
 
 /** 코드가 넣는 물건 (쇼핑몰 시그니처 상품): 이미 진열돼 있거나 팔린 것과 같은 이름은 건너뛴다. 지난 목록(prev)에는 넣지 않는다 */
@@ -1009,7 +1030,7 @@ export function shopEvents(chat: Chat): string[] {
     if (!spoke && lastOwner) out.push(guideTxt('Main', 'INVENTORY.SHOP.OWNER_SAID', { shop: st.shop, line: lastOwner.text }));
   }
   if (!main.has('ask')) return out;
-  if (st.closed && lastOwner) out.push(guideTxt('Main', 'INVENTORY.SHOP.REFUSED', { shop: st.shop, line: lastOwner.text.slice(0, 80) }));
+  if (st.closed && lastOwner) out.push(guideTxt('Main', 'INVENTORY.SHOP.REFUSED', { shop: st.shop, line: lastOwner.text }));
   else if (!st.closed && spoke && lastOwner) {
     // 주인과 나눈 말: 이 턴에 나눈 대화 전부 (2026-11-07 사용자: 6줄이 아니라 전부). 그 턴 한 번만 넘어간다
     const tail = capLines(turn, shopMainLines(chat.scriptstate)).map((l) => guideTxt('Main', l.who === 'me' ? 'INVENTORY.SHOP.TALK_ME' : 'INVENTORY.SHOP.TALK_OWNER', { text: l.text })).join(' / ');

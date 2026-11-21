@@ -4,6 +4,7 @@
 // 생성·대화는 core/shop.ts 의 요청문·해석을 쓰고 모델 호출은 host/llm.ts. 구입은 가계부 src:'store' + 소지품 from:'store'.
 // 팔기(11-07): 도구 줄 「팔기」 → 진열대 자리에 내 소지품 → 하나 고르면 입력창에 「팔기: 이름」 칩(값을 부르거나 그냥 보냄) → 주인이 값을 부르면 상세 창(잔고 / +값 / 잔액) [팔기][흥정][그만].
 import { needAttr } from './needfill';
+import { josa } from '../core/josa';
 import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
 import { refreshUseBox, useLocked } from '../host/usebox';
@@ -29,7 +30,7 @@ import { addItem, dropUse, EQUIP_LABEL, gridItems, ITEM_USE_AT_VAR, itemLeft, it
 import { getPrefs } from '../core/settings';
 import { guideTxt } from '../core/guides';
 import {
-  applyShelf, applyTalk, cancelSell, closeSale, currentShop, markSold, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
+  applyShelf, applyTalk, cancelSell, closeSale, currentShop, markSold, mergeLate, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
   type ShopItem, type ShopSource, type ShopState,
 } from '../core/shop';
 import { ICONS } from './icons';
@@ -80,6 +81,10 @@ export function resetShop(): void {
 let pts = false;
 /** 값 짧은 표기: 원 상점은 원, 포인트 상점은 p */
 const amt = (n: number): string => (pts ? `${n < 0 ? '−' : ''}${Math.abs(Math.trunc(n)).toLocaleString('en-US')}p` : shortWon(n));
+/** 「…」을/를: 이름 받침에 맞춘 조사만 (전수점검 사소-32·눌러2-보통-23) */
+const obj = (name: string): string => josa(name, '을', '를').slice(name.length);
+/** 판매 완료 안내: 금액은 판매 상세 창과 같은 꼴(원 상점 15,000원 · 포인트 상점 1,000p) (전수점검 사소-32) */
+const soldText = (name: string, price: number, p: boolean): string => `「${name}」${obj(name)} ${p ? `${Math.trunc(price).toLocaleString('en-US')}p` : `${shortWon(price)}원`}에 팔았어요.`;
 /** 이 상점의 장부: 원 상점은 가계부, 포인트 상점은 포인트 장부 */
 const ledgerOf = (vars: Record<string, unknown> | undefined, p: boolean) => (p ? readPoints(vars) : readWallet(vars, getPrefs().walletStart ?? WALLET_START_DEFAULT));
 const ledgerVars = (w: Wallet, p: boolean) => (p ? pointsVars(w) : walletVars(w));
@@ -121,7 +126,7 @@ export function shopPopup(ctx: ChatContext): string {
     <span class="it-cnt sh-bal" title="${pts ? '포인트' : '잔고'}">${esc(pts ? amt(bal) : formatWon(bal))}</span>
     <span class="it-right">
       ${phone ? '' : `<button class="it-act" data-action="shop-pick" ${st.closed || !st.loaded ? 'disabled' : ''} aria-label="${shopUi.pick ? '구매' : '판매'}">${ICONS.swap}<span>${shopUi.pick ? '구매' : '판매'}</span></button>`}
-      <button class="it-act" data-action="shop-refresh" ${shopUi.loading || st.closed ? 'disabled' : ''} aria-label="새로고침">${ICONS.refresh}<span>새로고침</span></button>
+      <button class="it-act" data-action="shop-refresh" ${shopUi.loading || st.closed || shopUi.pick ? 'disabled' : ''} aria-label="새로고침">${ICONS.refresh}<span>새로고침</span></button>
       ${phone ? '' : `<button class="it-act sh-x" data-action="shop-close" aria-label="닫기">${ICONS.close}</button>`}
     </span>
   </div>`;
@@ -138,7 +143,8 @@ export function shopPopup(ctx: ChatContext): string {
       <button class="it-act${shopUi.drawer ? ' on' : ''}" data-action="shop-drawer" aria-pressed="${shopUi.drawer}" aria-label="주인에게 말하기">${ICONS.person}<span>문의</span></button>
       <button class="it-act sh-close" data-action="shop-close" aria-label="닫기">${ICONS.close}<span>닫기</span></button>
     </div>`;
-    const drawer = shopUi.drawer ? `<div class="sh-dim" data-action="shop-drawer"></div><div class="sh-drawer" data-action="shop-keep"><button class="it-grip on" data-action="shop-drawer" aria-label="닫기"><i></i></button>${ownerHtml(ctx, st, true)}</div>` : '';
+    // 서랍 닫기: 다른 창과 같은 닫기 단추(36) (전수점검 눌러2-보통-21). 손잡이도 그대로 둔다
+    const drawer = shopUi.drawer ? `<div class="sh-dim" data-action="shop-drawer"></div><div class="sh-drawer" data-action="shop-keep"><button class="it-grip on" data-action="shop-drawer" aria-label="닫기"><i></i></button><button class="gx-agpop-x" data-action="shop-drawer" aria-label="닫기">${ICONS.close}</button>${ownerHtml(ctx, st, true)}</div>` : '';
     inner = `${tools}${notice}${body}${note}${foot}${drawer}`;
   } else {
     inner = `${tools}${notice}${body}${note}<div class="sh-owner">${ownerHtml(ctx, st, false)}</div>`;
@@ -196,7 +202,8 @@ function pickHtml(ctx: ChatContext, st: ShopState): string {
   const all = liveItemsOf(readItems(ctx.chat.scriptstate), ctx.chat);
   const mine = gridItems(all);
   // 진열대와 같은 구획 상자 안에 (사용자 11-07: 배경에 늘어놓지 말고 상자 안에)
-  const head = `<header class="sh-zh"><b>소지품</b><small>${all.length ? `${mine.length} · 팔 물건을 고르세요` : ''}</small></header>`;
+  // 수는 팔 수 있는 것 전부 (장착 띠의 것도 팔 수 있다, 전수점검 눌러2-사소-16)
+  const head = `<header class="sh-zh"><b>소지품</b><small>${all.length ? `${all.length} · 팔 물건을 고르세요` : ''}</small></header>`;
   const inner = mine.length ? `<div class="it-grid sh-grid">${mine.map((it) => pickCell(it, st)).join('')}</div>` : `<p class="gx-wt-empty">${all.length ? '장착한 것 말고는 소지품이 없어요.' : '팔 만한 소지품이 없어요.'}</p>`;
   // 장착 띠와 소지품 구획은 서로 다른 상자 (2026-11-12 사용자: 장착 칸과 물건 칸이 한 격자처럼 붙어 구분이 안 됨).
   // 소지품 창과 같은 규격: 위에 테두리 친 장착 띠 [아바타 | 장착 8칸], 그 아래 제목 줄을 가진 소지품 구획. 칸 크기·열 수는 style.css 가 PC·폰을 가른다
@@ -208,7 +215,7 @@ function pickCell(it: Item, st: ShopState): string {
   const tr = traitsOf(it);
   const tip = `<span class="it-tip" aria-hidden="true"><b>${esc(it.name)}</b>${tr ? `<small>${esc(tr)}</small>` : ''}${it.desc ? `<p>${esc(it.desc)}</p>` : ''}${it.effect ? `<p class="ef">효과: ${esc(it.effect)}</p>` : ''}${Number.isSafeInteger(it.price) ? `<span class="sh-amt">산 값 ${esc(amt(it.price!))}</span>` : ''}</span>`;
   return `<button class="it-c sh-c${sel ? ' sel' : ''}" data-action="shop-sell-pick" data-value="${esc(it.id)}" aria-label="${esc(it.name)} 판매" ${shopUi.loading ? 'disabled' : ''}>
-    <span class="it-ic">${pic(it.name, it.icon)}</span><span class="sh-nm"><b>${esc(it.name)}</b></span><span class="sh-band dim">${sel && typeof st.sell?.price === 'number' ? `<i>▴</i>${esc(amt(st.sell.price))}` : Number.isSafeInteger(it.price) ? esc(amt(it.price!)) : '&nbsp;'}</span>${tip}</button>`;
+    <span class="it-ic">${pic(it.name, it.icon)}</span><span class="sh-nm"><b>${esc(it.name)}</b></span><span class="sh-band dim">${sel && typeof st.sell?.price === 'number' ? `<i>▴</i>${esc(amt(st.sell.price))}` : Number.isSafeInteger(it.price) ? `산 값 ${esc(amt(it.price!))}` : '&nbsp;'}</span>${tip}</button>`;
 }
 
 /** 주인 사진이 없을 때 기본 얼굴: 어둠 속 역광 그림자 (사용자 11-07, 후보 C). 성별·옷·얼굴을 알 수 없는 형체만 */
@@ -231,7 +238,8 @@ function ownerHtml(ctx: ChatContext, st: ShopState, drawer: boolean): string {
 function talkbox(st: ShopState): string {
   const off = st.closed || !!shopUi.loading || !st.loaded;
   const sell = shopUi.chipKind === 'sell';
-  const chip = shopUi.chip ? `<button type="button" class="sh-ref${sell ? ' sell' : ''}" data-action="shop-chip-x" aria-label="${esc(shopUi.chip)} 빼기">${sell ? '판매: ' : ''}${esc(shopUi.chip)} ×</button>` : '';
+  // 칩: 「판매: 이름」·「문의: 이름」 같은 꼴, 떼기 ×는 따로 누르는 단추 (누름 칸 34, 전수점검 눌러2-보통-18)
+  const chip = shopUi.chip ? `<span class="sh-ref${sell ? ' sell' : ''}"><span class="sh-ref-nm">${sell ? '판매' : '문의'}: ${esc(shopUi.chip)}</span><button type="button" class="sh-ref-x" data-action="shop-chip-x" aria-label="${esc(shopUi.chip)} 빼기">×</button></span>` : '';
   const ph = st.closed ? '거래가 끊겼어요' : sell ? (typeof st.sell?.price === 'number' ? '값을 다시 불러 보기' : '값을 부르거나 그냥 보내기') : shopUi.chip ? '이 물건에 대해 묻기' : '주인에게 말하기';
   // 폼 제출은 플러그인 iframe(allow-forms 없음)에서 안 오므로 Enter(data-enter)·단추(data-action+data-take)로 보낸다
   return `<div class="sh-talk" data-sh-talk="1">
@@ -240,7 +248,7 @@ function talkbox(st: ShopState): string {
   </div>`;
 }
 
-/** 상세 팝업: 그림 88 → 이름·종류·값 → 설명·효과 → 영수증(잔고 / 값 / 잔액) → [구입][문의] */
+/** 상세 팝업: 그림 88 → 이름·종류·값 → 설명·효과 → 영수증(잔고 / 값 / 잔액) → [구매][묻기] (판매↔구매 단추와 같은 말, 아래 줄 「문의」(주인 서랍)와 다른 말 — 전수점검 눌러2-사소-13) */
 function detailHtml(ctx: ChatContext, st: ShopState, bal: number): string {
   if (!shopUi.detail) return '';
   if (shopUi.detail === 'sell') return sellHtml(st, bal);
@@ -255,13 +263,13 @@ function detailHtml(ctx: ChatContext, st: ShopState, bal: number): string {
     <div class="sum${poor ? ' bad' : ''}"><i>${poor ? '부족' : '잔액'}</i><span class="sh-amt">${esc(amt(poor ? -left : left))}</span></div>
   </div>`;
   const inner = `<button class="gx-agpop-x" data-action="shop-detail-close" aria-label="닫기">${ICONS.close}</button>
-    <div class="it-ph sh-ph"><span class="it-ic">${pic(it.name, it.icon)}</span><div class="sh-phtx"><b>${esc(it.name)}</b><span class="sh-meta">${it.tag === 'rare' ? `<span class="sh-tag rare">${ICONS.star}희귀</span>` : ''}${it.tag === 'sale' && it.was ? '<span class="sh-tag sale">특가</span>' : ''}${traitsOf(it) ? `<span class="sh-tag">${esc(traitsOf(it))}</span>` : ''}${it.sold ? '<span>산 물건</span>' : ''}</span><span class="sh-amt big${it.pay ? ' pay' : ''}">${it.tag === 'sale' && it.was ? `<s>${esc(amt(it.was))}</s> ` : ''}${esc(costText(it))}</span></div></div>
+    <div class="it-ph sh-ph"><span class="it-ic">${pic(it.name, it.icon)}</span><div class="sh-phtx"><b>${esc(it.name)}</b><span class="sh-meta">${it.tag === 'rare' ? `<span class="sh-tag rare">${ICONS.star}희귀</span>` : ''}${it.tag === 'sale' && it.was ? '<span class="sh-tag sale">특가</span>' : ''}${traitsOf(it) ? `<span class="sh-tag">${esc(traitsOf(it))}</span>` : ''}${it.sold ? '<span class="sh-tag">산 물건</span>' : ''}</span><span class="sh-amt big${it.pay ? ' pay' : ''}">${it.tag === 'sale' && it.was ? `<s>${esc(amt(it.was))}</s> ` : ''}${esc(costText(it))}</span></div></div>
     ${it.desc ? `<p>${esc(it.desc)}</p>` : '<p class="dim">설명 없음</p>'}
     ${it.effect ? `<p class="ef">효과: ${esc(it.effect)}</p>` : ''}
     ${it.sold ? '' : money}
     <div class="it-btns">
-      ${it.sold ? '' : `<button class="gx-chip on" data-action="shop-buy" data-value="${esc(it.id)}" ${poor || st.closed || shopUi.loading ? 'disabled' : ''}>구입</button>`}
-      <button class="gx-chip" data-action="shop-ask" data-value="${esc(it.id)}" ${st.closed ? 'disabled' : ''}>문의</button>
+      ${it.sold ? '' : `<button class="gx-chip on" data-action="shop-buy" data-value="${esc(it.id)}" ${poor || st.closed || shopUi.loading ? 'disabled' : ''}>구매</button>`}
+      <button class="gx-chip" data-action="shop-ask" data-value="${esc(it.id)}" ${st.closed ? 'disabled' : ''}>묻기</button>
     </div>`;
   return shell(inner, 'sh-det', 'shop-detail-close', 'shop-keep', it.name);
 }
@@ -395,24 +403,30 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
     const cur = env.current();
     if (!cur || chatKey(cur) !== key) return;
     let sold = false;
+    const sale = next.sell;
+    let merged = next;
     await updateChat(cur.charIndex, cur.chatIndex, (chat) => {
-      const now = readShop(chat.scriptstate);
+      const now0 = readShop(chat.scriptstate);
       // 그사이 응답이 와서 다른 가게가 됐으면 버린다
-      if (!now || now.shop !== next.shop) return null;
-      const saved = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...shopVars({ ...next, key: now.key }) } };
+      if (!now0 || now0.shop !== next.shop) return null;
+      // 기다리는 동안 「그만」한 판매·산 물건을 답이 되살리지 않게 지금 상태와 합친다 (쇼핑몰 ask 와 같게, 전수점검 보통-32)
+      const now = reviveShop(now0, aliveAnchors(chat));
+      merged = mergeLate(now, next, st0, s.shelf);
+      if (st0.sell && !now.sell) deal = '';
+      const saved = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...shopVars({ ...merged, key: now0.key }) } };
       const done = deal ? saleDone(saved, next.shop, deal) : null;
       if (done) sold = true;
       return done ?? saved;
     });
-    if (sold && next.sell) {
+    if (sold && sale && typeof sale.price === 'number') {
       shopUi.detail = '';
       if (shopUi.chipKind === 'sell') { shopUi.chip = ''; shopUi.chipKind = ''; }
-      shopUi.info = `「${next.sell.name}」을 ${next.identity.points ? `${next.sell.price}P` : `${next.sell.price}원`}에 팔았어요.`;
+      shopUi.info = soldText(sale.name, sale.price, !!next.identity.points);
       void refreshUseBox(cur.charIndex, cur.chatIndex);
-    } else if (kind === 'talk' && next.closed && !st0.closed) shopUi.info = '주인이 거래를 끊었어요.';
-    else if (kind === 'talk' && next.sell && next.sell.price !== undefined) {
+    } else if (kind === 'talk' && merged.closed && !st0.closed) shopUi.info = '주인이 거래를 끊었어요.';
+    else if (kind === 'talk' && merged.sell && merged.sell.price !== undefined) {
       shopUi.detail = 'sell';
-      if (next.sell.price !== null && shopUi.chipKind !== 'sell') { shopUi.chip = next.sell.name; shopUi.chipKind = 'sell'; }
+      if (merged.sell.price !== null && shopUi.chipKind !== 'sell') { shopUi.chip = merged.sell.name; shopUi.chipKind = 'sell'; }
     }
   } catch (error) {
     const cur = env.current();
@@ -533,7 +547,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       });
       shopUi.detail = '';
       if (shopUi.chipKind === 'sell') { shopUi.chip = ''; shopUi.chipKind = ''; }
-      shopUi.info = sold ? `「${o.name}」을 ${amt(o.price as number)}에 팔았어요.` : '팔 수 없는 상태예요 (물건이 없거나 값이 바뀌었어요).';
+      shopUi.info = sold ? soldText(o.name, o.price as number, pts) : '팔 수 없는 상태예요 (물건이 없거나 값이 바뀌었어요).';
       // 「사용」 자리에서 뺐으면 본 화면 상자도 다시 그린다 (소지품 버리기와 같이)
       if (sold) void refreshUseBox(ctx.charIndex, ctx.chatIndex);
       await env.refresh();
@@ -621,7 +635,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...(p ? pointsVars(w) : walletVars(w)), ...itemsVars(items), ...shopVars(markSold(now, target.id, now.key, storyStamp(chat))) } }; // 산 응답 키를 적어 다시 굴리면 되살게 (전수검사 11-13)
       });
       shopUi.detail = '';
-      shopUi.info = bought ? `「${it.name}」을 샀어요. 소지품에 들어갔어요.` : pts ? '포인트가 모자라거나 이미 팔린 물건이에요.' : '잔고가 모자라거나 이미 팔린 물건이에요.';
+      shopUi.info = bought ? `「${it.name}」${obj(it.name)} 샀어요. 소지품에 들어갔어요.` : pts ? '포인트가 모자라거나 이미 팔린 물건이에요.' : '잔고가 모자라거나 이미 팔린 물건이에요.';
       await env.refresh();
       return true;
     }

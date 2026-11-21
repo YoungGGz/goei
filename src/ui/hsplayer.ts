@@ -84,6 +84,8 @@ let cg: HTMLElement | null = null;
 let chatLog: HTMLElement | null = null;
 let run: Run | null = null;
 let showKey = '';
+/** 편성이 잠깐 안 보이는 동안 맡겨 둔 보던 자리 (그 편성 열쇠와 함께) */
+let parked: { key: string; run: Run } | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 /** 바로 앞 tick 시각 (0 = 막 다시 돌기 시작) */
 let tickAt = 0;
@@ -115,13 +117,25 @@ export function setPlayerFeed(f: PlayerFeed, h: PlayerHooks): void {
   feed = f;
   hooks = h;
   if (key !== showKey) {
-    showKey = key;
-    run = null;
-    extra.length = 0;
-    extraChat.length = 0;
-    shown.length = 0;
-    said = null;
-    if (chatLog) chatLog.innerHTML = '';
+    if (!key) {
+      // 받는 중·신호 없음처럼 잠깐 편성이 안 보이는 동안은 보던 자리를 맡겨 둔다: 새로 고침이 실패해 같은 편성으로 돌아오면 이어서 (전수점검 보통-42)
+      if (showKey && run) parked = { key: showKey, run };
+      showKey = '';
+      run = null;
+    } else if (parked && parked.key === key) {
+      showKey = key;
+      run = parked.run;
+      parked = null;
+    } else {
+      parked = null;
+      showKey = key;
+      run = null;
+      extra.length = 0;
+      extraChat.length = 0;
+      shown.length = 0;
+      said = null;
+      if (chatLog) chatLog.innerHTML = '';
+    }
   }
   if (f.show.loaded && (!run || run.part !== f.show.at)) run = freshRun(f.show.at);
 }

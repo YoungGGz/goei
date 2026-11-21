@@ -42,7 +42,7 @@ import { currentTheme, setCurrentTheme, themeName } from './theme';
 import { bindFootnotes, bindWikiSide, handleWiki, resetWiki, wiki, wikiHomeResults, wikiInput, wikiList, wikiTopResults, wikiOpenCheck, wikiTab, type WikiEnv } from './wiki';
 import { bmDeskWinSpec, mallWinSpec, mallAction, mallAskOpen, mallInput, mallOpenCheck, mallSettingsAction, mallTab, resetMalls } from './malls';
 import { isMallSite } from '../core/malls';
-import { homeshopAction, homeshopInput, homeshopMounted, homeshopOpenCheck, homeshopTab, resetHomeshop } from './homeshop';
+import { homeshopAction, homeshopClosed, homeshopInput, homeshopMounted, homeshopOpenCheck, homeshopTab, resetHomeshop } from './homeshop';
 import { hsSettings } from '../core/homeshop';
 import { boardChrome, gnet, gnetDmOpen, gnetDmWinSpec, gnetOpenCheck, gnetTab, handleGnet, resetGnet, useBoardSite, type GnetEnv } from './gnet';
 import { bindPopWins } from './popwin';
@@ -936,6 +936,7 @@ async function refresh(): Promise<void> {
 async function close(): Promise<void> {
   setShown(false);
   resetMore();
+  homeshopClosed();
   endSolo();
   stopCctvFx();
   await risuai.hideContainer();
