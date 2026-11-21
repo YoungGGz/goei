@@ -3,32 +3,53 @@
 // 11-22 사용자: 펼친 폴드 같은 중간 폭(601~860)은 설정 「펼친 폴드 화면 배치」로 PC·모바일을 고른다. 모바일이면 기준 폭을 860 으로 올린다.
 import { getPrefs } from '../core/settings';
 
-/** 중간 폭의 위 끝 (style.css 의 601~860 묶음과 같은 값) */
+/** 중간 폭의 위 끝 */
 export const FOLD_MAX = 860;
 const BASE = 600;
+/** 중간 폭(펼친 폴드)에서 PC 배치를 그대로 줄여 넣는 배율 (11-22 사용자: 화면마다 구조를 바꾸지 말고 글자·UI 를 통째로 줄인다).
+ *  752 폭 화면이 752 / 0.7 = 1074 폭 PC 창처럼 짜이고 0.7 배로 그려진다 */
+export const FOLD_ZOOM = 0.7;
+const MID = `(min-width: ${BASE + 1}px) and (max-width: ${FOLD_MAX}px)`;
+const LAND = '(max-height: 499px) and (pointer: coarse)'; // 가로로 든 폰: 늘 폰 배치
+type Mode = 'base' | 'phone' | 'zoom';
+/** 지금 CSS 를 어떻게 넣을지: 중간 폭이 아니면 그대로, 중간 폭 + 모바일 설정이면 폰 기준을 860 으로, 중간 폭 + PC 설정이면 통째로 줄임 */
+function mode(): Mode {
+  if (getPrefs().fold === 'phone') return 'phone';
+  return typeof matchMedia === 'function' && matchMedia(MID).matches && !matchMedia(LAND).matches ? 'zoom' : 'base';
+}
+/** 화면 좌표(px)를 줄인 화면 안의 길이로: 줄이지 않았으면 1 */
+export const zoomK = (): number => (mode() === 'zoom' ? FOLD_ZOOM : 1);
 /** 지금 폰 배치로 치는 폭 한도 */
 export const phoneMax = (): number => (getPrefs().fold === 'phone' ? FOLD_MAX : BASE);
-export const phoneMq = (): string => `(max-width: ${phoneMax()}px), (max-height: 499px) and (pointer: coarse)`;
+export const phoneMq = (): string => (mode() === 'zoom' ? 'not all' : `(max-width: ${phoneMax()}px), (max-height: 499px) and (pointer: coarse)`);
 export const isPhone = (): boolean => matchMedia(phoneMq()).matches;
-/** 기준 폭이 바뀌는 두 경계를 다 지켜본다 (설정을 바꿔도 다시 걸 필요가 없게) */
-export const PHONE_WATCH = [`(max-width: ${BASE}px)`, `(max-width: ${FOLD_MAX}px)`, '(max-height: 499px) and (pointer: coarse)'];
-/** CSS 글의 @media 머리에서 폰 기준 폭을 지금 설정에 맞춘다: 모바일이면 600→860, 601→861 (중간 폭 전용 묶음 601~860 은 저절로 안 걸린다) */
+/** 기준이 바뀌는 경계를 다 지켜본다 (설정을 바꿔도 다시 걸 필요가 없게) */
+export const PHONE_WATCH = [`(max-width: ${BASE}px)`, `(max-width: ${FOLD_MAX}px)`, LAND];
+const r2 = (n: number): number => Math.round(n * 100) / 100;
+/** CSS 글을 지금 방식에 맞춘다.
+ *  phone: @media 머리의 폰 기준 폭 600→860, 601→861.
+ *  zoom: @media 머리의 폭·높이 기준을 배율만큼 줄이고(752 폭이 PC 규칙에 걸리게), 화면 단위(vw·vh)는 배율만큼 키우고, 문서를 통째로 줄인다 */
 export function foldCss(css: string): string {
-  const max = phoneMax();
-  if (max === BASE) return css;
-  return css.replace(/@media[^{]*\{/g, (head) => head.replace(/max-width:\s*600px/g, `max-width: ${max}px`).replace(/min-width:\s*601px/g, `min-width: ${max + 1}px`));
+  const m = mode();
+  if (m === 'base') return css;
+  if (m === 'phone') { const max = FOLD_MAX; return css.replace(/@media[^{]*\{/g, (head) => head.replace(/max-width:\s*600px/g, `max-width: ${max}px`).replace(/min-width:\s*601px/g, `min-width: ${max + 1}px`)); }
+  const k = FOLD_ZOOM;
+  return css
+    .replace(/(\d*\.?\d+)(vw|vh|dvw|dvh|svh|lvh)\b/g, (_, n: string, u: string) => `${r2(Number(n) / k)}${u}`)
+    .replace(/@media[^{]*\{/g, (head) => head.replace(/((?:min|max)-(?:width|height):\s*)(\d*\.?\d+)px/g, (_, a: string, n: string) => `${a}${r2(Number(n) * k)}px`))
+    + `\nhtml { zoom: ${k}; }\n`;
 }
 
-const styles: { el: HTMLStyleElement; css: string; max: number }[] = [];
-/** <style> 에 CSS 를 넣고 기억해 둔다: 설정이 바뀌면 syncFoldStyles 가 같은 글을 새 기준 폭으로 다시 넣는다 */
+const styles: { el: HTMLStyleElement; css: string; mode: Mode }[] = [];
+/** <style> 에 CSS 를 넣고 기억해 둔다: 방식이 바뀌면 syncFoldStyles 가 같은 글을 다시 맞춰 넣는다 */
 export function foldStyle(el: HTMLStyleElement, css: string): void {
   el.textContent = foldCss(css);
-  styles.push({ el, css, max: phoneMax() });
+  styles.push({ el, css, mode: mode() });
 }
-/** 설정 「펼친 폴드 화면 배치」가 바뀌었으면 넣어 둔 CSS 를 다시 맞춘다. 바뀐 게 있으면 true */
+/** 설정 「펼친 폴드 화면 배치」나 화면 폭이 바뀌었으면 넣어 둔 CSS 를 다시 맞춘다. 바뀐 게 있으면 true */
 export function syncFoldStyles(): boolean {
-  const max = phoneMax();
+  const m = mode();
   let changed = false;
-  for (const s of styles) if (s.max !== max) { s.el.textContent = foldCss(s.css); s.max = max; changed = true; }
+  for (const s of styles) if (s.mode !== m) { s.el.textContent = foldCss(s.css); s.mode = m; changed = true; }
   return changed;
 }
