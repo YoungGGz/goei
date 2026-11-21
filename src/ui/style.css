@@ -5674,7 +5674,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-opcnt em { white-space: nowrap; }
   /* 임무: 두 칸을 반반으로 (왼쪽이 166px 라 지역 고르기가 화살표만 남고 「커스텀」이 잘리고 지도 핀이 엉켰다, 눌러보기 3차 fold_i).
      위 줄은 지역 고르기 + 커스텀, 검색은 다음 줄. 편성 카드는 얼굴을 줄여 이름 자리를 남긴다 */
-  .gx-field { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .gx-field { grid-template-columns: minmax(0, 1fr) minmax(220px, 1fr); gap: 12px; }
   .gx-mapbar { flex-wrap: wrap; }
   .gx-mapbar > .gx-select { flex: 1 1 60px; }
   .gx-mapbar > .gx-mapfind { order: 3; flex: 1 1 100%; }
@@ -5707,9 +5707,6 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .top { gap: 12px; padding: 0 14px; }
   .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 14px; }
   .wk .nw-infobox { float: none; width: 100%; margin: 0 0 14px; }
-}
-/* 그중에서도 좁은 창(601~780 폭): 두 칸으로 나눌 폭이 안 되는 화면은 한 칸씩 보인다 */
-@media (min-width: 601px) and (max-width: 780px) and (min-height: 500px), (min-width: 601px) and (max-width: 780px) and (pointer: fine), (min-width: 601px) and (max-width: 780px) and (pointer: none) {
   /* 괴담톡: 목록 또는 대화 한 칸 (대화 칸이 210px 라 머리 단추가 겹쳐 「방 삭제」 자리에서 전화 창이 뜨고 「초대」가 창 밖으로 나갔다).
      방 머리의 「목록으로」 단추로 돌아간다 */
   .gx-body.ph-app { grid-template-columns: minmax(0, 1fr); }
