@@ -1346,6 +1346,12 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-id-who b { font-size: 17px; font-weight: 800; line-height: 1.25; color: var(--text); overflow-wrap: anywhere; }
 .gx-id-who small { font-size: 12.5px; font-weight: 600; color: var(--signal); overflow-wrap: anywhere; }
 .gx-id .gx-op-st { align-self: stretch; text-align: left; margin-top: 0; }
+/* 카드 접기 띠 (11-22 사용자): 카드 맨 위 가운데의 얇은 띠. 누르면 사진·이름·소속이 접히고 잔고·위치·목표·날짜만 남는다 */
+.gx-id-fold { position: absolute; top: 0; left: 0; right: 0; height: 18px; display: grid; place-items: center; padding: 0; border: 0; background: transparent; color: var(--dim); cursor: pointer; z-index: 1; }
+.gx-id-fold svg { width: 14px; height: 14px; }
+.gx-id-fold:hover { color: var(--text); }
+.gx-id.folded { gap: 0; padding-top: 22px; }
+.gx-id.folded .gx-op-st { border-top: 0; padding-top: 0; }
 .gx-idbtn { display: none; overflow: hidden; padding: 0; }
 .gx-idbtn img { width: 100%; height: 100%; object-fit: cover; }
 .gx-idpop-card { position: relative; width: 300px; max-width: 100%; max-height: calc(100% - 8px); overflow-y: auto; }

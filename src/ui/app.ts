@@ -1417,6 +1417,9 @@ async function handle(action: string, value?: string): Promise<void> {
       walletTabUi.edit = false;
       return refresh();
     }
+    case 'id-fold':
+      await savePrefs((p) => ({ ...p, idFold: getPrefs().idFold === true ? undefined : true }));
+      return render();
     case 'agents-view':
       // 상황판 요원 칸 제목줄의 모니터·목록 아이콘 (설정 「요원 칸」과 같은 기기 공통 값)
       if (value !== 'wall' && value !== 'list') return;
@@ -2243,13 +2246,13 @@ function mobileNavHtml(): string {
 /** 왼쪽 위: 표지 + 세로 ID카드 */
 function brand(ctx: ChatContext): string {
   return `<div class="gx-nav-brand">
-      ${idCard(ctx)}
+      ${idCard(ctx, true)}
     </div>`;
 }
 
 /** 세로 ID카드 (v0.16.22, 사용자 설계): 맨 위 유저 사진({{source::user}})·이름({{user}}), 아래 소속과 위치·목표·시각·날씨.
  *  배경엔 소속 사진이 아래에서 위로 옅어지며 은은하게 비친다. PC 왼쪽 위, 모바일은 머리 버튼으로 작은 창 */
-function idCard(ctx: ChatContext): string {
+function idCard(ctx: ChatContext, foldable = false): string {
   const facs = factionList(ctx.char.globalLore);
   const code = String(ctx.chat.scriptstate?.['$st_faction'] ?? '') || currentChoice(ctx.chat).faction || '';
   const f = code ? findFaction(code, facs) : undefined;
@@ -2277,9 +2280,13 @@ function idCard(ctx: ChatContext): string {
   const aff = f?.group ? String(ctx.chat.scriptstate?.['$ib_affiliation'] ?? '').trim() : '';
   const who = `<span class="gx-id-who"><b>${esc(name)}</b><small>${esc([f ? (f.group ? (aff && aff !== f.name ? aff : '') : selfName(ctx, f.code, f.name)) : '소속 없음', pa?.rank ?? ''].filter(Boolean).join(' · '))}</small></span>`;
   const bg = img ? `<span class="gx-id-bg" style="background-image:url('${esc(img)}')"></span>` : '';
-  return `<div class="gx-id">${bg}
-      ${photo}
-      ${who}
+  // 왼쪽 칸 카드 접기 (11-22 사용자): 카드 맨 위 띠를 눌러 사진·이름·소속을 접고 편다. 잔고·위치·목표·날짜는 남는다. 이 기기 공통
+  const folded = foldable && getPrefs().idFold === true;
+  const strip = foldable ? `<button class="gx-id-fold" data-action="id-fold" aria-expanded="${!folded}" aria-label="${folded ? '카드 펼치기' : '카드 접기'}" title="${folded ? '펼치기' : '접기'}">${folded ? ICONS.down : ICONS.up}</button>` : '';
+  return `<div class="gx-id${folded ? ' folded' : ''}">${bg}
+      ${strip}
+      ${folded ? '' : photo}
+      ${folded ? '' : who}
       ${status || walletChip(ctx) ? `<span class="gx-op-st">${walletChip(ctx)}${status}</span>` : ''}
     </div>`;
 }
