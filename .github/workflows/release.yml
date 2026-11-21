@@ -101,3 +101,7 @@ jobs:
               --title "괴이 ː ANOMALY ${TAG}" --prerelease \
               --notes-file out/notes.md
           fi
+          # 지난 릴리스는 지운다: 목록에는 늘 최신 한 개만 남긴다 (사용자 2026-11-21). 플러그인은 release 브랜치에서 받으므로 영향 없음. 태그는 둔다.
+          for t in $(gh release list --limit 200 --json tagName -q '.[].tagName'); do
+            [ "$t" = "$TAG" ] || gh release delete "$t" -y
+          done
