@@ -5836,7 +5836,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .top { gap: 12px; padding: 0 14px; }
   /* 괴담톡: PC 두 칸 그대로(사용자 11-21: 폴드 펼침은 PC 배치), 왼쪽 목록만 좁혀 대화 칸에 폭을 준다
      (목록 300px 면 대화 칸이 210px 라 말풍선이 두세 글자마다 꺾이고 머리 단추가 겹쳐 창 밖으로 나갔다). 배치는 그대로, 크기·간격만 */
-  .gx-body.ph-app { grid-template-columns: minmax(196px, 38%) minmax(0, 1fr); }
+  .gx-body.ph-app { grid-template-columns: minmax(196px, 40%) minmax(0, 1fr); }
   .gx-body .ph-side { padding: 12px 8px 0; gap: 8px; }
   .gx-panel.has-nav .gx-content > .gx-body.ph-app > .ph-side { padding-top: 12px; }
   .ph-app .ph-content { margin: 0 -8px; padding: 0 2px 10px; }
@@ -5844,8 +5844,6 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .ph-app .ph-avatar, .ph-app .ph-contacts .ph-avatar { width: 38px; height: 38px; border-radius: 12px; font-size: 14px; }
   .ph-app .ph-row { gap: 0; padding-right: 2px; }
   .ph-app .ph-act { gap: 0; }
-  .ph-app .ph-act .ph-tool.sm { width: 28px; height: 28px; }
-  .ph-app .ph-act .ph-tool.sm svg { width: 16px; height: 16px; }
   .ph-app .ph-tab { padding: 0 8px; }
   .ph-app .ph-tabs { gap: 4px; padding: 0 6px 8px; }
   .ph-app .ph-notice-bar .ph-tabs { padding-right: 0; }
