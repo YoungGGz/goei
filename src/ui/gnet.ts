@@ -520,7 +520,7 @@ function composer(busy: boolean, placeholder: string, chip = '', label = ''): st
       <button class="ph-tool ph-plus${gnet.attachMenu ? ' on' : ''}" data-action="gn-att-menu" aria-label="첨부" aria-expanded="${gnet.attachMenu}" title="첨부">${ICONS.plus}</button>
       <textarea class="ph-input" name="gn-draft" data-input="gn-draft" rows="1" placeholder="${esc(placeholder)}" ${busy ? 'disabled' : ''}>${esc(gnet.draft)}</textarea>
       <button class="ph-send${label ? ' txt' : ''}" data-action="gn-send" aria-label="등록" title="등록"${needAttr('gn-draft', gnet.draft, busy, gnet.attach.length > 0)}>${label || ICONS.send}</button>
-      <button class="ph-tool ph-back2" data-action="gn-back" aria-label="목록으로" title="목록으로">${ICONS.back}</button>
+      <button class="ph-tool ph-back2" data-action="gn-back" aria-label="목록으로" title="목록으로">${ICONS.list}</button>
     </div>
   </div>`;
 }

@@ -3,6 +3,7 @@
 // 사이트마다 로고·디자인이 다르고 창 테마를 따라가지 않는다. 사이트 화면은 app.ts 가 그리고, 여기서는 틀(탭·주소창·즐겨찾기·로그인)만.
 import { needAttr } from './needfill';
 import { guideTxt } from '../core/guides';
+import { josaRo } from '../core/josa';
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export type SiteId = 'gn' | 'gal' | 'wpf' | 'sm' | 'cos' | 'wk' | 'bm' | 'hs';
@@ -230,7 +231,7 @@ export function chromeHtml(o: ChromeOpts): string {
     <button class="br-tb pc" data-action="br-reload" aria-label="새로고침">${ic(IC.rel)}</button>
     <button class="br-tb mo" data-action="br-home" aria-label="새 탭">${ic(IC.home)}</button>
     <div class="br-omni">${omni}</div>
-    <button class="br-prof${o.nick ? ' in' : ''}" data-action="br-login" aria-label="${o.nick ? `${esc(o.nick)}(으)로 로그인됨` : '로그인'}">${prof}</button>
+    <button class="br-prof${o.nick ? ' in' : ''}" data-action="br-login" aria-label="${o.nick ? `${esc(josaRo(o.nick))} 로그인됨` : '로그인'}">${prof}</button>
     <button class="br-tabn mo" data-action="br-list" aria-label="탭 ${br.tabs.length}개">${br.tabs.length}</button>
   </div>
   <div class="br-bms">${bms}</div>`;

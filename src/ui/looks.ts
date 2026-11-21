@@ -7,6 +7,7 @@ import { idleOf, lookActs, looksStatus, lookRows, ensureLooks, type ActLook, typ
 import { savePrefs } from '../host/prefs';
 import { updateChat, type ChatContext } from '../host/risu';
 import { ICONS } from './icons';
+import { josaRo } from '../core/josa';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -166,7 +167,7 @@ function chooser(sel: string, g: LookGender | '', withSegs: boolean): string {
  *  g 를 주면(시작 패널에서 성별을 고른 뒤) 그 성별만, 안 주면(시작한 뒤) 팝업 안에 성별 단추 */
 export function lookPopup(sel: string, lockedName = '', g: LookGender | '' = ''): string {
   if (!lookUi.open) return '';
-  const inner = lockedName ? `<p class="gx-hint">${esc(lockedName)}(으)로 플레이 중이라 그 인물 모습을 써요.</p>` : chooser(sel, g || lookUi.g, !g);
+  const inner = lockedName ? `<p class="gx-hint">${esc(josaRo(lockedName))} 플레이 중이라 그 인물 모습을 써요.</p>` : chooser(sel, g || lookUi.g, !g);
   return `<div class="gx-agpop gx-lookpop" data-action="look-close" role="dialog" aria-label="아바타"><div class="gx-agpop-card gx-lookpop-card" data-action="look-keep">
     <div class="gx-lookpop-head"><b>아바타</b><button class="gx-x" data-action="look-close" aria-label="닫기">${ICONS.close}</button></div>
     ${inner}${lookUi.notice ? `<div class="gx-err" role="alert">${esc(lookUi.notice)}</div>` : ''}

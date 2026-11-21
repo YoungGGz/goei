@@ -12,13 +12,14 @@ export type PartKind = 'text' | UserKind;
 export const ATTACH_KINDS: AttachKind[] = ['photo', 'video', 'file', 'link', 'gift'];
 export const ATTACH_LABELS: Record<AttachKind | 'image', string> = { image: '사진', photo: '사진', video: '영상', file: '파일', link: '링크', gift: '선물' };
 /** 입력칸 안내 */
+/** 첨부 내용 칸 안내: 폰 폭(첨부 이름표·빼기 단추 옆)에서도 잘리지 않게 짧게 (전수점검 눌러-사소-7) */
 export const ATTACH_HINTS: Record<UserKind, string> = {
   image: '사진 설명 (선택)',
-  photo: '사진에 무엇이 찍혔는지 적어 주세요',
-  video: '영상 내용을 적어 주세요',
-  file: '파일 이름이나 내용을 적어 주세요',
-  link: '주소나 링크 설명을 적어 주세요',
-  gift: '보낼 선물 이름을 적어 주세요',
+  photo: '무엇이 찍혔는지',
+  video: '영상 내용',
+  file: '파일 이름이나 내용',
+  link: '주소나 링크 설명',
+  gift: '보낼 선물 이름',
 };
 export const ATTACH_MAX = 3;
 /** 한 요청에 실제로 붙이는 사진 수의 기본값 */
