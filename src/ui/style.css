@@ -3865,6 +3865,39 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-items .it-usebox { flex: 1 1 100%; min-height: 96px; }
   .gx-items .it-eqslots .it-wt { display: none; } /* 칸이 59보다 작아 무게 글자가 그림을 가린다 (폰과 같음) */
 }
+/* 폭도 좁고 높이도 낮은 창 (폴드 펼침 677×674 실기, 2026-11-21 사용자: 「밑에 소지품 영역이 쥐똥만큼 보이잖아」 — 장착 띠가 410 이라 격자가 한 줄도 안 보였다).
+   짜임은 그대로 두고 낮게만: [아바타 전신 절반 크기 | 칸 수·무게 / 장착 8칸 한 줄(손 2 · 장비 6) / 사용칸 한 줄]. 띠 410 → 약 160, 격자가 두 줄 넘게 보인다.
+   창 높이 = 화면의 90%(.gx-panel) 라서 화면 높이로 가른다: 920 부터는 위의 넓은 모양으로도 격자 두 줄이 들어간다 */
+@media (min-width: 601px) and (max-height: 919px) {
+  @container (max-width: 603px) {
+    .gx-items.it-fix .it-eqin { display: grid; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 6px 12px; --slot: min(59px, calc((100cqw - 64px - 12px - 7 * 6px) / 8)); }
+    .gx-items.it-fix .it-av { grid-column: 1; grid-row: 1 / span 2; width: 64px; min-width: 0; height: 128px; align-self: end; }
+    .gx-items.it-fix .it-av .gx-look { zoom: .5; } /* 전신을 자르지 않고 절반 크기로 (도트 2배 화면에서 딱 1:1). 끼우는 동작 장의 음수 여백도 같이 줄어 발밑이 안 움직인다 */
+    .gx-items.it-fix .it-eqcol { grid-column: 2; grid-row: 1; gap: 6px; min-width: 0; }
+    .gx-items.it-fix .it-eqslots { grid-template-columns: repeat(8, var(--slot)); gap: 6px; }
+    .gx-items.it-fix .it-slot { padding: 4px; border-radius: 10px; }
+    .gx-items.it-fix .it-slot .it-dmg { left: 3px; top: 3px; padding: 0 3px; font-size: 9px; }
+    .gx-items.it-fix .it-eqslots .it-slot:nth-child(4n) .it-tip { left: calc(100% + 8px); right: auto; }
+    .gx-items.it-fix .it-eqslots .it-slot:nth-child(n+5) .it-tip { left: auto; right: calc(100% + 8px); }
+    .gx-items.it-fix .it-usebox { grid-column: 2; grid-row: 2; flex-direction: row; align-items: center; gap: 10px; min-width: 0; min-height: 0; padding: 4px 10px; }
+    .gx-items.it-fix .it-usebox .it-ulab { flex: none; }
+    .gx-items.it-fix .it-usebox .it-uchips { flex: 1 1 auto; }
+  }
+}
+/* 상점 팔기도 같은 창 크기에서 같은 모양으로 낮춘다: [아바타 절반 크기 | 장착 8칸 한 줄]. 띠 282 → 152 (본문 .sh-body 가 통째로 스크롤이라 띠가 낮을수록 소지품 구획이 위로 올라온다) */
+@media (min-width: 601px) and (max-height: 919px) {
+  @container (max-width: 660px) {
+    .sh-body .it-eqbox.sell .it-eqin { align-items: center; --slot: min(59px, calc((100cqw - 2 * var(--zp) - 2px - 64px - 14px - 7 * 6px) / 8)); }
+    .sh-body .it-eqbox.sell .it-av { width: 64px; height: 128px; }
+    .sh-body .it-eqbox.sell .it-av .gx-look { zoom: .5; }
+    .sh-body .it-eqbox.sell .it-eqslots { grid-template-columns: repeat(8, var(--slot)); gap: 6px; }
+    .sh-body .it-eqbox.sell .it-slot { padding: 4px; border-radius: 10px; }
+    .sh-body .it-eqbox.sell .it-slot .it-dmg { left: 3px; top: 3px; padding: 0 3px; font-size: 9px; }
+    .sh-body .it-eqbox.sell .it-eqslots .it-wt { display: none; }
+    .sh-body .it-eqbox.sell .it-eqslots .it-slot:nth-child(4n) .it-tip { left: calc(100% + 8px); right: auto; }
+    .sh-body .it-eqbox.sell .it-eqslots .it-slot:nth-child(n+5) .it-tip { left: auto; right: calc(100% + 8px); }
+  }
+}
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gx-items .it-eqin { gap: 10px; flex-wrap: wrap; --slot: min(59px, calc((100vw - 32px - 24px - 128px - 10px - 8px) / 2)); }
   .gx-items .it-av { flex: none; width: 128px; min-width: 0; height: 272px; }
