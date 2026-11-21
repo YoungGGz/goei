@@ -81,7 +81,7 @@ export function itemsPackText() {
   for (const [k, f] of Object.entries(src.head_rep ?? {})) if (typeof f === 'string') (rep[k] = f), files.add(f);
   const icons = {};
   for (const f of [...files].sort()) icons[f] = readFileSync(new URL(`그림/물건/icons/${f}`, ROOT)).toString('base64');
-  return JSON.stringify({ schema: 1, kind: 'items', table, rep, same: src.up_same ?? {}, cats: src.up_cats ?? [], icons });
+  return JSON.stringify({ schema: 1, kind: 'items', table, rep, same: src.up_same ?? {}, cats: src.up_cats ?? [], draw: src.up_draw ?? [], one: src.up_one ?? [], icons });
 }
 
 /** 내 모습 팩 글: { schema, kind:'looks', looks:[{id, name, g, unique, n, w, h, cw, ch, ox, oy, sec?, acts?, img}] }.

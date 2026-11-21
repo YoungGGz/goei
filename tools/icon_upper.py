@@ -245,6 +245,20 @@ def main():
             continue
         problems['윗말 없는 한 낱말 이름'].append(f'{r["kind"]}: {r["name"]}')
 
+    # 그 분류에 넣지 않는 그림 (_out.txt, 11-22 분류 검사): 「분류: 이름, 이름」. 윗말 표·끝 낱말로는 그 분류에 들지만 그 분류 말로 불렀을 때 나오면 어긋나는 그림
+    #  (TV 의 셋톱박스, 가구의 구속 의자, 신분증의 보관증). 줄의 up 칸에서만 뺀다 — 이름으로 찾는 데는 상관없다
+    n_out = 0
+    for cat, names in pairs('_out.txt') or []:
+        for nm in names:
+            hit_rows = [r for r in by_name.get(nm, []) if cat in (r.get('up') or [])]
+            if not hit_rows:
+                problems['_out.txt 의 그림이 그 분류에 없음'].append(f'{cat}: {nm}')
+            for r in hit_rows:
+                r['up'].remove(cat)
+                n_out += 1
+                if not r['up']:
+                    r.pop('up')
+    print(f'분류에서 뺀 그림 {n_out}줄 (_out.txt)')
     # 분류마다 같은 뜻으로 쓰는 말 (_same.txt) → 표의 up_same {말(띄어쓰기 없음): 분류}. 대분류(종류)는 '@food'
     KIND_KEYS = {'food', 'wear', 'tool', 'device', 'medical', 'consumable', 'charm', 'weapon', 'paper', 'valuable', 'key', 'seal', 'anomaly', 'adult', 'body', 'misc'}
     flat = lambda x: re.sub(r'[\s_]+', '', x).lower()
@@ -268,6 +282,11 @@ def main():
     kpath = os.path.join(UPPER, '_same_skip.txt')
     if os.path.exists(kpath):
         skip = {flat(l.split('→')[0]) for l in open(kpath, encoding='utf-8') if l.strip() and not l.startswith('#')}
+    # 같은 뜻 말로 쓰지 않는 말 (_same_out.txt, 11-22 분류 검사): 한 줄에 하나. 뜻이 다르거나(법전 ≠ 경전) 그 말 그대로인 그림이 따로 있는 말(벙거지 → 버킷햇)
+    same_out = set()
+    opath = os.path.join(UPPER, '_same_out.txt')
+    if os.path.exists(opath):
+        same_out = {flat(l.split('#')[0]) for l in open(opath, encoding='utf-8') if l.split('#')[0].strip()}
     same = {}
     n_cat = 0
     spath = os.path.join(UPPER, '_same.txt')
@@ -291,6 +310,8 @@ def main():
                     same[flat(w[1:])] = cat
                     continue
                 f = flat(w)
+                if f in same_out:
+                    continue
                 if len(f) < 2:
                     problems['같은 말이 한 글자라 뺌'].append(f'{cat}: {w}')
                 elif f in GENERIC:
@@ -318,7 +339,7 @@ def main():
         if r['name'] in cat_names and r['name'] in all_up:
             for k in r.get('keywords') or []:
                 f = flat(k)
-                if not KO.search(k) and len(f) >= 3 and f not in same and f not in up_flat:
+                if not KO.search(k) and len(f) >= 3 and f not in same and f not in up_flat and f not in same_out:
                     same[f] = r['name']
                     n_auto += 1
     print(f'분류 이름 그림의 영어 이름에서 온 말 {n_auto}개')
@@ -330,6 +351,31 @@ def main():
     for ups in tails.values():
         cats.update(ups)
     table['up_cats'] = sorted(c for c in cats if c in all_up)
+    # 골고루 뽑는 분류 (_draw.txt): 그 말만으로는 물건 하나로 정해지지 않는 묶음 말만. 여기 없는 분류는 매칭기가 늘 한 장(이름 그대로인 그림이나 대표 그림)을 준다
+    draw = []
+    dpath = os.path.join(UPPER, '_draw.txt')
+    if os.path.exists(dpath):
+        for line in open(dpath, encoding='utf-8'):
+            for w in line.split('#')[0].split():
+                w = w.replace('_', ' ')
+                if w not in table['up_cats']:
+                    problems['_draw.txt 의 분류가 없음'].append(w)
+                elif w not in draw:
+                    draw.append(w)
+    table['up_draw'] = sorted(draw)
+    # 같은 뜻 말 가운데 물건 하나인 말 (_same_one.txt): 골고루 뽑는 분류의 말이어도 뽑지 않고 대표 한 장
+    one = []
+    npath = os.path.join(UPPER, '_same_one.txt')
+    if os.path.exists(npath):
+        for line in open(npath, encoding='utf-8'):
+            for w in line.split('#')[0].split():
+                f = flat(w)
+                if f not in same:
+                    problems['_same_one.txt 의 말이 같은 말 표에 없음'].append(w)
+                elif f not in one:
+                    one.append(f)
+    table['up_one'] = sorted(one)
+    print(f'골고루 뽑는 분류 {len(draw)}개 / 분류 {len(table["up_cats"])}개')
     print(f'같은 말: 분류 {n_cat}개, 말 {len(same)}개 (매칭기가 이미 그림을 찾는 말 {n_skip}개는 뺌)')
 
     for k, v in problems.items():
