@@ -510,6 +510,9 @@ export function makeIconIndex(rows: IconRow[], rep: Record<string, string> = {},
     l.push({ file: r.file, kind: r.kind ?? '' });
     groups.set(f, l);
   }
+  /** 그림 파일 → 그 그림 이름의 낱말들 (두 글자 이상) */
+  const nameWords = new Map<string, string[]>();
+  for (const r of rows) if (!nameWords.has(r.file)) nameWords.set(r.file, normIcon((r.keywords ?? [])[0] ?? '').split(' ').filter((t) => t.length >= 2));
   const sameMap = opts.same ?? {};
   const cats = opts.cats ? new Set(opts.cats.map(flat)) : null;
   /** 말 → 그 분류의 그림들과 분류 이름 (그 말이 분류 이름이거나 같은 뜻 말일 때) */
@@ -577,6 +580,19 @@ export function makeIconIndex(rows: IconRow[], rep: Record<string, string> = {},
     if (pool.length < 2) return hit0;
     // 같은 뜻 말(다과)이면 그 분류(과자)의 대표 그림이 기본
     const first = (g.cat ? base(g.cat, kindOnly, false) : null) ?? hit0;
+    // 이름에 든 말이 같은 그림이 분류 안에 있으면 그 그림이 먼저 (사용자 11-22: 「관리국 요원증」에 보관증 — 「관리국 사원증」이 있는데 제비뽑기에 졌다).
+    // 같은 말이 든 그림이 없을 때만 분류 안에서 골고루 뽑는다
+    const asked = `${flat(name0)} ${flat(w0)}`;
+    const catWord = flat(g.cat);
+    let top = 0;
+    let near: string[] = [];
+    for (const f of pool) {
+      const n = (nameWords.get(f) ?? []).filter((t) => t !== catWord && asked.includes(t)).length;
+      if (n > top) (top = n), (near = [f]);
+      else if (n === top && n > 0) near.push(f);
+    }
+    if (near.length === 1) return { file: near[0], score: 1 };
+    if (near.length > 1) return { file: first && near.includes(first.file) ? first.file : near[0], score: first?.score ?? 1, pool: near };
     return { file: first?.file ?? pool[0], score: first?.score ?? 1, pool };
   };
 }
