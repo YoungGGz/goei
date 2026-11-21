@@ -5062,7 +5062,10 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .wrap { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px 16px; }
   .wk .doc { padding: 20px 22px; }
   .wk .wst { padding: 12px 16px 0; }
-  .wk .nw-infobox { float: none; width: 100%; margin: 0 0 14px; }
+  /* 띄우지 않되 PC 와 같은 300px 로 가운데 — 폭 전체면 사진이 첫 화면을 다 채움 (11-21) */
+  .wk .nw-infobox { float: none; width: min(100%, 300px); margin: 0 auto 14px; }
+  /* 사진은 PC 와 같은 정사각 자르기 그대로, 크기만 170px — 펼친 폴드 첫 화면에 정보표 줄·본문이 보이게 */
+  .wk .nw-infobox td.nw-ibphoto img { width: 170px; max-width: 100%; margin: 0 auto; }
 }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .wk .top { padding: 0 12px; }
@@ -5077,6 +5080,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .wst { padding: 8px 8px 0; }
   .wk .doc { padding: 16px 14px; }
   .wk .nw-infobox { float: none; width: 100%; margin: 0 0 14px; }
+  .wk .nw-infobox td.nw-ibphoto img { width: 100%; }
   .wk .h1r { flex-direction: column; gap: 4px; }
   .wk .dbtn { margin: 0 0 4px; }
   .wk .rr { flex-wrap: wrap; }
