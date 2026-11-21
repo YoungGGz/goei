@@ -49,7 +49,8 @@ for (const vp of ['pc', 'phone']) {
   const p1 = await pos(); await sleep(700); const p2 = await pos();
   if (p1 === p2) fails.push(`[${vp}] 대기 동작이 안 움직임 (${p1})`);
   const own = looks.find((r) => r.name === '가짜관리국검사A').id;
-  await click(`.gx-lookpop .gx-lookc[data-value="${own}"]`);
+  // 닫힘(LOOK_CLOSE_MS 350)보다 먼저 보도록 누른 직후 바로 확인한다 (click() 의 300ms 대기는 부하 때 닫힘과 겹침)
+  await page.evaluate((q) => document.querySelector(q)?.click(), `.gx-lookpop .gx-lookc[data-value="${own}"]`);
   // 고른 칸을 잠깐 「고름」으로 보인 뒤 닫힌다 (11-08 눌러 보기 점검)
   if (!(await page.$(`.gx-lookpop .gx-lookc.on[data-value="${own}"]`))) fails.push(`[${vp}] 고른 칸이 바로 고름으로 안 보임`);
   await sleep(700);

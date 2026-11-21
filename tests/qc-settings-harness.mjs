@@ -166,6 +166,8 @@ export async function goNode(page, n) {
   await page.waitForFunction((n) => !!document.querySelector(`.gw [data-action="ed-node"][data-value="${n}"]`), n);
   await page.evaluate((n) => document.querySelector(`.gw [data-action="ed-node"][data-value="${n}"]`).click(), n);
   await page.waitForFunction((n) => document.querySelector(`.gw .gw-tree-item.on`)?.dataset.value === n, n);
+  // 폰: 같은 페이지를 다시 고르면 다시 그리기(morph)라 왼쪽 목록이 .18s 동안 미끄러져 닫힌다 → 다 닫힐 때까지 기다린다 (닫히는 중인 목록을 「가로 넘침」으로 잡지 않게)
+  await page.waitForFunction(() => { const w = document.querySelector('.gw .gw-win'); const t = w?.querySelector('.gw-tree'); if (!t || w.classList.contains('drawer')) return true; const cs = getComputedStyle(t); return cs.position !== 'absolute' || (cs.visibility === 'hidden' && t.getBoundingClientRect().right <= 1); });
 }
 export async function openEditor(page, node = 'set:screen') {
   const picker = await page.$('.gx [data-action="prefs-open"]');

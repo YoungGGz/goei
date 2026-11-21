@@ -180,10 +180,12 @@ for (const vp of vps) {
   assert.equal(await page.isDisabled('.gw [data-action="ed-rule-new"]'), true, '100개면 새 규칙 잠김');
   // 내보내기 「지금 채팅 값도 넣기」(2026-11-06 사용자, 전수점검 남은 것 5): 기본은 안 넣음 → 체크하면 chat.vars 에 이 채팅의 설정 변수만, 가져오면 그 채팅 변수에 적힘
   await goNode(page, 'manage:backup');
-  await page.waitForSelector('.gw [data-change="man-with-chat"]');
+  // 체크 상자 → 스위치 (눌러-보통-43, f1e926c)
+  await page.waitForSelector('.gw [data-action="man-with-chat"][role="switch"]');
+  assert.equal(await page.getAttribute('.gw [data-action="man-with-chat"]', 'aria-checked'), 'false', '기본은 끔');
   const sizeBefore = await page.textContent('.gw .ps-row .gw-tokens');
-  await page.evaluate(() => { const el = document.querySelector('.gw [data-change="man-with-chat"]'); el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); });
-  await page.waitForFunction(() => document.querySelector('.gw [data-change="man-with-chat"]')?.checked);
+  await clickSel(page, '.gw [data-action="man-with-chat"]');
+  await page.waitForFunction(() => document.querySelector('.gw [data-action="man-with-chat"]')?.getAttribute('aria-checked') === 'true');
   // 크기는 KB 로 반올림돼 작은 차이는 안 보인다 (앞에서 규칙 100개를 넣음) → 복사한 글에 chat.vars 가 들어가는지로 본다
   void sizeBefore;
   await page.evaluate(() => { window.__clip = ''; Object.defineProperty(navigator, 'clipboard', { value: { writeText: async (t) => { window.__clip = t; } }, configurable: true }); });
@@ -202,8 +204,8 @@ for (const vp of vps) {
   const ss = await page.evaluate(() => window.__chat.scriptstate);
   assert.deepEqual([ss.$st_agent_limit, ss.$wg_random_p, ss.$st_faction, ss.x], ['7', '33', 'A00', undefined], '설정 변수만 이 채팅에 적히고 상태 변수·모르는 열쇠는 버림');
   // 체크를 풀면 chat 이 빠진다 (아래 「내보내기 JSON = 저장된 기기 설정」 비교를 위해 되돌림)
-  await page.evaluate(() => { const el = document.querySelector('.gw [data-change="man-with-chat"]'); el.checked = false; el.dispatchEvent(new Event('change', { bubbles: true })); });
-  await page.waitForFunction(() => document.querySelector('.gw [data-change="man-with-chat"]') && !document.querySelector('.gw [data-change="man-with-chat"]').checked);
+  await clickSel(page, '.gw [data-action="man-with-chat"]');
+  await page.waitForFunction(() => document.querySelector('.gw [data-action="man-with-chat"]')?.getAttribute('aria-checked') === 'false');
   // 저장소를 비워 되돌린다
   await page.evaluate(() => { delete window.__store['p:goei:prefs']; });
   await goNode(page, 'manage:backup');
@@ -219,7 +221,9 @@ for (const vp of vps) {
   await page.waitForSelector('.gw .gw-setbody .ps-row');
   const diag = await page.textContent('.gw .gw-setbody');
   assert.ok(diag.includes('괴이 카드') && diag.includes('진행 중') && diag.includes('메시지 2개'), `상태 점검 내용: ${diag.slice(0, 200)}`);
-  assert.ok(/플러그인[^·]{0,120}v\d+\.\d+\.\d+/.test(diag.replace(/\s+/g, ' ')), '플러그인 버전 (줄 이름 · 설명 · 배지 순)');
+  // 「플러그인」 줄에 설명이 생김(눌러2-보통-33, f1e926c: 설명 글에 「설치·업데이트」의 · 가 들어감) → 그 줄만 집어 이름·설명·배지 순을 본다
+  { const pr = await page.$$eval('.gw .gw-setbody .ps-row', (rows) => rows.map((r) => ({ name: r.querySelector('.ps-label > b')?.textContent?.trim(), text: r.textContent.replace(/\s+/g, ' ') }))).then((rs) => rs.find((r) => r.name === '플러그인'));
+    assert.ok(pr && /^\s*플러그인.+플러그인 판.+v\d+\.\d+\.\d+\s*$/.test(pr.text) && pr.text.includes('플러그인 판'), `플러그인 버전 (줄 이름 · 설명 · 배지 순): ${pr?.text}`); }
   // 카드 판 ≠ 플러그인 판 경고 (2026-11-06 사용자, 전수점검 남은 것 4): 같은 저장소에서 만든 카드라 처음엔 없고, 매니페스트 판이 다른 카드는 빨간 줄 + 업데이트로 가는 단추
   assert.ok(!diag.includes('판 맞춤'), '카드·플러그인 판이 같으면 경고 없음');
   const fxVer = (v) => { const f = JSON.parse(JSON.stringify(fx.fixture)); const e = f.globalLore.find((e) => e.comment === 'Plugin manifest'); const j = JSON.parse(e.content); if (v === null) delete j.version; else j.version = v; e.content = JSON.stringify(j); return { fixture: f, fixtureDir: fx.fixtureDir }; };

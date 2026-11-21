@@ -31,7 +31,7 @@ const boxes = () => page.evaluate(() => [...document.querySelectorAll('.gw .gw-m
   const inp = box.querySelector('input.adv-val');
   const plus = [...box.querySelectorAll('button.gx-step')].pop();
   const row = box.closest('[data-key], .st-row, .set-row, tr, .ck-row')?.textContent?.trim().replace(/\s+/g, ' ').slice(0, 30) ?? '';
-  return { has: !!inp, id: inp ? `${inp.dataset.change}|${inp.dataset.key ?? ''}` : '', n: inp ? inp.value : '', min: Number(inp?.min), max: Number(inp?.max), step: Number(inp?.step), plusOff: !!plus?.disabled, off: !!inp?.disabled, row, text: box.textContent.trim().slice(0, 20) };
+  return { has: !!inp, id: inp ? `${inp.dataset.change}|${inp.dataset.key ?? ''}` : '', n: inp ? inp.value.replace(/[,\s]/g, '') : '', min: Number(inp?.min), max: Number(inp?.max), step: Number(inp?.step), plusOff: !!plus?.disabled, off: !!inp?.disabled, row, text: box.textContent.trim().slice(0, 20) };
 }));
 const byId = async (id) => (await boxes()).find((x) => x.id === id);
 let total = 0, tried = 0;

@@ -980,10 +980,14 @@
     var(--panel);
 }
 .gw .ck > .ps-rows::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--sub) 45%, transparent); border: 2px solid transparent; background-clip: padding-box; }
-.gw .ck > .ps-rows > .ck-line { grid-column: 1 / -1; grid-template-columns: subgrid; min-width: 0; }
+.gw .ck > .ps-rows > .ck-line { grid-column: 1 / -1; grid-template-columns: subgrid; min-width: 0; padding-inline: 0; }
+/* subgrid 줄의 좌우 여백은 바깥 열을 깎아 먹는다(이름 칸·끝 칸이 좁아짐). 이름 칸 안에 넣으면 글 자리가 줄어 폰에서 이름이 잘린다 → 여백은 격자 상자 안쪽에 */
+.gw .ck > .ps-rows { padding-inline: 10px; }
 .gw .ck .ck-name .mx-name > span { white-space: nowrap; }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
-  .gw .ck > .ps-rows { grid-template-columns: minmax(var(--gname-ph, 74px), max-content) repeat(var(--ck-n), minmax(min-content, 1fr)); }
+  /* 이름 칸은 74px 이상, 이름이 길면 그만큼 (minmax(74px, max-content)는 칸이 많아 남는 폭이 없으면 74px에 머물러 이름이 잘렸다) */
+  .gw .ck > .ps-rows { grid-template-columns: max-content repeat(var(--ck-n), minmax(min-content, 1fr)); padding-inline: 6px; }
+  .gw .ck > .ps-rows .ck-name { min-width: var(--gname-ph, 74px); }
   .gw .ck-h1 b { font-size: 12px; letter-spacing: -.2px; }
   .gw .ck-h2 { font-size: 12px; letter-spacing: -.2px; }
   .gw .ck-h2 > span { padding: 0 3px; }
@@ -1017,7 +1021,7 @@
 /* 이미지 지침 글칸 (눌러-보통-50): 복사 단추를 글상자 안에 띄우면 첫 줄 끝을 덮었다 → 다른 지침처럼 글상자 위 줄에, 토큰 수와 함께 */
 .gw .ip-copyhead { justify-content: flex-end; min-height: 0; margin: 0 0 6px; }
 /* 지침 설명 (눌러-보통-51): 영어 낱말(FORMAT 등)이 글자 단위로 끊기지 않게 */
-.gw .gw-head > .gx-muted { word-break: keep-all; overflow-wrap: break-word; }
+.gw .gw-head > .gx-muted { word-break: keep-all; overflow-wrap: anywhere; } /* 끊을 곳 없는 긴 영어 줄(COMMON·OPENING·…)이 폰 폭을 넘지 않게 */
 /* 폰 켬/끔·표 고르기 (눌러2-보통-31): 스위치 36×20·동그라미 24 는 누르는 칸이 작았다 → 폰은 스위치 44×24, 표 고르기는 칸 둘레까지 눌린다 */
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gw .gx-switch { width: 44px; height: 24px; }

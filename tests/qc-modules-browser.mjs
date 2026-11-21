@@ -486,17 +486,17 @@ if (want('G5')) {
   await page.click('[data-action="br-reload"]');
   await idle(page);
   assert.equal(await page.locator('.gn-row').count(), 1, '내 명의 글은 뺌');
-  assert.ok((await page.textContent('.gx-toast')).includes('새 글 1개와 댓글·연결 답글 1개'), '뺀 것 안내');
+  assert.ok((await page.textContent('.gx-toast')).includes('사용자 명의로 온 새 글 1개와 댓글 1개는 뺐어요'), '뺀 것 안내');
   // 새 쪽지: 받는 사람을 직접 적는다 (쪽지 상대는 공개 글이 하나뿐이면 출처가 붙는다)
   await page.click('[data-action="gn-sub"][data-value="dm"]');
   await page.click('[data-action="gn-newdm"]');
   await page.waitForSelector('[data-input="gn-to"]');
-  await page.click('[data-action="gn-send"]');
-  assert.ok((await page.textContent('.gn')).includes('내용을 입력'), '빈 내용 막기');
+  // 빈 칸이면 보내기 단추를 끈다 (눌러-중대-9, e3bf573)
+  assert.ok(await page.locator('[data-action="gn-send"]').isDisabled(), '빈 내용 막기');
   await page.fill('[data-input="gn-draft"]', '안녕하세요');
-  await page.click('[data-action="gn-send"]');
-  assert.ok((await page.textContent('.gn')).includes('받는 사람 닉네임'), '받는 사람 없으면 막기');
+  assert.ok(await page.locator('[data-action="gn-send"]').isDisabled(), '받는 사람 없으면 막기');
   await page.fill('[data-input="gn-to"]', 'n1');
+  assert.ok(await page.locator('[data-action="gn-send"]').isEnabled(), '두 칸 다 차면 켜짐');
   await llm(page, [ok('{"body":"누구세요?"}')]);
   await page.click('[data-action="gn-send"]');
   await page.waitForSelector('.ph-msg.npc >> text=누구세요', { timeout: 6000 });
@@ -732,8 +732,8 @@ if (want('P2')) {
   // 연락처 추가: 명부 이름이면 그 인물, 아니면 기타; 빈 이름·줄바꿈 막기; 같은 이름 둘이면 안내; 삭제하면 1:1 방도
   await page.click('[data-action="ph-sub"][data-value="contacts"]');
   await page.click('[data-action="ph-add"]');
-  await page.click('[data-action="ph-add-save"]');
-  assert.ok((await page.textContent('.ph')).includes('60자 이내'));
+  // 빈 이름이면 추가 단추를 끈다 (빈 칸 단추 통일, 1eaf907)
+  assert.ok(await page.locator('[data-action="ph-add-save"]').isDisabled(), '빈 이름 막기');
   await page.fill('[data-input="ph-add-name"]', `동네 형${evil}`);
   await page.click('[data-action="ph-add-save"]');
   assert.ok((await page.textContent('.ph')).includes('괄호 없이'), '꺾쇠는 막는다');
@@ -789,7 +789,10 @@ if (want('P3')) {
   assert.ok(await page.isDisabled('[data-action="ph-send"]'), '대기 중엔 보내기 잠김');
   await page.click('[data-action="ph-skip"]');
   await page.waitForFunction(() => !JSON.parse(window.__chat.scriptstate.$ph_state).rooms.dm_c_50303031.pending);
+  // 빈 입력칸이면 보내기는 꺼져 있으니(빈 칸 단추 통일, 1eaf907·눌러-중대-9) 글을 적고 풀림을 본다
+  await page.fill('[data-input="ph-draft"]', '다시');
   assert.ok(await page.isEnabled('[data-action="ph-send"]'), '건너뛴 뒤 풀림');
+  await page.fill('[data-input="ph-draft"]', '');
   // 선물 첨부: 1:1 은 가능
   await page.click('[data-action="ph-att-menu"]');
   await page.click('[data-action="ph-att-add"][data-value="gift"]');
@@ -1129,7 +1132,8 @@ if (want('S1')) {
   await page.click('.gx-agrow[data-value="P001"]');
   await page.waitForSelector('.gx-agcard');
   assert.ok((await page.textContent('.gx-agcard')).includes('NO. P-001'));
-  assert.equal(await page.locator('.gx-agcard [data-action="people-goto"]').count(), 0, '기록이 없으면 「기록」 없음');
+  // 기록이 없으면 「기록」 단추는 자리만 두고 끈다 (눌러-보통-2, dfbbfbc)
+  assert.ok(await page.locator('.gx-agcard [data-action="people-goto"]').isDisabled(), '기록이 없으면 「기록」 꺼짐');
   await page.keyboard.press('Escape');
   await page.waitForSelector('.gx-agcard', { state: 'detached' }).catch(() => {});
   if (await page.locator('.gx-agcard').count()) await page.click('.ev-scrim');

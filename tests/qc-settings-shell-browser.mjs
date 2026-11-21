@@ -79,6 +79,8 @@ for (const vp of vps) {
       assert.deepEqual(u.bad, [], `${vp} ${t} ${n}: 빈 배색 변수`);
       assert.deepEqual(u.same, [], `${vp} ${t} ${n}: 글자색 = 배경색`);
       if (phone) {
+        // 폰: 갈래(ed-tab)를 누르면 서랍이 열리고 페이지를 고르면 닫힌다 → 닫히는 이동(.18s) 중에 재면 서랍이 화면 왼쪽에 걸쳐 잡힌다. 이동이 끝난 뒤에 잰다
+        await page.evaluate(() => Promise.all(document.getAnimations().filter((x) => x instanceof CSSTransition).map((x) => x.finished.catch(() => {}))));
         const a = await auditDom(page, '.gw');
         assert.deepEqual(a.overflow, [], `${vp} ${t} ${n}: 가로 넘침`);
         assert.ok(a.scrollW <= VIEWPORTS[vp].width + 1, `${vp} ${n}: 페이지 가로 스크롤 ${a.scrollW}`);

@@ -529,7 +529,7 @@ if (!skip()) {
   await frame.waitForFunction(() => document.querySelector('.gw-install')?.textContent?.includes('끝났어요'), null, { timeout: 180000 });
   const ms = Date.now() - t0;
   const info = await frame.textContent('.gw-install .gx-hint');
-  assert.match(info, /로어북·인사말·봇 이름 · 사진 2522장 · 아이콘 · 위키 기본 문서 · 토크나이저 — 끝났어요/, info);
+  assert.match(info, /로어북·인사말·봇 이름 · 사진 2663장 · 아이콘 · 위키 기본 문서 · 토크나이저 — 끝났어요/, info);
   assert.equal(await frame.locator('.gx-err').count(), 0, '안 된 것 없음');
   const ch = await frame.evaluate(() => window.__chars[0]);
   assert.equal(ch.name, '괴이 ː ANOMALY');
@@ -539,11 +539,12 @@ if (!skip()) {
   assert.deepEqual(ch.loreSettings, { tokenBudget: 99999, scanDepth: 10, recursiveScanning: false }, '로어북 설정 (글로벌 설정 사용 X)');
   assert.equal(ch.additionalAssets.length, manifest.pictures.length, '카드 사진 전부');
   assert.match(ch.image, /^assets\//, '아이콘이 메인');
-  assert.deepEqual(ch.ccAssets.map((a) => [a.type, a.name]), [['icon', 'main'], ['icon', 'goei']], '이전 아이콘은 목록에 남김');
+  // 메인이 되는 우리 아이콘은 목록에 넣지 않는다 (같은 그림 두 장, 사용자 2026-11-15 · d512c02). 설치 전 아이콘만 목록에 남김
+  assert.deepEqual(ch.ccAssets.map((a) => [a.type, a.name, a.uri]), [['icon', 'main', 'assets/old-icon.png']], '이전 아이콘은 목록에 남기고 우리 아이콘은 목록에 없음');
   const store = await frame.evaluate(() => Object.fromEntries(Object.entries(window.__store).map(([k, v]) => [k, typeof v === 'string' ? v.length : JSON.stringify(v).length])));
   assert.ok(store['p:goei:wikibase'] > 500_000, '위키 묶음 저장');
   assert.ok(store['p:goei:tok-o200k'] > 2_000_000, '토크나이저 저장');
-  assert.deepEqual(JSON.parse(await frame.evaluate(() => window.__store['p:goei:icon'])), { [ch.name]: { ours: ch.image, prev: 'assets/old-icon.png' } }, '아이콘 기록 (chaId 없는 봇은 이름으로)');
+  assert.deepEqual(JSON.parse(await frame.evaluate(() => window.__store['p:goei:icon'])), { [ch.name]: { ours: ch.image, prev: 'assets/old-icon.png', digest: JSON.parse(read('src/data/install/icon.json')).digest } }, '아이콘 기록 (chaId 없는 봇은 이름으로, 새 그림 판정용 지문 d512c02)');
   assert.equal(await frame.locator('.gw-inst-no').count(), 0, '점검 전부 있음');
   assert.match(await frame.textContent('.gw-install'), /모두 갖춰져 있어요/);
   assert.equal(await frame.textContent('[data-action="ed-inst-all"]'), '다시 점검·맞추기');
@@ -551,7 +552,8 @@ if (!skip()) {
   const f0 = (await fetched(frame)).length;
   await frame.click('[data-action="ed-inst-all"]');
   await frame.waitForFunction(() => /끝났어요|바꿀 것이 없었어요/.test(document.querySelector('.gw-install')?.textContent ?? ''), null, { timeout: 30000 });
-  assert.match(await frame.textContent('.gw-install .gx-hint'), /^로어북·인사말(·봇 이름)? — 끝났어요\.$/, '두 번째: 로어북만 다시 맞춤');
+  // 다 갖춘 카드는 다시 저장하지 않고 「바꿀 것이 없었어요」 (전수점검 사소-3, 1eaf907)
+  assert.equal(await frame.textContent('.gw-install .gx-hint'), '바꿀 것이 없었어요.', '두 번째: 바꿀 것 없음');
   // 위키 팩이 낡았는지 보려고 목록(wiki-base.json)만 읽는다 (전수검사 11-13 wiki#8). 팩·사진은 안 받음
   assert.deepEqual((await fetched(frame)).slice(f0).filter((u) => u !== 'wiki-base.json'), [], '두 번째는 아무것도 안 받음');
   // 저장소 사용량(설정 내보내기)에 본체·위키·토크나이저가 보인다
@@ -568,6 +570,7 @@ if (!skip()) {
   await frame.click('[data-action="ed-inst-icon-back"]');
   await frame.waitForFunction(() => document.querySelector('.gw-install')?.textContent?.includes('이전 아이콘 — 끝났어요'), null, { timeout: 10000 });
   assert.equal(await frame.evaluate(() => window.__chars[0].image), 'assets/old-icon.png');
+  assert.deepEqual(await frame.evaluate(() => window.__chars[0].ccAssets.map((a) => [a.type, a.name, a.uri])), [['icon', 'goei', ch.image]], '되돌리면 메인과 목록을 맞바꿈');
   // 창을 닫으면 플로팅 버튼 (설치로 괴이 카드가 됨 → 감시 다시 판정)
   await frame.click('.gw [data-action="ed-close"]');
   await frame.click('.gx [data-action="close"]');
@@ -603,15 +606,15 @@ if (!skip()) {
   await frame.click('[data-action="ed-inst-all"]');
   await frame.waitForFunction(() => /안 된 것/.test(document.querySelector('.gw-install')?.textContent ?? ''), null, { timeout: 180000 });
   const err2 = await frame.textContent('.gw-install .gx-err');
-  const part = Number(/(\d+)\/2522장까지 받았어요/.exec(err2)?.[1]);
+  const part = Number(new RegExp(`(\\d+)/${manifest.pictures.length}장까지 받았어요`).exec(err2)?.[1]);
   assert.ok(part >= 150 && part < 170, err2);
   assert.equal(await frame.evaluate(() => window.__chars[0].additionalAssets.length), part, '저장한 사진만 카드에');
-  assert.match(await frame.textContent('.gw-install'), new RegExp(`${part}/2522장`), '점검표에 남은 수');
+  assert.match(await frame.textContent('.gw-install'), new RegExp(`${part}/${manifest.pictures.length}장`), '점검표에 남은 수');
   // 404 를 고치고 다시 누르면 이어서 받는다
   await frame.evaluate(() => { window.__fetchHook = (n, u) => (u.includes('/pic/') ? new Uint8Array([1, 2, 3]) : undefined); });
   await frame.click('[data-action="ed-inst-all"]');
-  await frame.waitForFunction((n) => new RegExp(`사진 ${n}장`).test(document.querySelector('.gw-install')?.textContent ?? ''), 2522 - part, { timeout: 180000 });
-  assert.equal(await frame.evaluate(() => window.__chars[0].additionalAssets.length), 2522);
+  await frame.waitForFunction((n) => new RegExp(`사진 ${n}장`).test(document.querySelector('.gw-install')?.textContent ?? ''), manifest.pictures.length - part, { timeout: 180000 });
+  assert.equal(await frame.evaluate(() => window.__chars[0].additionalAssets.length), manifest.pictures.length);
   assert.equal(await frame.locator('.gw-inst-no').count(), 0);
   await closeOf(page, errors);
   ok('설치 부분 실패: 지문 불일치·404 묶음은 카드 그대로, 다른 단계 계속, 다시 누르면 이어서');
@@ -624,7 +627,7 @@ if (!skip()) {
   await waitFab(frame);
   await frame.evaluate(() => window.__buttons['goei-plugin-install'].cb());
   await frame.waitForSelector('.gw-install', { timeout: 10000 });
-  assert.match(await frame.textContent('.gw-install'), /빠진 것 2개/, '위키 묶음·토크나이저만 없음 (아이콘은 점검 항목이지만 빠진 것 수에는 안 셈)');
+  assert.match(await frame.textContent('.gw-install'), /빠진 것이 2개 있어요/, '위키 묶음·토크나이저만 없음 (아이콘은 점검 항목이지만 빠진 것 수에는 안 셈)');
   assert.equal(await frame.locator('.gw-inst-no').count(), 3, '아이콘·위키·토크나이저');
   await frame.click('[data-action="ed-inst-all"]');
   await frame.waitForFunction(() => document.querySelector('.gw-install')?.textContent?.includes('끝났어요'), null, { timeout: 60000 });
@@ -884,7 +887,7 @@ if (!skip()) {
   assert.equal(await frame.locator('.gl-card').count(), 1, '받기 창은 하나 (시작기는 자기 창을 겹쳐 띄우지 않음)');
   assert.equal(await frame.locator('[data-gl-world] [data-gl="file"]').count(), 1, '본체의 자료 받기 창에도 파일로 넣기');
   const first = await panelMsg(frame);
-  assert.match(first, /^세계 자료\(goei-data-world\)를 받지 못했어요: goei-data-world\.2\.txt을 받지 못했어요 \(404\)\./, first);
+  assert.match(first, /^세계 자료\(goei-data-world\)를 받지 못했어요: goei-data-world\.2\.txt를 받지 못했어요 \(404\)\./, first);
   assert.match(await frame.textContent('.gl-card'), /다시 받거나, 릴리스 zip에 든 goei-data-world\.txt/, '안내 글');
   assert.deepEqual(await frame.evaluate(() => window.__calls.show), ['fullscreen'], '창을 띄움');
   assert.equal(await fab(frame), 'none', '자료 없이는 버튼도 처리기 화면도 없음');
@@ -961,7 +964,7 @@ if (!skip()) {
   const a = await boot([fixture], 0, chat, { serve: missing, loader: 'old' });
   await a.frame.waitForSelector('.gl-card', { timeout: 15000 });
   assert.equal(await a.frame.locator('.gl-card').count(), 1, '처음 실패에 창 하나');
-  assert.match(await panelMsg(a.frame), /goei-data-world\.2\.txt을 받지 못했어요 \(404\)/);
+  assert.match(await panelMsg(a.frame), /goei-data-world\.2\.txt를 받지 못했어요 \(404\)/);
   await serve(a.frame, startFiles);
   await a.frame.click('[data-gl="get"]');
   await a.frame.waitForSelector('[data-gl-done]', { state: 'attached', timeout: 30000 });

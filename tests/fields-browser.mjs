@@ -29,6 +29,8 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   const count = (s) => page.locator(s).count();
   const put = async (s, v) => { await page.evaluate(([s, v]) => { const el = document.querySelector(s); el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); }, [s, v]); await sleep(350); };
   const click = async (s) => { await page.evaluate((s) => document.querySelector(s).click(), s); await sleep(350); };
+  // 줄 지우기는 가운데 팝업으로 한 번 묻는다 (115bc97, 전수점검 눌러-보통-28·눌러-사소-38): 팝업이 뜨는지 보고 「지우기」를 누른다
+  const del = async (s) => { await click(s); ok(await page.evaluate(() => !!document.querySelector('.gw-confirm [data-action="ed-askdel-yes"]')), `[${vp}] 줄 지우기 확인 팝업`); await click('.gw-confirm [data-action="ed-askdel-yes"]'); };
   const cell = (ch, key) => q(`[data-change="${ch}"][data-key="${key}"]`);
   const noOverflow = async (tag) => eq(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth || [...document.querySelectorAll('.gw .ms-tb')].some((t) => t.scrollWidth > t.clientWidth + 1)), false, `[${vp}] ${tag}: 가로 넘침 없음`);
   const shot = async (tag, s) => { await page.evaluate((s) => document.querySelector(s)?.closest('.ps-row, details')?.scrollIntoView({ block: 'start' }), s); await sleep(300); await page.screenshot({ path: `${OUT}/${vp}-${tag}.png` }); };
@@ -43,7 +45,7 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   eq(await count(q('[data-change="ms-roll"][data-key="cos:tiers"]')), 0, '옛 글 상자 없음');
   const names0 = await vals(q('[data-change="ms-tier"][data-key$=":name"]'));
   eq(names0, ['최저가', '저가', '중가', '고가', '최고가'], '기본 등급 이름이 칸에 들어 있다');
-  eq(await vals(q('[data-change="ms-tier"][data-key="cos:3:lo"]')), ['10000000'], '고가 하한 기본값');
+  eq(await vals(q('[data-change="ms-tier"][data-key="cos:3:lo"]')), ['10,000,000'], '고가 하한 기본값 (자릿점 표기, f1e926c·눌러-사소-39)');
   eq(await count(q('.ms-tb-err')), 0, '기본값에는 붉은 글 없음');
   eq(await count(q('[data-action="ms-roll-reset"]')), 0, '고친 게 없으면 「기본값으로」 없음');
   // 숫자 상자는 공통 규격 그대로
@@ -80,7 +82,7 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   await reopen('set:cos');
   eq(await vals(q('[data-change="ms-tier"][data-key="cos:5:name"]')), ['시험 등급'], '다시 열어도 그대로'); eq(await count(TR), 6);
   // 줄 지우기
-  await click(q('[data-action="ms-tier-del"][data-value="cos:5"]'));
+  await del(q('[data-action="ms-tier-del"][data-value="cos:5"]'));
   eq(await count(TR), 5, '× 로 줄 지우기');
   // 12줄 상한
   for (let i = 0; i < 7; i++) await click(q('[data-action="ms-tier-add"]'));
@@ -91,7 +93,7 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   await click(q('[data-action="ms-roll-reset"]'));
   ok(!(await ss()).$cos_roll_tiers, '「기본값으로」 두 번'); eq(await vals(q('[data-change="ms-tier"][data-key$=":name"]')), names0);
   // 다 지우면 기본값
-  for (let i = 4; i >= 0; i--) await click(q(`[data-action="ms-tier-del"][data-value="cos:${i}"]`));
+  for (let i = 4; i >= 0; i--) await del(q(`[data-action="ms-tier-del"][data-value="cos:${i}"]`));
   ok(!(await ss()).$cos_roll_tiers, '다 지우면 저장을 비운다'); eq(await count(TR), 5, '다 지우면 기본 5줄이 돌아온다');
 
   /* ── 포인트몰: 값 등급(p) + 상담사 주사위 칸 ── */
@@ -121,10 +123,10 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   await noOverflow('주사위 칸');
   await reopen('set:bm');
   eq(await vals(q('[data-change="ms-ax-name"][data-key="7"]')), ['취미'], '다시 열어도 그대로');
-  await click(q('[data-action="ms-ax-del"][data-value="7"]')); eq(await count(AX), 7);
+  await del(q('[data-action="ms-ax-del"][data-value="7"]')); eq(await count(AX), 7);
   await click(q('[data-action="ms-desk-reset"]'));
   ok(!(await ss()).$bm_desk_axes, '「기본값으로」'); eq(await vals(q('[data-change="ms-ax-vals"]')), ax0);
-  for (let i = 6; i >= 0; i--) await click(q(`[data-action="ms-ax-del"][data-value="${i}"]`));
+  for (let i = 6; i >= 0; i--) await del(q(`[data-action="ms-ax-del"][data-value="${i}"]`));
   ok(!(await ss()).$bm_desk_axes); eq(await count(AX), 7, '다 지우면 기본 7칸');
 
   /* ── 그림 대체 말 (소지품): 접어 둠 ── */
@@ -162,7 +164,7 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   await reopen('set:items');
   eq(await page.evaluate((s) => document.querySelector(s).open, D), true, '다시 열어도 펼친 채');
   eq(await vals(cell('set-items-alias-cell', '32:a')), ['시험말'], '다시 열어도 그대로');
-  await click(q('[data-action="set-items-alias-del"][data-value="32"]'));
+  await del(q('[data-action="set-items-alias-del"][data-value="32"]'));
   eq(await count(AR), 32, '× 로 줄 지우기');
   await click(q('[data-action="set-items-alias-reset"]'));
   ok(!(await ss()).$it_icon_alias, '「기본값으로」'); eq(await vals(cell('set-items-alias-cell', '0:b')), ['코트']);

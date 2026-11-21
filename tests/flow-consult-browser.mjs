@@ -32,7 +32,7 @@ async function clickAll(page, where) {
     const next = await page.evaluate(([sel, done]) => {
       const e = [...document.querySelectorAll(sel)].find((e) => !e.disabled && e.getAttribute('aria-pressed') !== 'true' && !done.includes(e.dataset.value));
       if (!e) return null;
-      return { v: e.dataset.value, row: e.closest('.fl-line')?.querySelector('.fl-name')?.textContent ?? '', sw: e.getAttribute('role') === 'switch', checked: e.getAttribute('aria-checked'), step: e.classList.contains('gx-step') ? e.parentElement.querySelector('b')?.textContent : null };
+      return { v: e.dataset.value, row: e.closest('.fl-line')?.querySelector('.fl-name')?.textContent ?? '', sw: e.getAttribute('role') === 'switch', checked: e.getAttribute('aria-checked'), step: e.classList.contains('gx-step') ? ((b) => b ? (b.tagName === 'INPUT' ? b.value || b.placeholder : b.textContent) : null)(e.parentElement.querySelector('b, input')) : null };
     }, [DO, [...done]]);
     if (!next) break;
     done.add(next.v);
@@ -42,11 +42,11 @@ async function clickAll(page, where) {
     const b = await snap(page);
     const at = a.chat !== b.chat ? (a.prefs !== b.prefs ? 'both' : 'chat') : a.prefs !== b.prefs ? 'prefs' : 'none';
     eq(at, where(next.v), `${next.row} (${next.v}): 저장 자리`);
-    // 화면: seg·격자 칸은 누른 것이 켜지고, 스위치는 뒤집히고, 수는 글이 바뀐다
+    // 화면: seg·격자 칸은 누른 것이 켜지고, 스위치는 뒤집히고, 수는 글이 바뀐다 (직접 입력 칸이 있는 수는 그 칸의 값, 56b4967)
     const now = await page.evaluate(([sel, v, row]) => {
       const same = [...document.querySelectorAll(sel)].find((e) => e.dataset.value === v);
       const line = [...document.querySelectorAll('.gw .fl-pc .fl-line')].find((l) => l.querySelector('.fl-name')?.textContent === row);
-      return { pressed: same?.getAttribute('aria-pressed') ?? null, sw: line?.querySelector('[role="switch"]')?.getAttribute('aria-checked') ?? null, steps: [...(line?.querySelectorAll('.st-step b') ?? [])].map((x) => x.textContent).join('|') };
+      return { pressed: same?.getAttribute('aria-pressed') ?? null, sw: line?.querySelector('[role="switch"]')?.getAttribute('aria-checked') ?? null, steps: [...(line?.querySelectorAll('.st-step b, .st-step input') ?? [])].map((x) => (x.tagName === 'INPUT' ? x.value || x.placeholder : x.textContent)).join('|') };
     }, [DO, next.v, next.row]);
     if (next.step !== null) ok(now.steps !== '' && !now.steps.split('|').includes(next.step) || now.steps.split('|').length > 1, `${next.row}: 수가 바뀜 (${next.step} → ${now.steps})`);
     else if (!next.sw) eq(now.pressed, 'true', `${next.row} (${next.v}): 누른 것이 켜짐`);

@@ -5110,6 +5110,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 /* 폰에서 「인터넷 접속」 고르기가 카드 밖으로 나가 마지막 칸이 잘렸다 → 높이 34 규격은 그대로, 폰에서만 칸 안 여백을 줄여 한 줄로 카드 안에 (390·360 폭 확인, 전수검사 11-13) */
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   /* 여백 4px 로 글 폭대로 몰면 글자가 붙고 마지막 칸이 카드 끝에 닿았다 → 높이 34 한 줄은 그대로, 카드 폭 안에서 칸을 나눠 갖고 넘치는 글은 말줄임 (전수점검 눌러-보통-53) */
+  /* 390 폭에서 칸 여백 6px·카드 여백 12px 이면 「없음·우주 쇼핑몰·백일몽 포인트몰·망상홈쇼핑」이 10px 모자라 셋이 말줄임됐다(규격 시험 잘림) → 칸 여백 6px(눌러-보통-53)은 두고 폰에서 카드 좌우 여백만 6px 로 줄여 한 줄에 다 보이게. 더 좁은 폭에서만 말줄임 */
+  .gw .ms-fx { padding-left: 6px; padding-right: 6px; }
   .gw .ms-fx .ph-inline:has(> .gx-segs) { width: 100%; }
   .gw .ms-fx .ph-inline > .gx-segs { display: flex; width: 100%; min-width: 0; }
   .gw .ms-fx .ph-inline > .gx-segs > .gx-seg { flex: 1 1 auto; min-width: 0; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; }

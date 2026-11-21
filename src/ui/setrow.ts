@@ -293,7 +293,8 @@ const ckWide0 = (bands: CkBand[], labels: string[], busy = false): string => {
   const stack = (b: CkBand): string => {
     let at = 0;
     const cols = b.groups.map((g) => ({ g, from: (at += g.opts.length) - g.opts.length }));
-    return `<div class="mx mx-grid ck-ph" style="--mx-n:${cols.length}"><section class="ps-group"><h3>${esc(b.title)}</h3><div class="ps-rows">${labels.map((label, r) => `<div class="mx-row"><b class="mx-label">${label}</b>${cols.map(({ g, from }) => `<div class="mx-cell"><span class="mx-site">${esc(g.name)}</span><span class="fam-set">${g.opts.map((o, i) => {
+    // 한 묶음 안의 수 상자는 한 폭으로 (하나라도 크면 모두 크게, 규격 sameStep)
+    return sameStep(`<div class="mx mx-grid ck-ph" style="--mx-n:${cols.length}"><section class="ps-group"><h3>${esc(b.title)}</h3><div class="ps-rows">${labels.map((label, r) => `<div class="mx-row"><b class="mx-label">${label}</b>${cols.map(({ g, from }) => `<div class="mx-cell"><span class="mx-site">${esc(g.name)}</span><span class="fam-set">${g.opts.map((o, i) => {
       const m = b.marks[r][from + i];
       // 쓰지 않는 칸은 PC 표처럼 「–」 (비워 두면 이름만 남아 고장처럼 보였다, 전수점검 눌러-보통-52)
       if (m === null || m === undefined) return '<span class="fam-set1"><span class="ck-x" aria-label="없음">–</span></span>';
@@ -303,7 +304,7 @@ const ckWide0 = (bands: CkBand[], labels: string[], busy = false): string => {
         return `<span class="fam-set1">${numCtl(b.acts[r][from + i] ?? '', m, `${g.name} ${o}`, o, busy, ckActs)}</span>`;
       }
       return `<span class="fam-set1">${g.opts.length > 1 || o !== '켬' ? `<span>${esc(o)}</span>` : ''}${ckCtl(m, b.acts[r][from + i], `${esc(g.name)} ${esc(o)}`, false, busy)}</span>`;
-    }).join('')}</span></div>`).join('')}</div>`).join('')}</div>${b.foot ? `<small class="mx-foot">${b.foot}</small>` : ''}</section></div>`;
+    }).join('')}</span></div>`).join('')}</div>`).join('')}</div>${b.foot ? `<small class="mx-foot">${b.foot}</small>` : ''}</section></div>`);
   };
   const hasNum = (b: CkBand) => b.marks.some((row) => row.some((m) => m !== null && typeof m === 'object'));
   const ph = bands.map((b) => hasNum(b) ? stack(b) : ckGrid(b.groups, labels.map((label, r) => ({ label, marks: b.marks[r], acts: b.acts[r] })), b.foot, b.title, busy).replace('class="ps-group ck', 'class="ps-group ck ck-ph')).join('');
