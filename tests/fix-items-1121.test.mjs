@@ -85,6 +85,39 @@ test('보통-28: 고치기에서 남은 0 은 다 씀 (한 번도 안 쓴 물건
   assert.equal(I.itemLeft(it, it.list[0], alive), 0);
 });
 
+test('보통-28 재검토: 더 얻은 기록·합친 줄로 쓴 횟수가 음수여도 고치기는 적은 수로 맞춘다', () => {
+  let it = I.addItem(empty, alive, { name: '생수', uses: 3, from: 'manual', anchor: '' });
+  it = I.applyItemChanges(it, alive, [ch({ anchor: 'c2', name: '생수', action: 'update', got: 10 })]);
+  assert.equal(I.itemLeft(it, it.list[0], alive), 13);
+  const five = I.setItemLeft(it, alive, it.list[0].id, 5);
+  assert.equal(I.itemLeft(five, five.list[0], alive), 5);
+  assert.equal(I.liveItems(five, alive).length, 1);
+  const twenty = I.setItemLeft(it, alive, it.list[0].id, 20);
+  assert.equal(I.itemLeft(twenty, twenty.list[0], alive), 20);
+  // 합친 뒤 고치기
+  let m = I.addItem(empty, alive, { name: '회복 물약', uses: 1, from: 'store', anchor: 'c1' });
+  m = I.addItem(m, alive, { name: '회복 물약', uses: 5, from: 'store', anchor: 'c2' });
+  const [a, b] = m.list;
+  m = I.mergeItems(m, alive, a.id, b.id, 'c2');
+  m = I.setItemLeft(m, alive, a.id, 3);
+  assert.deepEqual(I.liveItems(m, alive).map((e) => I.itemLeft(m, e, alive)), [3]);
+});
+
+test('사소-26 재검토: 합쳐도 남은 횟수는 999 를 넘지 않고, 쓰면 바로 준다. 본문이 말한 수에 닿는다', () => {
+  let it = I.addItem(empty, alive, { name: '탄알', uses: 900, from: 'store', anchor: 'c1' });
+  it = I.addItem(it, alive, { name: '탄알', uses: 900, from: 'store', anchor: 'c2' });
+  const [a, b] = it.list;
+  const m = I.mergeItems(it, alive, a.id, b.id, 'c3');
+  assert.equal(I.itemLeft(m, m.list[0], alive), 999);
+  assert.equal(m.list[0].uses - I.itemUsed(m, a.id, alive), 999, '자르지 않은 값도 999');
+  const used = I.addItemLog(m, { name: '탄알', item: a.id, what: 'use', by: 'manual', anchor: '' });
+  assert.equal(I.itemLeft(used, used.list[0], alive), 998);
+  const told = I.applyItemChanges(m, alive, [ch({ anchor: 'c3', name: '탄알', action: 'update', uses: 500 })]);
+  assert.equal(I.itemLeft(told, told.list[0], alive), 500);
+  // 남는 줄 응답(c1)을 다시 굴리면 합쳐 들어간 줄이 제 900 으로 돌아온다
+  assert.deepEqual(I.liveItems(m, without('c1')).map((e) => I.itemLeft(m, e, without('c1'))), [900]);
+});
+
 test('사소-25: 무게 0 은 0g', () => {
   assert.equal(I.weightText(0), '0g');
   assert.equal(I.weightText(0.0004), '1g');

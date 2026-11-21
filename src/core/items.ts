@@ -162,7 +162,7 @@ const isLog = (e: unknown): e is ItemLog => {
 
 const clean = (s: unknown, max: number) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-/** 저장된 처음 횟수: 남은 횟수의 상한(999)은 남은 횟수에 건다 — 많이 쓴 물건은 처음 횟수가 999 를 넘을 수 있다 (전수점검 사소-26) */
+/** 저장된 처음 횟수: 남은 횟수의 상한(999)은 남은 횟수에 건다 — 많이 쓴 물건은 처음 횟수가 999 를 넘을 수 있다 (전수점검 사소-26). 남은 횟수가 999 를 넘지 않게 늘리는 길(addMore·leftByLog·setItemLeft·mergeItems)이 지킨다 */
 const USES_STORE_MAX = 999999;
 const storedUses = (v: unknown): number | undefined => {
   const n = Number(v);
@@ -499,24 +499,27 @@ function addMore(it: Items, alive: Set<string>, id: string, n: number, by: ItemL
 function leftByLog(it: Items, alive: Set<string>, id: string, left: number, anchor: string, quote?: string): Items {
   const row = it.list.find((x) => x.id === id);
   if (!row || row.uses === undefined || !Number.isSafeInteger(left) || left < 0) return it;
+  // 기록의 수는 자르지 않은 남은 횟수(raw)에서 잰다: 자른 값에서 재면 본문이 말한 수에 닿지 않았다 (사소-26 재검토)
   const raw = row.uses - itemUsed(it, id, alive);
-  const now = Math.min(LEFT_MAX, Math.max(0, raw));
   const want = Math.min(LEFT_MAX, left);
-  if (want === now) return it;
+  if (want === raw) return it;
   const base = { name: row.name, item: row.id, ...(row.icon ? { icon: row.icon } : {}), by: 'story' as const, anchor, ...(quote ? { quote } : {}) };
-  return addItemLog(it, want < now ? { ...base, what: 'use', n: now - want, ...(want === 0 ? { note: '다 씀' } : {}) } : { ...base, what: 'get', n: want - raw }, alive);
+  return addItemLog(it, want < raw ? { ...base, what: 'use', n: raw - want, ...(want === 0 ? { note: '다 씀' } : {}) } : { ...base, what: 'get', n: want - raw }, alive);
 }
 
-/** 남은 횟수를 손으로 맞추기 (고치기): 처음 횟수 = 남은 + 쓴 횟수. 남은 횟수의 상한(999)은 남은 횟수에 건다 (사소-26).
- *  처음 횟수가 1 아래로 가야 하면(한 번도 안 쓴 물건을 0 으로) 직접 쓴 기록으로 남은 횟수를 뺀다 (보통-28) */
+/** 남은 횟수를 손으로 맞추기 (고치기): 처음 횟수 = 남은 + 쓴 횟수. 남은 횟수는 999 까지 (사소-26).
+ *  쓴 횟수는 더 얻은 기록·합쳐 들어온 줄만큼 음수일 수 있어, 처음 횟수가 1 아래로 가야 하면 처음 횟수는 두고 차이만큼 직접 쓴/얻은 기록을 남긴다 (보통-28 재검토: 음수를 0 으로 보고 다 씀 처리했다) */
 export function setItemLeft(it: Items, alive: Set<string>, id: string, left: number): Items {
   const cur = it.list.find((x) => x.id === id);
   if (!cur || cur.uses === undefined || !Number.isSafeInteger(left) || left < 0) return it;
   const used = itemUsed(it, id, alive);
-  const uses = Math.min(USES_STORE_MAX, Math.min(LEFT_MAX, left) + used);
-  if (uses >= 1) return uses === cur.uses ? it : { ...it, list: it.list.map((x) => (x.id === id ? { ...x, uses } : x)) };
-  const now = itemLeft(it, cur, alive) ?? 0;
-  return now > 0 ? addItemLog(it, { name: cur.name, item: cur.id, ...(cur.icon ? { icon: cur.icon } : {}), what: 'use', by: 'manual', anchor: '', n: now, note: '다 씀' }, alive) : it;
+  const want = Math.min(LEFT_MAX, left);
+  const uses = want + used;
+  if (uses >= 1) return uses === cur.uses ? it : { ...it, list: it.list.map((x) => (x.id === id ? { ...x, uses: Math.min(USES_STORE_MAX, uses) } : x)) };
+  const raw = cur.uses - used;
+  if (want === raw) return it;
+  const base = { name: cur.name, item: cur.id, ...(cur.icon ? { icon: cur.icon } : {}), by: 'manual' as const, anchor: '' };
+  return addItemLog(it, want < raw ? { ...base, what: 'use', n: raw - want, ...(want === 0 ? { note: '다 씀' } : {}) } : { ...base, what: 'get', n: want - raw }, alive);
 }
 
 const logId = (what: string, anchor: string, name: string, n: number) => `l_${hash(`${what}|${anchor}|${normName(name)}|${n}`)}`;
@@ -705,7 +708,12 @@ export function mergeItems(it: Items, alive: Set<string>, keepId: string, otherI
   const { slot: _s, held: _h, ...rest } = other;
   const hidden: Item = { ...rest, mergedInto: keepId };
   const list = it.list.map((x) => (x.id === keepId ? merged : x.id === otherId ? hidden : x));
-  return addItemLog({ ...it, list }, { name: other.name, item: other.id, ...(other.icon ? { icon: other.icon } : {}), what: 'merge', by: 'manual', anchor, note: `${josa(merged.name, '과', '와')} 합침` }, alive);
+  const done = addItemLog({ ...it, list }, { name: other.name, item: other.id, ...(other.icon ? { icon: other.icon } : {}), what: 'merge', by: 'manual', anchor, note: `${josa(merged.name, '과', '와')} 합침` }, alive);
+  // 합친 남은 횟수도 999 까지 (사소-26 재검토: 넘친 채로 두면 화면은 999 에 멈춰 써도 줄지 않았다). 넘친 몫은 합쳐 들어간 줄의 기록으로, 남는 줄의 응답에 묶는다 — 그 응답을 다시 굴려 합침이 풀리면 같이 돌아온다
+  const sum = (itemLeft(it, keep, alive) ?? 0) + (itemLeft(it, other, alive) ?? 0);
+  return sum > LEFT_MAX && keep.uses !== undefined && other.uses !== undefined
+    ? addItemLog(done, { name: other.name, item: other.id, ...(other.icon ? { icon: other.icon } : {}), what: 'use', by: 'manual', anchor: keep.anchor, n: sum - LEFT_MAX, note: '999 넘침' }, alive)
+    : done;
 }
 /** 합침 기록의 메모(「X와 합침」)에서 남는 물건 이름 */
 const mergedHost = (note: unknown): string => String(note ?? '').replace(/(과|와|과\(와\)) 합침$/, '');

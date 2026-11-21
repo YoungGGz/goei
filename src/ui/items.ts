@@ -158,9 +158,9 @@ export function itemsTab(ctx: ChatContext): string {
   const drawer = isPhone() ? drawerHtml(`${addButton('ph-tool')}${mergeButton(ctx, 'ph-tool')}`, '', 'gx-idrawer') : '';
   // PC 격자: 탭·도구 줄·장착 띠는 고정하고 격자만 스크롤 (it-fix, 2026-11-08 사용자)
   const fix = !isPhone() && itemsUi.view === 'grid' ? ' it-fix' : '';
-  // 물건 창이 떠 있으면 알림은 창 막 위에 (전수점검 눌러-보통-18: 막 밑에 깔려 흐렸다)
+  // 물건 창이 떠 있으면 알림은 창 막 위에, 입력 잘못 안내는 입력 창 안 제목 밑에 (전수점검 눌러-보통-18: 막 밑에 깔려 흐렸다)
   const pop = popup(ctx);
-  return `<main class="gx-body gx-records gx-items${fix}">${tabs}${notice}${itemsPane(ctx)}${pop ? '' : note}</main>${pop && note ? pop.replace(/<\/div>$/, `${note}</div>`) : pop}${drawer}`;
+  return `<main class="gx-body gx-records gx-items${fix}">${tabs}${pop ? '' : notice}${itemsPane(ctx)}${pop ? '' : note}</main>${pop && note ? pop.replace(/<\/div>$/, `${note}</div>`) : pop}${drawer}`;
 }
 
 const addButton = (cls: string) => `<button class="${cls} it-add" data-action="items-add" aria-label="직접 넣기">${ICONS.plus}<span class="${cls === 'ph-tool' ? 'ph-tool-l' : ''}">직접 넣기</span></button>`;
@@ -408,7 +408,8 @@ function popup(ctx: ChatContext): string {
 const shell = (label: string, inner: string, del = '') => `<div class="gx-agpop it-pop" data-action="items-close" role="dialog" aria-label="${esc(label)}"><div class="gx-agpop-card it-card" data-action="items-keep">${del ? `<button class="gx-agpop-x it-del" data-action="items-purge-ask" data-value="${esc(del)}" aria-label="삭제 (되돌릴 수 없음)" title="삭제: 목록과 기록에서 지워지고 되돌릴 수 없어요">${ICONS.trash}</button>` : ''}<button class="gx-agpop-x" data-action="items-close" aria-label="닫기">${ICONS.close}</button>${inner}</div></div>`;
 
 /** 입력 창 제목 줄: 닫기가 첫 입력칸 위에 얹히지 않게 (전수점검 눌러-중대-13) */
-const formHead = (label: string) => `<div class="it-ph it-fhead"><b>${esc(label)}</b></div>`;
+// 입력 잘못 안내(itemsUi.notice)는 제목 밑에: 본문에 두면 창 막 밑에 깔려 안 보였다 (전수점검 눌러-보통-18)
+const formHead = (label: string) => `<div class="it-ph it-fhead"><b>${esc(label)}</b></div>${itemsUi.notice ? `<div class="gx-err" role="alert">${esc(itemsUi.notice)}</div>` : ''}`;
 
 function form(it: Item | null, left?: number): string {
   const eq = it?.equip ?? '';
