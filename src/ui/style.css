@@ -2863,6 +2863,10 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 }
 /* 전수점검 눌러-중대-22·눌러2-보통-37: 주인공·아바타 고르기 카드, 상황판 고른 줄, 진행 중 사건 카드(종류 색 테두리가 고른 색을 덮었다)도 같은 민트 2px */
 .gx-whoc.on:not(.gx-lookchip) { position: relative; }
+/* 눌러 보기 3차: 첫 장면 칸(.gx-sc)도 같은 민트 2px. 마우스가 올라가 있으면 :hover:not(:disabled) 테두리(회색)가 더 세서 고른 직후 테두리가 회색으로 보였다 */
+.gx-sc.on { position: relative; }
+.gx-sc.on, .gx-sc.on:hover:not(:disabled) { border-color: var(--signal); }
+.gx-sc.on::after { content: ''; position: absolute; inset: 0; z-index: 3; border: 1px solid var(--signal); border-radius: inherit; pointer-events: none; }
 .gx-oprow.sel { position: relative; box-shadow: none; }
 .gx-oprow.sel::after { border-width: 2px; }
 .gx-evc.art.sel, .gx-evc.art.live.sel:is(:has(> .k-an), :has(> .k-in), :has(> .k-ms)) { border-color: var(--signal); border-width: 1px; }
