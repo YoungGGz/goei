@@ -5670,7 +5670,15 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   /* 상황판: CCTV 화면과 상황 목록을 위아래로 (두 칸이면 CCTV 시각이 세로로 깨지고 괴이·사건·특수 글이 한 글자씩 꺾였다) */
   .gx-ops { display: flex; flex-direction: column; height: auto; }
   .gx-opview { height: 320px; flex: none; }
-  .gx-ops > :not(.gx-opview) { max-height: 260px; }
+  /* 상황 목록·요원 칸은 안쪽 스크롤 없이 창 본문 한 줄 스크롤로 (11-21: 보이는 높이 약 520px 안에 목록 260px·요원 칸이 각자 스크롤해서
+     목록은 두 줄 반, 요원은 한 줄 반만 보였다). 요원 모니터는 세 칸 정사각, 목록은 한 줄 54px */
+  .gx-oplog > ul { flex: none; max-height: none; overflow: visible; overscroll-behavior: auto; }
+  .gx-board { min-height: 0; }
+  .gx-board > .gx-agbox, .gx-board > #gx-sec-ag { flex: none; min-height: 0; }
+  .gx-agbox .gx-agwall, .gx-agbox .gx-agrows { flex: none; max-height: none; overflow: visible; }
+  .gx-agwall { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: auto; }
+  .gx-agwall > .gx-agmon { aspect-ratio: 1; }
+  .gx-agrows { grid-auto-rows: 54px; }
   .gx-opcnt em { white-space: nowrap; }
   /* 임무: 두 칸을 반반으로 (왼쪽이 166px 라 지역 고르기가 화살표만 남고 「커스텀」이 잘리고 지도 핀이 엉켰다, 눌러보기 3차 fold_i).
      위 줄은 지역 고르기 + 커스텀, 검색은 다음 줄. 편성 카드는 얼굴을 줄여 이름 자리를 남긴다 */
