@@ -32,7 +32,7 @@ export function imgPromptPane(ctx: ChatContext): string {
   const preview = imgUi.preview ? `<div class="gw-copyto gw-copybox"><pre class="ip-preview">${esc(buildImgPrompt(cfg, picked, s.assetPlayer))}</pre>${copyBtn('조립 결과 복사')}</div>` : '';
   return `<article class="nw-doc pp-doc ip-pane">
     ${imgUi.notice ? `<div class="gx-err" role="alert">${esc(imgUi.notice)}</div>` : ''}
-    <p class="ps-note pp-intro">${esc(state)} 주인공 이미지 설정(${s.assetPlayer ? 'ON' : 'OFF'})은 캐릭터 이미지 설정에서 바꿔요. 이 기기의 모든 채팅에 같이 적용돼요.</p>
+    <p class="ps-note pp-intro">${esc(state)} 주인공 이미지 설정(${s.assetPlayer ? '켬' : '끔'})은 캐릭터 이미지 설정에서 바꿔요. 이 기기의 모든 채팅에 같이 적용돼요.</p>
     <section class="ps-group"><h3>지침 틀</h3><p class="ps-note">자리표 <code>{characters}</code> <code>{keywords}</code> 는 아래 목록으로 채워지고, <code>{user_skip}</code> <code>{user_rule}</code> 는 주인공 이미지 설정에 따라 채워져요. 비우면 기본 틀.</p>
       <div class="gw-copyto"><div class="gw-field-head ip-copyhead"><span class="gw-ftok">${tokens(template).toLocaleString()}토큰</span>${copyBtn()}</div><textarea class="gx-search nw-reqbox ip-template" name="ip-template" data-input="ip-template" data-autosave="ip-template-save" rows="14" maxlength="${IMG_TEMPLATE_MAX}">${esc(template)}</textarea></div>
       <div class="gx-row-btns"><button class="gx-mini" data-action="ip-preview">${imgUi.preview ? '미리보기 닫기' : '조립 결과 미리보기'}</button></div>${preview}</section>

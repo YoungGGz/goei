@@ -778,8 +778,8 @@ export async function handleSettings(action: string, value: string | undefined, 
     return true;
   }
   if (action === 'set-bar') {
-    // 시작 전(범위 = 새 채팅 기본값)에는 셋 다 막는다: 시작 전 채팅 값으로 저장하면 정해 둔 기본값이 지워졌다 (전수점검 중대-11)
-    settingsUi.confirm = scope !== 'defaults' && (v === 'save' || v === 'load' || v === 'reset') ? v : '';
+    // 시작 전(범위 = 새 채팅 기본값)에는 불러오기·초기화를 막는다. 저장은 기능 페이지에서 이 채팅에 바꾼 값을 기본값으로 올리는 길이라 둔다 (전수점검 중대-11)
+    settingsUi.confirm = v === 'save' || (scope !== 'defaults' && (v === 'load' || v === 'reset')) ? v : '';
     env.render();
     return true;
   }
@@ -835,7 +835,9 @@ export async function handleSettings(action: string, value: string | undefined, 
       // 시작 전에는 기본 설정(이미지·상황판·테마)을 새 채팅 기본값에 바로 고치므로 그 값을 그대로 둔다
       const cur = current(ctx, settingsUi.scope === 'defaults' ? 'defaults' : 'chat');
       await saveDefaults(env, (p) => ({ ...p, basic: { ...cur.basic }, world: { ...cur.world }, theme: cur.theme }));
-      if (!settingsUi.notice) await saveVarDefaults(ALL_PREFIXES, ctx.chat.scriptstate).catch((error) => (settingsUi.notice = `기본값을 저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`));
+      // 시작 전 채팅에는 기능 페이지에서 바꾼 값만 있다: 기본값을 밑에 깔아 넘겨야 정해 둔 기본값이 지워지지 않는다 (전수점검 중대-11, app.ts preCtx 와 같은 방식)
+      const state = scope === 'defaults' ? { ...(getPrefs().vars ?? {}), ...(ctx.chat.scriptstate ?? {}) } : ctx.chat.scriptstate;
+      if (!settingsUi.notice) await saveVarDefaults(ALL_PREFIXES, state).catch((error) => (settingsUi.notice = `기본값을 저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`));
       if (!settingsUi.notice) settingsUi.info = '지금 설정을 기본값으로 저장했어요.';
       env.render();
     } else if (what === 'load') {

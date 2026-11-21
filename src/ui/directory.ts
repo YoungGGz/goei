@@ -16,6 +16,7 @@ import { CUSTOM_FM, agentScene, factionScenes, nextCustomFm } from '../core/scen
 import { updateCharacterLore, updateChat, type ChatContext } from '../host/risu';
 import { imageUrl, picAvatar } from './images';
 import { ICONS } from './icons';
+import { switchHtml } from './controls';
 import { stUi } from './editor/start';
 import { parseStartItems, START_ITEM_COLUMNS, startItemsText } from '../core/startitems';
 import { itemWeight } from '../core/itemtraits';
@@ -363,10 +364,8 @@ export function directoryPhotoList(ctx: ChatContext): string {
 export function placePanel(p: PlaceRow, ctx: ChatContext): string {
   const k = (f: string) => `${f}|${p.lore}`;
   return `<div class="dir-panel">
-    <div class="dir-line"><span>무작위 발생 후보</span><div class="gx-segs gx-segs-sm">
-      <button class="gx-seg${p.preset ? ' on' : ''}" data-action="dir-set" data-value="${esc(`preset|1|${p.lore}`)}">ON</button>
-      <button class="gx-seg${!p.preset ? ' on' : ''}" data-action="dir-set" data-value="${esc(`preset|0|${p.lore}`)}">OFF</button></div></div>
-    <p class="gx-muted">OFF여도 직접 고르거나 대화에 나오면 상황판에 기록돼요.</p>
+    <div class="dir-line"><span>무작위 발생 후보</span>${switchHtml({ action: 'dir-set', value: `preset|${p.preset ? 0 : 1}|${p.lore}`, on: !!p.preset })}</div>
+    <p class="gx-muted">꺼져 있어도 직접 고르거나 대화에 나오면 상황판에 기록돼요.</p>
     ${input(k('label'), p.label, '표시 이름', '상황판과 지도에 보이는 이름')}
     ${input(k('english'), p.english, '영문명', '영어 응답에서도 이 이름을 알아봐요')}
     ${input(k('aliases'), p.aliases.join(', '), '별칭', '쉼표로 나눠 적어요')}

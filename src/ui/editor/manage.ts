@@ -63,7 +63,7 @@ export const manUi = {
   importName: '',
   pending: false,
   importText: '',
-  confirm: '' as '' | 'import' | 'drop-wiki' | 'drop-tok' | 'drop-diag',
+  confirm: '' as '' | 'import' | 'drop-wiki' | 'drop-tok' | 'drop-diag' | 'clear-fail',
   info: '',
   notice: '',
   diag: null as DiagRun[] | null,
@@ -182,7 +182,7 @@ function backupPage(ctx: ChatContext, canChat: boolean): string {
   const defRow = (label: string, help: string, what: 'save' | 'load' | 'reset', btn: string, off = false) =>
     row(label, `<button class="gx-mini${what === 'reset' ? ' danger' : ''}" data-action="set-bar" data-value="${what}" ${off ? 'disabled' : ''}>${btn}</button>`, help);
   const defaults = `<section class="ps-group"><h3>기본값</h3><div class="ps-rows">
-      ${defRow('기본값으로 저장', canChat ? '지금 설정을 기본값으로 저장해요. 앞으로 새로 시작하는 모든 채팅이 이 값으로 시작해요. 덮어쓴 기본값은 되돌릴 수 없어요.' : '채팅을 시작한 뒤에 쓸 수 있어요. 시작 전에 바꾼 설정은 바로 기본값에 저장돼요.', 'save', '기본값으로 저장', !canChat)}
+      ${defRow('기본값으로 저장', canChat ? '지금 설정을 기본값으로 저장해요. 앞으로 새로 시작하는 모든 채팅이 이 값으로 시작해요. 덮어쓴 기본값은 되돌릴 수 없어요.' : '기능 페이지(괴담넷·괴담톡·위키·인물 등)에서 이 채팅에 바꿔 둔 값을 기본값으로 저장해요. 앞으로 새로 시작하는 모든 채팅이 이 값으로 시작해요. 덮어쓴 기본값은 되돌릴 수 없어요.', 'save', '기본값으로 저장')}
       ${defRow('기본값 불러오기', canChat ? '저장해 둔 기본값을 지금 채팅에 가져와요.' : '채팅을 시작한 뒤에 쓸 수 있어요. 새 채팅은 기본값으로 시작해요.', 'load', '불러오기', !canChat)}
       ${defRow('초기화', '지금 채팅의 설정과 저장해 둔 기본값, 고친 지침, 고친 세계(카드 명부)를 플러그인 원래 값으로 되돌려요. 상황판 켜기·끄기와 추가 규칙은 그대로 둬요.', 'reset', '초기화', !canChat)}
     </div></section>${mainDefaultsConfirm(ctx)}${settingsNotices()}`;
@@ -234,7 +234,7 @@ function diagPage(ctx: ChatContext, canChat: boolean): string {
     ...(goei && compareVersions(ver, PLUGIN_VERSION) !== 0 ? [row('판 맞춤', badge(false, compareVersions(ver, PLUGIN_VERSION) < 0 ? '카드가 낡음' : '플러그인이 낡음'), compareVersions(ver, PLUGIN_VERSION) < 0
       ? `카드 ${ver === '0' ? '이전 판' : `v${ver}`}, 플러그인 v${PLUGIN_VERSION}. 새 기능·지침이 카드에 없을 수 있어요. 업데이트에서 카드를 플러그인 판으로 올리세요. <button class="gx-mini" data-action="ed-node" data-value="set:update">${ICONS.refresh}업데이트로</button>`
       : `카드 v${ver}, 플러그인 v${PLUGIN_VERSION}. 플러그인을 새 판으로 받으세요.`)] : []),
-    row('채팅', badge(canChat ? true : null, canChat ? '진행 중' : '시작 전'), canChat ? `메시지 ${msgs}개 · 이 채팅 값으로 동작해요` : '시작 화면이에요. 설정은 새 채팅 기본값으로 저장돼요'),
+    row('채팅', badge(canChat ? true : null, canChat ? '진행 중' : '시작 전'), canChat ? `메시지 ${msgs}개 · 이 채팅 값으로 동작해요` : '시작 화면이에요. 기본 설정은 새 채팅 기본값에, 기능 페이지 값은 이 채팅에 저장돼요'),
     // 없으면 배지 옆에 바로 받는 단추와, 안 받으면 뭐가 다른지 한 줄 (2026-11-06 사용자 승인, 전수점검 9-9).
     // 어림값·시작 전은 고장이 아니라 회색 (빨간 오류색이라 고장처럼 보였다, 전수점검 눌러-보통-42)
     row('토크나이저', badge(tok ? true : null, tok || '어림값') + getBtn('tok', '받기 (약 2MB)', !!tok), tok ? '토큰 수를 정확히 세요' : '안 받으면 토큰 수를 어림으로 세요. 받으면 정확해져요. 기능 차이는 없어요.'),
@@ -262,9 +262,10 @@ function logPage(ctx: ChatContext, canChat: boolean): string {
 }
 
 /** 확인 팝업 (2026-11-08 사용자: 저장·불러오기의 확인은 전부 팝업). 가져오기·저장소 지우기·호출 기록 지우기가 같은 팝업을 쓴다
- *  (저장소·호출 기록 지우기만 그 자리 「정말 지우기」 칩이라 확인 방식이 화면마다 달랐다, 전수점검 눌러-보통-28) */
+ *  최근 실패 지우기도 같은 팝업 (저장소·호출 기록 지우기만 그 자리 「정말 지우기」 칩이라 확인 방식이 화면마다 달랐다, 전수점검 눌러-보통-28) */
 const popup = (msg: string, yes: string, label: string): string => askPopup(msg, { action: yes }, { action: 'man-no' }, label);
 export function manageConfirmPopup(): string {
+  if (manUi.confirm === 'clear-fail') return popup('최근 실패 기록을 모두 지울까요? 지운 실패 원문은 되돌릴 수 없어요.', 'man-clear-fail-yes', '지우기');
   if (manUi.confirm === 'import') return popup('가져온 설정으로 지금 기기 설정(과 세계 편집)을 통째로 덮어쓸까요? 덮어쓴 설정은 되돌릴 수 없어요.', 'man-import-yes', '적용');
   if (manUi.confirm) {
     const st = STORE.find((x) => x[3] === `man-${manUi.confirm}`);
@@ -473,6 +474,11 @@ export async function manageAction(action: string, root: HTMLElement | null, ctx
       manUi.sizes = null;
       return true;
     case 'man-clear-fail':
+      // 지운 실패 원문은 되돌릴 수 없어 다른 지우기처럼 팝업으로 묻는다 (전수점검 눌러-보통-28)
+      manUi.confirm = 'clear-fail';
+      return true;
+    case 'man-clear-fail-yes':
+      manUi.confirm = '';
       clearBoardFailures(); // 보고 있지 않은 사이트 것도 (전수검사 11-13)
       phone.failure = null;
       wiki.failure = null;
