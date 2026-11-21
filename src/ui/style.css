@@ -3184,6 +3184,13 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
 .gx-wt-tiles .gx-wt-balrow b { font-size: 36px; }
 .gx-wt-tiles .gx-mon-cell b.fit1 { font-size: 22px; } .gx-wt-tiles .gx-mon-cell b.fit2 { font-size: 18px; } /* 긴 금액은 글자를 줄인다 (ui/wallet.ts fit) */
 .gx-wt-tiles .gx-wt-balrow b.fit1 { font-size: 28px; } .gx-wt-tiles .gx-wt-balrow b.fit2 { font-size: 22px; }
+/* 넓은 PC(861 폭~): 수입·지출·오늘 칸에서 「+2,400,0…」처럼 열 자리 금액이 잘렸다 → 칸 폭에 맞춰 글자만 줄인다 (11-21, 601~860 은 그대로) */
+@media (min-width: 861px) and (min-height: 500px), (min-width: 861px) and (pointer: fine), (min-width: 861px) and (pointer: none) {
+  .gx-wt-tiles .gx-mon-cell:not(.bal) { container-type: inline-size; }
+  .gx-wt-tiles .gx-mon-cell:not(.bal) b { font-size: min(28px, 100cqi / 6.2); }
+  .gx-wt-tiles .gx-mon-cell:not(.bal) b.fit1 { font-size: min(22px, 100cqi / 8.6); }
+  .gx-wt-tiles .gx-mon-cell:not(.bal) b.fit2 { font-size: min(18px, 100cqi / 11); }
+}
 .gx-wt-tiles .gx-wt-pen { color: rgba(232, 243, 239, .6); } .gx-wt-tiles .gx-wt-pen:hover { background: rgba(255, 255, 255, .08); color: #fff; }
 .gx-wt-tiles .gx-wt-edit input { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .2); color: #fff; }
 /* 거르기·찾기 줄 */
@@ -3260,6 +3267,11 @@ button.gx-cr-row { cursor: pointer; } button.gx-cr-row:hover { border-color: var
   .gx-wt-tiles .gx-mon-cell:not(.bal) { padding: 2px 12px; } .gx-wt-tiles .gx-mon-cell:not(.bal) b { font-size: 20px; }
   .gx-wt-tiles .gx-mon-cell b.fit1 { font-size: 17px; } .gx-wt-tiles .gx-mon-cell b.fit2 { font-size: 14px; }
   .gx-wt-tiles .gx-wt-balrow b.fit1 { font-size: 22px; } .gx-wt-tiles .gx-wt-balrow b.fit2 { font-size: 18px; }
+  /* 수입·지출·오늘 세 칸: 좁은 폰(344 폭)에서 「+2,40…」로 잘렸다 → 칸 폭에 맞춰 글자만 줄인다 (고정폭 글자 한 자 ≈ .6em, 11-21) */
+  .gx-wt-tiles .gx-mon-cell:not(.bal) { container-type: inline-size; }
+  .gx-wt-tiles .gx-mon-cell:not(.bal) b { font-size: min(20px, 100cqi / 6.2); }
+  .gx-wt-tiles .gx-mon-cell:not(.bal) b.fit1 { font-size: min(17px, 100cqi / 8.6); }
+  .gx-wt-tiles .gx-mon-cell:not(.bal) b.fit2 { font-size: min(14px, 100cqi / 11); }
   .gx-rec-tools .gx-wt-q { width: 100%; margin-left: 0; }
   .gx-jr-row { grid-template-columns: 88px minmax(0, 1fr); padding: 8px; }
   .gx-jr-row .gx-shot { height: 64px; }
@@ -5689,7 +5701,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs.hs-m .hs-icon { width: 64px; height: 64px; }
 .hs.hs-m .hs-icon img { max-width: 54px; max-height: 54px; }
 .hs.hs-m .hs-prod .tx b { font-size: 16px; }
-.hs.hs-m .hs-prod .pr { flex: 1 0 100%; flex-direction: row; justify-content: space-between; padding: 6px 12px; }
+.hs.hs-m .hs-prod .pr { flex: 1 0 100%; max-width: none; flex-direction: row; justify-content: space-between; padding: 6px 12px; } /* 값 칸 아래 줄 한가득: PC 의 max-width 50% 가 남아 있으면 한 줄에 끼여 「오늘 방송에서만」이 한 자씩 꺾였다 (11-21 344 폭) */
 .hs.hs-m .hs-prod .pr b { font-size: 18px; }
 .hs.hs-m .hs-ord { flex-wrap: wrap; }
 .hs.hs-m .hs-ord .call { flex: 1 0 100%; }
