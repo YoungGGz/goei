@@ -24,7 +24,7 @@ export function reportEndLabel(r: { kind: JournalRow['kind']; cause: JournalRow[
 }
 
 /** 보고서 딱지: 내가 낀 사건 「내 사건」, 아니면 「그 외」 (이름은 사용자 결정, 일지 칩과 같은 말) */
-export const reportBadge = (r: { mine: boolean }) => (r.mine ? '내 사건' : '그 외');
+export const reportBadge = (r: { mine?: boolean }) => (r.mine ? '내 사건' : '그 외');
 
 /** 템플릿 기호·줄바꿈을 막는다 (글 그대로 다른 곳에 들어갈 수 있어서) */
 const plain = (s: string, max: number) => s.replace(/\{\{/g, '｛｛').replace(/\}\}/g, '｝｝').replace(/%%/g, '％％').replace(/\s+/g, ' ').trim().slice(0, max);

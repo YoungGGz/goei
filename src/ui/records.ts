@@ -8,7 +8,7 @@ import { setRow, stepIn } from './setrow';
 import {
   JOURNAL_KIND_LABEL, JR, JR_JOURNAL_CAP, JR_LIST_PAGE, JR_PEOPLE_MAX, JR_REPORT_CAP, JR_TRADES_MAX, JR_TRAIL_MAX, journalClock, journalNewestFirst, journalSettings, jrValue, pinReport, readJournal, readReports, reportVars,
   type JournalKind, type JournalRow, type Report,
-  buildChronicle, CHRON_KIND_LABEL, type ChronEntry, type ChronKind, durLabel, reportEndLabel,
+  buildChronicle, CHRON_KIND_LABEL, type ChronEntry, type ChronKind, durLabel, reportBadge, reportEndLabel,
 } from '../core/journal';
 import { getPrefs } from '../core/settings';
 import { savePrefs } from '../host/prefs';
@@ -107,7 +107,7 @@ function gmark(kind: JournalKind, grade?: string): string {
   return `<i class="gx-gmark ${cls}${g ? ` g-${g.toLowerCase()}` : ''}" title="${JOURNAL_KIND_LABEL[kind]}${g ? ` ${esc(g)}등급` : ''}">${g ? esc(g) : mark}</i>`;
 }
 const whoText = (r: { mine: boolean; agents: { name: string }[] }) => [...(r.mine ? ['나'] : []), ...r.agents.map((a) => a.name)].filter(Boolean).join(' · ');
-const mineBadge = (r: { mine: boolean; kind: JournalKind }) => (r.mine ? '<span class="gx-badge live">내 사건</span>' : '<span class="gx-badge">그 외</span>');
+const mineBadge = (r: { mine: boolean; kind: JournalKind }) => `<span class="gx-badge${r.mine ? ' live' : ''}">${reportBadge(r)}</span>`;
 
 /** 세계 시각 (상황판) — 없으면 가장 최근 일지 줄의 시각 */
 function nowMinute(ctx: ChatContext, rows: JournalRow[]): number | null {
@@ -265,7 +265,7 @@ function journalRow(ctx: ChatContext, r: JournalRow, reps: Map<string, Report>):
   const rep = r.rpt ? reps.get(r.rpt) : undefined;
   const sum = rep ? `${peopleSum(rep)}${walletSum(rep)}` : '';
   const inner = `${shot(ctx, r.name, r.kind, r.loc, r.at, r.art)}
-    <span class="gx-jr-main"><span class="gx-jr-l1">${gmark(r.kind, r.grade)}<b>${esc(r.name)}</b>${r.mine ? '<span class="gx-badge live">내 사건</span>' : ''}${rep?.pin ? `<i class="gx-jr-pin" title="고정">${ICONS.pin}</i>` : ''}</span>
+    <span class="gx-jr-main"><span class="gx-jr-l1">${gmark(r.kind, r.grade)}<b>${esc(r.name)}</b>${r.mine ? `<span class="gx-badge live">${reportBadge(r)}</span>` : ''}${rep?.pin ? `<i class="gx-jr-pin" title="고정">${ICONS.pin}</i>` : ''}</span>
       <small>${[JOURNAL_KIND_LABEL[r.kind], locName(r.loc), dur ? `소요 ${dur}` : ''].filter(Boolean).map(esc).join(' · ')}</small>
       <span class="gx-jr-who">${faces(ctx, names)}${esc(whoText(r) || '투입 없음')}${r.result ? ` <em>— ${esc(r.result)}</em>` : ''}</span>
       ${sum ? `<span class="gx-rcard-sum">${sum}</span>` : ''}</span>
