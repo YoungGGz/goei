@@ -5787,3 +5787,30 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) { flex-wrap: wrap; }
   .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) > .ph-act { flex: 1 0 100%; justify-content: flex-end; }
 }
+
+/* 폴드 펼친 화면(601~860 폭) · 인터넷 틀과 두 쇼핑몰 (11-21 훑기). PC 배치는 그대로, 폭만 맞춘다.
+   즐겨찾기 줄: 511px 에 일곱 개가 안 들어가 「괴이위키」가 잘리고 포인트몰·망상홈쇼핑이 화면 밖에 있었다 → 두 줄로 접는다.
+   우주몰·포인트몰: 왼쪽 메뉴 170px 가 본문의 3분의 1을 먹어 우주몰 상품이 96px 세 줄(단추 글자가 세로로 쌓임), 포인트몰은 273px 한 줄이었다 → 메뉴를 좁히고 두 줄.
+   상담 창: 창 높이에서 위 108px 를 비워 677×674 에서 대화 칸이 290px 였다 → 위 여백을 줄인다 */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  .br-bms { flex-wrap: wrap; height: auto; min-height: 30px; padding: 3px 6px; gap: 2px; }
+  .br .br-bm { padding: 0 7px; gap: 6px; }
+  .ms-cos .cs-fr { grid-template-columns: 124px minmax(0, 1fr); }
+  .ms-cos .cs-lf { padding: 10px 6px; }
+  .ms-cos .cs-lt { font-size: 12.5px; }
+  .ms-cos .cs-ufo.cs-big { width: 64px; height: 48px; }
+  .ms-cos .cs-cnt span { letter-spacing: 1px; }
+  .ms-cos .cs-mn { padding: 12px 12px 20px; }
+  .ms-cos .cs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ms-cos .cs-bt { flex-wrap: wrap; }
+  .ms-cos .cs-askwin { top: 12px; right: 12px; width: min(440px, calc(100% - 24px)); height: min(540px, calc(100% - 24px)); }
+  .ms-bm .bp-wrap { grid-template-columns: 128px minmax(0, 1fr); gap: 14px; padding: 16px; }
+  .ms-bm .bp-side button { padding: 9px 12px; }
+  .ms-bm .bp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .ms-bm .bp-it { padding: 10px; }
+  .ms-bm .bp-pic { height: 100px; }
+  .ms-bm .bd-win { top: 12px; right: 12px; width: min(420px, calc(100% - 24px)); height: min(560px, calc(100% - 24px)); }
+}
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px) and (max-height: 760px) {
+  .br-ntp { padding-top: 32px; }
+}
