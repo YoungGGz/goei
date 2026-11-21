@@ -5808,3 +5808,52 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) { flex-wrap: wrap; }
   .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) > .ph-act { flex: 1 0 100%; justify-content: flex-end; }
 }
+
+/* 폴드 펼침 임무 (커스텀 줄·목록 제목) */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  /* 커스텀 위 줄: 종류 칩 + 「⇆ 임무」 한 줄 (전환 단추만 혼자 한 줄을 먹었다), 다음 줄에 검색 + 취소. 왼쪽 끝은 목록 카드와 맞춘다 */
+  .gx-mission .gx-mfilter { gap: 6px; }
+  .gx-mission .gx-mfilter > .gx-chip { order: 1; padding: 0 10px; }
+  .gx-mission .gx-mfilter > .gx-mswap { order: 2; height: var(--ctl-sm); padding: 0 10px 0 8px; margin-left: auto; }
+  .gx-mission .gx-mfilter > .gx-search { order: 3; flex: 1 1 calc(100% - 80px); min-width: 0; margin-left: 0; }
+  .gx-mission .gx-mfilter > .gx-unplace { order: 4; }
+  /* 목록 카드 제목: 왼쪽 칸이 230px 남짓이라 이름이 「얼굴 없는 …」으로 잘렸다 → 두 줄까지 접어 다 보이게 */
+  /* 띠 높이는 글에 맞춰 늘린다 (68px 아래로는 안 줄임). 영어 이름도 두 줄까지 */
+  .gx-mx:not(.open) .gx-mx-art { display: flex; align-items: center; height: auto; min-height: 68px; }
+  .gx-mx:not(.open) .gx-evart-cap { position: relative; inset: auto; transform: none; flex: 1; margin: 9px 56px 9px 12px; }
+  .gx-mx:not(.open) .gx-mx-art:has(> .gx-evart-top) .gx-evart-cap { margin-right: 120px; }
+  .gx-mx:not(.open) .gx-evart-name small { line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .gx-mx:not(.open) .gx-evart-name b { font-size: 15px; line-height: 1.25; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  .gx-field :is(.gx-evc-name b, .gx-evart-l1 > b) { line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+/* 폴드 펼침 임무 (편성 카드) */
+/* 지원 인원 카드: −/+ 가 이름 자리를 먹어 「지원 …」「등록 …」(673 폭은 「지」「등」)만 남았다 → −/+ 를 이름 아래 줄로 (752·673 모두).
+   요원 카드: 편성 칸이 좁을 때(673 폭, 카드 215px 안팎)만 톡·위키 단추가 이름 줄을 먹어 4글자 이름이 「고그...」로 잘리고,
+   소속·직급도 잘리고, 고른 표시(✓)가 소속 끝을 덮었다. 그때만 단추를 카드 오른쪽에 위아래로 세우고 이름·소속을 두 줄까지 꺾고,
+   ✓는 사진 오른쪽 아래 모서리로 옮긴다. 752 폭(카드 238px 안팎)은 이미 다 보여 그대로 둔다 */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  .gx-acard.pick.gx-scard { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 6px; align-items: center; }
+  .gx-acard.pick.gx-scard > .gx-ava { grid-row: 1 / span 2; }
+  .gx-acard.pick.gx-scard .gx-acard-txt small { white-space: normal; word-break: keep-all; line-height: 1.35; }
+  .gx-acard.pick.gx-scard > .gx-scard-step { grid-column: 2; }
+  .gx-acards.pick:has(> .gx-acard.pick.wide) { container-type: inline-size; }
+  @container (max-width: 225px) {
+    .gx-acard.pick.wide { height: auto; min-height: var(--acard-h, 96px); align-self: start; }
+    .gx-acard.pick.wide .gx-acard-act { top: 6px; right: 4px; flex-direction: column; gap: 2px; }
+    .gx-acard.pick.wide .gx-acard-txt { padding-right: 36px; }
+    .gx-acard.pick.wide .gx-acard-top { padding-right: 0; flex-wrap: wrap; row-gap: 4px; }
+    .gx-acard.pick.wide .gx-acard-top b { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.3; }
+    .gx-acard.pick.wide .gx-acard-txt > * { flex: none; }
+    .gx-acard.pick.wide .gx-acard-txt small { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.35; }
+    .gx-acard.pick.wide .gx-acard-check { z-index: 1; top: 50%; bottom: auto; left: 46px; right: auto; transform: translateY(8px); width: 20px; height: 20px; font-size: 12px; box-shadow: 0 0 0 2px var(--void); }
+  }
+/* 폴드 펼침 임무 (지도 이름표·거르기 칩) */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  /* 왼쪽 칸이 230~265px 라 지도가 작다. 이름표를 줄여 겹쳐서 숨는 이름표(서울·대전·대구 등)를 줄인다. 자리 비키기·숨기기는 mapzoom 의 declutter 그대로 */
+  .gx-field .gx-pname { gap: 3px; padding: 0 4px; border-radius: 5px; font-size: 11px; line-height: 1.35; }
+  .gx-field .gx-pin.nation .gx-pname { font-size: 11.5px; }
+  .gx-field .gx-pname b { padding: 0 4px; font-size: 10.5px; }
+  /* 거르기 칩 다섯 개(전체·괴이·사건·특수·취소)가 752 폭(폴드 펼침)에서 한 줄에 들게 옆 여백·틈만 줄인다 (높이 34px 그대로. 더 좁으면 전처럼 둘째 줄로) */
+  .gx-field .gx-sitbar { gap: 4px; }
+  .gx-field .gx-sitbar .gx-chip { gap: 3px; padding: 0 7px; }
+  .gx-field .gx-sitbar .gx-unplace { margin-left: 0; }
+}
