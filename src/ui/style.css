@@ -3159,7 +3159,7 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
   .ph-room-head { gap: 6px; }
   .ph-room-head .ph-act { gap: 4px; }
   .ph-room-head .ph-act .gx-mini { padding: 0 8px; gap: 4px; }
-  .ph-room-head .ph-act .pp-reread-sel { width: 96px; padding-left: 8px; padding-right: 22px; }
+  .ph-room-head .ph-act .pp-reread-sel { width: 112px; padding-left: 8px; padding-right: 22px; }
 }
 .gx-png-title { font-size: 14px; font-family: var(--mono); color: var(--dim); padding-right: 36px; }
 .gx-png-img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--void); }
