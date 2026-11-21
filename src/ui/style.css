@@ -760,7 +760,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .at-files .at-card-image { padding: 0; }
 .at-zoom { position: fixed; inset: 0; z-index: 2147483647; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .86); cursor: zoom-out; }
 .at-zoom img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; }
-.at-zoom-x { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .14); color: #fff; }
+/* 닫기는 다른 창의 닫기(.gx-x)와 같은 모양: 36 · 모서리 8 · 선 1px (전수점검 사소-69) */
+.at-zoom-x { position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--sub); }
+.at-zoom-x:hover { color: var(--text); border-color: var(--line2); }
 .at-zoom-x svg { width: 18px; height: 18px; }
 
 /* 요원 카드 (상황판·편성 공통, v0.11.0): 요원마다 칸을 나누고 사진은 둥근 네모 */
@@ -997,7 +999,10 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 /* 설정 탭 (v0.12.0): 묶음 카드 + 줄. 넓은 화면에서 너무 퍼지지 않게 가운데 */
 .gx-settings { display: flex; flex-direction: column; gap: 18px; }
 .gx-settings > * { width: 100%; max-width: 980px; margin-left: auto; margin-right: auto; }
-.ps-note { margin: 0 4px; font-size: 13px; color: var(--dim); line-height: 1.5; }
+/* 안내·빈 상태 글은 위 문단·칸과 왼쪽 끝을 맞춘다 (전수점검 눌러-사소-44·눌러2-사소-30: 어디에 놓여도 4px 들여 써졌다).
+   묶음 제목(.ps-group h3, 4px 안쪽) 바로 아래 글만 제목과 같이 4px */
+.ps-note { margin: 0; font-size: 13px; color: var(--dim); line-height: 1.5; }
+.ps-group > .ps-note { margin: 0 4px; }
 .ps-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
 .ps-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .ps-card h4 { margin: 0 4px; font-size: 15px; font-weight: 700; }
@@ -3016,7 +3021,6 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
 .gx-rpt-wallet li > b { flex: none; font-variant-numeric: tabular-nums; }
 .gx-rpt-wallet li.bal { margin-top: 4px; padding-top: 10px; border-top: 1px solid var(--line); font-weight: 700; }
 .gx-rpt-foot { margin: 0; font-size: 12.5px; color: var(--dim); } /* 위 문단과 왼쪽 끝을 맞춘다 (전수점검 눌러-사소-44) */
-.gw-setbody > .ps-note { margin: 0; }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gx-records .gx-wt-tools { flex-wrap: wrap; }
   .gx-records .gx-wt-q { max-width: none; flex: 1 1 100%; }

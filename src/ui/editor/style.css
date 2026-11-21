@@ -94,6 +94,8 @@
 .gw .gw-sec > summary { cursor: pointer; list-style: none; }
 .gw .ps-group > h3 small, .gw .gw-sec > h3 small, .gw .gw-sec > summary small { margin: 0; font-size: 12.5px; font-weight: 400; color: var(--dim); }
 .gw .ps-group > .ps-note, .gw .gw-setbody > .ps-note, .gw .ps-card > .ps-note { margin: -2px 2px 8px; font-size: 13px; line-height: 1.5; color: var(--dim); }
+/* 본문 칸 바로 아래 글(빈 상태 등)은 위 설명 글과 왼쪽 끝을 맞춘다: 묶음 제목(2px 안쪽)이 없는 자리 (전수점검 눌러-사소-44) */
+.gw .gw-setbody > .ps-note { margin-left: 0; margin-right: 0; }
 .gw .gw-variants { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-left: auto; font-weight: 400; }
 .gw .gw-variants input { width: 200px; }
 /* 카드 */

@@ -18,7 +18,7 @@ import { bindMbar } from '../mbar';
 import { bindSwipeBack } from '../swipeback';
 import { NavHistory } from '../../core/navhist';
 import { booksInput, defaultsState } from '../advanced';
-import { rememberPanel } from '../panels';
+import { guardHiddenScroll, rememberPanel, scrollInside } from '../panels';
 import editorCss from './style.css';
 import { recordCount, recordList, recordPage, recordAction, recordInput, recUi, rowsOf } from './record';
 import { relationsPage, relationsAction, relationsInput } from './relations';
@@ -171,6 +171,8 @@ function ensureRoot(): HTMLElement {
   root = document.createElement('div');
   root.className = 'gw';
   document.body.appendChild(root);
+  // 설정 창도 본 창과 같이: 숨긴 틀이 밀려 머리줄이 잘리지 않게 (전수점검 눌러-중대-1)
+  guardHiddenScroll(root);
   bindNeedFill();
   // 접는 칸(details data-keep)의 펼침을 기억한다: 조작 뒤 창을 다시 그려도 접히지 않게 (2026-10-28 QC: 패널만 기억하고 편집 창은 안 했다)
   root.addEventListener('toggle', (ev) => rememberPanel(ev.target as HTMLDetailsElement), true);
@@ -659,7 +661,8 @@ function findResults(ctx: ChatContext | null): string {
 function flashEl(el: HTMLElement, block: ScrollLogicalPosition): void {
   const box = el.closest('details');
   if (box && !box.open) box.open = true;
-  el.scrollIntoView({ block });
+  // 가장 가까운 스크롤 칸만 움직인다: scrollIntoView 는 숨긴 틀까지 밀었다 (전수점검 눌러-중대-1)
+  scrollInside(el, block === 'center' ? 'center' : block === 'start' ? 'start' : 'nearest');
   el.classList.remove('gw-find-flash');
   void el.offsetWidth; // 같은 자리를 다시 눌러도 효과가 처음부터
   el.classList.add('gw-find-flash');

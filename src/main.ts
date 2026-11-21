@@ -73,7 +73,8 @@ async function load(first: boolean): Promise<Body | null> {
     failedAt = Date.now();
     // 저장해 둔 본체가 깨져 있으면(판은 맞는데 실행이 안 됨) 지워서 다음에 다시 받게 한다. 그냥 두면 플러그인 판이 바뀔 때까지 영영 안 뜬다
     if (fromStore && codeBroken) await risuai.pluginStorage.removeItem(BODY_KEY).catch(() => {});
-    if (ask() && !link.__goeiBodyPanel) showPanel(VERSION, install, `본체를 시작하지 못했어요: ${startError}`, 'start');
+    // 첫 안내 글이 이미 「시작하지 못했어요」라 여기는 까닭만 (전수점검 사소-5)
+    if (ask() && !link.__goeiBodyPanel) showPanel(VERSION, install, `까닭: ${startError}`, 'start');
   }
   return b;
 }

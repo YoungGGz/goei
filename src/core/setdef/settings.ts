@@ -17,7 +17,7 @@ export const SETTINGS_SET: SetPage = {
         { key: 'dim', label: '창 바깥 불투명도', ctl: { t: 'custom' }, help: '창 뒤 채팅 화면을 가리는 정도예요. 0%면 그대로 보이고 100%면 다 가려요.', scope: 'device' },
         { key: 'progress', label: '호출 진행 창', ctl: { t: 'seg', opts: [['1', 'ON'], ['0', 'OFF']] }, help: '채팅을 보내면 채팅 화면 오른쪽 위에 지금 도는 단계(라우터·디렉터·메인·갱신기·인터넷)와 모델·토큰·경과 시간을 보여 줘요. PC는 카드로 펼쳐졌다 끝나면 단추로 접히고, 폰은 점 다섯 개짜리 막대예요. 눌러서 지난 턴을 다시 볼 수 있어요.', scope: 'device' },
         // 기다리는 시간 (전수점검 보통-5·사소-9: 코드에 박혀 있던 시간, core/timing.ts). 처리기는 set-time
-        { key: 'time-modelIdle', label: '모델 응답 대기', ctl: { t: 'custom' }, help: '괴담넷·괴담톡·위키·상점·인물 기록 같은 보조 호출이 응답을 받지 못하면(받는 중이면 마지막 조각부터) 실패로 보는 시간이에요. 생각이 긴 모델을 스트리밍 없이 쓰면 늘리세요. 실패하면 「모델 오류 재시도」만큼 다시 보내요.', scope: 'device' },
+        { key: 'time-modelIdle', label: '모델 응답 대기', ctl: { t: 'custom' }, help: '괴담넷·괴담톡·위키·상점·인물 기록 같은 보조 호출이 응답을 받지 못하면(받는 중이면 마지막 조각부터) 실패로 보는 시간이에요. 생각이 긴 모델을 스트리밍 없이 쓰면 늘리세요. 받는 도중 멈춘 것만 「모델 오류 재시도」만큼 다시 보내고, 아무것도 받지 못한 채 끊긴 것은 다시 보내지 않아요.', scope: 'device' },
         { key: 'time-retryGap', label: '재시도 간격', ctl: { t: 'custom' }, help: '모델 쪽 일시 오류(빈 응답·과부하·시간 초과) 뒤 같은 요청을 다시 보내기 전에 쉬는 시간이에요.', scope: 'device' },
         { key: 'time-mainWait', label: '메인 응답 대기', ctl: { t: 'custom' }, help: '채팅을 보낸 뒤 메인 응답을 기다리는 시간이에요. 그동안 소지품 「사용」을 잠그고, 지나면 아직 만드는 중인지 확인해요.', scope: 'device' },
         { key: 'time-mainAgain', label: '응답 다시 확인', ctl: { t: 'custom' }, help: '메인 응답 대기가 끝났는데 아직 만드는 중이면, 다시 확인할 때까지의 시간이에요.', scope: 'device' },

@@ -57,7 +57,7 @@ import { savePhoto } from '../host/photo';
 import { readPersona, readUser, userInfo } from '../host/user';
 import { applyAdvanced } from '../core/advanced';
 import { booksInput, defaultsState, handleAdvanced } from './advanced';
-import { rememberPanel, scrollInside } from './panels';
+import { guardHiddenScroll, rememberPanel, scrollInside } from './panels';
 import { startCctvFx, stopCctvFx } from './cctvfx';
 import { elapsedText, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
 import { evArt } from './evpic';
@@ -212,8 +212,10 @@ const recordsEnv: RecordsEnv = settingsEnv;
 let shown = false;
 /** 상황판이 떠 있나 (body.ts: 그동안 호출 진행 창은 숨긴다 — 본 문서의 진행 단추가 상황판 닫기 X 위에 올라와 눌리지 않았다, 11-09 릴리스 점검) */
 export const appShown = (): boolean => shown;
-/** 창 안에 어둡게 깔리는 팝업(상점·물건 창·아바타 창)이 떠 있나: 호출 진행 단추도 같이 흐리게 (전수점검 눌러2-사소-15) */
-export const appDimmed = (): boolean => shown && (shopUi.open || lookUi.open);
+/** 화면을 어둡게 덮는 팝업이 떠 있나: 호출 진행 단추도 같이 흐리게 (전수점검 눌러2-사소-15).
+ *  상태 하나하나가 아니라 덮개 자체를 본다 — 상점·물건·아바타·보고서·사원증(.gx-agpop), 사건·요원 카드(.ev-scrim), 사진 크게 보기(.at-zoom) */
+const DIM_SEL = '.gx-agpop, .ev-scrim, .at-zoom';
+export const appDimmed = (): boolean => (shown && (shopUi.open || lookUi.open)) || !!document.querySelector(DIM_SEL);
 let shownListener: ((shown: boolean) => void) | null = null;
 export function onAppShown(f: (shown: boolean) => void): void {
   shownListener = f;
@@ -272,14 +274,8 @@ function ensureRoot(): HTMLElement {
   root = document.createElement('div');
   root.className = 'gx';
   document.body.appendChild(root);
-  // 스크롤하지 않는 틀(overflow hidden: 창·본문 틀)이 scrollIntoView·focus 로 밀리면 머리줄이 위로 잘린다 → 바로 제자리로 (전수점검 눌러-중대-1·눌러2-보통-10)
-  root.addEventListener('scroll', (ev) => {
-    const el = ev.target;
-    if (!(el instanceof HTMLElement) || (!el.scrollTop && !el.scrollLeft)) return;
-    const cs = getComputedStyle(el);
-    if (cs.overflowY === 'hidden' && el.scrollTop) el.scrollTop = 0;
-    if (cs.overflowX === 'hidden' && el.scrollLeft) el.scrollLeft = 0;
-  }, true);
+  // 스크롤하지 않는 틀이 밀리면 바로 제자리로 (전수점검 눌러-중대-1·눌러2-보통-10)
+  guardHiddenScroll(root);
   bindNeedFill();
   root.addEventListener('toggle', (ev) => rememberPanel(ev.target as HTMLDetailsElement), true);
   // 실제 사진: 파일 고르기 창은 클릭 안에서 바로 열어야 해서 handle()을 거치지 않는다

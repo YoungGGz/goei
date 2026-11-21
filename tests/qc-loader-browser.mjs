@@ -410,7 +410,8 @@ if (!skip()) {
 if (!skip()) {
   const { page, frame, errors } = await boot([fixture], 0, emptyChat(), { body: `// goei-body ${VERSION}\nthis is not js (` });
   await frame.waitForSelector('.gl-card', { timeout: 8000 });
-  assert.match(await panelMsg(frame), /본체를 시작하지 못했어요/);
+  assert.match(await frame.evaluate(() => document.querySelector('.gl-card p')?.textContent ?? ''), /본체를 시작하지 못했어요/, '첫 안내 글이 시작 실패');
+  assert.match(await panelMsg(frame), /^까닭: /, '까닭 줄은 같은 말을 되풀이하지 않는다 (전수점검 사소-5)');
   assert.equal(await frame.evaluate(() => window.__store['p:goei:body'] ?? null), null, '깨진 저장 본체는 지움 (다음엔 다시 받게)');
   assert.deepEqual(await fetched(frame), [], '저장 본체가 있었으니 받지는 않았음');
   await serve(frame, startFiles);

@@ -85,8 +85,11 @@ function sync(ctx: ChatContext): void {
   ui.cos = fresh();
   ui.bm = fresh();
 }
+/** 뽑기 설정 「기본값으로」를 한 번 누른 몰: 한 번 더 눌러야 되돌린다 (상황판 휴지통과 같은 두 번 누르기, 전수점검 눌러2-보통-38) */
+let rollResetArm = '';
 export function resetMalls(): void {
   uiChat = '';
+  rollResetArm = '';
   ui.cos = fresh();
   ui.bm = fresh();
 }
@@ -1064,7 +1067,8 @@ function cosRollGroup(ctx: ChatContext, site: MallSite): string {
   const K = rollKeys(site);
   const D = rollDefaults(site);
   const bm = site === 'bm';
-  const reset = rollChanged(vars, site) || String(vars?.[K.tiers] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-roll-reset" data-value="${site}">기본값으로</button></div>` : '';
+  const armed = rollResetArm === site;
+  const reset = rollChanged(vars, site) || String(vars?.[K.tiers] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini${armed ? ' danger' : ''}" data-action="ms-roll-reset" data-value="${site}" title="${armed ? '한 번 더 누르면 기본값으로 되돌려요' : '뽑기 설정을 기본값으로'}">${armed ? '정말 되돌리기' : '기본값으로'}</button></div>` : '';
   // 기본값은 칸에 진짜 글로 들어 있다 (11-12 사용자: 회색 안내 글이면 한 글자만 쳐도 다 사라진다). 다르게 고친 줄만 「바꾼 줄」 점
   const gSet = defChanged(String(vars?.[K.genres] ?? ''), genresText(D.genres), genresNorm);
   const mark = (on: boolean) => (on ? 'ps-changed' : '');
@@ -1135,6 +1139,7 @@ function cosFixedGroup(ctx: ChatContext): string {
 
 /** 설정 값 바꾸기: ms-cfg 「사이트:키=값」 · ms-step 「사이트:키:±」 · ms-num 「사이트:키=숫자」(상품 수) · ms-text (값 기준) */
 export async function mallSettingsAction(action: string, value: string | undefined, ctx: ChatContext, env: MallEnv): Promise<boolean> {
+  if (action !== 'ms-roll-reset') rollResetArm = ''; // 다른 것을 만지면 「정말 되돌리기」를 거둔다
   if (await deskSettingsAction(action, value, ctx, env)) return true;
   if (await cosExtraAction(action, value, ctx, env)) return true;
   if (action !== 'ms-cfg' && action !== 'ms-step' && action !== 'ms-text' && action !== 'ms-num') return false;
@@ -1310,7 +1315,15 @@ async function cosExtraAction(action: string, value: string | undefined, ctx: Ch
     return set(m[2] === 'genres' ? { [K.genres]: defStored(m[3], genresText(D.genres), genresNorm) } : { [K.tiers]: defStored(m[3], tiersText(D.tiers), tiersNorm) });
   }
   if (action === 'ms-roll-reset') {
-    // 되돌린 것을 알린다 (말없이 칸만 당겨졌다, 전수점검 눌러2-보통-38)
+    // 되돌릴 수 없으니 한 번 더 눌러야 한다 (상황판 휴지통과 같게, 전수점검 눌러2-보통-38)
+    const site = value === 'bm' ? 'bm' : 'cos';
+    if (rollResetArm !== site) {
+      rollResetArm = site;
+      env.render();
+      return true;
+    }
+    rollResetArm = '';
+    // 되돌린 것을 알린다 (말없이 칸만 당겨졌다)
     settingsUi.info = '뽑기 설정을 기본값으로 되돌렸어요.';
     return set(Object.fromEntries(Object.values(rollKeys(value === 'bm' ? 'bm' : 'cos')).map((k) => [k, ''])));
   }

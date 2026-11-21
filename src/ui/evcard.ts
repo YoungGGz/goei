@@ -173,6 +173,8 @@ export async function aimFlash(key: string): Promise<void> {
   b.classList.add('fx');
   b.setAttribute('aria-pressed', String(on));
   b.setAttribute('title', on ? '해제' : '선택');
+  // 효과를 보는 동안(다시 그리기 전)에도 카드에 고른 테두리(민트 2px)를 같이 켠다: 조준선만 빨갛게 바뀌고 테두리는 회색 1px 그대로였다 (전수점검 눌러2-보통-37)
+  b.closest('.gx-mlist li.gx-mx, .gx-evc')?.classList.toggle('sel', on);
   aimHit.used = true;
   await new Promise((r) => setTimeout(r, on ? AIM_LOCK_MS : AIM_RELEASE_MS));
 }

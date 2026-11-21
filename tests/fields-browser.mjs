@@ -87,7 +87,9 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   eq(await count(TR), 12); ok(await page.evaluate(() => document.querySelector('.gw [data-action="ms-tier-add"]').disabled), '12줄이면 「등급 추가」 잠김');
   // 기본값으로
   await click(q('[data-action="ms-roll-reset"]'));
-  ok(!(await ss()).$cos_roll_tiers, '「기본값으로」'); eq(await vals(q('[data-change="ms-tier"][data-key$=":name"]')), names0);
+  ok(!!(await ss()).$cos_roll_tiers, '한 번 누르면 아직 안 되돌린다 (전수점검 눌러2-보통-38)');
+  await click(q('[data-action="ms-roll-reset"]'));
+  ok(!(await ss()).$cos_roll_tiers, '「기본값으로」 두 번'); eq(await vals(q('[data-change="ms-tier"][data-key$=":name"]')), names0);
   // 다 지우면 기본값
   for (let i = 4; i >= 0; i--) await click(q(`[data-action="ms-tier-del"][data-value="cos:${i}"]`));
   ok(!(await ss()).$cos_roll_tiers, '다 지우면 저장을 비운다'); eq(await count(TR), 5, '다 지우면 기본 5줄이 돌아온다');
@@ -97,7 +99,7 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   eq(await count(TR), 5, `[${vp}] 포인트몰 값 등급 기본 5줄`);
   await put(cell('ms-tier', 'bm:0:lo'), '40');
   ok((await ss()).$bm_roll_tiers.split('\n')[0].includes('|40|'), '포인트몰 값 등급 저장'); ok(!(await ss()).$cos_roll_tiers, '몰끼리 안 섞인다');
-  await click(q('[data-action="ms-roll-reset"]')); ok(!(await ss()).$bm_roll_tiers);
+  await click(q('[data-action="ms-roll-reset"]')); await click(q('[data-action="ms-roll-reset"]')); ok(!(await ss()).$bm_roll_tiers);
   const AX = q('.ms-axs .ms-ax');
   eq(await count(AX), 7, '주사위 기본 7칸'); eq(await count(q('[data-change="ms-desk"][data-key="axes"]')), 0, '옛 글 상자 없음');
   eq(await count(q('.ms-axs .gx-chip')), 0, '칩 없음');

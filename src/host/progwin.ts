@@ -271,6 +271,8 @@ export async function createProgWin(): Promise<ProgWin> {
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
   let tick: ReturnType<typeof setInterval> | undefined;
   let pos: Pos = { ...DEFAULT_POS };
+  /** 화면에 실제로 놓인 자리 (펼친 카드는 화면 안으로 옮겨 보여 pos 와 다를 수 있다): 끌기는 여기서 시작한다 */
+  let shownPos: Pos = { ...DEFAULT_POS };
   try {
     const raw = await risuai.safeLocalStorage.getItem(POS_KEY);
     const p = raw ? (JSON.parse(raw) as Partial<Pos>) : null;
@@ -308,11 +310,16 @@ export async function createProgWin(): Promise<ProgWin> {
     // 접으면 단추가 원래 자리로 돌아가고, 아래쪽에 둔 단추의 카드도 위로 올라와 화면 밖으로 안 넘친다 (전수점검 보통-9)
     pos = { right: Math.min(Math.max(0, pos.right), Math.max(0, vw - BTN)), top: Math.min(Math.max(0, pos.top), Math.max(0, vh - BTN)) };
     const w = open ? CARD_W : BTN;
-    const h = open ? Math.max(BTN, (await rectOf(card))?.height ?? BTN) : BTN;
-    await host.setStyle('right', `${Math.min(pos.right, Math.max(0, vw - w))}px`);
+    // 펼친 직후 카드는 scale(.16)→1 로 자라는 중이라 잰 높이가 작게 나온다. 가로·세로가 같은 비율로 줄어 있으니 폭(CARD_W)으로 되돌려 참 높이를 얻는다
+    const r = open ? await rectOf(card) : null;
+    const h = r && r.width > 0 ? Math.max(BTN, (r.height * CARD_W) / r.width) : BTN;
+    const right = Math.min(pos.right, Math.max(0, vw - w));
     // 상황판이 떠 있으면 펼친 카드는 머리줄(닫기 X·잔고) 아래에서 시작한다 (전수점검 눌러-보통-1)
     const floor = open && panelOpen && headBottom ? headBottom + 8 : 0;
-    await host.setStyle('top', `${Math.max(Math.min(floor, Math.max(0, vh - h)), Math.min(pos.top, Math.max(0, vh - h)))}px`);
+    const top = Math.max(Math.min(floor, Math.max(0, vh - h)), Math.min(pos.top, Math.max(0, vh - h)));
+    shownPos = { right, top };
+    await host.setStyle('right', `${right}px`);
+    await host.setStyle('top', `${top}px`);
   };
   const setOpen = async (next: boolean) => {
     if (open === next) return;
@@ -412,6 +419,8 @@ export async function createProgWin(): Promise<ProgWin> {
         if (phone) phoneTop = d.startTop + dy;
         else pos = { right: d.start.right - dx, top: d.start.top + dy };
         await applyPos();
+        // 펼친 카드를 끄는 중이면 보이는 자리를 그대로 자리로 삼는다: 화면 끝·머리줄에 막힌 만큼 pos 가 앞서 나가 되돌릴 때 안 움직이는 칸이 생겼다 (전수점검 보통-9)
+        if (!phone && open) pos = { ...shownPos };
       }
     } catch {
       drag = null;
@@ -430,7 +439,8 @@ export async function createProgWin(): Promise<ProgWin> {
     const y = ev.clientY;
     // 펼친 창은 머리줄을, 접힌 단추는 단추를 잡고 끈다 (11-11 사용자: 단추가 옮겨지지 않았다). 끌고 놓으면 뒤따르는 클릭은 무시된다 (moved)
     const grab = open;
-    drag = { x, y, start: { ...pos }, startTop: phoneTop, hit: (async () => inside(await rectOf(grab ? await card.querySelector('[data-grip]') : dot), x, y))().catch(() => false) };
+    // 펼친 카드는 화면 안으로 옮겨 보일 수 있으니 보이는 자리에서 끌기를 시작한다 (전수점검 보통-9)
+    drag = { x, y, start: grab && !phone ? { ...shownPos } : { ...pos }, startTop: phoneTop, hit: (async () => inside(await rectOf(grab ? await card.querySelector('[data-grip]') : dot), x, y))().catch(() => false) };
   };
   const onMove = (ev: PointerEv) => {
     if (!drag || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return;

@@ -860,7 +860,7 @@ export function bindFootnotes(root: HTMLElement): void {
     hide();
     const li = doc.querySelector<HTMLElement>(`.nw-notes li[data-fn="${sup.dataset.fn}"]`);
     if (!li) return;
-    li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    scrollInside(li, 'center', true); // 숨긴 틀까지 밀지 않게 (전수점검 눌러-중대-1)
     li.classList.remove('hit');
     void li.offsetWidth;
     li.classList.add('hit');

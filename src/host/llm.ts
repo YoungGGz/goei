@@ -74,18 +74,27 @@ async function withPhotos(messages: (LlmMessage & { images?: string[] })[]): Pro
 }
 
 /** 모델 호출 시간 제한 (전수검사 11-13 나-7, 사용자 결정 (2)): 응답이 이만큼 오지 않으면(받는 중이면 마지막 조각부터) 실패로 본다.
- * 모델 연결이 멈춰도 응답 뒤 처리(갱신기·이미지 태그 보충)가 채팅을 영영 묶어 두지 않게. raw 'timeout' 이라 일시 오류로 다시 보낸다 */
+ * 모델 연결이 멈춰도 응답 뒤 처리(갱신기·이미지 태그 보충)가 채팅을 영영 묶어 두지 않게. */
 // 시간은 설정 「화면 → 모델 응답 대기」 (core/timing.ts, 전수점검 보통-5: 5분이 박혀 있어 느린 모델이 끊기고 같은 요청이 다시 나갔다)
+// 조각을 하나도 받지 못하고 끊긴 것은 모델이 느린 것이라 같은 요청을 다시 보내도 또 끊긴다: 일시 오류 재시도에서 뺀다 (markTransientDone).
+// 받는 도중 멈춘 것(연결이 끊긴 것)만 raw 'timeout' 으로 일시 오류로 다시 보낸다
 function idleLimit<T>(run: (tick: () => void) => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let ticked = false;
   const ms = timeMs('modelIdle');
   return new Promise<T>((resolve, reject) => {
-    const arm = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => reject(new LlmError(`모델이 ${timeOf('modelIdle')}분 동안 응답하지 않아 멈췄어요. Risu의 모델 연결을 확인하거나, 설정 → 화면의 「모델 응답 대기」를 늘려 주세요.`, 'timeout')), ms);
+    const fire = () => {
+      const error = new LlmError(`모델이 ${timeOf('modelIdle')}분 동안 응답하지 않아 멈췄어요. Risu의 모델 연결을 확인하거나, 설정 → 화면의 「모델 응답 대기」를 늘려 주세요.`, 'timeout');
+      if (!ticked) markTransientDone(error);
+      reject(error);
     };
-    arm();
-    run(arm).then(resolve, reject).finally(() => clearTimeout(timer));
+    timer = setTimeout(fire, ms);
+    const tick = () => {
+      ticked = true;
+      clearTimeout(timer);
+      timer = setTimeout(fire, ms);
+    };
+    run(tick).then(resolve, reject).finally(() => clearTimeout(timer));
   });
 }
 
