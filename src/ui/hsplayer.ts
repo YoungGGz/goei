@@ -213,7 +213,7 @@ function build(): void {
 }
 
 /** 사이트 칸이 좁거나 낮은 PC 창(폴드 펼친 화면 등: 창 폭 600 초과라 PC 배치인데 사이트 칸은 510~580): 채팅 칸을 옆에 둘 자리가 없어 오른쪽이 잘렸다 (11-21 사용자 실기).
- *  .hs-n = 폭 720 미만 → 채팅을 방송 칸 아래로, 머리띠 두 줄. .hs-s = 높이 480 미만 → 전화 주문 창 왼쪽 칸을 통째로 스크롤. 폰 배치(.hs-m)는 그대로 */
+ *  .hs-n = 폭 720 미만 → PC 두 칸 그대로 채팅 칸 폭·간격·글자만 줄임. .hs-s = 높이 480 미만 → 전화 주문 창 왼쪽 칸을 통째로 스크롤. 폰 배치(.hs-m)는 그대로 */
 const SITE_NARROW = 720;
 const SITE_SHORT = 480;
 export function siteFit(page: HTMLElement | null | undefined): void {
@@ -223,12 +223,14 @@ export function siteFit(page: HTMLElement | null | undefined): void {
   page.classList.toggle('hs-s', pc && page.clientHeight < SITE_SHORT);
 }
 
-/** 방송 칸이 쓸 수 있는 폭: PC 는 옆 채팅 칸을 뺀다(넓은 창 최소 260 + 사이 14, 좁은 창 .hs-n 210 + 사이 10) · 방송 칸 테두리 2 */
+/** 방송 칸이 쓸 수 있는 폭: PC 는 옆 채팅 칸을 뺀다(넓은 창 최소 260 + 사이 14, 좁은 창 .hs-n 실제 채팅 칸 폭 + 사이 10) · 방송 칸 테두리 2 */
 function roomWidth(wrap: HTMLElement, page: HTMLElement): number {
   const cs = getComputedStyle(wrap);
   const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
   if (page.classList.contains('hs-m')) return inner - 2;
-  return inner - (page.classList.contains('hs-n') ? 220 : 274) - 2;
+  // 좁은 창(.hs-n)은 채팅 칸 폭이 창에 따라 170~196 이라 실제 폭 + 사이 10 을 뺀다
+  const chat = page.classList.contains('hs-n') ? page.querySelector<HTMLElement>('.hs-bd > .hs-chat') : null;
+  return inner - (chat ? chat.offsetWidth + 10 : 274) - 2;
 }
 
 /** 「자동·폭 맞춤」 배율: 방송 칸이 화면을 다 차지하지 않게, 사이트 칸 폭(넓은 PC 는 채팅 칸을 뺀 폭)과 보이는 높이 안에서.
@@ -274,11 +276,6 @@ function layout(): void {
   cg!.style.height = `${small ? h * k : h}px`;
   cg!.style.transform = small || k === 1 ? '' : `scale(${k})`;
   if (small) stage.style.fontSize = '';
-  // 좁은 PC 창(.hs-n): 채팅 칸을 방송 화면 높이에 맞춘다 → 첫 화면에 방송과 채팅(입력·보내기까지)이 나란히 (11-21 사용자: 채팅창 어디 갔냐)
-  const page = stage.closest<HTMLElement>('.hs');
-  const chat = page?.querySelector<HTMLElement>('.hs-bd > .hs-chat');
-  const tv = stage.closest<HTMLElement>('.hs-tv');
-  if (chat) chat.style.height = page!.classList.contains('hs-n') && tv ? `${tv.offsetHeight}px` : '';
 }
 
 /** 마지막으로 찾은 물건 그림 주소: tick 마다 그림 팩(5천여 줄)을 다시 뒤지지 않게. 찾은 것만 기억한다(팩이 늦게 받혀도 다시 찾게) (전수검사 11-13) */
