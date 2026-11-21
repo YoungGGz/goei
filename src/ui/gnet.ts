@@ -555,7 +555,22 @@ const narrow = () => isPhone();
 
 
 
-function composer(busy: boolean, placeholder: string, chip = '', label = ''): string {
+function composer(busy: boolean, placeholder: string, chip = '', label = '', board = false): string {
+  // PC 쪽지함 창이 글 위에 떠 있으면 입력 상태(gnet.draft)는 쪽지 칸 몫이다. 게시글 댓글 칸은 맡겨 둔 댓글만 보이고
+  // 입력·등록은 막는다 (같은 이름이면 쪽지에 쓴 글이 댓글 칸에도 보이고 등록 단추도 같이 켜졌다). 창 밖을 누르면 창이 닫히며 되찾는다
+  if (board && gnet.sub === 'dm') {
+    const h = gnet.held?.sub === 'board' ? gnet.held : null;
+    return `<div class="ph-composer gn-composer">
+    ${chip}
+    ${attachEditor('gn', h?.attach ?? [], GN_KINDS, true, '', false)}
+    <div class="ph-compose">
+      <button class="ph-tool ph-plus" aria-label="첨부" title="첨부" disabled>${ICONS.plus}</button>
+      <textarea class="ph-input" name="gn-held" rows="1" placeholder="${esc(placeholder)}" readonly>${esc(h?.draft ?? '')}</textarea>
+      <button class="ph-send${label ? ' txt' : ''}" aria-label="등록" title="등록" disabled>${label || ICONS.send}</button>
+      <button class="ph-tool ph-back2" data-action="gn-back" aria-label="목록으로" title="목록으로">${ICONS.back}</button>
+    </div>
+  </div>`;
+  }
   return `<div class="ph-composer gn-composer">
     ${chip}
     ${attachEditor('gn', gnet.attach, GN_KINDS, busy, '', gnet.attachMenu)}
@@ -590,7 +605,7 @@ function composeView(c: Compose, busy: boolean): string {
 /** 답글 입력줄: 답글을 누른 댓글 바로 밑 */
 function replyBox(label: string, busy: boolean, depth: number): string {
   const chip = `<div class="gn-replyto"><span>${esc(label)}</span><button class="ph-tool sm" data-action="gn-cancel" aria-label="답글 취소" title="취소">${ICONS.close}</button></div>`;
-  return `<li class="gn-c-compose" style="--gn-depth:${Math.min(depth, 3)}">${composer(busy, '답글 입력', chip, '등록')}</li>`;
+  return `<li class="gn-c-compose" style="--gn-depth:${Math.min(depth, 3)}">${composer(busy, '답글 입력', chip, '등록', true)}</li>`;
 }
 
 /** 댓글 시각: 늘 날짜와 함께 「05.14 09:10」 (2026-11-10 사용자: 시각만 있으면 이야기 시간이 흐른 뒤 맥락이 안 이어진다. 시각 없는 옛 댓글은 없음) */
@@ -959,7 +974,7 @@ function sitePost(site: BoardSite, p: GPost, busy: boolean, now: string): string
   const scrap = (cls: string, on = '★ 스크랩됨', off = '☆ 스크랩') => `<button class="${cls}${p.scrap ? ' on' : ''}" data-action="gn-scrap" data-value="${p.id}" aria-pressed="${!!p.scrap}">${p.scrap ? on : off}</button>`;
   const vote = (cls: string, inner: string) => `<button class="${cls}${p.voted ? ' on' : ''}" data-action="gn-vote" data-value="${p.id}" aria-pressed="${!!p.voted}">${inner}</button>`;
   const list = p.comments.length ? `<ul class="cms0 gn-comments">${commentTree(site, p, busy)}</ul>` : `<p class="bs-none gn-c-none">${site === 'sm' ? '아직 문의가 없어요.' : '아직 댓글이 없어요.'}</p>`;
-  const cin = reply ? '' : composer(busy, '댓글을 입력하세요', '', '등록');
+  const cin = reply ? '' : composer(busy, '댓글을 입력하세요', '', '등록', true);
   switch (site) {
     case 'gal': {
       const files = boardFiles(p.body);

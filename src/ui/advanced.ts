@@ -187,11 +187,12 @@ export async function handleAdvanced(action: string, value: string | undefined, 
       // 최소·최대 짝(「…_min」과 「…」): 최소가 최대를 넘으면 상대도 같이 맞춘다 (게시글·댓글 수 칸과 같게)
       const [f, item, val] = hit;
       const mate = item.key.endsWith('_min') ? advItem(f, item.key.slice(0, -4)) : advItem(f, `${item.key}_min`);
-      if (item.type === 'num' && mate?.type === 'num' && val !== '') {
+      // 기본값과 같아 비운 값('')도 기본값으로 읽어 짝을 맞추고, 상대에 적는 값도 상대 기본값과 같으면 비운다
+      if (item.type === 'num' && mate?.type === 'num') {
         const state = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
         const other = Number(advValue(state as never, f, mate.key));
-        const n = Number(val);
-        if (item.key.endsWith('_min') ? n > other : n < other) vars[advVar(f, mate)] = val;
+        const n = Number(val === '' ? item.def : val);
+        if (item.key.endsWith('_min') ? n > other : n < other) vars[advVar(f, mate)] = String(n) === String(mate.def) ? blank(mate) : String(n);
       }
     }
   } else if (action === 'adv-books') {

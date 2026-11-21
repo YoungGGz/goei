@@ -4264,9 +4264,6 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .nw-link, .wk .nw-fn { padding: 6px 2px; }
   .wk .wtabs button { min-height: 34px; padding: 0 12px; }
   .wk .dbtn button { min-height: 34px; }
-  /* 「‹ 목록」 손잡이: 34 폭, 본문 상자 테두리에 얹히지 않게 그만큼 비워 둔다 */
-  .wk .wgrab { width: 34px; }
-  .wk .wrap { padding-right: 42px; }
   .gx[data-wiki-side="left"] .wk .wrap { padding-right: 8px; padding-left: 42px; }
 }
 /* 위키 목록 판: 머리에 닫기, 자음판은 판 안에 들어가게·글자 진하게·닫기 */
@@ -4276,7 +4273,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk .wdx svg { width: 20px; height: 20px; }
 .wk .wdr .nw-kgrid { padding: 8px; }
 .wk .wdr .nw-kgrid-in { grid-template-columns: repeat(4, minmax(0, 52px)); max-width: 100%; box-sizing: border-box; padding: 10px; }
-.wk .wdr .nw-kgrid-in button { height: 48px; font-size: 18px; font-weight: 700; color: #1f5a4f; }
+.wk .wdr .nw-kgrid-in button { height: 48px; font-size: 18px; font-weight: 700; }
 .wk .wdr .nw-kgrid-in .nw-kx { grid-column: 1 / -1; justify-self: end; width: 36px; height: 36px; border: 0; background: none; color: #555; }
 .wk .wdr .nw-kgrid-in .nw-kx svg { width: 20px; height: 20px; }
 /* 각주 안 스포일러도 본문 스포일러와 같은 상자 */
@@ -4842,7 +4839,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk .wls .wnone { margin: 0; padding: 10px 14px; color: #888; font-size: 13px; }
 .wk .wdr .nw-kgrid { background: rgba(255, 255, 255, .8); }
 .wk .wdr .nw-kgrid-in { background: #fff; border-color: #ccc; border-radius: 6px; }
-.wk .wdr .nw-kgrid-in button { border: 1px solid #ccc; border-radius: 4px; background: #fafafa; color: #27685b; display: grid; place-items: center; }
+.wk .wdr .nw-kgrid-in button { border: 1px solid #ccc; border-radius: 4px; background: #fafafa; color: #1f5a4f; display: grid; place-items: center; }
 .wk .wdr .nw-fail { flex: none; margin: 0 12px 12px; font-size: 12.5px; color: #555; }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .wk .top { padding: 0 12px; }
@@ -4851,7 +4848,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .wtres { left: 0; right: 0; width: auto; }
   .wk .wtres .wls { max-height: 55vh; border-radius: 0; }
   .wk .top .rnd { margin-left: auto; }
-  .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 8px; }
+  /* 「‹ 목록」 손잡이(34 폭)가 본문 상자 테두리에 얹히지 않게 그만큼 비워 둔다 (왼쪽이면 위 규칙이 왼쪽을 비움) */
+  .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 8px 42px 8px 8px; }
   .wk .side { display: none; }
   .wk .wst { padding: 8px 8px 0; }
   .wk .doc { padding: 16px 14px; }
@@ -4863,7 +4861,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .rr .bt { flex: 1; text-align: center; justify-content: center; }
   .wk.nm table.irow td.ic { width: 48px; padding: 6px; }
   .wk.nm table.irow td.ic svg { width: 30px; height: 30px; }
-  .wk .wgrab { display: flex; position: absolute; right: 0; bottom: 96px; z-index: 4; height: 110px; width: 30px; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0 0; border: 1px solid #ccc; border-right: 0; border-radius: 12px 0 0 12px; background: #fff; color: #27685b; font: 800 18px 'Noto Sans KR', sans-serif; box-shadow: -3px 4px 12px -6px rgba(0, 0, 0, .4); }
+  .wk .wgrab { display: flex; position: absolute; right: 0; bottom: 96px; z-index: 4; height: 110px; width: 34px; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0 0; border: 1px solid #ccc; border-right: 0; border-radius: 12px 0 0 12px; background: #fff; color: #27685b; font: 800 18px 'Noto Sans KR', sans-serif; box-shadow: -3px 4px 12px -6px rgba(0, 0, 0, .4); }
   .wk .wgrab { color: #00a495; }
   .wk .wgrab span { writing-mode: vertical-rl; font-size: 12.5px; letter-spacing: .2em; color: #555; }
   .wk.dr-open .wgrab { display: none; }
