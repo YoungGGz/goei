@@ -748,7 +748,8 @@ const none = (list: GPost[]) => (!list.length ? '<p class="bs-none">해당하는
 // 그래서 PC 에서는 쪽지함 단추에 선택 표시가 없고(편지 아이콘으로 「여는 단추」임을 보인다), 쪽지함이 떠 있어도 보던 분류의 선택은 그대로다. 폰은 쪽지함이 한 화면이라 앞과 같다
 const dmTakes = () => gnet.sub === 'dm' && narrow();
 /** 열린 글을 읽는 중인지: 댓글·답글을 쓰는 중(compose comment)도 읽는 중으로 본다 (답글을 누르면 고른 줄이 「전체 글」로 옮겨 갔다) */
-const readingNow = () => !gnet.compose || gnet.compose.kind === 'comment';
+// PC 쪽지 쓰기는 글 위에 뜬 창이라 그 아래 글은 그대로 읽는 중 (눌러3 PC: 글에서 쪽지를 열면 「전체 글」이 골라져 있었다)
+const readingNow = () => !gnet.compose || gnet.compose.kind === 'comment' || ((gnet.compose.kind === 'dm' || gnet.compose.kind === 'newdm') && !narrow());
 const onCat = (v: string) => !dmTakes() && gnet.cat === v;
 const catBtn = (v: string, label: string, cls = '', extra = '', on = onCat(v)) => `<button class="${[cls, on ? 'on' : ''].filter(Boolean).join(' ')}" data-action="gn-cat" data-value="${esc(v)}" aria-pressed="${on}">${esc(label)}${extra}</button>`;
 const dmBtn = (st: GState, unreadDm: number, label = '쪽지함', cls = '') => `<button class="${[cls, dmTakes() ? 'on' : '', narrow() ? '' : 'gn-dmpop'].filter(Boolean).join(' ')}" data-action="gn-sub" data-value="dm" ${narrow() ? `aria-pressed="${dmTakes()}"` : `aria-haspopup="dialog" aria-expanded="${gnet.sub === 'dm'}"`}>${narrow() ? '' : ICONS.mail}${label}${unreadDm ? ` <b class="bs-new">${unreadDm}</b>` : dmUnread(st) ? '<span class="gn-dot"></span>' : ''}</button>`;
@@ -1108,11 +1109,13 @@ export function gnetTab(base: ChatContext, env?: GnetEnv, site: BoardSite = 'gn'
   const nick = gnet.editNick
     ? `<div class="gn-nickform"><input class="gx-search" name="gn-nick" data-enter="gn-nick-save" value="${esc(me === anon && !ctx.chat.scriptstate?.[GN_NICK] ? '' : me)}" placeholder="내 닉네임 (비우면 ${esc(anon)})" maxlength="36" aria-label="내 닉네임"><button class="gx-mini" data-action="gn-nick-save" data-take="gn-nick">저장</button></div>`
     : '';
+  // 실패는 떠 있는 알림 대신 원문 줄 위에 글로 (눌러3 PC: 맨 위에 뜬 알림이 글 제목·갤러리 제목·검색칸을 덮었다). 이 칸은 다시 그린 뒤 보이게 내린다 (app.ts)
+  const failMsg = !!gnet.failure && gnet.notice === gnet.failure.reason;
   const fail = gnet.failure
-    ? `<details class="nw-fail"><summary>최근 실패 원문</summary><p>${esc(gnet.failure.reason)}</p><textarea class="gx-search" rows="6" readonly>${esc(gnet.failure.raw)}</textarea></details>`
+    ? `<div class="gn-fail"${failMsg ? ' role="alert"' : ''}><p class="gn-failmsg">${esc(gnet.failure.reason)}</p><details class="nw-fail"><summary>최근 실패 원문</summary><textarea class="gx-search" rows="6" readonly>${esc(gnet.failure.raw)}</textarea></details></div>`
     : '';
   const status = job ? `<div class="nw-busy" role="status"><span class="nw-spin"></span>${esc(job)} 창을 닫아도 계속돼요.</div>` : '';
-  const note = toast('gn', gnet.notice, (t) => {
+  const note = failMsg ? '' : toast('gn', gnet.notice, (t) => {
     if (gnet.notice === t) gnet.notice = '';
   });
   // 떠 있는 알림(note)은 본문 위 줄(extras)에 넣지 않는다: 알림만 있어도 빈 줄이 한 칸 생겼다

@@ -1750,6 +1750,17 @@ function render(): void {
     // 사진이 늦게 뜨면 높이가 바뀌므로 맨 아래를 보던 중이면 한 번 더
     if (logKeep < 0) nlog.querySelectorAll('img').forEach((img) => img.addEventListener('load', () => (nlog.scrollTop = nlog.scrollHeight), { once: true }));
   }
+  // 게시판 실패 글: 새로 생기면 보이게 내린다 (눌러3 PC: 글 아래 「새 댓글 보기」를 누르면 실패 줄이 글 위, 주소줄 밑으로 잘려 있었다)
+  const gnFail = root.querySelector<HTMLElement>('.bs .gn-fail');
+  const gnFailKey = gnFail ? `${tab}|${gnFail.textContent ?? ''}` : '';
+  if (gnFail && root.dataset.gnf !== gnFailKey) {
+    const sc = gnFail.closest<HTMLElement>('.bs');
+    if (sc) {
+      const top = gnFail.getBoundingClientRect().top - sc.getBoundingClientRect().top;
+      if (top < 0 || top > sc.clientHeight - 40) sc.scrollTop = Math.max(0, sc.scrollTop + top - 12);
+    }
+  }
+  root.dataset.gnf = gnFailKey;
   root.dataset.gn = gnKey;
   if (gnKeep) ['.gn .ph-content', '.gn-pane .gn-doc'].forEach((q, i) => {
     const el = root!.querySelector<HTMLElement>(q);
