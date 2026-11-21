@@ -28,7 +28,7 @@ import { mountPlayer, playerCut, playerHold, playerPhone, playerRecentChat, play
 import { shopSource } from './shop';
 import { itemPic } from './items';
 import { isPhone } from './media';
-import { playerFlush, siteFit } from './hsplayer';
+import { playerFlush } from './hsplayer';
 import { appendLog, hsLogOperator, hsLogSticker, sameProgram, type HsLogEntry } from '../core/hslog';
 import { isWaiting, onWaiting } from '../host/waiting';
 
@@ -917,17 +917,8 @@ export function homeshopTab(ctx: ChatContext, env: HsEnv): string {
   return `<div class="hs${mobile ? ' hs-m' : ''}">${head}<div class="hs-wrap">${err}${page}</div>${pop}</div>`;
 }
 
-let fitRoot: HTMLElement | null = null;
-let fitBound = false;
 /** 화면을 그린 뒤 (app render 끝): 방송 칸에 캔버스·채팅을 꽂는다. 사이트가 안 보이면 멈춘다 */
 export function homeshopMounted(root: HTMLElement): void {
-  // 좁은·낮은 PC 창 표시(.hs-n·.hs-s)를 방송 칸 크기를 재기 전에 붙인다. 방송 칸이 없는 쪽(편성표·주문 조회)도 창 크기가 바뀌면 다시 잰다
-  siteFit(root.querySelector<HTMLElement>('.hs'));
-  fitRoot = root;
-  if (!fitBound) {
-    fitBound = true;
-    window.addEventListener('resize', () => siteFit(fitRoot?.querySelector<HTMLElement>('.hs')));
-  }
   if (root.querySelector('[data-hs-mount="stage"]')) mountPlayer(root);
   else stopPlayer();
   // 스티커 모서리 끌기 (PC 만. 폰은 누르기만): 끄는 만큼 젖히고, 절반 넘게 끌고 놓으면 그 자리부터 마저 젖힌다(hs-lift 에 끈 만큼을 넘김). 덜 끌면 도로 붙는다

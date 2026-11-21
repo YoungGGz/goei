@@ -272,7 +272,7 @@ export const ckGrid = (groups: CkGroup[], rows: CkRow[], foot = '', title = '', 
   const isNumMark = (m: CkMark | undefined): m is CkNum => m !== null && typeof m === 'object';
   const hasNum = flat.map((_, i) => rows.some((r) => isNumMark(r.marks[i])));
   const lg = flat.map((_, i) => rows.some((r) => { const m = r.marks[i]; return isNumMark(m) && !!m.lg; }));
-  return `<section class="ps-group ck${groups.some((g) => g.kind === 'num') ? ' ck-hasnum' : ''}${flat.length >= 10 ? ' ck-many' : ''}" style="--ck-n:${flat.length};--ck-cols:${ckCols(hasNum, lg)}">${title ? `<h3>${esc(title)}</h3>` : ''}<div class="ps-rows">${head1}${head2}${body}</div>${foot ? `<small class="mx-foot">${foot}</small>` : ''}</section>`;
+  return `<section class="ps-group ck${groups.some((g) => g.kind === 'num') ? ' ck-hasnum' : ''}" style="--ck-n:${flat.length};--ck-cols:${ckCols(hasNum, lg)}">${title ? `<h3>${esc(title)}</h3>` : ''}<div class="ps-rows">${head1}${head2}${body}</div>${foot ? `<small class="mx-foot">${foot}</small>` : ''}</section>`;
 };
 /** 띠 여러 개를 PC에서는 한 격자로 나란히, 폰에서는 띠마다 하나로 (폭이 달라서). foot = 설명(helpBox) */
 export interface CkBand { title: string; groups: CkGroup[]; marks: CkMark[][]; acts: (string | null)[][]; foot: string }

@@ -1,4 +1,3 @@
-import { isPhone } from './media';
 // 지도 확대: 지도 칸(.gx-canvas)은 그대로 두고 안쪽 그림(.gx-mapzoom)만 키우고 옮긴다.
 // 휴대폰은 두 손가락 벌리기·한 손가락 끌기, PC는 Ctrl+휠(트랙패드 오므리기)·끌기, 어디서나 +/− 버튼.
 // 핀은 그림과 함께 자리를 옮기고, 크기는 조금만 커지도록 되돌려 줄인다(--pz).
@@ -6,15 +5,10 @@ import { isPhone } from './media';
 const MAX = 4;
 const MOVE = 6;
 
-/** auto: 아직 손대지 않은 처음 자리. 칸 크기가 바뀌면(목록 길이·편성 열고 닫기) 다시 가운데로 맞춘다 */
-interface View { z: number; x: number; y: number; auto?: boolean }
+interface View { z: number; x: number; y: number }
 
 /** 지역별 확대 상태. 다시 그려도 보던 자리를 지킨다 */
 const views = new Map<string, View>();
-
-/** 지도 칸 크기가 바뀌면(창 크기·늦게 잡히는 배치) 지금 그려진 지도의 채우기·자리를 다시 맞춘다. 관찰자는 하나만 둔다 */
-let reapply: (() => void) | null = null;
-let sizeWatch: ResizeObserver | null = null;
 
 /** nation: 지역 지도일 때 맨 아래 「전국」 (v0.16.17: 지도 위 줄에 있던 ← 전국을 확대 버튼 밑으로).
  *  원래 크기 버튼은 맨 위: 확대하면 생기는데 아래에 두면 +/− 가 한 칸씩 밀려 올라갔다 (v0.16.18) */
@@ -31,7 +25,7 @@ export function mapZoomControls(nation = false): string {
 function clamp(v: View, cw: number, ch: number, lw: number, lh: number): View {
   const z = Math.min(MAX, Math.max(1, v.z));
   const fit = (p: number, c: number, l: number) => (l * z <= c ? (c - l * z) / 2 : Math.min(0, Math.max(c - l * z, p)));
-  return { ...v, z, x: fit(v.x, cw, lw), y: fit(v.y, ch, lh) };
+  return { z, x: fit(v.x, cw, lw), y: fit(v.y, ch, lh) };
 }
 
 type Box = { l: number; t: number; r: number; b: number };
@@ -117,14 +111,6 @@ function placeZoom(canvas: HTMLElement, layer: HTMLElement): void {
   canvas.classList.toggle('zl', score(left) < score(right));
 }
 
-/** 이름표가 칸 끝에 잘리지 않게 핀 범위 양쪽에 두는 여유(px) */
-const PIN_PAD = 16;
-/** 지금 지도의 핀 점 좌우 범위 (겹 폭에 대한 비율 0~1). 핀은 field.ts 가 left:% 로 놓는다 */
-function pinSpan(layer: HTMLElement): { l: number; r: number } | null {
-  const xs = [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')].map((p) => parseFloat(p.style.left) / 100).filter((n) => Number.isFinite(n));
-  return xs.length ? { l: Math.min(...xs), r: Math.max(...xs) } : null;
-}
-
 /** render() 뒤에 부른다. 지도 칸이 없으면 아무것도 안 한다 */
 export function bindMapZoom(root: HTMLElement): void {
   const canvas = root.querySelector<HTMLElement>('.gx-canvas[data-map]');
@@ -132,7 +118,7 @@ export function bindMapZoom(root: HTMLElement): void {
   if (!canvas || !layer) return;
   const key = canvas.dataset.map ?? '';
   // 처음엔 가운데 (PC 임무 탭은 칸이 그림보다 낮아 위아래가 잘린다. 2026-10-21 사용자: 끌어서 본다)
-  let v: View = views.get(key) ?? { z: 1, x: Number.NaN, y: Number.NaN, auto: true };
+  let v = views.get(key) ?? { z: 1, x: 0, y: Number.NaN };
   const canPan = () => layer.offsetWidth * v.z > canvas.clientWidth + 1 || layer.offsetHeight * v.z > canvas.clientHeight + 1;
 
   const img = canvas.querySelector<HTMLImageElement>('.gx-mapimg');
@@ -143,39 +129,7 @@ export function bindMapZoom(root: HTMLElement): void {
       layer.style.transform = '';
       return;
     }
-    // 폴드 펼침 폭(601~860, CSS --gx-mapfill: 1): 칸이 남은 높이를 다 쓰므로 그림을 칸 높이까지 키운다.
-    // 칸보다 넓어진 그림은 좌우로 끌어서 본다. 핀은 겹(.gx-mapzoom) 기준 %라 겹 폭만 바꾸면 제자리를 지킨다
-    const fill = getComputedStyle(canvas).getPropertyValue('--gx-mapfill').trim() === '1';
-    // 칸 최소 높이 = 칸 폭에 맞춘 그림 높이: 상황 목록이 길어도 지도가 그보다 줄지 않아 핀이 다 보이고, 목록이 스크롤한다 (검수 3차)
-    if (fill && img?.naturalWidth && img.naturalHeight) canvas.style.minHeight = `${Math.ceil((canvas.clientWidth * img.naturalHeight) / img.naturalWidth) + 2}px`;
-    else canvas.style.removeProperty('min-height');
-    if (v.auto) v = { z: 1, x: Number.NaN, y: Number.NaN, auto: true };
-    // 단, 처음 화면에 모든 핀이 보이게 겹 폭에 상한을 둔다: 핀 좌우 범위(+이름표 여유 PIN_PAD 양쪽)가 칸 폭 안에 들어오게.
-    // 상한에 걸려 그림이 칸보다 낮아지면 위아래는 clamp 가 가운데에 둔다(남는 띠는 칸 배경색)
-    const cw = canvas.clientWidth, ch = canvas.clientHeight;
-    const span = pinSpan(layer);
-    if (fill && img?.naturalWidth && img.naturalHeight) {
-      const cap = span && span.r > span.l ? (cw - PIN_PAD * 2) / (span.r - span.l) : Number.POSITIVE_INFINITY;
-      const w = Math.max(cw, Math.min((ch * img.naturalWidth) / img.naturalHeight, cap));
-      layer.style.width = `${Math.floor(w)}px`;
-    }
-    // PC 칸의 높이 상한(CSS max-content)이 줄어든 겹 높이를 따라가 칸이 다시 커지지 못하지 않게, 상한을 칸 폭에 맞춘 그림 높이로 박아 둔다
-    const pcFit = !fill && !isPhone() && !!img?.naturalWidth && !!img.naturalHeight;
-    if (pcFit) canvas.style.maxHeight = `${Math.ceil((cw * img!.naturalHeight) / img!.naturalWidth)}px`;
-    else canvas.style.removeProperty('max-height');
-    if (fill) {
-      if (!img?.naturalWidth || !img.naturalHeight) layer.style.removeProperty('width');
-    } else if (pcFit && (cw * img!.naturalHeight) / img!.naturalWidth > ch + 1) {
-      // PC(861 이상): 칸 폭에 맞추면 그림이 칸보다 높아 아래(제주·남해 핀)가 잘렸다 → 처음 화면에 그림 전체가 들어오게 겹 폭을 칸 높이에 맞춘다.
-      // 칸 크기는 그대로, 남는 좌우는 칸 배경색. 자세히 볼 땐 확대해서 끈다 (검수 4차, 0.21.24 부터 잘림)
-      layer.style.width = `${Math.floor((ch * img!.naturalWidth) / img!.naturalHeight)}px`;
-    } else layer.style.removeProperty('width');
-    if (Number.isNaN(v.y)) v = { ...v, y: (ch - layer.offsetHeight) / 2 };
-    // 처음엔 좌우도 가운데: 그림이 칸보다 넓으면 그림 가운데가 아니라 핀 범위 가운데를 칸 가운데에
-    if (Number.isNaN(v.x)) {
-      const lw = layer.offsetWidth;
-      v = { ...v, x: lw > cw && span ? cw / 2 - ((span.l + span.r) / 2) * lw : (cw - lw) / 2 };
-    }
+    if (Number.isNaN(v.y)) v = { ...v, y: (canvas.clientHeight - layer.offsetHeight) / 2 };
     v = clamp(v, canvas.clientWidth, canvas.clientHeight, layer.offsetWidth, layer.offsetHeight);
     views.set(key, v);
     layer.style.transform = v.z === 1 && !v.x && !v.y ? '' : `translate(${v.x}px, ${v.y}px) scale(${v.z})`;
@@ -199,19 +153,13 @@ export function bindMapZoom(root: HTMLElement): void {
   };
   if (img && !img.complete) img.addEventListener('load', apply, { once: true });
   apply();
-  reapply = apply;
-  if (typeof ResizeObserver !== 'undefined') {
-    sizeWatch ??= new ResizeObserver(() => reapply?.());
-    sizeWatch.disconnect();
-    sizeWatch.observe(canvas);
-  }
 
   canvas.querySelector('.gx-zoom')?.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-zoom]');
     if (!b) return;
     e.stopPropagation();
     const w = canvas.clientWidth / 2, h = canvas.clientHeight / 2;
-    if (b.dataset.zoom === 'reset') (v = { z: 1, x: Number.NaN, y: Number.NaN, auto: true }), apply();
+    if (b.dataset.zoom === 'reset') (v = { z: 1, x: 0, y: Number.NaN }), apply();
     else zoomAt(v.z * (b.dataset.zoom === 'in' ? 1.6 : 1 / 1.6), w, h);
   });
 
@@ -250,7 +198,7 @@ export function bindMapZoom(root: HTMLElement): void {
       e.preventDefault();
       const dx = t[0].clientX - start.x, dy = t[0].clientY - start.y;
       if (Math.hypot(dx, dy) > MOVE) dragged = true;
-      v = { ...start.v, x: start.v.x + dx, y: start.v.y + dy, auto: false };
+      v = { ...start.v, x: start.v.x + dx, y: start.v.y + dy };
       apply();
     }
   }, { passive: false });
@@ -275,7 +223,7 @@ export function bindMapZoom(root: HTMLElement): void {
     const move = (m: PointerEvent) => {
       const dx = m.clientX - sx, dy = m.clientY - sy;
       if (Math.hypot(dx, dy) > MOVE) dragged = true;
-      if (dragged) (v = { ...sv, x: sv.x + dx, y: sv.y + dy, auto: false }), apply();
+      if (dragged) (v = { ...sv, x: sv.x + dx, y: sv.y + dy }), apply();
     };
     const up = () => (window.removeEventListener('pointermove', move), window.removeEventListener('pointerup', up));
     window.addEventListener('pointermove', move);

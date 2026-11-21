@@ -918,16 +918,9 @@ export function render(): void {
 
 /** 기능 설정 우하단 「맨 위로」 (2026-11-08 사용자): 조금 내려갔을 때만 보인다.
  *  그 자리의 지우기 ×·입력값·펼침 화살표를 덮던 것(전수점검 눌러-보통-32)은 보임 규칙이 아니라 자리로 푼다: 기능 설정 본문 오른쪽에 단추 폭만큼 빈 띠(style.css) */
-let topLast = 0;
 function syncTop(): void {
   const b = root?.querySelector<HTMLElement>('.gw-totop');
-  const body = root?.querySelector<HTMLElement>('.gw-body');
-  if (!b || !body) return;
-  const top = body.scrollTop, was = topLast;
-  topLast = top;
-  // 본문이 좁으면(760 이하, style.css 와 같은 값) 빈 띠가 없다 → 내려 읽는 동안은 숨고, 위로 올릴 때만 보인다 (11-21 눌러 보기 3차). 폰은 0.21.24 그대로(띠 있음, 240 넘으면 보임)
-  if (body.clientWidth <= 760 && !isPhone()) { if (top <= 240 || top > was) b.classList.remove('show'); else if (top < was) b.classList.add('show'); }
-  else b.classList.toggle('show', top > 240);
+  if (b) b.classList.toggle('show', (root?.querySelector<HTMLElement>('.gw-body')?.scrollTop ?? 0) > 240);
 }
 
 const boundOnce = new WeakSet<HTMLElement>();
@@ -1192,11 +1185,6 @@ export async function handle(action: string, value?: string): Promise<void> {
     // 다른 폴더에서 넣은 후보는 바로 골라 기본 정보(발생 후보·빼기)를 보여 준다
     if (action === 'dir-ext-add' && value && isKind(edUi.node) && directoryDraft(ctx)[edUi.node === 'site' ? 'sites' : 'anomalies'].some((p) => p.lore === value)) {
       edUi.sel[edUi.node] = value;
-      render();
-    }
-    // 후보 목록에서 뺀 것이 본문에 그대로 남았다(수는 줄고 본문은 「관리국 · 명부에만 있음」, 눌러 보기 3차) → 고른 것을 비운다
-    if (action === 'dir-ext-del' && value && isKind(edUi.node) && edUi.sel[edUi.node] === value && !directoryDraft(ctx)[edUi.node === 'site' ? 'sites' : 'anomalies'].some((p) => p.lore === value)) {
-      edUi.sel[edUi.node] = '';
       render();
     }
     return;

@@ -212,36 +212,17 @@ function build(): void {
   chatLog.className = 'hs-chlog';
 }
 
-/** 사이트 칸이 좁거나 낮은 PC 창(폴드 펼친 화면 등: 창 폭 600 초과라 PC 배치인데 사이트 칸은 510~580): 채팅 칸을 옆에 둘 자리가 없어 오른쪽이 잘렸다 (11-21 사용자 실기).
- *  .hs-n = 폭 720 미만 → PC 두 칸 그대로 채팅 칸 폭·간격·글자만 줄임. .hs-s = 높이 480 미만 → 전화 주문 창 왼쪽 칸을 통째로 스크롤. 폰 배치(.hs-m)는 그대로 */
-const SITE_NARROW = 720;
-const SITE_SHORT = 480;
-export function siteFit(page: HTMLElement | null | undefined): void {
-  if (!page || !page.clientWidth) return;
-  const pc = !page.classList.contains('hs-m');
-  page.classList.toggle('hs-n', pc && page.clientWidth < SITE_NARROW);
-  page.classList.toggle('hs-s', pc && page.clientHeight < SITE_SHORT);
-}
-
-/** 방송 칸이 쓸 수 있는 폭: PC 는 옆 채팅 칸을 뺀다(넓은 창 최소 260 + 사이 14, 좁은 창 .hs-n 실제 채팅 칸 폭 + 사이 10) · 방송 칸 테두리 2 */
-function roomWidth(wrap: HTMLElement, page: HTMLElement): number {
-  const cs = getComputedStyle(wrap);
-  const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  if (page.classList.contains('hs-m')) return inner - 2;
-  // 좁은 창(.hs-n)은 채팅 칸 폭이 창에 따라 170~196 이라 실제 폭 + 사이 10 을 뺀다
-  const chat = page.classList.contains('hs-n') ? page.querySelector<HTMLElement>('.hs-bd > .hs-chat') : null;
-  return inner - (chat ? chat.offsetWidth + 10 : 274) - 2;
-}
-
-/** 「자동·폭 맞춤」 배율: 방송 칸이 화면을 다 차지하지 않게, 사이트 칸 폭(넓은 PC 는 채팅 칸을 뺀 폭)과 보이는 높이 안에서.
+/** 「자동·폭 맞춤」 배율: 방송 칸이 화면을 다 차지하지 않게, 사이트 칸 폭(PC 는 채팅 칸을 뺀 폭)과 보이는 높이 안에서.
  *  1배·2배처럼 정수가 들어가면 정수로 (도트가 고르게), 1배도 안 들어가면 그 폭에 맞춰 줄인다 (11-11 사용자: 큰 화면에서 2배로 커져 나머지가 안 보였다) */
 function fitScale(w: number, h: number): number {
   const wrap = stage?.closest<HTMLElement>('.hs-wrap');
   const page = stage?.closest<HTMLElement>('.hs');
   if (!wrap || !page) return 1;
   const phone = page.classList.contains('hs-m');
-  // 높이: 보이는 높이의 60% (아래 상품 칸·주문 단추가 첫 화면에 같이 보이게)
-  const roomW = roomWidth(wrap, page);
+  const cs = getComputedStyle(wrap);
+  const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  // PC: 채팅 칸 최소 폭 260 + 사이 14 · 방송 칸 테두리 2. 높이: 보이는 높이의 60% (아래 상품 칸·주문 단추가 첫 화면에 같이 보이게)
+  const roomW = (phone ? inner : inner - 274) - 2;
   const roomH = (page.clientHeight || window.innerHeight) * (phone ? 0.5 : 0.6) - 36;
   const fit = Math.max(0.25, Math.min(roomW / w, roomH / h));
   return fit >= 2 ? 2 : fit >= 1 ? 1 : fit;
@@ -252,12 +233,15 @@ function widthScale(w: number): number {
   const wrap = stage?.closest<HTMLElement>('.hs-wrap');
   const page = stage?.closest<HTMLElement>('.hs');
   if (!wrap || !page) return 1;
-  return Math.max(0.25, roomWidth(wrap, page) / w);
+  const phone = page.classList.contains('hs-m');
+  const cs = getComputedStyle(wrap);
+  const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const roomW = (phone ? inner : inner - 274) - 2;
+  return Math.max(0.25, roomW / w);
 }
 
 function layout(): void {
   if (!stage || !canvas || !feed) return;
-  siteFit(stage.closest<HTMLElement>('.hs'));
   const w = feed.art?.pack.w ?? 512;
   const h = feed.art?.pack.h ?? 384;
   // 0 = 자동(보이는 자리에 맞춤), -1 = 폭 맞춤
@@ -276,23 +260,6 @@ function layout(): void {
   cg!.style.height = `${small ? h * k : h}px`;
   cg!.style.transform = small || k === 1 ? '' : `scale(${k})`;
   if (small) stage.style.fontSize = '';
-  chatFit(stage.closest<HTMLElement>('.hs'));
-}
-
-/** 좁은 PC 창(.hs-n, 폴드 펼침 601~860): 채팅 칸이 왼쪽 칸 높이까지 늘면 입력칸·「보내기」가 첫 화면 아래로 내려간다(인터넷 탭은 브라우저 틀만큼 더).
- *  배치는 그대로 두고 채팅 칸 높이만 사이트의 보이는 높이 안으로 줄인다. 왼쪽 칸보다 길게 늘이지는 않는다. 넓은 PC(1280)는 손대지 않는다 */
-function chatFit(page: HTMLElement | null): void {
-  const chat = page?.querySelector<HTMLElement>('.hs-bd > .hs-chat');
-  if (!page || !chat) return;
-  chat.style.height = '';
-  chat.style.alignSelf = '';
-  if (!page.classList.contains('hs-n')) return;
-  const top = chat.getBoundingClientRect().top - page.getBoundingClientRect().top + page.scrollTop;
-  const room = Math.floor(page.clientHeight - top - 12);
-  if (room >= 160 && room < chat.offsetHeight) {
-    chat.style.height = `${room}px`;
-    chat.style.alignSelf = 'start';
-  }
 }
 
 /** 마지막으로 찾은 물건 그림 주소: tick 마다 그림 팩(5천여 줄)을 다시 뒤지지 않게. 찾은 것만 기억한다(팩이 늦게 받혀도 다시 찾게) (전수검사 11-13) */
