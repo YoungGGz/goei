@@ -2004,8 +2004,6 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-navhist { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 6px 4px 0; border-top: 1px solid var(--panel2); }
 /* PC 창이 낮으면(900 높이) 메뉴가 넘쳐 ‹ › 가 창 밑에 잘렸다: 메뉴 칸 맨 아래에 붙여 둔다 (전수점검 눌러-보통-55) */
 .gx-nav > .gx-navhist { position: sticky; bottom: -16px; margin-bottom: -16px; padding-bottom: 16px; background: var(--void); z-index: 1; flex: none; }
-@media (min-width: 861px) and (max-height: 960px) { .gx-nav .gx-id-photo { width: 80px; height: 80px; } .gx-nav .gx-nb { min-height: 44px; } }
-@media (min-width: 861px) and (max-height: 860px) { .gx-nav .gx-id { gap: 8px; padding: 12px 14px; } .gx-nav .gx-id-photo { width: 56px; height: 56px; } .gx-nav .gx-nb { min-height: 40px; } }
 .gx-nh { flex: 1 1 0; display: grid; place-items: center; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--dim); }
 .gx-nh svg { width: 21px; height: 21px; }
 .gx-nh.fwd svg { transform: scaleX(-1); }
