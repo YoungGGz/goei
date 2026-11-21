@@ -77,19 +77,24 @@ export function boardTable(state: State, busy = false): string {
     ['보호 대상', '「사생활」이 지켜 줄 사람의 이름이에요. 비우면 주인공이에요.'],
   ]), '주제와 말투');
   const cnt = (n: number, k: CountKey) => ({ n, lo: COUNT_RANGE[k][0], hi: COUNT_RANGE[k][1] });
+  // 선쪽지는 생성량 표와 따로: 한 표에 수 상자 일곱(104px)이 들면 1280 창 본문(796px)보다 넓어 끝 칸이 잘려 보였다 (상자 크기는 규격 그대로)
   const amount: CkBand = { title: '생성량', groups: [
     { name: '게시글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '새 글 댓글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '활동 댓글 수', opts: ['최소', '최대'], kind: 'num' },
-    { name: '선쪽지', opts: ['받기', '확률(%)'], kind: 'check' },
-  ], marks: each((st) => { const s = gnetSettings(st); const c = s.counts; return [cnt(c.post[0], 'post'), cnt(c.post[1], 'post'), cnt(c.cmt[0], 'cmt'), cnt(c.cmt[1], 'cmt'), cnt(c.act[0], 'act'), cnt(c.act[1], 'act'), s.incoming, s.incoming ? { n: s.incomingChance, lo: 0, hi: 100 } : null]; }),
-    acts: each((st, site) => { const b = `b:${site}`; return [`${b}:post_min`, `${b}:post_max`, `${b}:cmt_min`, `${b}:cmt_max`, `${b}:act_min`, `${b}:act_max`, `${b}:incoming=${gnetSettings(st).incoming ? '0' : '1'}`, `${b}:incoming_chance`]; }),
+  ], marks: each((st) => { const c = gnetSettings(st).counts; return [cnt(c.post[0], 'post'), cnt(c.post[1], 'post'), cnt(c.cmt[0], 'cmt'), cnt(c.cmt[1], 'cmt'), cnt(c.act[0], 'act'), cnt(c.act[1], 'act')]; }),
+    acts: each((_, site) => { const b = `b:${site}`; return [`${b}:post_min`, `${b}:post_max`, `${b}:cmt_min`, `${b}:cmt_max`, `${b}:act_min`, `${b}:act_max`]; }),
     foot: helpBox('', [
       ['게시글 수', '새로고침 한 번에 새로 만드는 글의 수예요. 많을수록 토큰을 더 써요.'],
       ['새 글 댓글 수', '새로 만드는 글마다 달리는 댓글의 수예요.'],
       ['활동 댓글 수', '글 쓰기·댓글 달기·글 하나 새로고침 때 지난 글에 새로 붙는 댓글의 수예요.'],
-      ['선쪽지 받기', '켜면 게시판 사람이 먼저 쪽지를 보낼 수 있어요.'],
-      ['선쪽지 확률', '새로고침 한 번에 선쪽지가 올 확률이에요.'],
+    ]) };
+  const incoming: CkBand = { title: '선쪽지', groups: [{ name: '', opts: ['받기', '확률(%)'], kind: 'check' }],
+    marks: each((st) => { const s = gnetSettings(st); return [s.incoming, s.incoming ? { n: s.incomingChance, lo: 0, hi: 100 } : null]; }),
+    acts: each((st, site) => { const b = `b:${site}`; return [`${b}:incoming=${gnetSettings(st).incoming ? '0' : '1'}`, `${b}:incoming_chance`]; }),
+    foot: helpBox('', [
+      ['받기', '켜면 게시판 사람이 먼저 쪽지를 보낼 수 있어요.'],
+      ['확률', '새로고침 한 번에 선쪽지가 올 확률이에요.'],
     ]) };
 
   /** 넘길 내용: 게시판마다의 칩 (값은 그 게시판 자리의 adv_ 칩, core/boards.ts BOARD_REF_CFG). 기능 표와 둘 다 켜진 것만 넘긴다 (core/reffn.ts) */
@@ -160,7 +165,7 @@ export function boardTable(state: State, busy = false): string {
     R('최대 양', set([['게시글', N('ctx_post_count')], ['글마다 댓글', N('ctx_comment_count')], ['쪽지', N('ctx_dm_count')], ['토큰 상한', N('ctx_tokens')]]), '토큰 상한을 넘는 것은 빼요.'),
   ].join(''));
 
-  return `<h2 class="fam-h">게시판마다 따로 정하는 값</h2>${ckWide([call, priv], L, busy)}${texts}${ckWide([amount], L, busy)}${ckWide([refs], L, busy)}`
+  return `<h2 class="fam-h">게시판마다 따로 정하는 값</h2>${ckWide([call, priv], L, busy)}${texts}${ckWide([amount], L, busy)}${ckWide([incoming], L, busy)}${ckWide([refs], L, busy)}`
     + `<h2 class="fam-h">기능마다 따로 정하는 값</h2>${byFn}`
     + `<h2 class="fam-h">네 게시판이 같이 쓰는 값</h2>${write}${limit}${keep}${attach}`;
 }
