@@ -2457,7 +2457,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
    칸 높이 = 본문 높이 − (지역 줄 34 + 칸 사이 10×2 + 필터·카드 세 줄 342 + 틀 2) */
 @media (min-width: 601px) and (min-height: 500px), (min-width: 601px) and (pointer: fine), (min-width: 601px) and (pointer: none) {
   .gx-map .gx-mapbar .gx-select, .gx-map .gx-mapbar .gx-search { height: var(--ctl-sm); min-height: var(--ctl-sm); }
-  .gx-map > .gx-mapcol > .gx-canvas:not(.ph) { width: 100%; margin: 0; flex: 1 1 0; min-height: calc(min((100vh - 28px) * .9, 950px) - 98px - 398px); max-height: max-content; background: #0c1315; }
+  .gx-map > .gx-mapcol > .gx-canvas:not(.ph) { width: 100%; margin: 0; flex: 1 1 0; min-height: min(calc(min((100vh - 28px) * .9, 950px) - 98px - 398px), calc(80cqw - 1px)); max-height: max-content; background: #0c1315; }
+  /* 창이 세로로 길면 최소 높이가 그림(5:4)보다 커져 위아래에 검은 띠가 생겼다 → 최소 높이는 그림 높이(칸 폭의 80%)를 넘지 않는다 */
+  .gx-map > .gx-mapcol { container-type: inline-size; }
   .gx-map .gx-canvas:not(.ph) > .gx-mapzoom { width: 100%; }
   .gx-map .gx-mapimg { width: 100%; max-width: none; max-height: none; }
   /* 칸 높이는 최소값. 목록이 짧으면 지도 칸이 남은 높이를 그림 높이까지 쓰고, 목록이 길면 목록이 줄어 스크롤 (전수점검 눌러-사소-1: 지도 아래 빈 자리) */
