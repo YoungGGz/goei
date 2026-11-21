@@ -202,7 +202,11 @@ function ensureRoot(): HTMLElement {
     if (slotDropped) return; // 손잡이를 놓은 직후의 click 은 칸 펼치기가 아니다
     const el = t.closest<HTMLElement>('[data-action]');
     if (!el || el.hasAttribute('disabled')) return;
-    if (el.dataset.action === 'ed-hint') return hintFor === el ? hideHint() : showHint(el); // 폰: 누르면 열고 닫는다
+    if (el.dataset.action === 'ed-hint') {
+      // 폰: 누르면 열고 닫는다. 손가락으로 누르면 브라우저가 mouseover 를 먼저 보내 방금 띄운 것을 이 click 이 바로 닫았다(「?」를 눌러도 설명이 안 뜸, 눌러 보기 3차) → 막 띄운 것은 둔다
+      if (hintFor === el && Date.now() - hintAt < 700) return;
+      return hintFor === el ? hideHint() : showHint(el);
+    }
     const take = el.dataset.take ? root?.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${el.dataset.take}"]`)?.value : undefined;
     void run(el.dataset.action!, take ?? el.dataset.value);
   });
@@ -913,9 +917,16 @@ export function render(): void {
 
 /** 기능 설정 우하단 「맨 위로」 (2026-11-08 사용자): 조금 내려갔을 때만 보인다.
  *  그 자리의 지우기 ×·입력값·펼침 화살표를 덮던 것(전수점검 눌러-보통-32)은 보임 규칙이 아니라 자리로 푼다: 기능 설정 본문 오른쪽에 단추 폭만큼 빈 띠(style.css) */
+let topLast = 0;
 function syncTop(): void {
   const b = root?.querySelector<HTMLElement>('.gw-totop');
-  if (b) b.classList.toggle('show', (root?.querySelector<HTMLElement>('.gw-body')?.scrollTop ?? 0) > 240);
+  const body = root?.querySelector<HTMLElement>('.gw-body');
+  if (!b || !body) return;
+  const top = body.scrollTop, was = topLast;
+  topLast = top;
+  // 본문이 좁으면(760 이하, style.css 와 같은 값) 빈 띠가 없다 → 내려 읽는 동안은 숨고, 위로 올릴 때만 보인다 (11-21 눌러 보기 3차)
+  if (body.clientWidth <= 760) { if (top <= 240 || top > was) b.classList.remove('show'); else if (top < was) b.classList.add('show'); }
+  else b.classList.toggle('show', top > 240);
 }
 
 const boundOnce = new WeakSet<HTMLElement>();
@@ -1052,6 +1063,8 @@ const ROW_DEL: Record<string, string> = {
   'ms-fx-del': '이 시그니처 상품을 지울까요?',
   'set-items-rules-del': '이 판정 표 줄을 지울까요?',
   'set-items-alias-del': '이 그림 대체 말 줄을 지울까요?',
+  // 인물 기록 점검 「진단 지우기」만 묻지 않고 바로 전부 지웠다 (눌러 보기 3차)
+  'pp-diag-clear': '이 기기에 저장된 갱신 기록을 모두 지울까요?',
 };
 
 export async function handle(action: string, value?: string): Promise<void> {
@@ -1178,6 +1191,11 @@ export async function handle(action: string, value?: string): Promise<void> {
     // 다른 폴더에서 넣은 후보는 바로 골라 기본 정보(발생 후보·빼기)를 보여 준다
     if (action === 'dir-ext-add' && value && isKind(edUi.node) && directoryDraft(ctx)[edUi.node === 'site' ? 'sites' : 'anomalies'].some((p) => p.lore === value)) {
       edUi.sel[edUi.node] = value;
+      render();
+    }
+    // 후보 목록에서 뺀 것이 본문에 그대로 남았다(수는 줄고 본문은 「관리국 · 명부에만 있음」, 눌러 보기 3차) → 고른 것을 비운다
+    if (action === 'dir-ext-del' && value && isKind(edUi.node) && edUi.sel[edUi.node] === value && !directoryDraft(ctx)[edUi.node === 'site' ? 'sites' : 'anomalies'].some((p) => p.lore === value)) {
+      edUi.sel[edUi.node] = '';
       render();
     }
     return;
