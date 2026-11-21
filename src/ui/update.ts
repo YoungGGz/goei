@@ -181,7 +181,7 @@ export function updateGroup(ctx: ChatContext): string {
   const L = updateUi.latest;
   const row = (label: string, value: string, help = '') => setRow(label, value, help);
   if (!UPDATE_BASE) {
-    return section(row('업데이트', '<span class="gx-muted">준비 중</span>', '업데이트 주소가 아직 연결되지 않은 빌드예요. 지금은 zip으로 갈아끼워 주세요.'));
+    return section(row('업데이트', '<span class="gx-muted">준비 중</span>', '업데이트 주소가 아직 연결되지 않은 빌드예요. 지금은 릴리스 페이지에서 새 파일을 받아 다시 넣어 주세요.'));
   }
   const pluginNew = L && compareVersions(L.plugin, PLUGIN_VERSION) > 0;
   rows.push(row('플러그인', `<span class="upd-ver">v${esc(PLUGIN_VERSION)}${pluginNew ? ` → <b>v${esc(L!.plugin)}</b>` : ''}</span>`,
@@ -278,7 +278,7 @@ export async function handleUpdate(action: string, ctx: ChatContext, env: Settin
           });
         } catch (error) {
           updateUi.progress = '';
-          throw new Error(`${error instanceof Error ? error.message : String(error)} 카드는 바꾸지 않았어요. 잠시 뒤 다시 눌러 주세요. 계속 안 되면 zip 안의 카드를 다시 가져와 주세요.`);
+          throw new Error(`${error instanceof Error ? error.message : String(error)} 카드는 바꾸지 않았어요. 잠시 뒤 다시 눌러 주세요. 계속 안 되면 릴리스 페이지의 봇 카드를 다시 가져와 주세요.`);
         }
         updateUi.progress = '카드에 적용 중…';
         env.render();

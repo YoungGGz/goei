@@ -367,7 +367,7 @@ if (!skip()) {
   ok('시작기 파일로 넣기: 다른 판 · 깨진 파일 · 닫기 · 카드 다시 열면 창 · 맞는 판');
 }
 
-// ── 3-1) 자료 팩 없이 파일로 넣기(네트워크가 막힌 환경, 릴리스 zip 의 goei-body.js + goei-data-world.txt): 본체 파일 → 본체가 세계 자료를 못 받음 →
+// ── 3-1) 자료 팩 없이 파일로 넣기(네트워크가 막힌 환경, 릴리스 페이지의 goei-body.js + goei-data-world.txt): 본체 파일 → 본체가 세계 자료를 못 받음 →
 //        시작기 창은 거두고(컨테이너는 그대로) 본체의 받기 창 하나(파일로 넣기 있음) → 목록 파일·지문이 다른 글은 거절 → goei-data-world.txt → 켜짐
 if (!skip()) {
   const { page, frame, errors, logs } = await boot([fixture], 0, emptyChat());
@@ -888,7 +888,7 @@ if (!skip()) {
   assert.equal(await frame.locator('[data-gl-world] [data-gl="file"]').count(), 1, '본체의 자료 받기 창에도 파일로 넣기');
   const first = await panelMsg(frame);
   assert.match(first, /^세계 자료\(goei-data-world\)를 받지 못했어요: goei-data-world\.2\.txt를 받지 못했어요 \(404\)\./, first);
-  assert.match(await frame.textContent('.gl-card'), /다시 받거나, 릴리스 zip에 든 goei-data-world\.txt/, '안내 글');
+  assert.match(await frame.textContent('.gl-card'), /다시 받거나, 릴리스 페이지의 「세계 자료」\(goei-data-world\.txt\)/, '안내 글');
   assert.deepEqual(await frame.evaluate(() => window.__calls.show), ['fullscreen'], '창을 띄움');
   assert.equal(await fab(frame), 'none', '자료 없이는 버튼도 처리기 화면도 없음');
   assert.equal(await storedWorld(frame), null, '못 받은 자료는 저장 안 함');
