@@ -3147,6 +3147,13 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
   .gx-rptpop { padding: 14px 20px; align-items: start; }
   .gx-rptpop .gx-rptcard { width: 100%; max-height: calc(100% - 28px); padding: 14px 14px 20px; border-radius: 18px; }
 }
+/* 폴드 펼침(PC 배치, 기록 상자 ~480px): 화면 너비가 아니라 기록 상자 너비로 같은 줄바꿈 — 이름·부제가 단추 셋에 밀려 4줄로 꺾이던 문제 (11-21) */
+.gx-rec-pane { container: gxrec / inline-size; }
+@container gxrec (max-width: 620px) {
+  .ph-room-head { flex-wrap: wrap; }
+  .ph-room-head .ph-room-title { flex: 1 1 0; min-width: 0; }
+  .ph-room-head .ph-act { flex: 1 1 100%; justify-content: flex-end; }
+}
 .gx-png-title { font-size: 14px; font-family: var(--mono); color: var(--dim); padding-right: 36px; }
 .gx-png-img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--void); }
 .gx-pngcard .ps-note { margin: 0; font-size: 13px; color: var(--sub); }
@@ -5010,6 +5017,15 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk .wdr .nw-kgrid-in { background: #fff; border-color: #ccc; border-radius: 6px; }
 .wk .wdr .nw-kgrid-in button { border: 1px solid #ccc; border-radius: 4px; background: #fafafa; color: #1f5a4f; display: grid; place-items: center; }
 .wk .wdr .nw-fail { flex: none; margin: 0 12px 12px; font-size: 12.5px; color: #555; }
+/* 위키 칸 자체가 좁을 때 (폴드 펼침 PC 배치 ~511): 오른쪽 「최근 변경」 칸을 본문 아래로, 정보 상자는 띄우지 않고 한 줄 전체.
+   화면 폭이 아니라 위키 스크롤 칸 폭 기준이라 1280 PC 는 두 칸 그대로. 폰 규칙(아래 @media)이 뒤에 와서 폰은 폰대로 */
+.wk .wsc { container: wkw / inline-size; }
+@container wkw (max-width: 700px) {
+  .wk .wrap { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px 16px; }
+  .wk .doc { padding: 20px 22px; }
+  .wk .wst { padding: 12px 16px 0; }
+  .wk .nw-infobox { float: none; width: 100%; margin: 0 0 14px; }
+}
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .wk .top { padding: 0 12px; }
   .wk .top nav, .wk .wlb { display: none; }
