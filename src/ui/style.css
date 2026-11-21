@@ -5631,11 +5631,28 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs.hs-m .hs-ord button { flex: 1; padding: 11px 0; font-size: 13.5px; }
 .hs.hs-m .hs-chat { height: 240px; margin-top: 12px; }
 .hs.hs-m .hs-sec h4 { flex-wrap: wrap; gap: 2px 10px; }
-.hs.hs-m .hs-lu:not(.col) { grid-template-columns: 1fr 1fr; }
+.hs.hs-m .hs-lu:not(.col) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } /* 1fr 만 쓰면 카드 글 폭만큼 칸이 벌어져 좁은 폰(344)에서 오른쪽 카드가 잘렸다 */
 .hs.hs-m .hs-lc .st { position: absolute; right: 6px; top: 6px; }
 .hs.hs-m .hs-ol .bar { display: none; }
 .hs.hs-m .hs-dim { place-items: end center; padding: 0; position: fixed; }
 .hs.hs-m .hs-pop { position: relative; top: auto; bottom: auto; width: 100%; max-height: 82%; border-radius: 14px 14px 0 0; border-bottom: 0; }
+/* 좁은 PC 창 (11-21 사용자 실기: 폴드 펼친 화면에서 잘린다. 창 폭이 600 을 넘어 PC 배치인데 사이트 칸은 510~580 이라 채팅 칸이 오른쪽 밖으로 나가고 머리띠 글이 겹쳤다).
+   ui/hsplayer.ts siteFit 이 사이트 칸 폭 720 미만이면 .hs-n, 높이 480 미만이면 .hs-s 를 붙인다. PC 배치 그대로 두고 자리만 다시 잡는다 */
+.hs.hs-n .hs-gnb { flex-wrap: wrap; height: auto; gap: 0 12px; padding: 8px 16px 0; }
+.hs.hs-n .hs-logo { flex: 1; font-size: 22px; }
+.hs.hs-n .hs-tel { font-size: 16px; }
+.hs.hs-n .hs-tel small { display: none; }
+.hs.hs-n .hs-menu { flex: none; order: 3; width: 100%; height: 40px; margin: 4px -10px 0; overflow-x: auto; scrollbar-width: none; }
+.hs.hs-n .hs-menu::-webkit-scrollbar { display: none; }
+.hs.hs-n .hs-bd { display: block; }
+.hs.hs-n .hs-main { width: auto; }
+.hs.hs-n .hs-chat { height: 240px; margin-top: 12px; }
+.hs.hs-n .hs-dim { padding: 8px; }
+/* 낮은 창의 전화 주문: 결제 고르기 칸이 두 줄도 안 보였다 → 왼쪽 칸(상품·결제·조건·주문 단추)을 통째로 스크롤 */
+.hs.hs-s .hs-side { overflow-y: auto; }
+.hs.hs-s .hs-side > .sc { flex: none; overflow: visible; }
+/* 단독 창: 창(전화 주문·스티커·방청)이 떠 있는 동안 창 닫기 단추가 그 창의 닫기 단추를 덮지 않게 어둠막 아래로 */
+.gx-netsolo:has(.hs .hs-dim) .br-solox { z-index: 4; }
 
 
 /* 닫기·취소 단추 공통 (2026-11-13 사용자: X 가 상자 가운데에서 삐뚤다 → 다른 창도 같은 규칙으로).
