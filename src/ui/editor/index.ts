@@ -202,7 +202,11 @@ function ensureRoot(): HTMLElement {
     if (slotDropped) return; // 손잡이를 놓은 직후의 click 은 칸 펼치기가 아니다
     const el = t.closest<HTMLElement>('[data-action]');
     if (!el || el.hasAttribute('disabled')) return;
-    if (el.dataset.action === 'ed-hint') return hintFor === el ? hideHint() : showHint(el); // 폰: 누르면 열고 닫는다
+    if (el.dataset.action === 'ed-hint') {
+      // 폰: 누르면 열고 닫는다. 손가락으로 누르면 브라우저가 mouseover 를 먼저 보내 방금 띄운 것을 이 click 이 바로 닫았다(「?」를 눌러도 설명이 안 뜸, 눌러 보기 3차) → 막 띄운 것은 둔다
+      if (hintFor === el && Date.now() - hintAt < 700) return;
+      return hintFor === el ? hideHint() : showHint(el);
+    }
     const take = el.dataset.take ? root?.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${el.dataset.take}"]`)?.value : undefined;
     void run(el.dataset.action!, take ?? el.dataset.value);
   });
@@ -1059,6 +1063,8 @@ const ROW_DEL: Record<string, string> = {
   'ms-fx-del': '이 시그니처 상품을 지울까요?',
   'set-items-rules-del': '이 판정 표 줄을 지울까요?',
   'set-items-alias-del': '이 그림 대체 말 줄을 지울까요?',
+  // 인물 기록 점검 「진단 지우기」만 묻지 않고 바로 전부 지웠다 (눌러 보기 3차)
+  'pp-diag-clear': '이 기기에 저장된 갱신 기록을 모두 지울까요?',
 };
 
 export async function handle(action: string, value?: string): Promise<void> {
