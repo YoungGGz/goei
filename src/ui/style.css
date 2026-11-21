@@ -1528,6 +1528,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .ph-drawer .ph-tool-l { font-size: 11px; }
 .ph-drawer .gn-nickform { margin: 10px 12px 0; }
 .ph-content { padding-bottom: 10px; }
+/* 떠 있는 알림(.gx-toast, 아래 82px)이 목록 마지막 줄을 덮지 않게: 알림이 떠 있는 동안 목록 끝에 알림 높이만큼 여백 (전수점검 눌러2-보통-9) */
+.ph-app.has-note .ph-content { padding-bottom: 76px; }
 /* 모바일: 메뉴별 도구 줄은 하단 바 바로 위에 늘 보인다 (2026-11-07 사용자: 접는 손잡이 없음. 위 여백 6px, 글씨 11px — 하단 바보다 작게) */
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .ph-drawer { margin: 0 -12px; border-top-color: var(--line); }

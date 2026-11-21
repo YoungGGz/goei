@@ -204,7 +204,8 @@ async function run(ctx: ChatContext, env: PhoneEnv, label: string, what: string,
     const msg = `${what}: ${raw ? full.split('\n')[0] : full}`;
     // 저장을 기다리는 사이 다른 작업이 돌고 있어도 실패는 알린다 (전수점검 보통-48: 알림 없이 사라졌다)
     phone.notice = msg;
-    if (raw) phone.failure = { label, reason: msg, raw };
+    // reason 은 설정 「상태 점검·실패 기록」용. 괴담톡 펼침 칸에는 원문만 싣고 알림과 같은 문장을 다시 싣지 않는다 (전수점검 눌러2-보통-9)
+    if (raw) phone.failure = { label: what, reason: msg, raw };
   } finally {
     if (held) jobs.delete(key);
     else parked.delete(key);
@@ -1292,7 +1293,7 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
     `<button class="ph-sub${phone.sub === id ? ' on' : ''}" data-action="ph-sub" data-value="${id}" aria-pressed="${phone.sub === id}">${label}${extra}</button>`;
   // 실패 원문은 목록 위에: 아래 도구 줄 바로 위에서는 떠 있는 알림이 덮었다 (전수점검 눌러2-보통-9)
   const fail = phone.failure
-    ? `<details class="nw-fail"><summary>최근 실패 원문</summary><p>${esc(phone.failure.reason)}</p><textarea class="gx-search" rows="6" readonly>${esc(phone.failure.raw)}</textarea></details>`
+    ? `<details class="nw-fail"><summary>최근 실패 원문 · ${esc(phone.failure.label)}</summary><textarea class="gx-search" rows="6" readonly>${esc(phone.failure.raw)}</textarea></details>`
     : '';
   const status = job ? `<div class="nw-busy" role="status"><span class="nw-spin"></span>${esc(job)} 창을 닫아도 계속돼요.</div>` : '';
   const note = toast('ph', phone.notice, (t) => {
@@ -1308,7 +1309,7 @@ export function phoneTab(ctx: ChatContext, env: PhoneEnv): string {
     tool('ph-add', ICONS.addUser, '연락처 추가', '', '추가'),
     tool('ph-call', ICONS.call, '전화 걸기', 'data-value=""', '전화'),
   ].join('');
-  return `<main class="gx-body ph ph-app ${detail ? 'is-detail' : 'is-list'}">
+  return `<main class="gx-body ph ph-app ${detail ? 'is-detail' : 'is-list'}${note && !pop ? ' has-note' : ''}">
     <section class="ph-side" aria-label="괴담톡 목록">
       <div class="ph-side-head">
         <div class="ph-subs">${subBtn('contacts', '연락처')}${subBtn('chats', '대화', badge(unread + viewUnread(readViews(ctx.chat.scriptstate))))}${subBtn('notices', '공지', badge(b ? b.items.filter((r) => r.read === false).length : 0))}</div>

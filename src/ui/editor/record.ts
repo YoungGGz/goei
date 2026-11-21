@@ -187,7 +187,7 @@ function sceneCard(sel: string, d: Directory): string {
 function membersCard(ctx: ChatContext, sel: string, d: Directory): string {
   const list = d.agents.filter((a) => a.affiliation === sel);
   const items = list.map((a) => {
-    const sub = [a.rank, a.department].filter(Boolean).join(' · ');
+    const sub = [a.department, a.rank].filter(Boolean).join(' · '); // 소속(부서) · 직급: agentInner 와 같은 순서 (눌러-보통-8)
     return `<button class="gw-member" data-action="ed-goto" data-value="agent|${esc(a.lore)}" title="요원 기록으로">${picAvatar(ctx.char, facePic(ctx.char, a, true), a.name)}<span class="gw-member-t"><b>${esc(a.name)}</b><small>${esc(a.english || '')}${sub ? ` · ${esc(sub)}` : ''}</small></span></button>`;
   }).join('');
   return `<section class="gw-sec gw-members"><h3>소속 요원<b>${list.length}</b></h3>${list.length ? `<div class="gw-member-list">${items}</div>` : '<p class="gx-muted">이 조직 소속으로 등록된 요원이 없어요. 요원 기록의 기본 정보에서 소속을 정해요.</p>'}</section>`;

@@ -571,7 +571,7 @@ function placeRow(p: PlaceRow, ctx: ChatContext, src = ''): string {
 
 function agentRow(a: AgentRow, ctx: ChatContext, d: Directory, names: Record<string, string>, order?: { first: boolean; last: boolean }): string {
   const open = dirUi.open === a.lore;
-  const sub = [a.affiliation ? orgName(d, names, a.affiliation) : '', a.rank, a.department].filter(Boolean).join(' · ');
+  const sub = [a.affiliation ? orgName(d, names, a.affiliation) : '', a.department, a.rank].filter(Boolean).join(' · ');
   // 순서 바꾸기 (검색 중에는 없음): PC는 손잡이를 끌고, 모바일은 ▲▼. 같은 조직 안에서만 움직인다
   const move = order
     ? `<span class="dir-move"><span class="dir-grip" data-drag-agent="${esc(a.lore)}" title="끌어서 순서 바꾸기" aria-hidden="true">${ICONS.grip}</span>`
