@@ -32,7 +32,7 @@ export function showPanel(version: string, install: (code: string) => Promise<vo
   root = document.createElement('div');
   root.innerHTML = `<style>${PANEL_CSS}</style><div class="gl-back"><div class="gl-card" role="dialog" aria-label="괴이 ː ANOMALY">
       <b>괴이 ː ANOMALY</b>
-      <p>${why === 'start' ? '플러그인 본체를 시작하지 못했어요' : '플러그인 본체를 받지 못했어요'}. 다시 받거나, 릴리스 zip에 든 goei-body.js를 넣어 주세요. (이어서 세계 자료 goei-data-world.txt 도 창이 뜨면 넣어 주세요)</p>
+      <p>${why === 'start' ? '플러그인 본체를 시작하지 못했어요' : '플러그인 본체를 받지 못했어요'}. 다시 받거나, 릴리스 페이지의 「본체」(goei-body.js)를 넣어 주세요. (이어서 세계 자료 goei-data-world.txt 도 창이 뜨면 넣어 주세요)</p>
       <p class="gl-msg" hidden></p>
       <div class="gl-act"><button class="primary" data-gl="get">다시 받기</button><button data-gl="file">파일로 넣기</button><button data-gl="close">닫기</button></div>
     </div></div>`;
