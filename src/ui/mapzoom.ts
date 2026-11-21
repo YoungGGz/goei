@@ -44,7 +44,8 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
   const dots = [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')];
   if (!labs.length) return;
   for (const el of labs) el.style.removeProperty('--lx'), el.style.removeProperty('--ly');
-  const F = box(frame);
+  // 칸 테두리(1px)에서 1px 더 안쪽까지만 (이름표가 칸 위 끝을 3px 넘어 검색 칸을 덮었다, 752×749 실리수)
+  const F = grow(box(frame), -2);
   const inFrame = (r: Box) => r.l >= F.l && r.r <= F.r && r.t >= F.t && r.b <= F.b;
   const dotBox = dots.map((d) => { const dot = d.querySelector('.gx-dot'); return dot ? box(dot) : null; });
   const order = labs.map((el, i) => ({ el, i })).sort((a, b) => rank(a.el) - rank(b.el) || a.i - b.i);
@@ -54,8 +55,14 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     const name = el.querySelector('.gx-pname');
     const D = dotBox[i];
     if (!name || !D) continue;
-    const N = box(name);
-    const w = N.r - N.l, h = N.b - N.t, my = (D.t + D.b) / 2 - h / 2;
+    const N0 = box(name);
+    const w = N0.r - N0.l, h = N0.b - N0.t;
+    // 점이 칸 안에 보이는데 제자리 이름표가 칸 밖으로 삐져나가면 칸 안으로 밀어 넣는다 (확대해 칸 밖으로 나간 점은 그대로)
+    const dIn = D.l >= F.l && D.r <= F.r && D.t >= F.t && D.b <= F.b;
+    const nl = dIn && w <= F.r - F.l ? Math.min(Math.max(N0.l, F.l), F.r - w) : N0.l;
+    const nt = dIn && h <= F.b - F.t ? Math.min(Math.max(N0.t, F.t), F.b - h) : N0.t;
+    const N = { l: nl, t: nt, r: nl + w, b: nt + h };
+    const my = (D.t + D.b) / 2 - h / 2;
     // 아래(제자리) → 위 → 오른쪽 → 왼쪽 → 네 귀퉁이 → 옆 반 칸 위아래
     // (옆 반 칸: 귀퉁이까지 막혀 이름표 없는 점이 여럿 남았다, 전수점검 눌러-사소-1·눌러2-보통-7. 점에 닿는 자리만이라 어느 점 이름인지는 그대로 읽힌다)
     const up = D.t - 2 - h, dn = D.b + 2, rt = D.r + 1, lt = D.l - 1 - w, hh = h / 2 + 1;
@@ -73,9 +80,9 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     if (at < 0 && rank(el) === 0) at = 0, placed.push({ l: N.l, t: N.t, r: N.r, b: N.b });
     const blocked = at < 0;
     el.classList.toggle('lab-off', blocked);
-    if (at > 0) {
-      el.style.setProperty('--lx', `${(spots[at][0] - N.l) / z}px`);
-      el.style.setProperty('--ly', `${(spots[at][1] - N.t) / z}px`);
+    if (at >= 0 && (spots[at][0] !== N0.l || spots[at][1] !== N0.t)) {
+      el.style.setProperty('--lx', `${(spots[at][0] - N0.l) / z}px`);
+      el.style.setProperty('--ly', `${(spots[at][1] - N0.t) / z}px`);
     }
     const d = dots[i];
     d.toggleAttribute('title', blocked);
