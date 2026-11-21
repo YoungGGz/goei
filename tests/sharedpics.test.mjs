@@ -88,7 +88,7 @@ test('전수점검 보통-77·78·79: 두 글자 강·산, 탈것의 객실, 「
   assert.match(top('한강'), /^RiversidePark/);
   assert.match(top('한강에서'), /^RiversidePark/);
   assert.match(top('남산'), /^Forest/);
-  for (const n of ['생강 밭', '재산 분쟁', '대강 훑기', '일산 호수공원 옆 골목']) assert.ok(!/^(Forest|RiversidePark)/.test(top(n)), n);
+  for (const n of ['생강 밭', '재산 분쟁', '대강 훑기', '일산 호수공원 옆 골목', '통산 3회', '인강', '도산']) assert.ok(!/^(Forest|RiversidePark)/.test(top(n)), n);
   assert.equal(top('무궁화호 객실'), 'Subway 2');
   assert.match(top('여객선 객실'), /^Ferry/);
   assert.equal(top('호텔 객실'), 'Lodging 2');

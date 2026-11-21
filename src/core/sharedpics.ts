@@ -70,7 +70,7 @@ interface Pic { n: number; w: string[]; s?: string[]; in?: boolean; inc?: string
 interface Place { k: string; w?: string[]; s?: string[]; pics?: Pic[]; g?: { w: string[]; p: number[] }; near?: string; inc?: string[]; base?: boolean }
 const PLACES = (pw as { places: Place[] }).places;
 
-/** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고(강·산은 TWO 로 두 글자도), 같은 글자로 끝나는 다른 낱말은 뺀다 */
+/** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고(두 글자는 TWO 에 있는 강·산 이름만), 같은 글자로 끝나는 다른 낱말은 뺀다 */
 const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
   호: { to: 'Lake', n: 1, not: ['번호', '신호', '보호', '간호', '구호', '암호', '경호', '수호', '변호', '상호', '기호', '부호', '애호', '옹호', '양호', '괄호', '점호', '전호', '엄호', '원호', '칭호', '존호', '방호', '참호', '산호', '미호', '호호', '선호', '환호', '연호', '국호', '시호', '묘호', '당호', '아호', '별호', '작호', '군호', '문호', '가호', '비호', '맹호', '백호', '흑호', '념호', '집호'] },
   천: { to: 'RiversidePark', not: ['온천', '수천', '추천', '원천', '실천', '황천'] },
@@ -86,10 +86,10 @@ const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
   숲: { to: 'Forest', not: [] },
   댐: { to: 'Lake', n: 1, not: [] },
 };
-/** 두 글자 낱말도 끝말로 보는 글자 (한강·남산). 같은 글자로 끝나는 두 글자 보통 낱말은 뺀다 (SUFFIX 의 not 도 함께 본다) */
+/** 두 글자인데도 강·산 이름인 낱말 (한강·남산). 두 글자 「~강」「~산」은 보통 낱말(생강·통산·인강·도산)이 훨씬 많아 이 목록에 있는 것만 끝말로 본다 */
 const TWO: Record<string, string[]> = {
-  강: ['요강', '수강', '결강', '종강', '청강', '열강', '부강', '대강', '생강', '입강', '근강'],
-  산: ['등산', '청산', '결산', '합산', '환산', '가산', '감산', '증산', '공산', '산산', '승산', '타산', '연산', '녹산', '개산', '추산', '흩산', '일산', '마산', '진산', '영산'],
+  강: ['한강', '금강', '남강', '섬강', '동강', '서강'],
+  산: ['남산'],
 };
 /** 「~교」로 끝나지만 다리가 아닌 말 (사전에서 「교」로 끝나는 3자 이상 낱말 732개를 갈라 뽑음). 학교류는 표의 낱말이 먼저 받는다 */
 const GYO_NOT = ['학교', '장교', '외교', '대주교', '좌주교', '부주교', '설교', '조교', '비교', '기교', '등교', '하교', '휴교', '모교', '본교', '타교', '국교', '배교', '친교', '절교', '순교', '함교', '근교', '소방교', '탑승교', '실험교', '자매교'];
@@ -174,7 +174,7 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
     const person = PERSON_CUE.test(text);
     for (const { stem, end } of tokenEnd) {
       const last = stem.slice(-1);
-      if (stem.length < 3 && !(stem.length === 2 && TWO[last] && !TWO[last].includes(stem))) continue;
+      if (stem.length < 3 && !(stem.length === 2 && TWO[last]?.includes(stem))) continue;
       if (last === '호' && /\d/.test(stem.slice(-2, -1))) continue;
       // 종교 이름(유대교·○○신교)은 「대교」 같은 표의 낱말보다 먼저 가른다
       if (last === '교' && !GYO_NOT.some((x) => stem.endsWith(x)) && (FAITH.some((x) => stem.endsWith(x)) || (!taken.has(end) && FAITH_CUE.test(ctx.replace(stem, ' '))))) {
