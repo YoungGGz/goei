@@ -4,7 +4,9 @@
 let bound = false;
 
 /** 그릴 때: 값이 비었으면 ' disabled' */
-export const needAttr = (name: string, value: string, busy = false): string => ` data-need="${name}"${busy ? ' data-busy="1"' : ''}${busy || !value.trim() ? ' disabled' : ''}`;
+/** other: 글이 없어도 보낼 거리가 있다(첨부·팔 물건 등) → 흐리게 하지 않는다 */
+export const needAttr = (name: string, value: string, busy = false, other = false): string =>
+  other ? (busy ? ' disabled' : '') : ` data-need="${name}"${busy ? ' data-busy="1"' : ''}${busy || !value.trim() ? ' disabled' : ''}`;
 
 export function bindNeedFill(doc: Document = document): void {
   if (bound) return;

@@ -40,7 +40,7 @@ import { cleanOutput, hasWorldTags, parseCatalog, processOutput, readDirectory }
 import { basicSettings, missingBasicVars, worldSettings } from './core/settings';
 import { staleFactionVars } from './core/factions';
 import { supplementAssets } from './host/asset';
-import { loadContext, updateCharacterLore, updateChat, getChar, type ChatContext, type CharacterSnapshot } from './host/risu';
+import { loadContext, updateCharacterLore, updateChat, nudgeMessages, getChar, type ChatContext, type CharacterSnapshot } from './host/risu';
 import { WatchState, type WatchSnapshot } from './core/watch';
 import { createFab, type Fab } from './host/overlay';
 import { createProgWin, progressOn, type ProgWin } from './host/progwin';
@@ -49,7 +49,7 @@ import { cardPalette as themedCardPalette, currentTheme, onThemeChange, repaintT
 import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, keepImgTagsInRequest, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
 import { loadModuleAssets, modulePicker } from './host/assets';
 import { getPrefs } from './core/settings';
-import { appShown, openApp, openInstall, openRecords, openShop, openWiki } from './ui/app';
+import { appDimmed, appShown, openApp, openInstall, openRecords, openShop, openWiki } from './ui/app';
 import { isGoeiLore, isLanding } from './core/install';
 import { dropOldGame, loadStoredTokenizer, loadStoredWikiPack } from './host/install';
 import { loadWorldData } from './host/datapack';
@@ -96,6 +96,9 @@ const WATCH_MS = 1000;
 
 /** 지금 보고 있는 캐릭터가 괴이봇 Lite인지 (감시 루프가 갱신). 다른 봇에서는 아무것도 하지 않기 위해 쓴다 */
 let liteNow = false;
+/** 감시의 첫 판정(liteNow)이 끝나면 풀린다. 본체를 받는 중에 보낸 첫 요청이 판정 전 false 로 「다른 봇 요청」처럼 나가지 않게 기다린다 (전수점검 보통-1) */
+let liteDecided: () => void = () => {};
+const liteReady = new Promise<void>((res) => (liteDecided = res));
 
 /** 시험용 예외 주입: 가짜 Risu 가 globalThis.__goeiFaultSteps 에 단계 이름 목록을 두면 그 단계가 던진다 (tests/qc-pipeline-browser.mjs).
  *  GOEI_TEST 이름표 블록은 배포 본체 빌드에서 통째로 빠지고(scripts/build.mjs dropLabels) 시험 본체(dist-test/goei-body.js)에만 남는다 */
@@ -205,6 +208,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
       return fallback;
     }
   };
+  await liteReady;
   try {
     setWaiting(true);
     setUseLockAt(null); // 「사용」 잠금: 어느 채팅인지 읽기 전에는 전부 (host/usebox.ts)
@@ -715,7 +719,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 저장 직후 Risu 가 메시지를 다시 그릴 때 카드 열쇠 표가 비어 있으면 종료 응답 아래 보고서 카드가 안 나오고 다음 저장까지 기다려야 했다
     await refreshStatusContext(arg.characterIndex, arg.chatIndex, { char, chat: now }).catch(() => {});
     // 이번 응답에서 종료된 사건의 카드가 있으면 채팅을 그대로 한 번 저장해 그 메시지를 다시 그리게 한다 (설정 변경 때와 같은 기법)
-    if (latest && chatCardsAt(now, arg.messageIndex).length) now = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => ({ ...cur })).catch(() => null)) ?? now;
+    if (latest && chatCardsAt(now, arg.messageIndex).length) now = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => nudgeMessages(cur, (_d, i) => i === arg.messageIndex)).catch(() => null)) ?? now;
     // 다음 요청에 넣을 로어북을 미리 골라 둔다 (다시 굴리기·자동 전송은 입력 처리를 거치지 않는다)
     await storeLore(arg.characterIndex, arg.chatIndex, undefined, { char, chat: now }).catch(() => {});
     // 막혔던 요청을 사용자가 전송 버튼으로 보냈으면 카드의 「전송을 눌러 주세요」·취소를 없앤다
@@ -756,7 +760,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
         const gnetFail = (site: string) => (error: unknown) => console.log(`[goei] ${BOARD_NAME[site as keyof typeof BOARD_NAME] ?? site} 자동 새로고침 실패: ${error instanceof Error ? error.message : String(error)}`);
         // 덩어리마다: 둘 이상이면 Joint 로 한 요청(각 작업은 요청문을 만들어 맡기고, 다 모이면 한 번에 보냄), 하나면 그냥. 덩어리끼리는 차례로
         for (const group of jointGroups(now!.scriptstate)) {
-          const joint = group.length > 1 ? new Joint(group[0].model, group[0].fixed, group.map((t) => t.kind), genSettings(now!.scriptstate).concurrent) : undefined;
+          const joint = group.length > 1 ? new Joint(group[0].model, group[0].fixed, group.map((t) => t.kind), genSettings(now!.scriptstate).concurrent, genSettings(now!.scriptstate).transientRetries) : undefined;
           await Promise.all(group.map(async (t) => {
             try {
               if (t.kind === 'phone') await autoRefresh(await fresh(), arg.messageIndex, undefined, joint);
@@ -888,10 +892,7 @@ async function redrawAfterLoad(): Promise<void> {
     if (!ctx || !isGoeiLore(ctx.char.globalLore)) return;
     if (!ctx.chat.message.some((m) => typeof m.data === 'string' && m.data.includes('<img='))) return;
     // 같은 글을 그대로 저장하면 Risu(Chats.svelte, 글 해시로 그린 것을 재사용)가 다시 그리지 않는다. 그림 태그가 있는 글의 끝 줄바꿈을 붙였다 뗐다 해 글이 바뀌게 한다 (보이는 것·요청은 그대로)
-    await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => ({
-      ...cur,
-      message: (cur.message ?? []).map((m) => (typeof m.data === 'string' && m.data.includes('<img=') ? { ...m, data: m.data.endsWith('\n') ? m.data.slice(0, -1) : `${m.data}\n` } : m)),
-    }));
+    await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => nudgeMessages(cur, (d) => d.includes('<img=')));
   } catch {
     /* 다시 그리지 못해도 그만 (다음 채팅 전환 때 그려진다) */
   }
@@ -997,6 +998,7 @@ function startWatcher(fab: Fab | null): () => void {
       if (stopped) return;
       const next = state.update(snap, lite);
       liteNow = state.lite;
+      liteDecided();
       // 캐릭터를 바꾸거나 봇 판정이 바뀌면 에셋 목록을 다시 읽는다 (안 읽으면 앞 캐릭터 목록으로 그림 태그를 골랐다. 첫 차례는 시작 때 읽음, 전수검사 11-13)
       if (snap.charIndex >= 0) {
         if (lastChar !== undefined && (snap.charIndex !== lastChar || (next.changed && next.fabVisible))) void loadModuleAssets().catch(() => false);
@@ -1011,7 +1013,7 @@ function startWatcher(fab: Fab | null): () => void {
         await readTheme(snap).catch(() => {});
         await refreshStatusContext(snap.charIndex, snap.chatIndex).catch(() => {});
         // Risu 가 옮긴 직후 앞 채팅 목록으로 그린 상태창이 남아 있을 수 있으니 채팅을 그대로 한 번 저장해 다시 그리게 한다
-        if (switched) await updateChat(snap.charIndex, snap.chatIndex, (cur) => ({ ...cur })).catch(() => null);
+        if (switched) await updateChat(snap.charIndex, snap.chatIndex, (cur) => nudgeMessages(cur, (d) => hasStatusTag(d))).catch(() => null);
         await refreshOpeningHint(snap.charIndex, snap.chatIndex).catch(() => {});
         await refreshUseBox(snap.charIndex, snap.chatIndex).catch(() => {});
       } else if (!next.fabVisible && next.changed) {
@@ -1029,12 +1031,14 @@ function startWatcher(fab: Fab | null): () => void {
       // 떠 있으면 매 초 폭(폰·PC 모양)·자리를 다시 맞춘다 (릴리스 점검 11-09: 창 크기를 바꿔도 그대로였다)
       else if (prog && pShow) await prog.setVisible(true).catch(() => {});
       // 상황판이 떠 있으면 PC 카드를 저절로 펴지 않고(닫기 X 를 가리지 않게, 전수검사 11-13), 폰 막대는 숨긴다 (11-15 사용자)
-      if (prog) await prog.setPanel(appShown()).catch(() => {});
+      // 상황판 머리줄 아래 끝도 넘겨, 단추로 펼친 카드가 닫기 X·잔고를 덮지 않게 그 아래로 내린다 (전수점검 눌러-보통-1)
+      if (prog) await prog.setPanel(appShown(), appShown() ? document.querySelector('.gx-panel > .gx-head, .gx-panel .gx-head')?.getBoundingClientRect().bottom ?? 0 : 0, appDimmed()).catch(() => {});
       // 턴에 채팅을 붙이고, 채팅을 옮겼으면 앞 채팅의 턴을 치우고, 본편을 너무 오래 기다리면 실패로 닫는다
       progressWatch(`${snap.charIndex}:${snap.chatIndex}`);
     } catch (error) {
       console.log(`[goei] 채팅 감시 실패: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
+      liteDecided();
       if (!stopped) timer = setTimeout(() => void tick(), WATCH_MS);
     }
   };

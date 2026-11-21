@@ -6,6 +6,7 @@ import { dropPendingVars, worldOn } from '../core/world/output';
 import { armChatClick, elements, hit, onChatClick } from './chatclicks';
 import { getChar, updateChat } from './risu';
 import { passWaiting } from './waiting';
+import { timeMs } from '../core/timing';
 import { openRepick } from './openinghint';
 
 /** 방금 놓은 마지막 유저 메시지(기록 카드·직접 입력)를 「아직 안 보냄」으로 */
@@ -33,10 +34,17 @@ onChatClick('unsent', async (_doc, x, y) => {
   if (busy) return false;
   const list = await elements(_doc, '[data-goei-cancel]');
   if (!list.length) return 'idle';
-  let on = false;
-  for (const el of list) if (await hit(el, x, y)) on = true;
-  // 응답을 기다리는 중이면 5초 안에 두 번 눌러야 지운다 (실패한 요청이 3분 동안 취소를 막지 않게, 전수검사 11-13)
-  if (!on || !passWaiting()) return false;
+  let on: (typeof list)[number] | null = null;
+  for (const el of list) if (await hit(el, x, y)) on = el;
+  if (!on) return false;
+  // 응답을 기다리는 중이면 정한 시간(설정 「취소 두 번 누르기」) 안에 두 번 눌러야 지운다 (실패한 요청이 3분 동안 취소를 막지 않게, 전수검사 11-13).
+  // 첫 번은 단추 글로 알린다 (전수점검 보통-10: 아무 표시가 없어 고장 난 것처럼 보였다)
+  if (!passWaiting()) {
+    const el = on;
+    await el.setInnerHTML('한 번 더 누르면 취소').catch(() => {});
+    setTimeout(() => void el.setInnerHTML('취소').catch(() => {}), timeMs('cancelTwice'));
+    return true;
+  }
   busy = true;
   try {
     const charIndex = await risuai.getCurrentCharacterIndex();

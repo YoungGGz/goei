@@ -5,6 +5,7 @@
 // 끌어다 놓기(PC): 격자 → 장착 칸(장착) · 사용 상자(×n) · 버리기(한 번 확인), 장착 칸 → 격자(풀기). 팝업 단추(사용·장착·버리기)는 폰용으로 남김.
 // 칸을 올리면 설명 말풍선(PC), 누르면 팝업. 폰은 직접 넣기·합치기가 아래 도구 줄에.
 // 플러그인은 막지도 경고하지도 않는다: 칸이 넘치면 넘친 칸을 붉은 테두리로 보여 줄 뿐, 푸는 건 본편 응답 (core/items.ts).
+import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
 import { freeUseLock, refreshUseBox, useLocked, useSending } from '../host/usebox';
@@ -413,7 +414,7 @@ function form(it: Item | null, left?: number): string {
     <label><span>횟수</span><input name="uses" type="number" min="1" max="999" inputmode="numeric" value="${left ?? it?.uses ?? ''}" placeholder="소모성이면 남은 횟수 (비우면 닳지 않음)"></label>
     <label><span>무게(1개)</span><input name="weight" type="number" min="0" step="0.001" inputmode="decimal" value="${it?.weight ?? ''}" placeholder="kg"></label>
 ${pics ? `<label><span>그림</span><select name="pic">${pics.some((n) => n === picNow) ? '' : '<option value="" selected>그대로</option>'}${pics.map((n) => `<option value="${esc(n)}"${n === picNow ? ' selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : ''}
-    <div class="it-btns"><button type="button" class="gx-chip on" data-action="items-save" data-value="${esc(it?.id ?? '')}">${it ? '저장' : '넣기'}</button><button type="button" class="gx-chip" data-action="${it ? 'items-back' : 'items-close'}">취소</button></div>
+    <div class="it-btns it-formfoot"><button type="button" class="gx-start" data-action="items-save" data-value="${esc(it?.id ?? '')}"${needAttr('name', it?.name ?? '')}>${it ? '저장' : '넣기'}</button><button type="button" class="gx-chip" data-action="${it ? 'items-back' : 'items-close'}">취소</button></div>
   </div>`;
 }
 

@@ -1,5 +1,7 @@
 // 「괴담넷」 탭: 게시판·쪽지함. 생성은 새로고침·글 올리기·댓글·쪽지 보내기를 눌렀을 때만 한 번씩 부른다.
 // 원본은 채팅 입력창을 빌려 썼지만 여기서는 창 안의 입력칸에 쓴다. 생성은 창을 닫아도 계속되고 끝나면 원래 채팅에 저장한다.
+import { needAttr } from './needfill';
+import { scrollInside } from './panels';
 import { turnKeyAt, turnResultValid, type TurnMark } from '../core/shop';
 import { defGroups, setSeg, type Wire } from './setrow';
 import { GNET_SET } from '../core/setdef/gnet';
@@ -516,8 +518,8 @@ function composer(busy: boolean, placeholder: string, chip = '', label = ''): st
     ${attachEditor('gn', gnet.attach, GN_KINDS, busy, '', gnet.attachMenu)}
     <div class="ph-compose">
       <button class="ph-tool ph-plus${gnet.attachMenu ? ' on' : ''}" data-action="gn-att-menu" aria-label="첨부" aria-expanded="${gnet.attachMenu}" title="첨부">${ICONS.plus}</button>
-      <textarea class="ph-input" data-input="gn-draft" rows="1" placeholder="${esc(placeholder)}" ${busy ? 'disabled' : ''}>${esc(gnet.draft)}</textarea>
-      <button class="ph-send${label ? ' txt' : ''}" data-action="gn-send" aria-label="등록" title="등록" ${busy ? 'disabled' : ''}>${label || ICONS.send}</button>
+      <textarea class="ph-input" name="gn-draft" data-input="gn-draft" rows="1" placeholder="${esc(placeholder)}" ${busy ? 'disabled' : ''}>${esc(gnet.draft)}</textarea>
+      <button class="ph-send${label ? ' txt' : ''}" data-action="gn-send" aria-label="등록" title="등록"${needAttr('gn-draft', gnet.draft, busy, gnet.attach.length > 0)}>${label || ICONS.send}</button>
       <button class="ph-tool ph-back2" data-action="gn-back" aria-label="목록으로" title="목록으로">${ICONS.back}</button>
     </div>
   </div>`;
@@ -532,10 +534,10 @@ function composeView(c: Compose, busy: boolean): string {
   const ph = post ? '올릴 글이나 쓰고 싶은 내용 (제목과 본문은 다듬어서 올려요)' : gnet.attach.length ? '함께 보낼 글 (선택)' : `${dmW()} 내용`;
   return `<div class="ph-form gn-cpane">${paneHead(post ? '새 글' : `새 ${dmW()}`, c.kind === 'dm' ? esc(c.label) : '')}
     <div class="ph-form-body">${to}${post && uiSite === 'sm' ? `<div class="cats gn-wtags" role="group" aria-label="거래 구분">${smTags().map((t, _i, tags) => `<button class="${(c.tag ?? tags[0]) === t ? 'on' : ''}" data-action="gn-wtag" data-value="${esc(t)}" aria-pressed="${(c.tag ?? tags[0]) === t}">${esc(t)}</button>`).join('')}</div>` : ''}
-      <textarea class="gx-search gn-text" data-input="gn-draft" rows="${post ? 8 : 5}" placeholder="${esc(ph)}" aria-label="내용">${esc(gnet.draft)}</textarea>
+      <textarea class="gx-search gn-text" name="gn-draft" data-input="gn-draft" rows="${post ? 8 : 5}" placeholder="${esc(ph)}" aria-label="내용">${esc(gnet.draft)}</textarea>
       ${attachEditor('gn', gnet.attach, GN_KINDS, busy)}
     </div>
-    <div class="ph-form-foot"><button class="gx-start" data-action="gn-send" ${busy ? 'disabled' : ''}>${post ? '올리기' : '보내기'}</button></div></div>`;
+    <div class="ph-form-foot"><button class="gx-start" data-action="gn-send"${needAttr('gn-draft', gnet.draft, busy, gnet.attach.length > 0)}>${post ? '올리기' : '보내기'}</button></div></div>`;
 }
 
 /** 답글 입력줄: 답글을 누른 댓글 바로 밑 */
@@ -1240,7 +1242,7 @@ export async function handleGnet(action: string, value: string | undefined, base
       gnet.attach = [];
       env.render();
       const box = document.querySelector<HTMLTextAreaElement>('.gn-composer [data-input="gn-draft"]');
-      box?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      scrollInside(box, 'center', true);
       box?.focus({ preventScroll: true });
       return true;
     }
@@ -1259,7 +1261,7 @@ export async function handleGnet(action: string, value: string | undefined, base
       // 화면은 그대로 두고, 열린 입력줄이 가려져 있을 때만 살짝 당겨 보인다
       const box = document.querySelector<HTMLTextAreaElement>('.gn-c-compose [data-input="gn-draft"]');
       box?.focus({ preventScroll: true });
-      box?.closest('.gn-c-compose')?.scrollIntoView({ block: 'nearest' });
+      scrollInside(box?.closest<HTMLElement>('.gn-c-compose'));
       return true;
     }
     case 'gn-dm-from': {

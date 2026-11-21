@@ -80,8 +80,8 @@ export async function checkInstall(charIndex: number, progress?: Progress): Prom
 export type InstallStep = 'lore' | 'pictures' | 'icon' | 'wiki';
 export type { Progress };
 
-/** 로어북·첫 메시지·인사말·로어북 설정 심기 (없는 것만). 캐릭터를 저장한다 */
-export async function installLoreAndGreetings(charIndex: number, o: { name?: string } = {}): Promise<void> {
+/** 로어북·첫 메시지·인사말·로어북 설정 심기 (없는 것만). 바뀐 것이 있을 때만 캐릭터를 저장하고 true (전수점검 사소-3: 다 갖춘 카드도 늘 다시 저장했다) */
+export async function installLoreAndGreetings(charIndex: number, o: { name?: string } = {}): Promise<boolean> {
   const char = (await risuai.getCharacterFromIndex(charIndex)) as Record<string, unknown> | null;
   if (!char) throw new Error('캐릭터를 찾을 수 없어요.');
   const planted = plantGreetings(char.alternateGreetings);
@@ -92,7 +92,10 @@ export async function installLoreAndGreetings(charIndex: number, o: { name?: str
   if (!isLanding(first) && typeof first === 'string' && first.trim() && !planted.greetings.includes(first)) planted.greetings.push(first);
   // 로어북 설정: 없으면(「글로벌 설정 사용」) 플러그인 기본 값으로. 있으면 그대로
   const ls = installLoreSettings(char.loreSettings);
-  // 봇 이름: 설치 화면의 선택(기본: 괴이 카드가 아니던 봇이면 「괴이: ANOMALY」로)
+  // 봇 이름: 설치 화면의 선택(기본: 괴이 카드가 아니던 봇이면 「괴이 ː ANOMALY」로)
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+  const changed = (!!o.name && o.name !== char.name) || 'firstMessage' in landing || !!ls || !same(lore, char.globalLore) || !same(planted.greetings, char.alternateGreetings);
+  if (!changed) return false;
   await risuai.setCharacterToIndex(charIndex, {
     ...char,
     ...(o.name ? { name: o.name } : {}),
@@ -101,6 +104,7 @@ export async function installLoreAndGreetings(charIndex: number, o: { name?: str
     globalLore: lore,
     alternateGreetings: planted.greetings,
   });
+  return true;
 }
 
 /** 없는 카드 사진을 release/pic 에서 받아 에셋 저장소에 넣는다 */
@@ -115,11 +119,11 @@ export async function installPictures(charIndex: number, progress: Progress): Pr
   const WORKERS = 8;
   const COMMIT = 300;
   let saved = 0;
-  let assets: unknown = char.additionalAssets;
   const commit = async (list: [Picture, string][]) => {
     if (!list.length) return;
-    assets = mergePictures(assets, list);
+    // 저장 직전의 캐릭터 에셋에 합친다: 받는 사이 다른 곳에서 더한 에셋이 시작 때 목록으로 덮이지 않게 (전수점검 사소-4)
     const fresh = ((await risuai.getCharacterFromIndex(charIndex)) ?? char) as Record<string, unknown>;
+    const assets = mergePictures(fresh.additionalAssets, list);
     // 깡통봇: 받은 사진의 지문을 매니페스트에 적는다 (안 적으면 바뀐 사진을 점검이 계속 「없음」으로 센다, loader#6)
     const lore = notePictures(fresh.globalLore as LoreEntry[] | undefined, list.map(([p]) => p));
     await risuai.setCharacterToIndex(charIndex, { ...fresh, additionalAssets: assets, ...(lore ? { globalLore: lore } : {}) });

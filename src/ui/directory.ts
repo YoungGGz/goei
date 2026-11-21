@@ -1,5 +1,6 @@
 // 설정 → 「카드 명부」: 로어북 폴더에서 모은 괴이·미스틱 사이트·요원의 세부값 편집.
 // 고친 값은 카드 로어북 「Directory」에 저장되어 카드와 함께 공유되고, 이 카드의 모든 채팅에 바로 적용된다.
+import { scrollInside } from './panels';
 import {
   agentGroup, assignOrg, directoryData, moveAgent, type Directory, factionDisplayNames, orgAffiliation, orgOf, type OrgRow, phoneTabs, readDirectory, type AgentRow,
   type BaseRow, type PlaceRow, withDirectory, agentGender, loreGender, type AppendixRow,
@@ -1185,7 +1186,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       stUi.sel = stUi.sel === v ? '' : v;
       stUi.confirm = '';
       // 펼친 칸의 상세는 목록 아래에 그려져서, 열면 그 자리로 내려간다 (안 내려가면 눌러도 바뀐 게 안 보인다)
-      if (stUi.sel) requestAnimationFrame(() => document.querySelector('.gw .st-sel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+      if (stUi.sel) requestAnimationFrame(() => scrollInside(document.querySelector<HTMLElement>('.gw .st-sel'), 'start', true));
       break;
     case 'dir-start-show': {
       const [on, code] = v.split('|');

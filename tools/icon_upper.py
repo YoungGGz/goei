@@ -86,6 +86,7 @@ def main():
                 a, b = line.split(':', 1)
                 yield a.strip(), [x.strip() for x in b.split(',') if x.strip()]
     extra = 0
+    problems = collections.defaultdict(list)  # 표에 없는 이름도 여기에 모은다 (전수점검 사소-84: 먼저 쓰고 뒤에서 만들어 UnboundLocalError)
     for fname, col in (('_head.txt', 'head'), ('_keywords.txt', 'keywords')):
         for nm, words in pairs(fname) or []:
             if nm not in by_name:
@@ -112,7 +113,6 @@ def main():
                 if KO.search(k):
                     plain_named.setdefault(k, r)
     rep_name = read_rep()
-    problems = collections.defaultdict(list)
     added = 0
     for r in rows:  # up 칸은 매번 윗말 표에서 새로 만든다 (표에서 옮기거나 뺀 것이 남지 않게)
         r.pop('up', None)

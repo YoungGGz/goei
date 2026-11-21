@@ -265,3 +265,9 @@ export function parseWon(text: string): number | null {
 export function mentionsAmount(text: string): boolean {
   return /(₩\s*\d|\d[\d,]*\s*(?:원|won|KRW)|\d+\s*(?:억|만|천)\s*(?:원)?)/i.test(text);
 }
+
+/** 프로그램이 이미 장부에 적은 거래(상점·쇼핑몰·홈쇼핑·필드) 가운데 이 응답들에 딸린 것. 갱신기가 본문의 같은 거래를 또 적지 않게 자료로 넘긴다 (전수점검 중대-14) */
+export function recordedPaid(w: Wallet, keys: string[]): { amount: number; memo: string }[] {
+  const set = new Set(keys.filter(Boolean));
+  return w.log.filter((e) => (e.src === 'store' || e.src === 'field') && set.has(e.anchor)).map((e) => ({ amount: e.amount, memo: e.memo }));
+}

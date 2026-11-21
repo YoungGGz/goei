@@ -14,7 +14,7 @@ import {
 import { buildClosures, journalSettings, recordVars } from '../core/journal';
 import { chatCardsAt, refreshStatusContext } from '../host/statusview';
 import { assetUrl } from '../host/assets';
-import { updateChat, type CharacterSnapshot, type ChatContext } from '../host/risu';
+import { nudgeMessages, updateChat, type CharacterSnapshot, type ChatContext } from '../host/risu';
 import { noticeClass, sendNow } from '../host/send';
 import { markUnsent } from '../host/unsent';
 import { ICONS } from './icons';
@@ -739,7 +739,7 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
     if (saved && closedAt >= 0) {
       try {
         await refreshStatusContext(ctx.charIndex, ctx.chatIndex, { chat: saved, char: ctx.char });
-        if (chatCardsAt(saved, closedAt).length) await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => ({ ...cur }));
+        if (chatCardsAt(saved, closedAt).length) await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => nudgeMessages(cur, (_d, i) => i === closedAt));
       } catch {
         /* 다시 못 그려도 종료는 저장됐다 (다음 저장·채팅 전환 때 보인다) */
       }

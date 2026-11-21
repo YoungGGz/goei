@@ -3,6 +3,7 @@
 // 폰은 전체 화면·아래 [문의][닫기], 문의 → 2/3 높이 서랍(사진 56·이름·대사 상자·입력창). 물건을 누르면 상세 팝업 [구입][문의].
 // 생성·대화는 core/shop.ts 의 요청문·해석을 쓰고 모델 호출은 host/llm.ts. 구입은 가계부 src:'store' + 소지품 from:'store'.
 // 팔기(11-07): 도구 줄 「팔기」 → 진열대 자리에 내 소지품 → 하나 고르면 입력창에 「팔기: 이름」 칩(값을 부르거나 그냥 보냄) → 주인이 값을 부르면 상세 창(잔고 / +값 / 잔액) [팔기][흥정][그만].
+import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
 import { refreshUseBox, useLocked } from '../host/usebox';
@@ -235,7 +236,7 @@ function talkbox(st: ShopState): string {
   // 폼 제출은 플러그인 iframe(allow-forms 없음)에서 안 오므로 Enter(data-enter)·단추(data-action+data-take)로 보낸다
   return `<div class="sh-talk" data-sh-talk="1">
     <label class="sh-talk-in">${chip}<input type="text" name="shop-say" data-input="shop-say" data-enter="shop-say" value="${esc(shopUi.input)}" maxlength="300" placeholder="${ph}" aria-label="주인에게 말하기" ${off ? 'disabled' : ''}></label>
-    <button type="button" class="sh-go" data-action="shop-say" data-take="shop-say" aria-label="보내기" ${off ? 'disabled' : ''}>↵</button>
+    <button type="button" class="sh-go" data-action="shop-say" data-take="shop-say" aria-label="보내기"${needAttr('shop-say', shopUi.input, off, sell && !!st.sell)}>↵</button>
   </div>`;
 }
 

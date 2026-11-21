@@ -206,6 +206,8 @@ export interface BuildOpts {
   only?: string[];
   /** 장부 잔고 (원). 잔고 칸을 쓰지 않으면 null/없음 → 거래 절 없음 */
   wallet?: number | null;
+  /** 이번 응답들에 딸려 프로그램이 이미 장부에 적은 거래 (상점·쇼핑몰·홈쇼핑·필드). 자료 wallet_recorded */
+  walletDone?: { amount: number; memo: string }[];
   /** 백일몽 포인트 잔고 (core/points.ts). 포인트를 쓰지 않으면 null/없음 → 포인트 거래 절 없음 */
   points?: number | null;
   /** 모델 Router 가 본 미등록 이름 (힌트). 자료 name_hints */
@@ -407,6 +409,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     span: span.map(({ index: _i, ...rest }) => rest),
     identity_known: store.identity ? { faction: store.identity.faction, rank: store.identity.rank } : null,
     wallet_now: typeof o.wallet === 'number' ? { balance: o.wallet, unit: 'KRW' } : undefined,
+    wallet_recorded: typeof o.wallet === 'number' && o.walletDone?.length ? o.walletDone : undefined,
     points_now: typeof o.points === 'number' ? { balance: o.points, unit: 'p' } : undefined,
     ...(sexualAnyOn(o.settings) ? { sexual_profile: { sexual_desire_enabled: sexualGlobal(o.settings).desire, paraphilia_enabled: sexualGlobal(o.settings).paraphilia, explicit_sexual_style_enabled: o.settings.explicitStyle, policy: 'sexual_context_only' } } : {}),
     ...(speechVariety(o.settings).level !== 'off' ? { speech_variety: { level: speechVariety(o.settings).level, counted: speechVariety(o.settings).level === 'two' && speechVariety(o.settings).counted, limit: speechVariety(o.settings).limit, mode: speechVariety(o.settings).mode } } : {}),

@@ -3,11 +3,12 @@
 // PC: 턴이 시작되면 카드(300px)가 저절로 펼쳐지고 끝나면 5초(실패 10초) 뒤 48px 단추(유령 단추와 같은 규격)로 접힌다. 머리글을 끌어 옮기고, 누르면 접고, 단추를 누르면 지난 턴을 다시 본다.
 // 폰: 새 단추 없이 오른쪽 가장자리의 점 다섯 개짜리 막대(길이 고정) — 턴 중에 점이 켜지고, 누르면 PC 와 같은 카드. 본문은 가리지 않는다. 위아래로 끌어 옮기고, 상황판이 열려 있으면 숨는다.
 // 본 화면 DOM 은 SafeElement 로만 다룬다 (host/overlay.ts 와 같은 방식: 리스너는 좌표로 어느 것을 눌렀는지 판단).
+import { timeMs } from '../core/timing';
 import { body as rootBody, themeVars } from './overlay';
 import { inside, type Rect } from '../core/fab';
 import type { ThemeName } from '../ui/theme';
 import { getPrefs } from '../core/settings';
-import { PROGRESS_WATCHDOG, GROUPS, GROUP_LABEL, groupState, onProgress, progressTurn, running, runningStages, stageCount, stageState, turnSummary, type Stage, type StageState, type Turn } from '../core/progress';
+import { progressWatchdog, GROUPS, GROUP_LABEL, groupState, onProgress, progressTurn, running, runningStages, stageCount, stageState, turnSummary, type Stage, type StageState, type Turn } from '../core/progress';
 
 type Safe = Awaited<ReturnType<RisuaiPluginAPI['getRootDocument']>>;
 type SafeEl = Awaited<ReturnType<Safe['createElement']>>;
@@ -17,9 +18,7 @@ const POS_KEY = 'goei-plugin:prog-pos';
 const PHONE_MAX = 760;
 const CARD_W = 300;
 const BTN = 48;
-const HIDE_AFTER_OK = 5000;
-const HIDE_AFTER_FAIL = 10000;
-const WATCHDOG = PROGRESS_WATCHDOG;
+// 끝난 턴을 펼친 채 두는 시간·진행 감시 시간은 설정 「화면」 (core/timing.ts, 전수점검 사소-9)
 
 /** 파형(심전도 선) 아이콘 — 유령은 플로팅 단추가 쓰니 다른 모양 */
 const PULSE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12h4l2.5-6 4 12 2.5-6h6"/></svg>';
@@ -38,6 +37,8 @@ ${themeVars('[x-goei-prog]')}
   color: var(--g-text); word-break: keep-all; -webkit-font-smoothing: antialiased;
 }
 [x-goei-prog][x-goei-show="true"] { display: block; }
+/* 창 안 팝업이 화면을 어둡게 덮으면 같이 흐리게, 누르지 않게 (설정 창 막 밑에 깔릴 때와 같게, 전수점검 눌러2-사소-15) */
+[x-goei-prog][x-goei-dim="true"] { opacity: .35; pointer-events: none; }
 [x-goei-prog] * { box-sizing: border-box; }
 [x-goei-prog] [data-mono] { font-family: 'JetBrains Mono', 'IBM Plex Sans KR', ui-monospace, Menlo, monospace; font-variant-numeric: tabular-nums; }
 /* 카드: 오른쪽 위 꼭짓점을 기준으로 자라고 줄어든다 */
@@ -48,7 +49,7 @@ ${themeVars('[x-goei-prog]')}
   transform-origin: top right; transition: transform .2s ease, opacity .2s ease;
 }
 [x-goei-prog][x-goei-open="false"] [data-card] { transform: scale(.16); opacity: 0; pointer-events: none; }
-[x-goei-prog] [data-grip] { display: flex; align-items: center; gap: 8px; color: var(--g-sub); font-size: 11.5px; font-weight: 600; letter-spacing: .04em; cursor: grab; user-select: none; -webkit-user-select: none; }
+[x-goei-prog] [data-grip] { display: flex; align-items: center; gap: 8px; min-height: 36px; margin: -9px 0 -9px; /* 누르면 접히는 머리줄: 누름 칸 36 (전수점검 눌러-보통-1) */ color: var(--g-sub); font-size: 11.5px; font-weight: 600; letter-spacing: .04em; cursor: grab; user-select: none; -webkit-user-select: none; }
 [x-goei-prog][x-goei-drag="true"] [data-grip] { cursor: grabbing; }
 [x-goei-prog] [data-grip] svg { width: 14px; height: 14px; color: var(--g-signal); flex: 0 0 14px; }
 [x-goei-prog] [data-grip] [data-p="n"] { margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--p-dim); }
@@ -134,7 +135,7 @@ function titleOf(t: Turn, now: number): string {
   }
   const run = runningStages(t);
   if (t.aborted && !run.length) return '응답 없음';
-  if (!run.length) return t.replyAt ? '응답 뒤 정리 중' : t.mainAt ? '메인 응답 대기' : now - t.at < WATCHDOG ? '요청 준비 중' : '응답 없음';
+  if (!run.length) return t.replyAt ? '응답 뒤 정리 중' : t.mainAt ? '메인 응답 대기' : now - t.at < progressWatchdog() ? '요청 준비 중' : '응답 없음';
   if (run.some((s) => s.id === 'main')) return '메인 응답 대기';
   const net = run.filter((s) => s.group === 'net');
   if (net.length > 1) return `인터넷 자동 호출 · ${net.length}건`;
@@ -217,7 +218,8 @@ export function dotHtml(t: Turn | null): string {
 export interface ProgWin {
   setVisible(visible: boolean): Promise<void>;
   /** 상황판이 떠 있나 (body.ts 가 매 초 appShown() 으로). 떠 있으면 PC 는 저절로 펴지 않고, 폰은 숨긴다 */
-  setPanel(open: boolean): Promise<void>;
+  /** headBottom: 상황판 머리줄의 아래 끝 (화면 좌표). PC 에서 펼친 카드를 그 아래로 내린다 */
+  setPanel(open: boolean, headBottom?: number, dim?: boolean): Promise<void>;
   setTheme(theme: ThemeName): Promise<void>;
   remove(): Promise<void>;
 }
@@ -259,6 +261,9 @@ export async function createProgWin(): Promise<ProgWin> {
   let visible = false;
   let phone = false;
   let panelOpen = false;
+  /** 상황판 머리줄 아래 끝 (setPanel). 0 이면 모름 */
+  let headBottom = 0;
+  let dimmed = false;
   let open = false;
   let seen: Turn | null = null;
   let lastCard = '';
@@ -299,10 +304,15 @@ export async function createProgWin(): Promise<ProgWin> {
       return;
     }
     await card.setStyle('bottom', '');
+    // 저장하는 자리(pos)는 접힌 단추 기준. 펼친 카드는 그 자리에서 화면 안에 들어오게만 옮겨 보이고 pos 는 안 바꾼다:
+    // 접으면 단추가 원래 자리로 돌아가고, 아래쪽에 둔 단추의 카드도 위로 올라와 화면 밖으로 안 넘친다 (전수점검 보통-9)
+    pos = { right: Math.min(Math.max(0, pos.right), Math.max(0, vw - BTN)), top: Math.min(Math.max(0, pos.top), Math.max(0, vh - BTN)) };
     const w = open ? CARD_W : BTN;
-    pos = { right: Math.min(Math.max(0, pos.right), Math.max(0, vw - w)), top: Math.min(Math.max(0, pos.top), Math.max(0, vh - 40)) };
-    await host.setStyle('right', `${pos.right}px`);
-    await host.setStyle('top', `${pos.top}px`);
+    const h = open ? Math.max(BTN, (await rectOf(card))?.height ?? BTN) : BTN;
+    await host.setStyle('right', `${Math.min(pos.right, Math.max(0, vw - w))}px`);
+    // 상황판이 떠 있으면 펼친 카드는 머리줄(닫기 X·잔고) 아래에서 시작한다 (전수점검 눌러-보통-1)
+    const floor = open && panelOpen && headBottom ? headBottom + 8 : 0;
+    await host.setStyle('top', `${Math.max(Math.min(floor, Math.max(0, vh - h)), Math.min(pos.top, Math.max(0, vh - h)))}px`);
   };
   const setOpen = async (next: boolean) => {
     if (open === next) return;
@@ -318,7 +328,7 @@ export async function createProgWin(): Promise<ProgWin> {
   const paint = async () => {
     const t = progressTurn();
     const now = Date.now();
-    const run = !!t && !t.endAt && now - t.at < WATCHDOG;
+    const run = !!t && !t.endAt && now - t.at < progressWatchdog();
     const fail = !!t && turnSummary(t).failed > 0;
     const c = cardHtml(t, now);
     if (c !== lastCard) {
@@ -370,7 +380,7 @@ export async function createProgWin(): Promise<ProgWin> {
       hideTimer = setTimeout(() => {
         hideTimer = undefined;
         void setOpen(false);
-      }, turnSummary(t).failed ? HIDE_AFTER_FAIL : HIDE_AFTER_OK);
+      }, timeMs(turnSummary(t).failed ? 'progHideFail' : 'progHideOk'));
     }
     void schedule();
   };
@@ -414,7 +424,7 @@ export async function createProgWin(): Promise<ProgWin> {
     pending = null;
     moved = false;
     // 폰은 접힌 막대만 위아래로 끈다 (펼친 카드는 머리줄을 누르면 접힌다)
-    if (!visible || (phone && (open || panelOpen)) || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return;
+    if (!visible || dimmed || (phone && (open || panelOpen)) || typeof ev.clientX !== 'number' || typeof ev.clientY !== 'number') return;
     if ((ev.buttons ?? 1) !== 1 && (ev.button ?? 0) !== 0) return;
     const x = ev.clientX;
     const y = ev.clientY;
@@ -447,7 +457,7 @@ export async function createProgWin(): Promise<ProgWin> {
     });
   };
   const onClick = async (ev: PointerEv) => {
-    if (!visible || (phone && panelOpen)) return;
+    if (!visible || dimmed || (phone && panelOpen)) return;
     await loop;
     if (moved) return; // 끌고 놓은 뒤 따라오는 클릭
     if (!open) {
@@ -465,7 +475,7 @@ export async function createProgWin(): Promise<ProgWin> {
     if (inside(await rectOf(card), ev.clientX, ev.clientY)) return;
     // 창 밖: 폰은 언제든 접는다 (11-15 사용자). PC 는 저절로 펴지는 창이라 도는 중이 아닐 때만 (팝업창 규격과 같게, 11-09 사용자)
     const t = progressTurn();
-    if (phone || !t || t.endAt || Date.now() - t.at >= WATCHDOG) {
+    if (phone || !t || t.endAt || Date.now() - t.at >= progressWatchdog()) {
       clearHide();
       await setOpen(false);
     }
@@ -516,11 +526,20 @@ export async function createProgWin(): Promise<ProgWin> {
       } else await applyPos();
       await host.setAttribute('x-goei-show', next ? 'true' : 'false');
     },
-    async setPanel(next) {
-      if (next === panelOpen) return;
+    async setPanel(next, head = 0, dim = false) {
+      const hb = next ? Math.max(0, Math.round(head)) : 0;
+      const dm = next && dim;
+      if (dm !== dimmed) {
+        dimmed = dm;
+        await host.setAttribute('x-goei-dim', dm ? 'true' : 'false');
+      }
+      if (next === panelOpen && hb === headBottom) return;
+      const changed = next !== panelOpen;
       panelOpen = next;
-      await host.setAttribute('x-goei-panel', next ? 'true' : 'false');
+      headBottom = hb;
+      if (changed) await host.setAttribute('x-goei-panel', next ? 'true' : 'false');
       if (next && phone) await setOpen(false);
+      else if (open && !phone) await applyPos();
     },
     async setTheme(theme) {
       await host.setAttribute('x-goei-theme', theme);

@@ -9,8 +9,8 @@ export interface Palette {
 
 export const PALETTES: Record<ThemeName, Palette> = {
   dark: { void: '#1A2226', panel: '#232D32', line: '#37464D', text: '#E9F0EE', sub: '#BECBC8', signal: '#5EEAD4', accentBg: '#1D403A', accentLine: '#3F8879', scrim: 'rgba(3, 7, 9, .9)' },
-  light: { void: '#F4F6F5', panel: '#FFFFFF', line: '#DCE3E1', text: '#13201D', sub: '#3B4B47', signal: '#0F8C7A', accentBg: '#DDF3EE', accentLine: '#8FCFC3', scrim: 'rgba(236, 242, 240, .94)' },
-  paper: { void: '#EFE6D2', panel: '#F8F2E4', line: '#D8C9A8', text: '#2B2418', sub: '#4A3F2C', signal: '#8A4B12', accentBg: '#F1DEC2', accentLine: '#C99A63', scrim: 'rgba(239, 230, 210, .94)' },
+  light: { void: '#F4F6F5', panel: '#FFFFFF', line: '#BCC9C5', text: '#13201D', sub: '#3B4B47', signal: '#0F8C7A', accentBg: '#DDF3EE', accentLine: '#8FCFC3', scrim: 'rgba(236, 242, 240, .94)' },
+  paper: { void: '#EFE6D2', panel: '#FAF5E9', line: '#D3C29E', text: '#2B2418', sub: '#4A3F2C', signal: '#8A4B12', accentBg: '#F1DEC2', accentLine: '#C99A63', scrim: 'rgba(239, 230, 210, .94)' },
 };
 
 export function themeName(v: unknown, fallback: ThemeName = 'dark'): ThemeName {

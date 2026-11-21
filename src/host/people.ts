@@ -27,7 +27,7 @@ import { messageText } from '../core/refs';
 import { findStatusTags } from '../core/world/status';
 import { colConfig } from '../core/world/statuscols';
 import { mentionsPoints, pointsOn, pointsVars, readPoints, syncPointsToStatus } from '../core/points';
-import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
+import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, recordedPaid, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { applyItemChanges, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
 import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
@@ -315,6 +315,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const walletOn = colConfig(fresh.chat.scriptstate).wallet !== 'off';
       const walletStart = getPrefs().walletStart ?? WALLET_START_DEFAULT;
       const balance = walletOn ? walletBalance(readWallet(fresh.chat.scriptstate, walletStart), aliveAnchors(fresh.chat)) : null;
+      // 이미 장부에 적힌 거래: 이 묶음 바로 앞 응답(상점을 연 응답)부터 묶음 끝까지에 딸린 것 (전수점검 중대-14)
+      const paidFrom = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' && i < Math.min(...batches[b]) ? i : a), Math.min(...batches[b]));
+      const walletDone = walletOn ? recordedPaid(readWallet(fresh.chat.scriptstate, walletStart), fresh.chat.message.slice(paidFrom, Math.max(...batches[b]) + 1).map((m, j) => messageKey(m, paidFrom + j))) : [];
       // 백일몽 포인트 (core/points.ts): 신분이 백일몽이면 포인트 잔고를 자료에 넣고 포인트 거래 절을 켠다
       const pointsUse = pointsOn(fresh.chat);
       const pointBal = pointsUse ? walletBalance(readPoints(fresh.chat.scriptstate), aliveAnchors(fresh.chat)) : null;
@@ -339,7 +342,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       const prevChar = fresh.chat.message.reduce((a, m, i) => (m.role === 'char' && i < lastChar ? i : a), -1);
       const prevKey = prevChar >= 0 ? messageKey(fresh.chat.message[prevChar], prevChar) : '';
       const pickNames = !o.scope?.only && lastChar >= 0 && batches[b].includes(lastChar) && bmPickupConfirm(fresh.chat.scriptstate) ? bmAsked(liveBmOrders(fresh.chat.scriptstate, aliveAnchors(fresh.chat)), prevKey).map((x) => x.item.name) : [];
-      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat, awayAsOf) : [] });
+      const input = buildUpdate(fresh.chat, curStore, batches[b], { shop: shopAt >= 0 ? { at: shopAt, self: shopSelf } : null, pickup: pickNames.length ? { at: lastChar, items: pickNames } : null,  settings, system: '', values: Object.fromEntries(input0Names(curStore).map((n) => [n, valuesOf(n)])), names: namesWith(curStore, allNames(roster)), roster, hints: routerHintsNow(), memory: await hypaMemory(fresh.chat, fresh.char, [...batches[b].map((i) => messageText(String(fresh.chat.message[i]?.data ?? ''))), ...Object.keys(curStore.people)].join('\n'), settings), exclude, factionNames: factionNamesOf(fresh.char.globalLore), only: o.scope?.only, wallet: balance, walletDone, points: pointBal, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(fresh.chat, awayAsOf) : [] });
       // 지침은 자료를 본 뒤 조립한다 (저장 상한을 넘긴 인물이 있으면 정리 절을 켠다)
       const sections = enabledSections(settings);
       if (input.tidy.length) sections.add('tidy');
@@ -797,13 +800,15 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
     if (last >= 0) {
       const walletOn = colConfig(ctx.chat.scriptstate).wallet !== 'off';
       const balance = walletOn ? walletBalance(readWallet(ctx.chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT), aliveAnchors(ctx.chat)) : null;
+      const paidFrom = list.reduce((a, m, i) => (m.role === 'char' && i < last ? i : a), last);
+      const walletDone = walletOn ? recordedPaid(readWallet(ctx.chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT), list.slice(paidFrom, last + 1).map((m, j) => messageKey(m, paidFrom + j))) : [];
       const itemsOn = itemAutoOn(ctx.chat.scriptstate);
       const itemsNow = itemsOn ? itemsNowOf(ctx.chat, itemPictures) : null;
       const usedNow = itemsOn && list[last] ? usedItemsAt(readItems(ctx.chat.scriptstate), [messageKey(list[last], last)], aliveAnchors(ctx.chat)) : [];
       const memory = await hypaMemory(ctx.chat, ctx.char, [messageText(String(list[last]?.data ?? '')), ...Object.keys(store.people)].join('\n'), settings).catch(() => [] as string[]);
       // 상점 판단 (실제 호출과 같게, 릴리스 점검 11-09)
       const shopOnNow = shopOn(ctx.chat.scriptstate) && shopJudgeBy(ctx.chat.scriptstate).by === 'updater';
-      const inp = buildUpdate(ctx.chat, store, [last], { shop: shopOnNow ? { at: last, self: [...exclude, userInfo().name] } : null, settings, system: '', values: Object.fromEntries(input0Names(store).map((n) => [n, valuesOf(n)])), names: namesWith(store, names), roster, hints: routerHintsNow(), memory, exclude, factionNames: factionNamesOf(ctx.char.globalLore), wallet: balance, points: pointsOn(ctx.chat) ? walletBalance(readPoints(ctx.chat.scriptstate), aliveAnchors(ctx.chat)) : null, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(ctx.chat) : [] });
+      const inp = buildUpdate(ctx.chat, store, [last], { shop: shopOnNow ? { at: last, self: [...exclude, userInfo().name] } : null, settings, system: '', values: Object.fromEntries(input0Names(store).map((n) => [n, valuesOf(n)])), names: namesWith(store, names), roster, hints: routerHintsNow(), memory, exclude, factionNames: factionNamesOf(ctx.char.globalLore), wallet: balance, walletDone, points: pointsOn(ctx.chat) ? walletBalance(readPoints(ctx.chat.scriptstate), aliveAnchors(ctx.chat)) : null, items: itemsNow, used: usedNow, away: itemsOn ? itemsAwayOf(ctx.chat) : [] });
       const sections = enabledSections(settings);
       if (inp.tidy.length) sections.add('tidy');
       if (walletOn) sections.add('wallet');

@@ -25,13 +25,14 @@ export function closePanel(keepContainer = false): void {
   if (!keepContainer) void risuai.hideContainer();
 }
 
-/** message: 처음부터 보일 까닭 (저장해 둔 본체가 실행되지 않았을 때 등) */
-export function showPanel(version: string, install: (code: string) => Promise<void>, message = ''): void {
+/** message: 처음부터 보일 까닭 (저장해 둔 본체가 실행되지 않았을 때 등).
+ *  why: 받기 자체가 실패했나(fetch), 받았는데 시작이 실패했나(start) — 첫 안내 글이 상황에 맞게 (전수점검 사소-5) */
+export function showPanel(version: string, install: (code: string) => Promise<void>, message = '', why: 'fetch' | 'start' = 'fetch'): void {
   if (root) return;
   root = document.createElement('div');
   root.innerHTML = `<style>${PANEL_CSS}</style><div class="gl-back"><div class="gl-card" role="dialog" aria-label="괴이 ː ANOMALY">
       <b>괴이 ː ANOMALY</b>
-      <p>플러그인 본체를 받지 못했어요. 다시 받거나, 릴리스 zip에 든 goei-body.js를 넣어 주세요. (이어서 세계 자료 goei-data-world.txt 도 창이 뜨면 넣어 주세요)</p>
+      <p>${why === 'start' ? '플러그인 본체를 시작하지 못했어요' : '플러그인 본체를 받지 못했어요'}. 다시 받거나, 릴리스 zip에 든 goei-body.js를 넣어 주세요. (이어서 세계 자료 goei-data-world.txt 도 창이 뜨면 넣어 주세요)</p>
       <p class="gl-msg" hidden></p>
       <div class="gl-act"><button class="primary" data-gl="get">다시 받기</button><button data-gl="file">파일로 넣기</button><button data-gl="close">닫기</button></div>
     </div></div>`;
@@ -41,9 +42,9 @@ export function showPanel(version: string, install: (code: string) => Promise<vo
   const btns = [...root.querySelectorAll<HTMLButtonElement>('button')];
   const say = (t: string) => ((msg.hidden = !t), (msg.textContent = t));
   if (message) say(message);
-  const run = async (get: () => Promise<string>) => {
+  const run = async (get: () => Promise<string>, busy: string) => {
     btns.forEach((b) => (b.disabled = true));
-    say('받는 중');
+    say(busy);
     try {
       const code = await get();
       if (bodyVersion(code) !== version) throw new BodyError(`이 플러그인(${version})과 맞는 goei-body.js가 아니에요.`);
@@ -61,11 +62,11 @@ export function showPanel(version: string, install: (code: string) => Promise<vo
   picker.addEventListener('change', () => {
     const f = picker.files?.[0];
     picker.value = '';
-    if (f) void run(() => f.text());
+    if (f) void run(() => f.text(), '넣는 중');
   });
   root.addEventListener('click', (ev) => {
     const act = (ev.target as HTMLElement).closest<HTMLElement>('[data-gl]')?.dataset.gl;
-    if (act === 'get') void run(() => fetchBody(version));
+    if (act === 'get') void run(() => fetchBody(version), '받는 중');
     else if (act === 'file') picker.click();
     else if (act === 'close') closePanel();
   });

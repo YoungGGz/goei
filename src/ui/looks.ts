@@ -218,13 +218,17 @@ export function flashPick(value: string, then: () => void | Promise<void>): void
 export async function lookAction(action: string, value: string | undefined, ctx: ChatContext, refresh: () => Promise<void>): Promise<boolean> {
   if (lookCommon(action, value)) return true;
   if (action !== 'look' || !lookUi.open || !value) return false;
+  // 고를 때마다 앞 실패 안내를 비우고, 이 채팅에 적지 못했으면 새 채팅 기본값도 바꾸지 않는다 (전수점검 보통-72)
+  lookUi.notice = '';
+  let failed = false;
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[LOOK_KEY] ?? '') === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [LOOK_KEY]: value } })).catch((error) => {
+    failed = true;
     lookUi.notice = error instanceof Error ? error.message : String(error);
     return null;
   });
   // 마지막에 고른 아바타 = 다음 새 채팅 기본
-  await savePrefs((p) => ({ ...p, look: value })).catch(() => {});
-  if (lookUi.notice) {
+  if (!failed) await savePrefs((p) => ({ ...p, look: value })).catch(() => {});
+  if (failed) {
     await refresh();
     return true;
   }

@@ -12,6 +12,7 @@ import { installDataReady } from '../core/install';
 import { sha256Text, textHash } from '../core/texthash';
 import { fetchParts } from '../core/fetchparts';
 import { oldPluginMessage } from '../core/stalever';
+import { josa } from '../core/josa';
 import { PLUGIN_VERSION, UPDATE_BASE } from '../core/update';
 import { worldDataReady } from '../core/world/records';
 import { toBytes } from './assets';
@@ -28,7 +29,7 @@ type RisuFetch = (url: string, arg: Record<string, unknown>) => Promise<{ ok: bo
 const TIMEOUT_MS = 40_000;
 function timeout<T>(p: Promise<T>, name: string): Promise<T> {
   let t: ReturnType<typeof setTimeout> | undefined;
-  return Promise.race([p, new Promise<never>((_, rej) => (t = setTimeout(() => rej(new Error(`${name}을 ${TIMEOUT_MS / 1000}초 안에 받지 못했어요.`)), TIMEOUT_MS)))]).finally(() => clearTimeout(t));
+  return Promise.race([p, new Promise<never>((_, rej) => (t = setTimeout(() => rej(new Error(`${josa(name, '을', '를')} ${TIMEOUT_MS / 1000}초 안에 받지 못했어요.`)), TIMEOUT_MS)))]).finally(() => clearTimeout(t));
 }
 
 /** release 폴더의 글 파일 */
@@ -44,7 +45,7 @@ export async function getText(name: string): Promise<string> {
     }
   }
   const res = await timeout(risuai.nativeFetch(url, { method: 'GET' }), name);
-  if (!res.ok) throw new Error(`${name}을 받지 못했어요 (${res.status}).`);
+  if (!res.ok) throw new Error(`${josa(name, '을', '를')} 받지 못했어요 (${res.status}).`);
   return String((await timeout(res.text(), name)) ?? '');
 }
 
@@ -62,7 +63,7 @@ export async function getBytes(name: string): Promise<Uint8Array> {
     }
   }
   const res = await timeout(risuai.nativeFetch(url, { method: 'GET' }), name);
-  if (!res.ok) throw new Error(`${name}을 받지 못했어요 (${res.status}).`);
+  if (!res.ok) throw new Error(`${josa(name, '을', '를')} 받지 못했어요 (${res.status}).`);
   return new Uint8Array(await timeout(res.arrayBuffer(), name));
 }
 
@@ -82,7 +83,7 @@ export async function fetchPack(pack: PackSpec, progress?: Progress): Promise<st
   }
   if (!index || !Array.isArray(index.parts) || typeof index.length !== 'number') throw new DataPackError(`${pack.label} 목록 형식이 달라요.`);
   // 올라온 자료가 더 새 판의 것이면 다시 받아도 안 맞는다 → 플러그인 업데이트 안내 (11-14 D-4)
-  if (index.hash !== pack.expect.hash) throw new DataPackError(oldPluginMessage(PLUGIN_VERSION, index.version) ?? `아직 이 판의 ${pack.label}가 올라오지 않았어요. 잠시 뒤 다시 받아 주세요.`);
+  if (index.hash !== pack.expect.hash) throw new DataPackError(oldPluginMessage(PLUGIN_VERSION, index.version) ?? `아직 이 판의 ${josa(pack.label, '이', '가')} 올라오지 않았어요. 잠시 뒤 다시 받아 주세요.`);
   const re = new RegExp(`^${pack.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.\\d+\\.txt$`);
   for (const name of index.parts) {
     if (typeof name !== 'string' || !re.test(name)) throw new DataPackError(`${pack.label} 목록 형식이 달라요.`);
@@ -91,11 +92,11 @@ export async function fetchPack(pack: PackSpec, progress?: Progress): Promise<st
   const t0 = Date.now();
   const text = await fetchParts(parts, getText, (n) => progress?.(`${pack.label} 받는 중 ${n}/${parts.length}`));
   console.log(`[goei] ${pack.label} ${parts.length}조각 받기: ${((Date.now() - t0) / 1000).toFixed(1)}초`);
-  if (text.length !== pack.expect.length) throw new DataPackError(`${pack.label}를 끝까지 받지 못했어요. (${text.length}/${pack.expect.length}자)`);
+  if (text.length !== pack.expect.length) throw new DataPackError(`${josa(pack.label, '을', '를')} 끝까지 받지 못했어요. (${text.length}/${pack.expect.length}자)`);
   const got = await sha256Text(text);
   if (got !== null) {
-    if (got !== pack.expect.sha256) throw new DataPackError(`받은 ${pack.label}가 깨져 있어요(sha256). 다시 받아 주세요.`);
-  } else if (textHash(text) !== pack.expect.hash) throw new DataPackError(`받은 ${pack.label}가 깨져 있어요(hash). 다시 받아 주세요.`);
+    if (got !== pack.expect.sha256) throw new DataPackError(`받은 ${josa(pack.label, '이', '가')} 깨져 있어요(sha256). 다시 받아 주세요.`);
+  } else if (textHash(text) !== pack.expect.hash) throw new DataPackError(`받은 ${josa(pack.label, '이', '가')} 깨져 있어요(hash). 다시 받아 주세요.`);
   return text;
 }
 
@@ -126,7 +127,7 @@ export async function loadWorldData(force = false): Promise<'store' | 'fetch'> {
   try {
     text = await fetchPack(WORLD_PACK);
   } catch (error) {
-    const reason = `${WORLD_PACK.label}(${WORLD_PACK.name})를 받지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+    const reason = `${WORLD_PACK.label}(${WORLD_PACK.name})${josa(WORLD_PACK.label, '을', '를').slice(WORLD_PACK.label.length)} 받지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
     g.__goeiWorldFail = { at: Date.now(), reason };
     throw new Error(reason);
   }

@@ -175,7 +175,7 @@ export function flowNodes(ctx: ChatContext): { pre: Node[]; main: Node; post: No
     { name: '인물 정리', sub: '상한 넘긴 기록 합치기', kind: 'aux', on: tidyOn, model: tidyOn ? ppModel('tidy') : undefined, calls: tidyOn ? '넘긴 인물마다 1회' : '호출 없음 (갱신에 얹음)', page: 'set:people', to: 'r:정리 방식', sure: 0, maybe: tidyOn ? 1 : 0 },
     { name: '이미지 태그 보충', sub: '응답에 빠진 인물 이미지 태그 채우기', kind: 'aux', on: assetOn, model: assetOn ? '보조' : undefined, calls: assetOn ? '1회' : basic.assetOn ? '호출 없음 (메인이 태그를 씀)' : '호출 없음 (이미지 끔)', page: 'set:image', to: 'r:모델', sure: assetOn ? 1 : 0, maybe: 0 },
     { name: '괴담톡 확인', sub: '새 메시지·공지·초대', kind: 'aux', on: ph.auto, model: ph.auto ? phoneModel : undefined, calls: ph.auto ? jointText('phone').calls : ph.autoOpen ? '괴담톡 열 때 1회' : '수동 (새로고침 때만)', page: 'set:phone', to: 'r:자동 호출', sure: ph.auto ? jointText('phone').sure : 0, maybe: 0 },
-    { name: '괴담넷 새로고침', sub: '게시판 글·댓글·쪽지', kind: 'aux', on: gn.auto, model: gn.auto ? gnetModel : undefined, calls: gn.auto ? jointText('gn').calls : gn.autoOpen ? '창 열 때 1회' : '수동 (새로고침 때만)', page: 'set:net', to: 'r:자동 호출', sure: gn.auto ? jointText('gn').sure : 0, maybe: 0 },
+    { name: `${BOARD_NAME.gn} 새로고침`, sub: '게시판 글·댓글·쪽지', kind: 'aux', on: gn.auto, model: gn.auto ? gnetModel : undefined, calls: gn.auto ? jointText('gn').calls : gn.autoOpen ? '창 열 때 1회' : '수동 (새로고침 때만)', page: 'set:net', to: 'r:자동 호출', sure: gn.auto ? jointText('gn').sure : 0, maybe: 0 },
     // 다른 게시판 셋·쇼핑몰 둘 (11-09 사용자: 괴담넷만 있고 통째로 빠져 있었다). 사이트마다 설정 변수가 따로라 그 사이트로 비춘 상태값으로 읽는다
     ...(['gal', 'wpf', 'sm'] as const).map((site): Node => {
       const sv = boardView(ctx.chat, site).scriptstate;

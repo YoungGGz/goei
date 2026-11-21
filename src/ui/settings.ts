@@ -1,5 +1,6 @@
 // 「설정」 탭: 원본 설정 창의 동작·요원창·캐릭터 이미지 항목. 값은 이 채팅의 $st_* 변수에 두고,
 // 범위: 이 채팅($st_*·$wg_*) / 새 채팅 기본값(플러그인 저장소) / 카드 명부(directory.ts, 카드 로어북).
+import { TIME_KEYS, TIME_SPEC, timeOf, type TimeKey } from '../core/timing';
 import { stepNext, stepOf } from '../core/stepval';
 import { ckWide, defRow, helpBox, numCtl, numSet, stepIn, setGroup, setRow, stepBox, type CkActs, type CkBand, type CkNum, type RowScope } from './setrow';
 import { SETTINGS_SET } from '../core/setdef/settings';
@@ -420,6 +421,8 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
       D('dim', '', { ctl: dimSlider(getPrefs().dim ?? DIM_DEFAULT, busy) }),
       // 호출 진행 창 (11-09 사용자): 채팅을 보내면 라우터→디렉터→메인→갱신기→인터넷이 어디까지 돌았는지 (host/progwin.ts)
       D('progress', getPrefs().progress === false ? '0' : '1'),
+      // 기다리는 시간 (core/timing.ts, 전수점검 보통-5·사소-9)
+      ...TIME_KEYS.map((k) => D(`time-${k}`, '', { ctl: stepIn('set-time', k, timeOf(k), TIME_SPEC[k].lo, TIME_SPEC[k].hi, TIME_SPEC[k].unit, TIME_SPEC[k].label, busy) })),
       // 호출 기록·AI 상담 대화는 기기에 하나뿐인 저장소라 보관하는 양도 이 기기에 하나 (core/settings.ts)
       D('trace-keep', '', { ctl: stepBox('set-trace-keep', 'n', keepTurns(), ...TRACE_KEEP_RANGE, '턴', '호출 기록 보관', busy) }),
       // 창 둘레 기기 틀 (2026-10-29 사용자, ui/frame.ts). 좁아서 숨긴 상태는 app.ts 가 .gx 에 data-frame-hidden 으로 적는다
@@ -551,6 +554,12 @@ export function settingsTab(ctx: ChatContext, scope: SettingsScope = 'chat', can
 }
 
 /** 상점이 꺼질 때(상점·소지품·가계부 끔): 채팅에 남은 표식을 지워 「상점 열기」 카드가 남지 않게 (core/shop.ts stripShopTags) */
+/** 한꺼번에 바꾼 뒤 상점이 꺼졌으면 이번 방문을 닫고 채팅의 상점 표식을 지운다 (설정 가져오기도 같이 쓴다) */
+export async function bulkShopOff(ctx: ChatContext): Promise<void> {
+  resetShop();
+  await dropShopTags(ctx);
+}
+
 async function dropShopTags(ctx: ChatContext): Promise<void> {
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
     const list = chat.message ?? [];
@@ -562,7 +571,7 @@ async function dropShopTags(ctx: ChatContext): Promise<void> {
 /** 설정을 한꺼번에 바꿀 때(기본값 불러오기·초기값으로·되돌리기, 11-08 전수점검): 한 칸씩 바꿀 때 하던 뒷정리를 같이 한다.
  *  상태창 칸 구성이 바뀌면 바뀐 시점 기록, 소지품이 꺼지면 「사용」 자리 비움, 다시 켜지면 「그 사이 변화는 목록에 없다」, 상점이 꺼지면 이번 방문 닫기.
  *  prev = 지금 채팅 변수, next = 바뀐 뒤 변수 전부. 돌려주는 값을 바꿀 변수에 더한다. shopOff 면 저장 뒤 resetShop·dropShopTags */
-function bulkSideVars(chat: Chat, prev: ScriptState | undefined, next: ScriptState): { vars: ScriptState; shopOff: boolean } {
+export function bulkSideVars(chat: Chat, prev: ScriptState | undefined, next: ScriptState): { vars: ScriptState; shopOff: boolean } {
   const vars: ScriptState = {};
   const n = (chat.message ?? []).length;
   const before = usedCols(colConfig(prev));
@@ -972,6 +981,21 @@ export async function handleSettings(action: string, value: string | undefined, 
   }
   if (action === 'set-progress') {
     if (v === '1' || v === '0') await saveDefaults(env, (p) => ({ ...p, progress: v === '0' ? false : undefined }));
+    return true;
+  }
+  // 기다리는 시간: 「열쇠:-」「열쇠:+」 또는 「열쇠=수」 (core/timing.ts). 기본값이면 칸을 지운다
+  if (action === 'set-time') {
+    const k = v.split(/[:=]/)[0] as TimeKey;
+    if (!TIME_KEYS.includes(k)) return true;
+    const sp = TIME_SPEC[k];
+    const n = stepNext(v.slice(k.length), timeOf(k), sp.lo, sp.hi);
+    if (n === null || n === timeOf(k)) return true;
+    await saveDefaults(env, (p) => {
+      const t = { ...(p.times ?? {}) };
+      if (n === sp.def) delete t[k];
+      else t[k] = n;
+      return { ...p, times: t };
+    });
     return true;
   }
   if (action === 'set-trace-keep' || action === 'set-consult-lines' || action === 'set-consult-chats') {

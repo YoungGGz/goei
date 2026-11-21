@@ -10,7 +10,7 @@ import { looseTerm, sameTerm, statusHtml, type StatusContext } from '../ui/statu
 import { reportCardHtml } from '../ui/reportcard';
 import { cardPalette, currentTheme } from '../ui/theme';
 import { armChatClick, elements, hit, onChatClick } from './chatclicks';
-import { getChar, updateChat } from './risu';
+import { getChar, nudgeMessages, updateChat } from './risu';
 
 let ctx: StatusContext = { timeline: null, terms: [], hide: new Set() };
 /** 채팅을 옮길 때: 앞 채팅의 목록을 바로 버린다 (다시 모을 때까지 비교 없이 그린다) */
@@ -95,7 +95,8 @@ export async function refreshStatusContext(charIndex: number, chatIndex: number,
 export async function redrawChatCards(charIndex: number, chatIndex: number): Promise<void> {
   try {
     await refreshStatusContext(charIndex, chatIndex);
-    await updateChat(charIndex, chatIndex, (cur) => ({ ...cur }));
+    // 상태창·보고서 카드가 있을 수 있는 응답만 다시 그린다 (같은 글 그대로 저장은 Risu 가 다시 안 그림, host/risu.ts nudgeMessages)
+    await updateChat(charIndex, chatIndex, (cur) => nudgeMessages(cur, (d) => findStatusTags(d).length > 0));
   } catch {
     /* 다시 못 그려도 설정은 저장됐다 (다음 채팅 전환 때 반영) */
   }

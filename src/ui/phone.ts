@@ -1,6 +1,7 @@
 // 「괴담톡」 탭: 연락처·대화방·공지·전화. 원본 괴담톡(폰)과 같은 저장 형식과 규칙.
 // 생성은 보내기·방 새로고침·단톡 만들기·초대·새 메시지 확인을 눌렀을 때, 그리고 (설정이 켜져 있으면) 채팅 응답이 끝날 때마다 한 번.
 // 생성은 창을 닫아도 계속되고 끝나면 원래 채팅에 저장한다.
+import { needAttr } from './needfill';
 import { defGroups, helpBox, setSeg, type Wire } from './setrow';
 import { fnGrids } from './fngrid';
 import { PHONE_SET } from '../core/setdef/phone';
@@ -967,8 +968,8 @@ function roomView(ctx: ChatContext, st: PState, d: Directory, busy: boolean): st
       ${off ? '' : attachEditor('ph', phone.attach, phKinds(r), !!r.pending, r.kind === 'dm' ? '' : '선물은 1:1 대화에서만 보낼 수 있어요.', phone.attachMenu)}
       <div class="ph-compose">
         <button class="ph-tool ph-plus${phone.attachMenu ? ' on' : ''}" data-action="ph-att-menu" aria-label="첨부" aria-expanded="${phone.attachMenu}" title="사진·파일·선물 첨부 (사진은 붙여넣기도 돼요)" ${locked ? 'disabled' : ''}>${ICONS.plus}</button>
-        <textarea class="ph-input" data-input="ph-draft" rows="1" placeholder="${off ? '참여자가 없어요' : phone.attach.length ? '함께 보낼 메시지 (선택)' : '메시지 입력'}" ${locked ? 'disabled' : ''}>${esc(phone.draft)}</textarea>
-        <button class="ph-send" data-action="ph-send" data-value="${esc(r.id)}" aria-label="보내기" title="보내기" ${busy || locked ? 'disabled' : ''}>${ICONS.send}</button>
+        <textarea class="ph-input" name="ph-draft" data-input="ph-draft" rows="1" placeholder="${off ? '참여자가 없어요' : phone.attach.length ? '함께 보낼 메시지 (선택)' : '메시지 입력'}" ${locked ? 'disabled' : ''}>${esc(phone.draft)}</textarea>
+        <button class="ph-send" data-action="ph-send" data-value="${esc(r.id)}" aria-label="보내기" title="보내기"${needAttr('ph-draft', phone.draft, busy || locked, phone.attach.length > 0)}>${ICONS.send}</button>
         <button class="ph-tool ph-back2" data-action="ph-back" aria-label="목록으로" title="목록으로">${ICONS.back}</button>
       </div>
     </div>
@@ -1159,10 +1160,10 @@ function callView(ctx: ChatContext): string {
 function addView(ctx: ChatContext): string {
   return popWin('연락처 추가', '「기타」 탭에 들어가요.', `
     <div class="ph-form-body">
-      <label class="ph-label">이름<small>명부에 없는 사람은 이름을 직접 적어요</small></label>${rosterPick(ctx, phone.addName, (c) => !c.visible)}<input class="gx-search" data-input="ph-add-name" value="${esc(phone.addName)}" maxlength="60" placeholder="이름">
+      <label class="ph-label">이름<small>명부에 없는 사람은 이름을 직접 적어요</small></label>${rosterPick(ctx, phone.addName, (c) => !c.visible)}<input class="gx-search" name="ph-add-name" data-input="ph-add-name" value="${esc(phone.addName)}" maxlength="60" placeholder="이름">
       <label class="ph-label">인물 메모 (선택)<small>어떤 사람인지, 어떻게 아는 사이인지</small></label><textarea class="gx-search" data-input="ph-add-note" rows="3">${esc(phone.addNote)}</textarea>
     </div>
-    <div class="ph-form-foot"><button class="gx-start" data-action="ph-add-save">추가</button></div>`);
+    <div class="ph-form-foot"><button class="gx-start" data-action="ph-add-save"${needAttr('ph-add-name', phone.addName)}>추가</button></div>`);
 }
 
 function settingsView(ctx: ChatContext): string {

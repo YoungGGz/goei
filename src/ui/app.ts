@@ -57,7 +57,7 @@ import { savePhoto } from '../host/photo';
 import { readPersona, readUser, userInfo } from '../host/user';
 import { applyAdvanced } from '../core/advanced';
 import { booksInput, defaultsState, handleAdvanced } from './advanced';
-import { rememberPanel } from './panels';
+import { rememberPanel, scrollInside } from './panels';
 import { startCctvFx, stopCctvFx } from './cctvfx';
 import { elapsedText, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
 import { evArt } from './evpic';
@@ -74,7 +74,7 @@ import { bindCropDrag, cropValue, setCrop, directoryExtList, directoryInput, dir
 import { basicDefaults, basicVars, DIM_DEFAULT, getPrefs, worldDefaults, worldSettings, worldVarsOf } from '../core/settings';
 import { colConfig } from '../core/world/statuscols';
 import { invOn, itemStartOn } from '../core/items';
-import { adjustWallet, walletEditable, aliveAnchors, formatWon, parseWon, readWallet, removeWalletEntry, walletBalance, walletVars, WALLET_MAX, WALLET_START_DEFAULT } from '../core/wallet';
+import { adjustWallet, walletEditable, aliveAnchors, formatWon, parseWon, readWallet, removeWalletEntry, walletBalance, walletVars, WALLET_MAX, WALLET_START_DEFAULT, WALLET_VAR } from '../core/wallet';
 import { walletHeadButton, walletList, walletUi as walletTabUi } from './wallet';
 import { parsePoints, pointsOn, pointsVars, readPoints } from '../core/points';
 import { guideTxt } from '../core/guides';
@@ -212,6 +212,8 @@ const recordsEnv: RecordsEnv = settingsEnv;
 let shown = false;
 /** 상황판이 떠 있나 (body.ts: 그동안 호출 진행 창은 숨긴다 — 본 문서의 진행 단추가 상황판 닫기 X 위에 올라와 눌리지 않았다, 11-09 릴리스 점검) */
 export const appShown = (): boolean => shown;
+/** 창 안에 어둡게 깔리는 팝업(상점·물건 창·아바타 창)이 떠 있나: 호출 진행 단추도 같이 흐리게 (전수점검 눌러2-사소-15) */
+export const appDimmed = (): boolean => shown && (shopUi.open || lookUi.open);
 let shownListener: ((shown: boolean) => void) | null = null;
 export function onAppShown(f: (shown: boolean) => void): void {
   shownListener = f;
@@ -270,6 +272,14 @@ function ensureRoot(): HTMLElement {
   root = document.createElement('div');
   root.className = 'gx';
   document.body.appendChild(root);
+  // 스크롤하지 않는 틀(overflow hidden: 창·본문 틀)이 scrollIntoView·focus 로 밀리면 머리줄이 위로 잘린다 → 바로 제자리로 (전수점검 눌러-중대-1·눌러2-보통-10)
+  root.addEventListener('scroll', (ev) => {
+    const el = ev.target;
+    if (!(el instanceof HTMLElement) || (!el.scrollTop && !el.scrollLeft)) return;
+    const cs = getComputedStyle(el);
+    if (cs.overflowY === 'hidden' && el.scrollTop) el.scrollTop = 0;
+    if (cs.overflowX === 'hidden' && el.scrollLeft) el.scrollLeft = 0;
+  }, true);
   bindNeedFill();
   root.addEventListener('toggle', (ev) => rememberPanel(ev.target as HTMLDetailsElement), true);
   // 실제 사진: 파일 고르기 창은 클릭 안에서 바로 열어야 해서 handle()을 거치지 않는다
@@ -426,7 +436,8 @@ function ensureRoot(): HTMLElement {
     // 창 둘레 기기 틀: 뷰포트 폭·필드 전체화면이 바뀌어 그릴지 말지가 달라질 때만 다시 그린다 (ui/frame.ts)
     const frameWatch = () => {
       if (!root || root.style.display === 'none') return;
-      const fr = frameState(getPrefs().frame, view.kind === 'started');
+      // render() 와 같은 셈 (전수점검 보통-73: 카드로 연 단독 창은 메뉴가 없는데 메뉴 폭으로 셈해 일정 폭에서 크기를 바꿀 때마다 다시 그렸다)
+      const fr = frameState(getPrefs().frame, view.kind === 'started' && !(netSolo && inBrowser()));
       if (root.dataset.frame !== fr.kind || (root.dataset.frameHidden === '1') !== fr.hidden) render();
     };
     window.addEventListener('resize', frameWatch);
@@ -548,10 +559,11 @@ function ensureRoot(): HTMLElement {
     // 우주 쇼핑몰 질문 창 (11-09 사용자: 팝업창처럼 Esc·바깥 누름으로 닫힘)
     if (view.kind === 'started' && inBrowser() && mallAskOpen(curTab().site)) return void handle('mall-ask-close');
     if (view.kind === 'started' && inBrowser() && isBoardSite(curTab().site) && gnetDmOpen()) return void handle('gn-dm-close');
-    // 상점 팝업: 상세 → 폰 서랍 → 팝업 순으로 하나씩 닫는다
-    if (view.kind === 'started' && shopUi.open) return void handle(shopUi.detail ? 'shop-detail-close' : shopUi.drawer ? 'shop-drawer' : 'shop-close');
+    // 아바타 창은 상점 판매 화면 위에도 뜬다: 맨 위 창부터 닫는다 (전수점검 보통-71: 아바타 창 대신 상점이 닫혔다)
     // 아바타 창·인터넷 로그인 창은 상태로 떠 있다: 상태를 닫아야 다음 그리기에 다시 안 뜬다 (전수검사 11-13)
     if (lookUi.open) return void handle('look-close');
+    // 상점 팝업: 상세 → 폰 서랍 → 팝업 순으로 하나씩 닫는다
+    if (view.kind === 'started' && shopUi.open) return void handle(shopUi.detail ? 'shop-detail-close' : shopUi.drawer ? 'shop-drawer' : 'shop-close');
     if (view.kind === 'started' && inBrowser() && br.login) return void handle('br-login');
     const pop = document.querySelector('.gx-agpop');
     if (pop) return void pop.remove();
@@ -896,6 +908,9 @@ async function refresh(): Promise<void> {
         resetDirectory();
         pickerPrefs = false;
         repick = false;
+        // 앞 채팅 시작 패널에 적던 상황·잔고는 새 채팅으로 넘기지 않는다
+        delete draft.situation;
+        delete draft.wallet;
       }
       const cur = currentChoice(ctx.chat);
       const facs = factionList(ctx.char.globalLore);
@@ -905,8 +920,10 @@ async function refresh(): Promise<void> {
       else if (presetStaged && !repick) view = { kind: 'opening', ctx };
       else {
         view = { kind: 'picker', ctx, manifest, staged: phase === 'staged' };
-        draft = { faction: cur.faction ?? draft.faction, lang: cur.lang ?? draft.lang, fm: cur.fm ?? draft.fm, player: cur.player ?? draft.player ?? '', look: lookId(ctx.chat.scriptstate) || draft.look || '' };
-        if (draft.faction && !facs.some((f) => f.code === draft.faction && !f.hidden)) draft = { lang: draft.lang };
+        // 적던 「시작할 상황」과 고친 시작 잔고는 다시 그려도 남긴다 (전수점검 중대-13: 창을 닫았다 열거나 자동 저장이 돌면 지워졌다). 채팅을 옮기면 위에서 비운다
+        const keep = { ...(draft.situation !== undefined ? { situation: draft.situation } : {}), ...(draft.wallet !== undefined ? { wallet: draft.wallet } : {}) };
+        draft = { faction: cur.faction ?? draft.faction, lang: cur.lang ?? draft.lang, fm: cur.fm ?? draft.fm, player: cur.player ?? draft.player ?? '', look: lookId(ctx.chat.scriptstate) || draft.look || '', ...keep };
+        if (draft.faction && !facs.some((f) => f.code === draft.faction && !f.hidden)) draft = { lang: draft.lang, ...keep };
         const fsel = draft.faction ? findFaction(draft.faction, facs) : undefined;
         if (fsel) {
           const list = scenariosFor(fsel, draft.player, ctx.char.globalLore);
@@ -1172,6 +1189,11 @@ async function handle(action: string, value?: string): Promise<void> {
             draft.fm = scenariosFor(f, first.id, view.ctx.char.globalLore)[0]?.fm;
           }
         }
+        // 기본 첫 장면을 숨겼으면 보이는 첫 장면으로 (출발 단추가 꺼지지 않게, 전수점검 사소-85)
+        if (view.kind === 'picker') {
+          const list = scenariosFor(f, draft.player, view.ctx.char.globalLore);
+          if (!list.some((x) => x.fm === draft.fm)) draft.fm = list[0]?.fm ?? draft.fm;
+        }
       }
       draft.faction = f.code;
       notice = '';
@@ -1209,7 +1231,8 @@ async function handle(action: string, value?: string): Promise<void> {
     case 'nav-tab':
     case 'tab':
       // PC 왼쪽 메뉴(nav-tab): 이미 보고 있는 탭을 한 번 더 누르면 상황판으로 (2026-10-21 사용자, 모바일 아래 줄(tab)은 그대로)
-      if (action === 'nav-tab' && value === tab && value !== 'board' && !isPhone()) value = 'board';
+      // 인터넷은 보는 사이트에 따라 탭이 gnet·wiki 로 바뀌므로 그때도 「인터넷」을 다시 누른 것으로 본다 (전수점검 보통-74)
+      if (action === 'nav-tab' && (value === tab || (value === 'net' && inBrowser())) && value !== 'board' && !isPhone()) value = 'board';
       if (value === 'settings') return handle('ed-open', 'set:screen');
       if (value === 'wallet') return openWallet();
       // 다른 탭에서 기록으로 들어오면 일지 목록부터 (2026-11-05 사용자: 가계부를 보고 나온 뒤 기록을 누르면 가계부가 다시 열렸다)
@@ -1310,7 +1333,8 @@ async function handle(action: string, value?: string): Promise<void> {
       opsUi.sel = value ?? '';
       field.confirmEnd = null;
       render();
-      if (isPhone()) root?.querySelector('.gx-opview')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      // 큰 보기를 담은 스크롤 칸만 움직인다 (scrollIntoView 는 창 틀까지 밀어 머리줄을 잘랐다, 전수점검 눌러-중대-1)
+      if (isPhone()) scrollInside(root?.querySelector<HTMLElement>('.gx-opview'), 'start', true);
       return;
     case 'ops-mode':
       opsUi.mode = value === 'map' ? 'map' : 'feed';
@@ -1450,12 +1474,12 @@ async function start(): Promise<void> {
       if (chatPhase(chat) === 'started') throw new StartError('그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
       const next = applyStart(chat, plan);
       if (situation) next.message = [...(next.message ?? []), newMessage(startRecord(situation))];
-      // 새 채팅 기본값(설정 창)을 이 채팅에 적어 둔다. 나중에 기본값을 바꿔도 이 채팅은 그대로 (원본 ensureDefaults)
+      // 새 채팅 기본값(설정 창)을 이 채팅에 적어 둔다. 나중에 기본값을 바꿔도 이 채팅은 그대로 (원본 ensureDefaults) 시작 잔고도 지금 기본값으로 적는다 (전수점검 보통-84)
       const theme = getPrefs().theme ?? 'dark';
       return {
         ...next,
         // 아바타: 페르소나로 시작할 때만 (고유 인물은 그 인물 모습)
-        scriptstate: { ...basicVars(basicDefaults(lore)), ...worldVarsOf(worldDefaults(lore)), $st_fixed_theme: theme, ...(getPrefs().vars ?? {}), ...(next.scriptstate ?? {}), [LOOK_KEY]: draft.player ? '' : (draft.look ?? ''), ...(draft.wallet !== undefined ? walletVars({ start: draft.wallet, log: [] }) : {}) },
+        scriptstate: { ...basicVars(basicDefaults(lore)), ...worldVarsOf(worldDefaults(lore)), $st_fixed_theme: theme, ...(getPrefs().vars ?? {}), ...(next.scriptstate ?? {}), [LOOK_KEY]: draft.player ? '' : (draft.look ?? ''), ...(draft.wallet !== undefined ? walletVars({ start: draft.wallet, log: [] }) : next.scriptstate?.[WALLET_VAR] ? {} : walletVars({ start: getPrefs().walletStart ?? WALLET_START_DEFAULT, log: [] })) },
       };
     });
     if (!saved) throw new StartError('저장하지 못했어요.');
@@ -1636,7 +1660,7 @@ function render(): void {
   // 명부 통합 검색에서 고른 줄로 (위쪽 고정 줄에 가리지 않게 가운데로)
   if (dirUi.scrollTo) {
     dirUi.scrollTo = '';
-    root.querySelector('.dir-row.open')?.scrollIntoView({ block: 'center' });
+    scrollInside(root.querySelector<HTMLElement>('.dir-row.open'), 'center');
   }
   root.dataset.tab = tab;
   const toastEl = root.querySelector<HTMLElement>('.gx-rectoast');
@@ -1828,6 +1852,9 @@ function navStep(dir: -1 | 1): (() => void) | null {
   if (view.kind === 'picker') return dir < 0 && pickerPrefs ? go('prefs-close') : null;
   if (view.kind === 'opening') return dir < 0 ? go('repick') : null;
   if (view.kind !== 'started') return null;
+  // 아바타 창·상점 창이 떠 있으면 쓸어도 뒤 화면을 넘기지 않는다. 뒤로 쓸면 맨 위 창을 닫는다 (전수점검 보통-75)
+  if (lookUi.open) return dir < 0 ? go('look-close') : null;
+  if (shopUi.open) return dir < 0 ? go(shopUi.detail ? 'shop-detail-close' : shopUi.drawer ? 'shop-drawer' : 'shop-close') : null;
   if (evUi.pop && dir < 0) return () => void run('ev-pop', evUi.pop);
   if (agUi.pop && dir < 0) return () => void run('agent-info', agUi.pop);
   if (tab === 'phone' && phone.pop && dir < 0) return go('ph-pop-close');
@@ -1850,7 +1877,8 @@ function themeOf(): string {
   const ctx = view.kind === 'started' || view.kind === 'opening' || view.kind === 'picker' ? view.ctx : null;
   const v = String(ctx?.chat.scriptstate?.['$st_fixed_theme'] ?? '');
   if (v === 'light' || v === 'paper' || v === 'dark') return v;
-  if (view.kind === 'picker') return getPrefs().theme ?? 'dark';
+  // 시작 화면·「연결 안 됨」 화면은 기기 설정 배색 (밝게 고정하지 않는다, 전수점검 사소-67)
+  if (view.kind === 'picker' || view.kind === 'not-lite') return getPrefs().theme ?? 'dark';
   // 불러오는 중·오류: 지금 배색 그대로 (열 때마다 밝게 번쩍이던 문제, 전수검사 11-13)
   if (view.kind === 'loading' || view.kind === 'error') return currentTheme();
   return 'light';
@@ -1891,12 +1919,15 @@ function body(): string {
     case 'not-lite':
       return `${header('연결 안 됨')}<div class="gx-empty">
         <p><b>${esc(view.name || '이 캐릭터')}</b>는 ${view.goei ? `${BRAND.name} 카드지만 Plugin manifest 가 없어요.` : `${BRAND.name} 카드가 아니에요.`}</p>
-        <p>${view.goei ? '설치 · 점검에서 매니페스트와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
-        <button class="gx-start" data-action="install-open">${view.goei ? '설치 · 점검 열기' : `이 봇에 ${BRAND.name} 설치`}</button>
+        <p>${view.goei ? '설치·업데이트에서 매니페스트와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
+        <button class="gx-start" data-action="install-open">${view.goei ? '설치·업데이트 열기' : `이 봇에 ${BRAND.name} 설치`}</button>
       </div>`;
     case 'started':
       evSeenReset();
-      if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}`;
+      // 카드로 연 상점에서도 판매 화면의 아바타 창이 뜨게 (전수점검 보통-71)
+      if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
+      // 가계부·소지품이 둘 다 꺼졌으면 소지품 탭을 상황판으로 옮긴다 (제목·메뉴·본문이 어긋나지 않게, 전수점검 사소-68)
+      if (tab === 'items' && !invMenuOn(view.ctx)) tab = 'board';
       if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
       return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
     case 'opening':

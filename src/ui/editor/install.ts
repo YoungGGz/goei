@@ -6,6 +6,7 @@ import type { ChatContext } from '../../host/risu';
 import { notifyInstalled } from '../../host/hooks';
 import { BRAND } from '../brand';
 import { updateGroup } from '../update';
+import { josa } from '../../core/josa';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const mb = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1e3))}KB`);
@@ -90,7 +91,7 @@ export function installPage(ctx: ChatContext): string {
     ? missing.length
       ? `${esc(name)}: 빠진 것 ${missing.length}개. 오른쪽 단추 하나로 전부 채워요.`
       : `${esc(name)}: 모두 갖춰져 있어요.`
-    : `${esc(name)}는 아직 ${esc(BRAND.name)} 카드가 아니에요. 오른쪽 단추 하나로 설정 폴더·명부·첫 메시지·인사말·로어북 설정·사진·아이콘·위키 기본 문서·토크나이저를 전부 심어요.`;
+    : `${esc(josa(name, '은', '는'))} 아직 ${esc(BRAND.name)} 카드가 아니에요. 오른쪽 단추 하나로 설정 폴더·명부·첫 메시지·인사말·로어북 설정·사진·아이콘·위키 기본 문서·토크나이저를 전부 심어요.`;
   const main = busy
     ? `<button class="gx-mini primary" disabled>${esc(instUi.progress || '설치하는 중…')}</button>`
     : allDone
@@ -158,7 +159,7 @@ export async function installAction(action: string, ctx: ChatContext, env: Env):
     // 한 단계가 실패해도 다음 단계로 간다. 끝에 된 것·안 된 것을 한꺼번에 보여 준다
     await run('로어북·인사말', async () => {
       progress('로어북·첫 메시지·인사말 심는 중…');
-      await installLoreAndGreetings(ctx.charIndex, instUi.setName ? { name: BRAND.name } : {});
+      if (!(await installLoreAndGreetings(ctx.charIndex, instUi.setName ? { name: BRAND.name } : {}))) return null;
       return instUi.setName ? '로어북·인사말·봇 이름' : '로어북·인사말';
     });
     notifyInstalled();

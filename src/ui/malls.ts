@@ -3,6 +3,8 @@
 //   운영자에게 질문: 넷스케이프 팝업. 상품 화면에서 열면 그 물건이 붙고, 다른 곳은 [물건을 붙인다]. 운영자 답에 물건 이름이 있으면 링크로.
 // 백일몽 포인트몰: 사내 쇼핑몰, 운영자 없음(문의·흥정 X), 로그인해야 씀, 정가로 포인트 구매.
 // 진열·문의 요청문은 상점(core/shop.ts)과 같고, 지침·설정만 사이트 것(core/malls.ts).
+import { settingsUi } from './settings';
+import { scrollInside } from './panels';
 import { stepNext } from '../core/stepval';
 import { setGroup, setRow, stepIn } from './setrow';
 import { needAttr } from './needfill';
@@ -569,7 +571,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       v.page = '';
       v.focus = value ?? '';
       env.render();
-      document.querySelector(`.ms [data-item="${CSS.escape(v.focus)}"]`)?.scrollIntoView({ block: 'center' });
+      scrollInside(document.querySelector<HTMLElement>(`.ms [data-item="${CSS.escape(v.focus)}"]`), 'center');
       return true;
     case 'mall-raw':
       if (v.failRaw) v.notice = `${v.notice.split('\n')[0]}\n${v.failRaw.slice(0, 1500)}`;
@@ -1307,7 +1309,11 @@ async function cosExtraAction(action: string, value: string | undefined, ctx: Ch
     const D = rollDefaults(site);
     return set(m[2] === 'genres' ? { [K.genres]: defStored(m[3], genresText(D.genres), genresNorm) } : { [K.tiers]: defStored(m[3], tiersText(D.tiers), tiersNorm) });
   }
-  if (action === 'ms-roll-reset') return set(Object.fromEntries(Object.values(rollKeys(value === 'bm' ? 'bm' : 'cos')).map((k) => [k, ''])));
+  if (action === 'ms-roll-reset') {
+    // 되돌린 것을 알린다 (말없이 칸만 당겨졌다, 전수점검 눌러2-보통-38)
+    settingsUi.info = '뽑기 설정을 기본값으로 되돌렸어요.';
+    return set(Object.fromEntries(Object.values(rollKeys(value === 'bm' ? 'bm' : 'cos')).map((k) => [k, ''])));
+  }
   if (action === 'ms-fx') {
     const m = /^(\w+):(name|pct|price|was|desc|effect|truth)=([\s\S]*)$/.exec(value ?? '');
     if (!m) return true;

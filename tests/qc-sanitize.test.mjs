@@ -7,7 +7,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { sceneRecord, startRecord, setUnsent, phone, SEED_OPEN, SEED_CLOSE, unwrapScenes, unwrapCalls, stripStartCard, stripUnsentMark, applySeedLifetime } from '../dist-test/core.mjs';
+import { sceneRecord, sceneMessage, startRecord, setUnsent, phone, SEED_OPEN, SEED_CLOSE, unwrapScenes, unwrapCalls, stripStartCard, stripUnsentMark, stripSceneMark, applySeedLifetime } from '../dist-test/core.mjs';
 
 const dir = await mkdtemp(join(tmpdir(), 'goei-qc-sanitize-'));
 await build({ entryPoints: ['src/core/sanitize.ts'], outdir: dir, bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' }, logLevel: 'silent' });
@@ -24,7 +24,7 @@ function rawRequest() {
   return [
     sys('SYSTEM'),
     sys(`<!-- goei:lore -->\n## RP Guidance\n규칙\n${SEED_OPEN}\n### Character - Jyaldi\n시드 본문\n${SEED_CLOSE}\n### Character - Aileen\n고른 로어`),
-    bot('첫 장면\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|없음]'),
+    bot(sceneMessage('첫 장면\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|없음]')),
     usr(startRecord('시작 화면에서 적은 첫 상황')),
     bot('[AN|명일 아파트|발생] 괴이가 나타났다.\n[🔓|부록 하나]\n[▣|2025.01.01|03:00 AM|☀️|4°C|관리국 본부|명일 아파트]'),
     usr(sceneRecord({ target: '명일 아파트', party: '쟈알디' }, '{{user}} moves to 명일 아파트 with 쟈알디.') + '\n추가 요청'),
@@ -53,7 +53,7 @@ test('stripMarkers: 표식 전수 제거, 본문·다른 메시지는 그대로'
   assert.equal(out[5].content, '{{user}} moves to 명일 아파트 with 쟈알디.\n추가 요청', '지시문: 표식 줄만');
   assert.equal(out[6].content, '{{user}} places a phone call to 에일린.\n\n지원 요청');
   assert.equal(out[7].content, '아직 안 보낸 글');
-  assert.equal(out[2].content, inp[2].content, '상태창 줄은 지우지 않음 (모델 자신의 출력, 다음 턴에 필요)');
+  assert.equal(out[2].content, '첫 장면\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|없음]', '상태창 줄은 지우지 않음 (모델 자신의 출력, 다음 턴에 필요). 첫 장면 표식만 뗌');
   assert.equal(out[4].content, inp[4].content, '기본은 상황판 태그도 그대로 (괴이 카드가 아닐 수 있음)');
   assert.ok(texts(out).some((c) => c.includes('[▣|')), '상태창은 남음');
 });
@@ -72,7 +72,7 @@ test('stripMarkers: 멱등 — 두 번 돌려도 같고, 각 단계가 정상 �
   assert.equal(twice, once, '표식이 없으면 같은 배열 객체');
   // 정상 경로: 단계들이 지운 뒤 모양 (unwrap·stripStartCard·stripUnsentMark·applySeedLifetime)
   let m = unwrapCalls(unwrapScenes(rawRequest()).messages).messages;
-  m = m.map((x) => (typeof x.content === 'string' ? { ...x, content: applySeedLifetime(stripStartCard(stripUnsentMark(x.content)), true) } : x));
+  m = m.map((x) => (typeof x.content === 'string' ? { ...x, content: applySeedLifetime(stripStartCard(stripUnsentMark(stripSceneMark(x.content))), true) } : x));
   assert.ok(noMarkers(m), '정상 단계가 이미 지움');
   assert.equal(stripMarkers(m), m, '정상 결과는 그대로 통과');
   const clean = [sys('S'), usr('안녕'), bot('반가워\n[▣|a|b]')];

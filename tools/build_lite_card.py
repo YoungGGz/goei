@@ -773,7 +773,7 @@ def write_update(folder, payload):
              'parts': names, 'length': len(text.encode('utf-16-le')) // 2}  # JS 글자 수(UTF-16)
     (folder / UPDATE_FILE).write_text(json.dumps(index, ensure_ascii=False), encoding='utf-8')
     return len(names)
-CARD_NAME = '괴이: ANOMALY'  # 정식 이름 (src/ui/brand.ts BRAND.name과 같게)
+CARD_NAME = '괴이 ː ANOMALY'  # 정식 이름 (src/ui/brand.ts BRAND.name과 같게)
 
 
 def update_payload(data, risu, module, version, min_plugin):

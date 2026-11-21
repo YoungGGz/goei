@@ -88,6 +88,13 @@ function applyChatLimits(state: Chat['scriptstate']): void {
   setItemRules(state);
 }
 
+/** 이미 그려진 메시지를 Risu 가 다시 그리게 한다: 같은 글을 그대로 저장하면 Risu(Chats.svelte, 글 해시로 그린 것을 재사용)가 다시 그리지 않으므로
+ *  고를 메시지의 끝 줄바꿈을 붙였다 뗐다 해 글이 바뀌게 한다. 보이는 것·요청은 그대로이고 읽음 해시도 공백은 안 본다 (core/people/store.ts).
+ *  전수점검 보통-11: 보고서 카드·상태창을 다시 그리려 같은 글을 그대로 저장해 Risu 가 다시 그리지 않을 수 있었다 */
+export function nudgeMessages(chat: Chat, pick: (data: string, index: number) => boolean = () => true): Chat {
+  return { ...chat, message: (chat.message ?? []).map((m, i) => (typeof m.data === 'string' && pick(m.data, i) ? { ...m, data: m.data.endsWith('\n') ? m.data.slice(0, -1) : `${m.data}\n` } : m)) };
+}
+
 // 같은 채팅 저장은 차례로 (읽고 쓰는 사이에 다른 저장이 끼면 그 변경이 사라진다. 괴담넷·괴담톡 자동 확인이 동시에 저장할 수 있다)
 const queues = new Map<string, Promise<unknown>>();
 

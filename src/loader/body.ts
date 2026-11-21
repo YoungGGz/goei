@@ -3,6 +3,7 @@ import type { BodyHandlers } from '../body';
 import { sha256Text, textHash } from '../core/texthash';
 import { fetchParts } from '../core/fetchparts';
 import { oldPluginMessage } from '../core/stalever';
+import { josa } from '../core/josa';
 
 export type Body = BodyHandlers;
 export const BODY_KEY = 'goei:body';
@@ -48,7 +49,7 @@ type RisuFetch = (url: string, arg: Record<string, unknown>) => Promise<{ ok: bo
 const TIMEOUT_MS = 40_000;
 function timeout<T>(p: Promise<T>, what: string): Promise<T> {
   let t: ReturnType<typeof setTimeout> | undefined;
-  return Promise.race([p, new Promise<never>((_, rej) => (t = setTimeout(() => rej(new BodyError(`${what}을 ${TIMEOUT_MS / 1000}초 안에 받지 못했어요.`)), TIMEOUT_MS)))]).finally(() => clearTimeout(t));
+  return Promise.race([p, new Promise<never>((_, rej) => (t = setTimeout(() => rej(new BodyError(`${josa(what, '을', '를')} ${TIMEOUT_MS / 1000}초 안에 받지 못했어요.`)), TIMEOUT_MS)))]).finally(() => clearTimeout(t));
 }
 
 /** release 폴더의 글 파일. Risu 본 화면에서 직접 받고(risuFetch), 안 되면 nativeFetch (ui/update.ts와 같은 이유) */

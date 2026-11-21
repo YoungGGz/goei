@@ -23,7 +23,7 @@ import { seedPerson } from '../core/people/seed';
 import { AFF_MAX, AFF_MIN, AXIS_LABEL, CORE_SLOTS, DOC_TYPES, FACTION_MAX, FACTION_MIN, FACTION_STAGES, FEATURE_SLOTS, REGISTERS, SLOTS, SLOT_META, STAGES, TASTE_STAGES, factionWho, opennessStage, slotsFor, stageOf, type Candidate, type Change, type Doc, type DocType, type Entry, type EntrySrc, type Person, type PeopleStore, type Register, type SexualField, type SlotId, SEXUAL_CHARS } from '../core/people/types';
 import { approveCandidate, axesView, candidateStats, liveEvidence, rejectCandidate, revertCandidate } from '../core/people/axes';
 import { ICONS } from './icons';
-import { keepOpen } from './panels';
+import { keepOpen, scrollInside } from './panels';
 import { toast } from './toast';
 import { savePrefs } from '../host/prefs';
 import { defaultsAction, defaultsButtons, defaultsConfirm } from './defaults';
@@ -1014,7 +1014,7 @@ export async function handlePeople(action: string, value: string | undefined, ct
         const [blockId, label] = PP_GOTO_ROW[v] ?? [v, ''];
         const row = [...(document.getElementById(blockId)?.querySelectorAll<HTMLElement>('.ps-row') ?? [])].find((r) => r.querySelector('.ps-label > b')?.firstChild?.textContent?.trim() === label);
         if (!row) return;
-        row.scrollIntoView({ block: 'center' });
+        scrollInside(row, 'center');
         row.classList.remove('gw-find-flash');
         void row.offsetWidth;
         row.classList.add('gw-find-flash');

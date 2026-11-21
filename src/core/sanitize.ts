@@ -10,12 +10,14 @@ import { hasUnlockTag, stripUnlockTags } from './lore';
 import { hasReadyTag, stripReadyTags } from './orders';
 
 /** 플러그인 표식 목록 (원문에는 있고 모델에는 가면 안 되는 글). 시험·문서에서 전수 확인에 쓴다 */
-export const PLUGIN_MARKERS = ['%%SCENE_CARD:', '%%/SCENE_CARD%%', '%%PHONE_CALL:', '%%/PHONE_CALL%%', '%%GOEI_START%%', '%%/GOEI_START%%', '%%GOEI_UNSENT%%', '%%SEED%%', '%%/SEED%%'] as const;
+export const PLUGIN_MARKERS = ['%%SCENE_CARD:', '%%/SCENE_CARD%%', '%%PHONE_CALL:', '%%/PHONE_CALL%%', '%%GOEI_START%%', '%%/GOEI_START%%', '%%GOEI_UNSENT%%', '%%SEED%%', '%%/SEED%%', '%%GOEI_SCENE%%'] as const;
 
 /** 여는 표식(뒤의 줄바꿈까지) · 닫는 표식(앞의 줄바꿈까지) · 안 보냄 표식(앞의 줄바꿈까지) */
 const OPEN_RE = /%%(?:SCENE_CARD:[0-9a-f]*|PHONE_CALL:[0-9a-f]*|GOEI_START|SEED)%%[ \t]*(?:\r?\n)?/g;
 const CLOSE_RE = /(?:\r?\n)?[ \t]*%%\/(?:SCENE_CARD|PHONE_CALL|GOEI_START|SEED)%%/g;
 const UNSENT_RE = /(?:\r?\n)?[ \t]*%%GOEI_UNSENT%%/g;
+/** 첫 장면 표식 (core/dispatch SCENE_MARK, 메시지 끝 줄). 마지막 안전망에서도 지운다 (전수점검 사소-6) */
+const SCENE_RE = /(?:\r?\n)?[ \t]*%%GOEI_SCENE%%/g;
 
 export function hasPluginMarkers(text: unknown): text is string {
   return typeof text === 'string' && text.includes('%%') && PLUGIN_MARKERS.some((m) => text.includes(m));
@@ -24,7 +26,7 @@ export function hasPluginMarkers(text: unknown): text is string {
 /** 글 하나에서 표식만 지운다 (본문 유지). 표식이 없으면 같은 글 */
 export function stripMarkerText(text: string): string {
   if (!hasPluginMarkers(text)) return text;
-  return text.replace(OPEN_RE, '').replace(CLOSE_RE, '').replace(UNSENT_RE, '').replace(/\n{3,}/g, '\n\n');
+  return text.replace(OPEN_RE, '').replace(CLOSE_RE, '').replace(UNSENT_RE, '').replace(SCENE_RE, '').replace(/\n{3,}/g, '\n\n');
 }
 
 export interface StripOptions {

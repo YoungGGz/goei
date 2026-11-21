@@ -87,6 +87,6 @@ test('진행 창: 보낸 뒤 센 토큰을 호출 줄·본편에 채운다 (perf
 test('body.ts 연결: 이미지 지침 {{user}} 풀기, 인물 갱신 채팅 번호, 묶음 동시 요청 수, 캐릭터 바뀌면 에셋 다시 읽기', () => {
   assert.match(body, /appendImgPrompt\(out, evaluate\(buildImgPrompt\(cfg, names, s\.assetPlayer\), \{ vars: chat\.scriptstate \?\? \{\}, char: char\.name, user: me\?\.name \|\| userOrTag\(\) \}\)\)/);
   assert.match(body, /requestPeopleUpdate\('turn', \{ at: \{ charIndex: arg\.characterIndex, chatIndex: arg\.chatIndex \} \}\)/);
-  assert.match(body, /new Joint\(group\[0\]\.model, group\[0\]\.fixed, group\.map\(\(t\) => t\.kind\), genSettings\(now!\.scriptstate\)\.concurrent\)/);
+  assert.match(body, /new Joint\(group\[0\]\.model, group\[0\]\.fixed, group\.map\(\(t\) => t\.kind\), genSettings\(now!\.scriptstate\)\.concurrent, genSettings\(now!\.scriptstate\)\.transientRetries\)/);
   assert.match(body, /snap\.charIndex !== lastChar \|\| \(next\.changed && next\.fabVisible\)\)\) void loadModuleAssets\(\)/);
 });

@@ -64,5 +64,36 @@ export function fitTotal(parts: ContextPart[], total: number): string[] {
     remaining -= alloc[i];
     left -= weight[i];
   }
-  return parts.map((p, i) => (alloc[i] >= size[i] ? texts[i] : alloc[i] > 0 ? p.build(alloc[i]) : ''));
+  const out = parts.map((p, i) => (alloc[i] >= size[i] ? texts[i] : alloc[i] > 0 ? p.build(alloc[i]) : ''));
+  // 잘린 기능이 몫보다 덜 쓰면(기록 단위로 고르니 몫을 다 못 채운다) 남는 자리를 아직 덜 들어간 기능에 다시 나눠 준다 (전수점검 보통-4).
+  // 기능 수만큼만 돈다: 매번 몫이 늘거나 끝나므로 그 안에 멈춘다
+  // 처음 나눈 몫으로 이미 총 상한 이하가 아니면(기록 하나가 몫보다 크면) 더 주지 않는다. 더 줄 때도 실제 합이 총 상한을 넘는 몫은 받지 않는다
+  const used = out.map((t) => (t ? tokens(t) : 0));
+  const capOf = alloc.slice();
+  const stuck = new Set<number>();
+  for (let round = 0; round < parts.length; round++) {
+    const slack = total - used.reduce((a, b) => a + b, 0);
+    const open = parts.map((_, i) => i).filter((i) => capOf[i] < size[i] && !stuck.has(i));
+    if (slack <= 0 || !open.length) break;
+    const w = open.reduce((a, i) => a + weight[i], 0);
+    let grew = false;
+    for (const i of open) {
+      const room = total - used.reduce((a, b) => a + b, 0);
+      const more = Math.min(room, Math.floor((slack * weight[i]) / w));
+      if (more <= 0) continue;
+      const cap = Math.min(size[i], capOf[i] + more);
+      const t = cap >= size[i] ? texts[i] : parts[i].build(cap);
+      const n = t ? tokens(t) : 0;
+      if (n - used[i] > room) {
+        stuck.add(i);
+        continue;
+      }
+      capOf[i] = cap;
+      if (n > used[i]) grew = true;
+      out[i] = t;
+      used[i] = n;
+    }
+    if (!grew) break;
+  }
+  return out;
 }

@@ -259,12 +259,15 @@ export function factionVars(lore: LoreEntry[] | undefined): ScriptState {
   const extras = extraFactions(lore);
   const tag = loreText(lore ?? [], TAG_BOOK);
   const gmName = (f: Faction) => f.gmName || f.org || f.name;
+  // 이미 배치 칸에 있는 세력: 태그 글 전체가 아니라 그 줄의 「|」 칸과 통째로 같은 이름만 (「세광특별시」에 「세광」이 걸리지 않게, 전수점검 사소-87)
+  const poolLine = /\n[ \t]*- Faction pool:([^\n]*)/.exec(tag)?.[1] ?? '';
+  const inPool = new Set(poolLine.split('|').map((x) => x.trim()).filter(Boolean));
   return {
     $fac_codes: extras.map((f) => ` | ${f.code}`).join(''),
     $fac_ac: extras.map((f) => `\n   - ${f.code} = ${gmName(f)}`).join(''),
     $fac_pool: extras
       .map((f) => f.org ?? f.name)
-      .filter((n) => !tag.includes(n))
+      .filter((n) => !inPool.has(n))
       .map((n) => ` | ${n}`)
       .join(''),
     $fac_extra: extras

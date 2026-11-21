@@ -150,10 +150,19 @@ export function rulesFor(name: GuideName): string {
 }
 
 /** 요청에 쓰는 지침 글: 고친 글(또는 기본) + 내가 추가한 규칙. 편집 창은 guideText(규칙 없는 글)를 쓴다 */
+/** 규칙을 붙인 지침 글 (지침 글·규칙이 같으면 다시 쪼개고 합치지 않는다, 전수점검 사소-11) */
+const promptCache = new Map<GuideName, { base: string; rules: string; out: string }>();
 export function guidePrompt(name: GuideName): string {
   const base = guideText(name);
   const rules = rulesFor(name);
   if (!rules) return base;
+  const hit = promptCache.get(name);
+  if (hit && hit.base === base && hit.rules === rules) return hit.out;
+  const out = joinRules(name, base, rules);
+  promptCache.set(name, { base, rules, out });
+  return out;
+}
+function joinRules(name: GuideName, base: string, rules: string): string {
   const at = RULE_SECTION[name as RuleTarget];
   if (!at) return `${base.replace(/\s+$/, '')}\n\n${rules}\n`;
   const parts = splitGuide(base);

@@ -8,6 +8,7 @@ import { dropAssets, planPictures, type PicPlan, type Picture } from '../core/pi
 import { forgetImages } from './images';
 import { loadModuleAssets } from '../host/assets';
 import type { SettingsEnv } from './settings';
+import { josaRo } from '../core/josa';
 
 const esc = (s: unknown) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -137,6 +138,8 @@ export async function checkLatest(env: SettingsEnv, force = false): Promise<void
     updateUi.latest = { card: v.card, plugin: v.plugin, minPlugin: v.minPlugin ?? v.plugin };
   } catch (error) {
     if (force) updateUi.notice = error instanceof Error ? error.message : String(error);
+    // 실패하면 다음에 창을 열 때 다시 확인한다 (전수점검 보통-3: 첫 확인이 실패하면 세션 내내 새 판 점·안내가 안 떴다)
+    else checked = false;
   }
   updateUi.busy = false;
   env.render();
@@ -185,8 +188,9 @@ export function updateGroup(ctx: ChatContext): string {
     pluginNew ? 'Risu 설정 → 플러그인 탭에서 이 플러그인의 업데이트를 눌러 주세요.' : L ? '최신이에요.' : ''));
   const cardNew = lite && L && compareVersions(L.card, cur) > 0;
   const needPlugin = !!L && compareVersions(L.minPlugin, PLUGIN_VERSION) > 0;
-  rows.push(row('카드', `<span class="upd-ver">${cur === '0' ? '이전 판' : `v${esc(cur)}`}${cardNew ? ` → <b>v${esc(L!.card)}</b>` : ''}</span>`,
-    !lite ? '이 채팅의 카드는 Lite 카드가 아니에요.' : cardNew ? (needPlugin ? '플러그인을 먼저 업데이트한 뒤 창을 다시 열어 주세요.' : '채팅·사진·에셋과 카드 명부는 그대로 두고 카드 내용만 바꿔요.') : L ? '최신이에요.' : ''));
+  // 괴이 카드가 아니면 판 대신 「괴이 카드 아님」 (전수점검 보통-2: 남의 봇에 「이전 판」·옛 이름 「Lite 카드」가 떴다. 상태 점검과 같은 말)
+  rows.push(row('카드', !lite ? '<span class="gx-muted">괴이 카드 아님</span>' : `<span class="upd-ver">${cur === '0' ? '이전 판' : `v${esc(cur)}`}${cardNew ? ` → <b>v${esc(L!.card)}</b>` : ''}</span>`,
+    !lite ? '이 채팅의 카드는 괴이 카드가 아니에요. 위에서 설치하면 괴이 카드가 돼요.' : cardNew ? (needPlugin ? '플러그인을 먼저 업데이트한 뒤 창을 다시 열어 주세요.' : '채팅·사진·에셋과 카드 명부는 그대로 두고 카드 내용만 바꿔요.') : L ? '최신이에요.' : ''));
   let actions = `<button class="gx-mini" data-action="upd-check" ${busy ? 'disabled' : ''}>${busy && !updateUi.payload ? esc(updateUi.progress || '확인 중…') : '새 버전 확인'}</button>`;
   if (cardNew && !needPlugin) {
     actions += updateUi.plan
@@ -295,7 +299,7 @@ export async function handleUpdate(action: string, ctx: ChatContext, env: Settin
         // 채팅 속 그림 태그가 보는 에셋 목록도 다시 읽는다 (안 읽으면 새 표정 그림이 창을 다시 열 때까지 안 뜸. 전수검사 11-13)
         await loadModuleAssets().catch(() => false);
       }
-      updateUi.done = `카드를 v${updateUi.payload.version}으로 바꿨어요.${pics.get.length ? ` 사진 ${pics.get.length}장도 바꿨어요.` : ''}${pics.drop.length ? ` 안 쓰는 사진 ${pics.drop.length}장은 뺐어요.` : ''} 채팅을 다시 열면 새 내용이 보여요.`;
+      updateUi.done = `카드를 ${josaRo(`v${updateUi.payload.version}`)} 바꿨어요.${pics.get.length ? ` 사진 ${pics.get.length}장도 바꿨어요.` : ''}${pics.drop.length ? ` 안 쓰는 사진 ${pics.drop.length}장은 뺐어요.` : ''} 채팅을 다시 열면 새 내용이 보여요.`;
       updateUi.payload = null;
       updateUi.plan = null;
       updateUi.pics = null;

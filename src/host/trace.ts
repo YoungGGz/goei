@@ -4,7 +4,7 @@
 import type { LlmMessage } from './llm';
 import { tokens } from '../core/gnet';
 import { getPrefs, TRACE_KEEP_DEFAULT } from '../core/settings';
-import { PROGRESS_WATCHDOG, progressBegin, progressMain, progressMainTokens, progressReply, progressTurn } from '../core/progress';
+import { progressWatchdog, progressBegin, progressMain, progressMainTokens, progressReply, progressTurn } from '../core/progress';
 
 export interface TraceCall {
   /** 호출 종류 (라우터·디렉터·갱신기·괴담넷·괴담톡·위키·소지품·상점·…) */
@@ -220,7 +220,9 @@ export async function traceBegin(): Promise<void> {
   replied = false;
   ended = false;
   progressBegin(); // 진행 창 (core/progress.ts): 새 턴
-  await push(t);
+  // 목록에 넣는 것은 기다리지 않는다: 앱을 연 뒤 첫 전송이 호출 기록 전체를 읽을 때까지 늦게 나갔다 (전수점검 사소-8).
+  // 열린 턴(open)은 바로 쓰이고, 저장(save)도 같은 읽기를 기다리므로 넣은 뒤에 쓴다
+  void push(t).catch(() => {});
 }
 
 /** 본편 요청 조립 끝: 최종 모양을 적는다 */
@@ -266,16 +268,28 @@ export function traceEnd(id: string | null): void {
   if (open && id && open.id === id) ended = true;
 }
 
-/** 보조 호출 한 건 (runModel 이 부른다). 열린 턴이 없으면 수동 턴을 만든다. 턴이 끝난 뒤의 호출은 그 턴에 manual 로 붙는다 */
-export async function traceCall(c: Omit<TraceCall, 'phase' | 'at'> & { at: string }): Promise<void> {
-  let t = open;
+/** 호출이 시작될 때의 턴·단계. runModel 이 시작할 때 쥐고 끝날 때 traceCall 에 넘긴다 (전수점검 보통-7: 끝나는 때의 턴으로 적어,
+ *  앞 턴의 자동 호출이 늦게 끝나면 다음 턴의 「본편 전」으로 보였다) */
+export interface TraceMark {
+  id: string | null;
+  phase: TraceCall['phase'];
+}
+export function traceMark(): TraceMark {
+  const t = open;
   // 본편이 실패·중지되면 응답 훅이 안 와 traceEnd 가 안 불린다. 진행 창(core/progress.ts)과 같은 시간만큼 응답이 없으면 끝난 턴으로 본다 (재검토 11-14). 늦게라도 응답이 붙으면 그 뒤 호출은 다시 after
-  const dead = !!t && !replied && Date.now() - new Date(t.at).getTime() >= PROGRESS_WATCHDOG;
-  let phase: TraceCall['phase'] = ended || dead ? 'manual' : replied ? 'after' : 'before';
+  const dead = !!t && !replied && Date.now() - new Date(t.at).getTime() >= progressWatchdog();
+  return { id: t?.id ?? null, phase: !t || ended || dead ? 'manual' : replied ? 'after' : 'before' };
+}
+
+/** 보조 호출 한 건 (runModel 이 부른다). 열린 턴이 없으면 수동 턴을 만든다. 턴이 끝난 뒤의 호출은 그 턴에 manual 로 붙는다.
+ *  mark: 호출이 시작될 때의 턴 (없으면 지금) */
+export async function traceCall(c: Omit<TraceCall, 'phase' | 'at'> & { at: string }, mark: TraceMark = traceMark()): Promise<void> {
+  let t: TraceTurn | null = mark.id ? (open?.id === mark.id ? open : (await load()).find((x) => x.id === mark.id) ?? null) : null;
+  let phase: TraceCall['phase'] = mark.phase;
   if (!t) {
     const list = await load();
     const last = list[list.length - 1];
-    if (last && !last.main && Date.now() - new Date(last.at).getTime() < 10 * 60 * 1000) t = last;
+    if (last && !last.main && Date.now() - new Date(last.at).getTime() < progressWatchdog()) t = last;
     else {
       t = { id: `${Date.now().toString(36)}m`, at: c.at, calls: [] };
       await push(t);

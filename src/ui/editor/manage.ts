@@ -24,7 +24,7 @@ import { wiki } from '../wiki';
 
 import { copyText } from '../copy';
 import { ICONS } from '../icons';
-import { mainDefaultsConfirm } from '../settings';
+import { bulkShopOff, bulkSideVars, mainDefaultsConfirm } from '../settings';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -37,12 +37,12 @@ export const isManageNode = (n: string): n is ManageNode => n === 'manage:backup
 /** 저장소 항목: [키, 이름, 설명, 지우기 동작] */
 const STORE: [string, string, string, string?][] = [
   ['goei:prefs', '기기 설정', '화면·이미지·지침 고친 글·추가 규칙·새 채팅 기본값'],
-  ['goei:wikibase', '위키 기본 문서', '카드에서 뺀 기본 문서 묶음. 지우면 설치·점검에서 다시 받아요', 'man-drop-wiki'],
+  ['goei:wikibase', '위키 기본 문서', '카드에서 뺀 기본 문서 묶음. 지우면 설치·업데이트에서 다시 받아요', 'man-drop-wiki'],
   ['goei:tok-o200k', '토크나이저', 'o200k_base 순위표. 지우면 토큰 수가 어림값이 돼요', 'man-drop-tok'],
   ['goei-people-diag', '인물 기록 실행 기록', '최근 갱신의 입력·출력 원문', 'man-drop-diag'],
   ['goei:body', '플러그인 본체', '괴이 카드를 열 때 받아 둔 goei-body.js. 플러그인 판이 바뀌면 다시 받아요'],
   ['goei:data-world', '세계 자료', '요원·조직·괴이·파밍·부록 기본 기록과 세력 관계 기본값. 본체가 뜰 때 받아 두고, 플러그인 판이 바뀌면 다시 받아요'],
-  ['goei:data-install', '설치 자료', '인사말·카드 사진 목록·기본 명부·아이콘 정보. 설치·점검을 처음 열 때 받아 두고, 플러그인 판이 바뀌면 다시 받아요'],
+  ['goei:data-install', '설치 자료', '인사말·카드 사진 목록·기본 명부·아이콘 정보. 설치·업데이트를 처음 열 때 받아 두고, 플러그인 판이 바뀌면 다시 받아요'],
 ];
 
 async function sizeOf(key: string): Promise<number> {
@@ -222,7 +222,7 @@ function diagPage(ctx: ChatContext, canChat: boolean): string {
   const wikiOld = wikiPackOld();
   if (!wikiOld) void checkWikiPackOld().then((old) => old && wikiPackOld() && diagOpen && rerender?.());
   const rows = [
-    row('카드', badge(goei, goei ? '괴이 카드' : '괴이 카드 아님'), goei ? `카드 ${ver === '0' ? '이전 판' : `v${ver}`} · 명부·매니페스트 있음` : '설치 · 점검에서 심으면 괴이 카드가 돼요'),
+    row('카드', badge(goei, goei ? '괴이 카드' : '괴이 카드 아님'), goei ? `카드 ${ver === '0' ? '이전 판' : `v${ver}`} · 명부·매니페스트 있음` : '설치·업데이트에서 심으면 괴이 카드가 돼요'),
     row('플러그인', badge(true, `v${PLUGIN_VERSION}`), UPDATE_BASE ? '' : '업데이트를 받을 수 없는 빌드'), // 주소 글은 보여 주지 않는다 (2026-11-13 사용자)
     // 카드 판 ≠ 플러그인 판이면 빨간 줄 (2026-11-06 사용자, 전수점검 남은 것 4): 카드가 낡았으면 업데이트 페이지로, 카드가 더 새면 플러그인을 받으라고
     ...(goei && compareVersions(ver, PLUGIN_VERSION) !== 0 ? [row('판 맞춤', badge(false, compareVersions(ver, PLUGIN_VERSION) < 0 ? '카드가 낡음' : '플러그인이 낡음'), compareVersions(ver, PLUGIN_VERSION) < 0
@@ -392,11 +392,18 @@ export async function manageAction(action: string, root: HTMLElement | null, ctx
         if (cv && typeof cv === 'object' && !Array.isArray(cv)) {
           const vars = Object.entries(cv as Record<string, unknown>).filter(([k, v]) => isChatSettingVar(k) && (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean'));
           if (ctx && canChat && vars.length) {
+            // 한꺼번에 바꿀 때의 뒷정리(칸 구성 기록·소지품 「사용」 비움·상점 닫기)를 같이 한다 (전수점검 사소-86)
+            let shopOff = false;
             await updateChat(ctx.charIndex, ctx.chatIndex, (c) => {
-              c.scriptstate ??= {};
-              for (const [k, v] of vars) c.scriptstate[k] = String(v);
+              const prev = { ...(c.scriptstate ?? {}) };
+              const next = { ...prev };
+              for (const [k, v] of vars) next[k] = String(v);
+              const side = bulkSideVars(c, prev, next);
+              shopOff = side.shopOff;
+              c.scriptstate = { ...next, ...side.vars };
               return c;
             });
+            if (shopOff) await bulkShopOff(ctx);
             wrote += ` 채팅 값 ${vars.length}개도 이 채팅에 적었어요.`;
           } else if (vars.length) wrote += ' 채팅 값은 시작 전이라 적지 않았어요.';
         }

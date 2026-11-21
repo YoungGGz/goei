@@ -272,7 +272,7 @@ function evBtns(c: EvCard): string {
   const name = esc(c.name);
   return `${c.rpt ? `<button class="gx-evbtn" data-action="rec-open" data-value="${esc(c.rpt)}" title="보고서" aria-label="${name} 보고서">${ICONS.records}</button>` : ''}
     ${c.name === '이름 미확인' ? '' : `<button class="gx-evbtn" data-action="wiki-goto" data-value="${name}" title="위키" aria-label="${name} 위키">${ICONS.wiki}</button>`}
-    ${c.key ? `<button class="gx-evbtn end${c.confirmEnd ? ' danger' : ''}" data-action="end-event" data-value="${key}" title="${c.confirmEnd ? '한 번 더 누르면 종료' : '상황 종료'}" aria-label="${name} ${c.confirmEnd ? '정말 종료' : '상황 종료'}">${ICONS.trash}</button>` : ''}`;
+    ${c.key ? `<button class="gx-evbtn end${c.confirmEnd ? ' danger' : ''}" data-action="end-event" data-value="${key}" title="${c.confirmEnd ? '한 번 더 누르면 종료' : '상황 종료'}" aria-label="${name} ${c.confirmEnd ? '정말 종료' : '상황 종료'}">${ICONS.trash}${c.confirmEnd ? '<span>정말 종료</span>' : ''}</button>` : ''}`;
 }
 
 /** 위성 보기: 제목이 없어 오른쪽 위 단추 줄 맨 앞에 같은 표식 */

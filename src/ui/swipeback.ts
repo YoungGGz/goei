@@ -4,7 +4,7 @@
 import { isPhone } from './media';
 
 // 지금 위키 목록 서랍(.wdr·.wgrab·.wscrim)도 비킨다 (전수검사 11-13)
-export const SWIPE_SKIP = 'input, textarea, select, [contenteditable], .gx-canvas, .gx-mbar, .gx-nav, .nw-rail, .nw-panel, .nw-scrim, .nw-edge, .wk .wdr, .wk .wgrab, .wk .wscrim, .ph-drawer';
+export const SWIPE_SKIP = 'input, textarea, select, [contenteditable], .gx-canvas, .gx-mbar, .gx-nav, .nw-rail, .nw-panel, .nw-scrim, .nw-edge, .wk .wdr, .wk .wgrab, .wk .wscrim, .ph-drawer, .gx-agpop';
 const SKIP = SWIPE_SKIP;
 const FIRE = 72;
 const bound = new WeakSet<HTMLElement>();

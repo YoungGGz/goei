@@ -1,6 +1,7 @@
 // 모델 호출 (위키·괴담넷·괴담톡 생성). 본편 요청과 따로, 사용자가 그 화면에서 누를 때만 부른다.
+import { timeMs, timeOf } from '../core/timing';
 import { prepareAttachments } from '../core/attach';
-import { clip, requestText, traceCall } from './trace';
+import { clip, requestText, traceCall, traceMark } from './trace';
 import { tokens } from '../core/gnet';
 import { photoData } from './photo';
 import { advNum, applyAdvanced, applyGenLimits } from '../core/advanced';
@@ -24,7 +25,10 @@ export class LlmError extends Error {
 
 /** 생각 블록 제거 (생각 단계 「적고 지움」의 <lb-process> 포함). <thinking> 도 (전수검사 11-13) */
 export function stripThoughts(s: string): string {
-  const t = s.replace(/<(thoughts|thinking|think|lb-process)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+  let t = s.replace(/<(thoughts|thinking|think|lb-process)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+  // 여는 태그 없이 닫는 태그만 남은 생각 글 (일부 추론 모델은 여는 태그를 떼고 보낸다): 마지막 닫는 태그까지가 생각이다 (전수점검 사소-10)
+  const close = [...t.matchAll(/<\/(?:thoughts|thinking|think|lb-process)\s*>/gi)].pop();
+  if (close && close.index !== undefined) t = t.slice(close.index + close[0].length);
   // 맨 앞의 닫히지 않은 칸: 「{」「[」나 생각 칸이 아닌 태그로 시작하는 줄부터는 답으로 남긴다. 그런 줄이 없으면 전처럼 다 지운다 (전수검사 11-13)
   const head = /^\s*<(?:thoughts|thinking|think|lb-process)\b[^>]*>/i.exec(t);
   if (head) {
@@ -71,13 +75,14 @@ async function withPhotos(messages: (LlmMessage & { images?: string[] })[]): Pro
 
 /** 모델 호출 시간 제한 (전수검사 11-13 나-7, 사용자 결정 (2)): 응답이 이만큼 오지 않으면(받는 중이면 마지막 조각부터) 실패로 본다.
  * 모델 연결이 멈춰도 응답 뒤 처리(갱신기·이미지 태그 보충)가 채팅을 영영 묶어 두지 않게. raw 'timeout' 이라 일시 오류로 다시 보낸다 */
-const MODEL_IDLE_MS = 300_000;
+// 시간은 설정 「화면 → 모델 응답 대기」 (core/timing.ts, 전수점검 보통-5: 5분이 박혀 있어 느린 모델이 끊기고 같은 요청이 다시 나갔다)
 function idleLimit<T>(run: (tick: () => void) => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const ms = timeMs('modelIdle');
   return new Promise<T>((resolve, reject) => {
     const arm = () => {
       clearTimeout(timer);
-      timer = setTimeout(() => reject(new LlmError(`모델이 ${MODEL_IDLE_MS / 1000}초 동안 응답하지 않아 멈췄어요. Risu의 모델 연결을 확인해 주세요.`, 'timeout')), MODEL_IDLE_MS);
+      timer = setTimeout(() => reject(new LlmError(`모델이 ${timeOf('modelIdle')}분 동안 응답하지 않아 멈췄어요. Risu의 모델 연결을 확인하거나, 설정 → 화면의 「모델 응답 대기」를 늘려 주세요.`, 'timeout')), ms);
     };
     arm();
     run(arm).then(resolve, reject).finally(() => clearTimeout(timer));
@@ -89,6 +94,7 @@ export async function runModel(messages: LlmMessage[], model: ModelChoice, stati
   // 호출 흐름 기록 (host/trace.ts): 성공·실패 모두 한 건으로 남긴다
   const at = new Date().toISOString();
   const t0 = Date.now();
+  const mark = traceMark(); // 시작할 때의 턴에 적는다 (전수점검 보통-7)
   const req = requestText(messages);
   // 진행 창 (core/progress.ts): 시작할 때 모델을 알리고, 끝나면 응답 토큰·시간을
   const pid = progressCallStart(label, staticModel || model, 0);
@@ -107,7 +113,7 @@ export async function runModel(messages: LlmMessage[], model: ModelChoice, stati
     countReq();
     const responseTokens = tokens(response);
     progressCallEnd(pid, { ok, ms, respTokens: responseTokens, ...(error ? { error } : {}) });
-    void traceCall({ label, at, ms, model: staticModel || model, ok, ...(error ? { error } : {}), request: clip(req), requestChars: req.length, requestTokens: countReq(), response: clip(response), responseChars: response.length, responseTokens }).catch(() => {});
+    void traceCall({ label, at, ms, model: staticModel || model, ok, ...(error ? { error } : {}), request: clip(req), requestChars: req.length, requestTokens: countReq(), response: clip(response), responseChars: response.length, responseTokens }, mark).catch(() => {});
   };
   try {
     const text = await idleLimit((tick) => runModelRaw(messages, model, staticModel, (n) => {
@@ -161,7 +167,14 @@ async function runModelRaw(messages: LlmMessage[], model: ModelChoice, staticMod
     }
     if (r.type === 'fail') throw new LlmError(`모델 요청에 실패했어요. Risu의 모델 연결을 확인해 주세요.\n${String(r.result ?? '').slice(0, 300)}`, String(r.result ?? ''));
     if (r.type === 'multiline' && Array.isArray(r.result)) text = (r.result as [string, string][]).filter(([role]) => role === 'char').map(([, t]) => t).join('\n');
-    else if (r.type === 'streaming' && r.result && typeof (r.result as ReadableStream).getReader === 'function') text = await readStream(r.result as ReadableStream<unknown>, onChunk);
+    else if (r.type === 'streaming' && r.result && typeof (r.result as ReadableStream).getReader === 'function') {
+      // 받는 도중 끊기면 모델 연결 오류(일시 오류)로 본다. 그냥 두면 형식 재시도로 가고 영어 원문 오류가 그대로 떴다 (전수점검 보통-8)
+      try {
+        text = await readStream(r.result as ReadableStream<unknown>, onChunk);
+      } catch (error) {
+        throw new LlmError('모델 응답을 받는 중에 연결이 끊겼어요. Risu의 모델 연결을 확인해 주세요.', `connection lost: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     else if (typeof r.result === 'string') text = r.result;
   }
   text = stripThoughts(text).trim();
@@ -214,8 +227,20 @@ export const reiterationText = (i: number, n: number): string => guideTxt('Commo
 /** 원본과 같이 응답 형식이 틀렸을 때만 다시 묻는다. 모델 연결 실패(LlmError)는 다시 불러도 대개 같다 */
 const retryable = (error: unknown) => !(error instanceof LlmError);
 /** 모델 쪽 일시 오류 (빈 응답·Gemini MALFORMED_RESPONSE·과부하·429/5xx): 같은 요청을 그대로 다시 보낸다 (2026-11-07 사용자: 상점에서 빈 응답·오류가 잦음) */
-const TRANSIENT = /빈 응답|MALFORMED|finishReason|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED|rate ?limit|\b(429|500|502|503|504)\b|timeout|timed out|ECONNRESET|fetch failed/i;
-const transient = (error: unknown) => error instanceof LlmError && TRANSIENT.test(`${error.message}\n${error.raw}`);
+const TRANSIENT = /빈 응답|MALFORMED|finishReason|overloaded|UNAVAILABLE|RESOURCE_EXHAUSTED|rate ?limit|\b(429|500|502|503|504)\b|timeout|timed out|ECONNRESET|fetch failed|connection lost/i;
+const transient = (error: unknown) => error instanceof LlmError && !(error as { transientDone?: boolean }).transientDone && TRANSIENT.test(`${error.message}\n${error.raw}`);
+/** 모델 쪽 일시 오류인가 (통합 요청이 묶음째 다시 보낼 때, host/joint.ts) */
+export const isTransient = transient;
+/** 이미 일시 오류 재시도를 다 한 오류: generate 가 같은 요청을 또 다시 보내지 않게 표시한다 */
+export function markTransientDone(error: unknown): void {
+  if (error && typeof error === 'object') {
+    try {
+      Object.defineProperty(error, 'transientDone', { value: true, configurable: true });
+    } catch {
+      /* 표시를 못 붙여도 오류는 그대로 */
+    }
+  }
+}
 const TRANSIENT_RETRIES = 2;
 
 export const defaultFix = (messages: LlmMessage[]) => (raw: string, reason: string): LlmMessage[] => [
@@ -257,7 +282,7 @@ export async function generate<T>(messages: LlmMessage[], model: ModelChoice, pa
         if (!transient(error) || transientLeft <= 0) throw error;
         transientLeft--;
         console.log(`[goei] 모델 일시 오류, 다시 보냄 (${transientMax - transientLeft}/${transientMax}): ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`);
-        await new Promise((r) => setTimeout(r, 1200));
+        await new Promise((r) => setTimeout(r, timeMs('retryGap')));
         attempt--;
         continue;
       }

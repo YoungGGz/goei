@@ -1,5 +1,6 @@
 // 「위키」 탭: 목록·검색·작성 화면·문서 보기. 생성은 "위키 작성 시작"·"새로고침"을 눌렀을 때만 한 번 부른다.
 // 생성은 창을 닫아도 계속되고, 끝나면 원래 채팅의 로어북에 저장한다.
+import { scrollInside } from './panels';
 import { defGroups, type Wire } from './setrow';
 import { WIKI_SET } from '../core/setdef/wiki';
 import { turnKeyAt } from '../core/shop';
@@ -1082,7 +1083,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
       // 접힌 정답 문단 속 소제목이면 펼치고 간다
       const fold = el?.closest('details');
       if (fold) fold.open = true;
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollInside(el, 'start', true);
       return true;
     }
     case 'wiki-request':
