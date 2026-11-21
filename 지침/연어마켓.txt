@@ -541,3 +541,7 @@ sender and recipient only
 @@SECTION POST.TRADE_TAG.FREE
 나눔
 @@END
+
+@@SECTION POST.TRADE_TAG.INFO
+정보
+@@END

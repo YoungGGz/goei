@@ -159,3 +159,11 @@ test('공용 그림은 진행이 시작될 때 한 번 정해지고, 상황 글�
   assert.deepEqual(w3.ended.find((e) => e.name === '구룡포 방파제').art, e1.art.pics);
   assert.deepEqual(w3.closed[0].entry.art.pics, e1.art.pics);
 });
+
+test('전수점검 보통-80: 모델이 무작위 괴이 이름을 조금 바꿔 써도 정해 둔 그림은 그대로', () => {
+  const w1 = W.applyOutput(W.emptyWorld(), catalog, S, 'A00', '[AN|부산광역시 중구|구룡포 방파제|활성|E|없음|안개]', always).world;
+  const pics = w1.an[0].art.pics;
+  const w2 = W.applyOutput(w1, catalog, S, 'A00', '[AN|부산광역시 중구|구룡포 방파제 지하 창고|활성|E|없음|안개]', always).world;
+  assert.equal(w2.an[0].name, '구룡포 방파제 지하 창고');
+  assert.deepEqual(w2.an[0].art.pics, pics);
+});

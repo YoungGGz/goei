@@ -45,6 +45,15 @@ test('asset: 맨 앞 <Thoughts> 칸은 번호에서 빠지고 저장 본문 앞�
   assert.equal(out, `${think}첫 단락\n\n<img=Aileen_smile>\n\n둘째 단락\n[▣|상태]`);
 });
 
+test('전수점검 사소-75: 이미지 태그를 끼워도 본문 속 주석·생각 칸·빈 줄 수는 그대로', () => {
+  const d = { characters: ['Aileen'], aliases: new Map([['aileen', 'Aileen'], ['에일린', 'Aileen']]), keywords: ['smile'], keywordSet: new Set(['smile']) };
+  const body = '에일린이 웃었다.\n<!-- 메모 -->\n\n\n<think>속생각</think>\n\n바람이 분다.\n[▣|상태]';
+  const job = AS.planAsset(body, d, 2);
+  assert.deepEqual(job.paras, ['에일린이 웃었다.', '바람이 분다.']);
+  const out = AS.finishAsset(job, '[{"line": 1, "tag": "<img=Aileen_smile>"}]', d, 2);
+  assert.equal(out, '에일린이 웃었다.\n\n<img=Aileen_smile>\n\n<!-- 메모 -->\n\n\n<think>속생각</think>\n\n바람이 분다.\n[▣|상태]');
+});
+
 test('attach: 묶음 준비는 번호를 이어 가고 system 은 그대로, 단건은 예전과 같다', () => {
   const sys = { role: 'system', content: 'Example [[ATTACH:photo]]what the picture shows[[/ATTACH]]' };
   const a = [sys, { role: 'user', content: '[[ATTACH:photo]]문[[/ATTACH]]' }];

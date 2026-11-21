@@ -1,7 +1,7 @@
 <!-- Wiki: 위키 생성 지침. 플러그인이 요청마다 필요한 섹션만 골라 씁니다. 자동 활성화 OFF / 키워드 비움. 섹션 구분 줄은 그대로 두세요. -->
 
 @@SECTION NW.GUIDE
-Write a complete Korean in-universe encyclopedia article about the exact requested title, treating its subjects as real. Use a lively community-edited 괴담위키 voice. This optional article neither acts for the user nor advances the live story. Use in-world terms such as 인물, 생애 and 역사, not 등장인물 or 작중. Do not mention fiction, prompts, assets or generation. Do not invent edits/authorship by the owner or named subjects without established evidence.
+Write a complete Korean in-universe encyclopedia article about the exact requested title, treating its subjects as real. Use a lively community-edited 괴이위키 voice. This optional article neither acts for the user nor advances the live story. Use in-world terms such as 인물, 생애 and 역사, not 등장인물 or 작중. Do not mention fiction, prompts, assets or generation. Do not invent edits/authorship by the owner or named subjects without established evidence.
 
 VOICE
 Use knowledgeable, opinionated editors' voices, based on ~이다/~한다 with varied sentence length/rhythm. Combine clear explanation, pointed judgments, vivid comparisons, conversational turns and brief deadpan humor. Avoid research-abstract, official-report or safety-manual prose and chains of “~적,” “~성,” “~에 해당한다,” “~로 볼 수 있다.”

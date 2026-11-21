@@ -1,4 +1,4 @@
-// 괴담위키: 원본 Namuwiki 모듈과 같은 저장 형식·프롬프트·검사 규칙.
+// 괴이위키: 원본 Namuwiki 모듈과 같은 저장 형식·프롬프트·검사 규칙.
 // 문서는 채팅 로어북 "WIKI｜제목" 항목(키 없음, 비활성)에 meta + <lightboard-namuwiki> 본문으로 둔다.
 import { advNum, advOn, genSettings, refToggles } from './advanced';
 import { related, type Focus } from './focus';

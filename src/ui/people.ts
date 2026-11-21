@@ -451,7 +451,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ...(s.router === 'model' ? [
       stageModel('router', 'Router 호출에 쓸 모델이에요. 갱신과 같게 = 위 갱신 모델'),
       ppRow('router_timeout', String(s.routerTimeout)),
-      `<div class="pp-rules one">${ruleBox('pp-router-rules', 'Router 에 덧붙일 지침', v('router_rules'), '장면 인물을 고를 때 규칙을 더해요 (예: 어떤 인물은 늘 빼기). 기본 지침 전체는 설정 「지침 → 인물 기록 지침 → Router」에서 고쳐요', 2000, '예: 관리국 요원만 고르고 민간인은 빼라', 'pp-rrules-save')}</div>`,
+      `<div class="pp-rules one">${ruleBox('pp-router-rules', 'Router 에 덧붙일 지침', v('router_rules'), '장면 인물을 고를 때 규칙을 더해요 (예: 어떤 인물은 늘 빼기). 기본 지침 전체는 설정 「지침 → 인물 기록 → Router(장면 인물 고르기)」에서 고쳐요', 2000, '예: 관리국 요원만 고르고 민간인은 빼라', 'pp-rrules-save')}</div>`,
     ] : []),
   ].join('');
   const director = [
