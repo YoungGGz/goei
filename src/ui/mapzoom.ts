@@ -56,9 +56,11 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     if (!name || !D) continue;
     const N = box(name);
     const w = N.r - N.l, h = N.b - N.t, my = (D.t + D.b) / 2 - h / 2;
-    // 아래(제자리) → 위 → 오른쪽 → 왼쪽 → 네 귀퉁이
-    const up = D.t - 2 - h, dn = D.b + 2, rt = D.r + 1, lt = D.l - 1 - w;
-    const spots: [number, number][] = [[N.l, N.t], [N.l, up], [D.r + 3, my], [D.l - 3 - w, my], [rt, up], [lt, up], [rt, dn], [lt, dn]];
+    // 아래(제자리) → 위 → 오른쪽 → 왼쪽 → 네 귀퉁이 → 옆 반 칸 위아래
+    // (옆 반 칸: 귀퉁이까지 막혀 이름표 없는 점이 여럿 남았다, 전수점검 눌러-사소-1·눌러2-보통-7. 점에 닿는 자리만이라 어느 점 이름인지는 그대로 읽힌다)
+    const up = D.t - 2 - h, dn = D.b + 2, rt = D.r + 1, lt = D.l - 1 - w, hh = h / 2 + 1;
+    const spots: [number, number][] = [[N.l, N.t], [N.l, up], [D.r + 3, my], [D.l - 3 - w, my], [rt, up], [lt, up], [rt, dn], [lt, dn],
+      [D.r + 3, my - hh], [D.r + 3, my + hh], [D.l - 3 - w, my - hh], [D.l - 3 - w, my + hh]];
     // 남의 점과는 조금 띄운다: 맞닿기만 해도 그 점의 이름표로 읽혔다 (전수점검 눌러2-보통-7: 「경남」 이름표가 전남 점에 붙어 있었다)
     const free = (r: Box) => !placed.some((p) => hit(p, r)) && !dotBox.some((d, j) => j !== i && d && hit(grow(d, DOT_GAP), r));
     let at = -1;
@@ -93,10 +95,10 @@ function placeZoom(canvas: HTMLElement, layer: HTMLElement): void {
   const right = Z;
   const left = { l: C.l + (C.r - Z.r), t: Z.t, r: C.l + (C.r - Z.r) + w, b: Z.b };
   const weight = (el: Element) => (el.classList.contains('sel') ? 100 : /\bhot/.test(el.className) ? 10 : 1);
-  const score = (z: Box) => [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')].reduce((n, d) => {
-    const dot = d.querySelector('.gx-dot');
-    return dot && hit(box(dot), z) ? n + weight(d) : n;
-  }, 0);
+  // 점과 함께 고른 곳·사건 난 곳의 이름표도 센다 (점은 비켜도 바로 밑 목표 이름표를 덮었다)
+  const marks = [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')].map((d) => [d, d.querySelector('.gx-dot')] as const)
+    .concat([...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-plab')].filter((l) => rank(l) < 2).map((l) => [l, l.querySelector('.gx-pname')] as const));
+  const score = (z: Box) => marks.reduce((n, [pin, el]) => (el && hit(box(el), z) ? n + weight(pin) : n), 0);
   canvas.classList.toggle('zl', score(left) < score(right));
 }
 

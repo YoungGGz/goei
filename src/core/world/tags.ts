@@ -62,9 +62,9 @@ export function stripLabel(v: string | undefined): string {
 export function normGrade(v: string | undefined): string {
   // 「Grade」「Class」 같은 이름표 낱말은 먼저 뗀다: 그 안의 A·D·E·C 를 등급으로 읽어 「Grade SS」가 A 로 보였다 (전수점검 사소-22)
   const s = stripLabel(v).toUpperCase().replace(/\b(?:GRADE|CLASS|RANK|LEVEL|TIER)\b/g, ' ');
-  // 따로 떨어진 등급 글자 (Grade B → B, B급 → B). 규격 밖 겹글자(SS·AA)는 그 글자로. 둘 다 아니면 비운다 (전수검사 11-13)
+  // 따로 떨어진 등급 글자 (Grade B → B, B급 → B). 규격 밖 겹글자(SS·AA)는 그 글자로. 없을 때만 남은 첫 글자 (Safe → S) (전수검사 11-13)
   const alone = /(?:^|[^A-Z])([FEDCBAS])\1*(?![A-Z])/.exec(s);
-  return alone ? alone[1] : '';
+  return alone ? alone[1] : s.replace(/[^FEDCBAS]/g, '').charAt(0);
 }
 
 export function normAnState(v: string | undefined): AnState {
