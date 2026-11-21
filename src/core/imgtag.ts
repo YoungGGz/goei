@@ -101,7 +101,7 @@ export function stripOldImgTags<M extends { role?: string; content?: unknown }>(
 }
 
 /** 이미지 칸 크기 (%): 원본 카드 크기(최대 너비 32em)를 100으로. 채팅 폭보다 넓어지지는 않는다 */
-export const IMG_SIZE = { min: 30, max: 200, step: 5, def: 100 };
+export const IMG_SIZE = { min: 30, max: 200, step: 1, def: 100 };
 /** 접힌 칸에 보이는 높이 (%): 그림 전체 높이를 100으로. 원본은 정사각형(832:1216 그림의 약 68%)으로 접혔다가 누르거나 올리면 펼쳐진다 */
 export const IMG_FOLD = { min: 20, max: 100, step: 1, def: 68 };
 const BASE_EM = 32;

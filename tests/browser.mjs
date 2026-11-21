@@ -152,7 +152,7 @@ async function pickCustom(page, row = '.gx-mlist li.gx-mx') {
 
 // 설정 창(2026-10-27 개편: 별도 창 .gw 하나, 탭 기능·세계·지침·점검 + 왼쪽 목록의 페이지 노드)
 const edTabOf = (n) => (n.startsWith('guide:') || n.startsWith('rule:') ? 'guide' : n === 'install' || n === 'set:update' || n.startsWith('manage:') ? 'manage' : n.startsWith('set:') ? 'set' : 'world');
-// 목록은 폰(760px 이하)에서 서랍에 숨으므로 DOM 에서 누른다 (tests/qc-settings-harness.mjs goNode 와 같음)
+// 목록은 폰(600px 이하)에서 서랍에 숨으므로 DOM 에서 누른다 (tests/qc-settings-harness.mjs goNode 와 같음)
 /** 설정 창 바로 저장(2026-11-08 사용자)이 끝날 때까지: 고친 것 없음 + 저장 중 아님 */
 async function edSaved(page) {
   await page.waitForTimeout(50);

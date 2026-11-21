@@ -59,15 +59,16 @@ export function hypaPlusItems(stored: unknown): HypaItem[] {
   let state: unknown = stored;
   if (typeof stored === 'string') { try { state = JSON.parse(stored); } catch { return []; } }
   if (!state || typeof state !== 'object' || Array.isArray(state)) return [];
-  const out: HypaItem[] = [];
+  const found: { text: string; favorite: boolean; at: number; n: number }[] = [];
   const chunks = (state as { chunks?: unknown }).chunks;
   for (const chunk of Array.isArray(chunks) ? (chunks as Record<string, unknown>[]) : []) {
     for (const node of Array.isArray(chunk?.nodes) ? (chunk.nodes as Record<string, unknown>[]) : []) {
       const text = plusNodeText(node);
-      if (text) out.push({ source: 'hypaplus', text, favorite: node?.favorite === true, index: Number(node?.createdAt) || out.length + 1 });
+      if (text) found.push({ text, favorite: node?.favorite === true, at: Number(node?.createdAt) || 0, n: found.length });
     }
   }
-  return out;
+  // 순번은 만든 시각 차례로 1, 2, 3… (전수점검 보통-20: 시각 값(밀리초)을 그대로 순번으로 써 관련도·중요 표시 점수를 덮었다)
+  return found.sort((a, b) => (a.at && b.at ? a.at - b.at : 0) || a.n - b.n).map((x, i) => ({ source: 'hypaplus' as const, text: x.text, favorite: x.favorite, index: i + 1 }));
 }
 
 /** 관련도 순위로 고르기 (원본 selectHypaItems): 중복 제거 → 점수 내림차순(같으면 최신) → 개수·글자 상한 → 원래 순서로 돌려준다 */

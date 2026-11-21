@@ -4,7 +4,8 @@
 // - 다중인격 혼잣말: 시점 인물의 마음속 여러 갈래(1~9)가 단톡처럼 주고받는다
 // 내가 끼지 않는 방이라 괴담톡 대화 기록(PState)과 따로 둔다. 선톡·새로고침·채팅 반영에는 섞이지 않는다.
 // 방은 참여 인물마다 하나: 같은 인물들이면 그 방에 이어 쓰고, 인물이 다르면 새 방 (matchView).
-import { decodeJson, parseReactions, PH, phoneValue, PhoneError } from './phone';
+import { decodeJson, hiddenPause, parseReactions, PH, phoneValue, PhoneError } from './phone';
+import { trimRooms } from './budget';
 import { guideTxt } from './guides';
 
 export type ViewPreset = 'side' | 'mono' | 'multi';
@@ -90,7 +91,9 @@ export function matchView(list: ViewRoom[], value: Pick<ViewRoom, 'preset' | 'po
 /** 같은 종류의 기존 방들 (모델에 보낼 모양, 최근 방부터). 모델이 인물 이름을 그대로 다시 쓰고 앞 내용을 되풀이하지 않게.
  *  limit = 방마다 넘길 말풍선 수 (양 표 「보기 전용 방」 줄의 지난 기록) */
 export function viewRooms(list: ViewRoom[], preset: ViewPreset, limit = VIEW_LIMITS.messages): unknown[] {
-  const rooms = list.filter((x) => x.preset === preset).reverse();
+  // 최근 방부터. 요청 토큰 상한에 걸리면 오래된 방부터 덜 싣는다 (core/budget.ts trimRooms)
+  const all = list.filter((x) => x.preset === preset).reverse();
+  const rooms = all.slice(0, trimRooms(all.length));
   const each = Math.max(1, limit);
   return rooms.map((r) => ({
     name: r.name, pov: r.pov, participants: r.people,
@@ -122,7 +125,7 @@ export function parseView(raw: string, preset: ViewPreset): Omit<ViewRoom, 'id' 
       const cap = ids.size - 1;
       const reactions = cap > 0 ? parseReactions(m?.reactions).map((r) => `${r.emoji}${Math.min(r.count, cap)}`).join(' ') : '';
       messages.push({ sender: str(m.sender), type: 'text', text: content.slice(0, VIEW_LIMITS.text), ...(reactions ? { reactions } : {}) });
-    } else if (type === 'pause' && content && content !== '-' && [...content].length <= 12) messages.push({ sender: '-', type: 'pause', text: content });
+    } else if (type === 'pause' && content !== '-' && !hiddenPause(content)) messages.push({ sender: '-', type: 'pause', text: content });
     else if (type === 'skip' && messages.length && messages[messages.length - 1].type !== 'skip') messages.push({ sender: '-', type: 'skip', text: '' });
     if (messages.length >= VIEW_LIMITS.messages) break;
   }

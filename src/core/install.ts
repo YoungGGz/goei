@@ -34,7 +34,7 @@ export function setInstallData(d: InstallData): void {
 export const installDataReady = (): boolean => data !== null;
 /** 설치 자료. 아직 받지 않았으면 던진다 (host/install.ts 가 설치·점검 전에 ensureInstallData 로 받는다) */
 export function installData(): InstallData {
-  if (!data) throw new Error('설치 자료(goei-data-install)를 아직 받지 않았어요. 설치·점검 화면을 다시 열어 주세요.');
+  if (!data) throw new Error('설치 자료(goei-data-install)를 아직 받지 않았어요. 설치·업데이트 화면을 다시 열어 주세요.');
   return data;
 }
 

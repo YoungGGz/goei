@@ -1,6 +1,7 @@
 // 첨부 화면 (원본 AT.menu·AT.card·AT.gnetRender): 작성칸 아래 첨부 고르기, 말풍선·글 안의 첨부 카드.
 import { ATTACH_HINTS, ATTACH_LABELS, ATTACH_MAX, attachUrl, bodyParts, type PartKind, type UserKind } from '../core/attach';
 import { photoUrl } from '../host/photo';
+import { ICONS } from './icons';
 
 /** image: 실제 사진 (asset = 저장 경로, preview = 작성칸 미리보기 주소) */
 export type Attachments = { kind: UserKind; content: string; asset?: string; preview?: string }[];
@@ -116,7 +117,7 @@ export function zoomPhoto(src: string, alt: string): void {
   box.className = 'gx at-zoom';
   box.setAttribute('role', 'dialog');
   box.setAttribute('aria-label', '사진 크게 보기');
-  box.innerHTML = `<img src="${esc(src)}" alt="${esc(alt)}"><button class="at-zoom-x" aria-label="닫기">✕</button>`;
+  box.innerHTML = `<img src="${esc(src)}" alt="${esc(alt)}"><button class="at-zoom-x" aria-label="닫기">${ICONS.close}</button>`;
   const close = () => {
     box.remove();
     document.removeEventListener('keydown', key, true);

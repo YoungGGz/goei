@@ -773,7 +773,7 @@ def write_update(folder, payload):
              'parts': names, 'length': len(text.encode('utf-16-le')) // 2}  # JS 글자 수(UTF-16)
     (folder / UPDATE_FILE).write_text(json.dumps(index, ensure_ascii=False), encoding='utf-8')
     return len(names)
-CARD_NAME = '괴이: ANOMALY'  # 정식 이름 (src/ui/brand.ts BRAND.name과 같게)
+CARD_NAME = '괴이 ː ANOMALY'  # 정식 이름 (src/ui/brand.ts BRAND.name과 같게)
 
 
 def update_payload(data, risu, module, version, min_plugin):
@@ -866,19 +866,6 @@ def add_image_lore(lore):
     names = {b['comment'] for b in books} | {'Asset', 'Image tag'}
     settings = next(e for e in lore if e.get('mode') == 'folder' and e.get('comment') == SETTINGS_FOLDER_NAME)
     return [e for e in lore if e.get('comment') not in names] + [{**b, 'folder': settings['key']} for b in books]
-
-
-VISIT_GUIDE = ROOT / '카드' / 'visit-guide.txt'
-VISIT_HEAD = '<!-- Visit: 본부 방문 대화 지침. 플러그인이 요청마다 필요한 섹션만 골라 씁니다. 자동 활성화 OFF / 키워드 비움. 섹션 구분 줄은 그대로 두세요. -->'
-
-
-def add_visit_guide(lore):
-    """본부 방문 대화 지침(카드/visit-guide.txt)을 괴담톡 Phone처럼 ⚙️설정 폴더의 키 없는 항목으로 넣는다 (플러그인 core/visitPrompt.ts)"""
-    settings = next(e for e in lore if e.get('mode') == 'folder' and e.get('comment') == SETTINGS_FOLDER_NAME)
-    entry = {'key': '', 'secondkey': '', 'comment': 'Visit', 'content': VISIT_HEAD + '\n\n' + VISIT_GUIDE.read_text(encoding='utf-8').strip() + '\n',
-             'mode': 'normal', 'insertorder': 100, 'alwaysActive': False, 'selective': False, 'useRegex': False,
-             'folder': settings['key'], 'bookVersion': 2}
-    return [e for e in lore if e.get('comment') != 'Visit'] + [entry]
 
 
 def shrink_maps(others):

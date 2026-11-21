@@ -28,7 +28,7 @@ const c = chat(['user', '출근했다', 'u1'], ['char', '쟈알디가 커피를 
 
 test('지침 편집: 절 본문 읽기 (기본 지침은 지침 탭에서만 고친다)', () => {
   const body = U.sectionBody(P.UPDATER_DETAILED, 'register');
-  assert.ok(body.startsWith('"## 8.') || body.includes('## 8. Relationship'), body.slice(0, 80));
+  assert.ok(body.startsWith('"## 9.') || body.includes('## 9. Relationship'), body.slice(0, 80));
   assert.equal(U.overrideSections, undefined, '채팅별 절 덮어쓰기는 없앰');
   assert.equal(St.PS, undefined);
 });

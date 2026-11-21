@@ -1,3 +1,4 @@
+import { timeMs } from '../core/timing';
 // 본편 응답을 기다리는 중인가: 요청이 나가면 켜고, 응답이 붙거나 너무 오래되면 끈다 (게임 연출에만 쓴다)
 let on = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
@@ -8,9 +9,7 @@ let probe: (() => Promise<boolean>) | null = null;
 export function setWaitingProbe(fn: (() => Promise<boolean>) | null): void {
   probe = fn;
 }
-/** 처음 기다리는 시간 · 아직 만드는 중이면 다시 물을 때까지의 시간 */
-export const WAIT_MS = 180_000;
-export const WAIT_AGAIN_MS = 30_000;
+// 처음 기다리는 시간 · 아직 만드는 중이면 다시 물을 때까지의 시간 · 「취소」 두 번 누르기 시간은 설정 「화면」 (core/timing.ts, 전수점검 사소-9)
 
 /** 시간이 다 됐다: 아직 만드는 중이면 더 기다리고(답이 3분보다 늦어도 기다림이 중간에 꺼지지 않게, 11-14 재검토), 아니면 늦게 끈다 */
 async function expire(mine: ReturnType<typeof setTimeout> | undefined): Promise<void> {
@@ -21,7 +20,7 @@ async function expire(mine: ReturnType<typeof setTimeout> | undefined): Promise<
   // 묻는 사이 기다림이 바뀌었으면(답이 왔거나 새 요청) 손대지 않는다
   if (timer !== mine || !on) return;
   if (busy) {
-    const t: ReturnType<typeof setTimeout> = setTimeout(() => void expire(t), WAIT_AGAIN_MS);
+    const t: ReturnType<typeof setTimeout> = setTimeout(() => void expire(t), timeMs('mainAgain'));
     timer = t;
     return;
   }
@@ -34,7 +33,7 @@ export function setWaiting(w: boolean, late = false): void {
   timer = undefined;
   // 응답 알림을 놓쳐도 계속 켜져 있지 않게
   if (w) {
-    const t: ReturnType<typeof setTimeout> = setTimeout(() => void expire(t), WAIT_MS);
+    const t: ReturnType<typeof setTimeout> = setTimeout(() => void expire(t), timeMs('mainWait'));
     timer = t;
   }
   if (w === on) return;
@@ -49,7 +48,7 @@ export const isWaiting = () => on;
 let askedAt = 0;
 export function passWaiting(now = Date.now()): boolean {
   if (!on) return true;
-  if (now - askedAt <= 5000) {
+  if (now - askedAt <= timeMs('cancelTwice')) {
     askedAt = 0;
     return true;
   }

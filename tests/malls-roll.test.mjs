@@ -8,10 +8,12 @@ const M = await import(`data:text/javascript;base64,${Buffer.from(out.outputFile
 /** 정해진 수열을 내는 난수 (시험용) */
 const seq = (...xs) => { let i = 0; return () => xs[i++ % xs.length]; };
 
-test('진열 배정: 기본값은 장르 20종·등급 5단계, 칸마다 다른 장르, 등급 구간이 글에 들어간다', () => {
+test('진열 배정: 기본값은 장르 19종·등급 5단계, 칸마다 다른 장르, 등급 구간이 글에 들어간다', () => {
   const r = M.cosRoll({});
   assert.equal(r.on, true);
-  assert.equal(r.genres.length, 20);
+  // 전수점검 보통-36: 외계를 드러내지 않는 몰이라(11-09 사용자) 기본 장르에서 alien 을 뺐다
+  assert.equal(r.genres.length, 19);
+  assert.ok(!r.genres.includes('alien'));
   assert.equal(r.tiers.length, 5);
   assert.equal(r.useful, 'auto');
   const text = M.cosAssignment(5, true, r, seq(0.1, 0.5, 0.9, 0.3, 0.7));

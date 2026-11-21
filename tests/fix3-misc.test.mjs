@@ -72,9 +72,10 @@ test('그림 찾기 바뀜 횟수: 같은 대체 표·같은 분류 설정은 �
   assert.equal((src.match(/hits\.clear\(\);/g) ?? []).length, 4, '팩을 바꾸는 세 곳 + 바뀜 횟수');
 });
 
-test('폰 「인터넷 접속」 고르기는 높이 34 한 줄로 카드 안에: 폰에서만 칸 여백을 줄인다 (css#5)', async () => {
+test('폰 「인터넷 접속」 고르기는 높이 34 한 줄로 카드 안에: 폰에서만 칸을 카드 폭으로 나눈다 (css#5)', async () => {
   const css = await read('src/ui/style.css');
-  assert.match(css, /\.gw \.ms-fx \.ph-inline > \.gx-segs > \.gx-seg \{ padding: 0 4px; \}/);
+  // 눌러-보통-53: 칸 여백 6px, 카드 폭 안에서 칸을 나눠 갖고 넘치면 말줄임 (4px 은 글자가 붙었다)
+  assert.match(css, /\.gw \.ms-fx \.ph-inline > \.gx-segs > \.gx-seg \{ flex: 1 1 auto; min-width: 0; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; \}/);
   assert.doesNotMatch(css, /\.gw \.ms-fx \.ph-inline > \.gx-segs \{ flex-wrap: wrap/, '두 줄로 접으면 높이 34 규격이 깨진다');
 });
 

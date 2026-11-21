@@ -39,7 +39,7 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   }
   // ① 기본값이 진짜 글로
   const g0 = await val(G);
-  assert.ok(g0.split(',').length === 20, `[${vp}] 장르 칸에 기본 20종이 들어 있다: ${g0.slice(0, 60)}`);
+  assert.ok(g0.split(',').length === 19 && !/\balien\b/.test(g0), `[${vp}] 장르 칸에 기본 19종(alien 뺌, 전수점검 보통-36)이 들어 있다: ${g0.slice(0, 60)}`);
   assert.equal(await ph(G), '', '회색 안내 글 없음');
   assert.equal(await changed(G), false);
   assert.equal(await page.locator('.gw [data-action="ms-roll-reset"]').count(), 0, '고친 게 없으면 「기본값으로」 없음');
@@ -49,7 +49,7 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   // ② 하나만 덧붙이면 나머지가 남는다 + ④ 점
   await page.focus(G); await page.keyboard.press('Control+End'); await page.keyboard.type(', 시험 장르'); await page.evaluate((s) => document.querySelector(s).blur(), G); await sleep(400);
   const g1 = (await ss()).$cos_roll_genres;
-  assert.equal(g1, `${g0}, 시험 장르`, '친 글 + 기본 20종이 그대로');
+  assert.equal(g1, `${g0}, 시험 장르`, '친 글 + 기본 19종이 그대로');
   assert.equal(await val(G), g1); assert.equal(await changed(G), true, '바꾼 줄 점');
   assert.equal(await page.locator('.gw [data-action="ms-roll-reset"]').count(), 1);
   await shot('cos-2-typed', G);
@@ -66,16 +66,14 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   await put(BG, `${b0}, 시험 분류`); assert.equal((await ss()).$bm_roll_genres, `${b0}, 시험 분류`); assert.equal(await changed(BG), true);
   await shot('bm-genres-edited', BG);
   await put(BG, ''); assert.ok(!(await ss()).$bm_roll_genres); assert.equal(await val(BG), b0);
-  // 망상홈쇼핑: 주문 전화번호·출연 형태
+  // 망상홈쇼핑: 주문 전화번호 (출연 형태 칸은 v0.21.20(170acda)에서 없어졌다)
   await goNode(page, 'set:hs'); await sleep(300);
-  const TEL = sel('hs-text', 'tel'); const F = sel('hs-text', 'forms');
-  assert.equal(await val(TEL), '080-404-0000'); assert.equal(await val(F), '전화 출연, 엑스트라, 모델'); assert.equal(await ph(F), '');
-  await put(F, '전화 출연, 엑스트라, 모델'); assert.ok(!(await ss()).$hs_forms);
-  await put(F, '전화 출연, 엑스트라, 모델, 방청객'); assert.equal((await ss()).$hs_forms, '전화 출연, 엑스트라, 모델, 방청객'); assert.equal(await changed(F), true); assert.equal(await changed(TEL), false);
-  await shot('hs-forms-edited', F);
-  await put(F, ''); assert.ok(!(await ss()).$hs_forms); assert.equal(await val(F), '전화 출연, 엑스트라, 모델'); assert.equal(await changed(F), false);
+  const TEL = sel('hs-text', 'tel');
+  assert.equal(await val(TEL), '080-404-0000'); assert.equal(await ph(TEL), ''); assert.equal(await changed(TEL), false);
+  await put(TEL, '080-404-0000'); assert.ok(!(await ss()).$hs_tel, '기본값과 같으면 저장 안 함');
   await put(TEL, '080-111-2222'); assert.equal((await ss()).$hs_tel, '080-111-2222'); assert.equal(await changed(TEL), true);
-  await put(TEL, ''); assert.ok(!(await ss()).$hs_tel); assert.equal(await val(TEL), '080-404-0000');
+  await shot('hs-tel-edited', TEL);
+  await put(TEL, ''); assert.ok(!(await ss()).$hs_tel); assert.equal(await val(TEL), '080-404-0000'); assert.equal(await changed(TEL), false);
   // 가로 넘침·이름 줄바꿈 없음
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth), false, '가로 넘침 없음');
   assert.deepEqual(errors.filter((e) => !/favicon/.test(e)), []);

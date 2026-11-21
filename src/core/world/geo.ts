@@ -21,19 +21,37 @@ export function locName(loc: string): string {
   return gu ? `${sido} ${gu}` : sido;
 }
 
-/** "서울특별시 종로구" → "서울 종로구" (모델이 시도를 줄여 쓰는 경우) */
-function shortName(name: string): string {
-  return name.replace(/^(\S+?)(?:특별자치도|특별자치시|특별시|광역시|도)(\s)/, '$1$2');
+/** 지금 이름과 다른 옛 시도 이름 (모델이 옛 이름으로 쓰는 경우) */
+const OLD_SIDO: Record<string, string[]> = { 전북: ['전라북도'], 강원: ['강원도'], 제주: ['제주도'] };
+
+/**
+ * 시도 이름을 모델이 쓸 법한 모든 꼴로: "서울특별시" → 서울특별시·서울, "충청남도" → 충청남도·충청남·충남, "전북특별자치도" → 전북특별자치도·전북·전라북도.
+ * 줄인 시도 이름(충남·경북·전남…)으로 온 태그가 등록·종료되지 않던 것 (전수점검 중대-4)
+ */
+function sidoForms(sido: string): string[] {
+  const stem = sido.replace(/(?:특별자치도|특별자치시|특별시|광역시|도)$/, '');
+  const out = new Set([sido, stem]);
+  // 충청남·경상북·전라남 → 충남·경북·전남
+  if (stem.length === 3 && /[남북]$/.test(stem)) out.add(stem[0] + stem[2]);
+  for (const s of [...out]) for (const old of OLD_SIDO[s] ?? []) out.add(old);
+  return [...out].filter(Boolean);
+}
+
+/** "충청남도 당진시" → 충청남도 당진시·충남 당진시… (시도 꼴만 바꾼 이름들) */
+export function nameForms(name: string): string[] {
+  const m = /^(\S+)(\s.*)$/.exec(name.trim());
+  if (!m) return [...new Set([name, ...sidoForms(name.trim())])];
+  return sidoForms(m[1]).map((s) => s + m[2]);
 }
 
 /**
  * 모델이 적은 지역과 시스템 지역이 같은지. 공백 무시, 한쪽이 다른 쪽을 포함하면 일치 (시도 접두 차이 허용).
- * 원본 규칙에 더해 "서울 종로구"처럼 시도를 줄여 쓴 것도 받는다.
+ * 원본 규칙에 더해 "서울 종로구"·"충남 당진시"처럼 시도를 줄여 쓴 것도 받는다.
  */
 export function regionMatch(tagRegion: string | undefined, name: string | undefined): boolean {
   if (!tagRegion?.trim() || !name?.trim()) return false;
   const a = tagRegion.replace(/\s+/g, '');
-  return [name, shortName(name)].some((n) => {
+  return nameForms(name).some((n) => {
     const b = n.replace(/\s+/g, '');
     return a === b || a.includes(b) || b.includes(a);
   });

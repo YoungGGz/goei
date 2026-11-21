@@ -2,6 +2,7 @@
 // 차이는 카드를 눌렀을 때 하는 일뿐이다. 종류(괴이·사건·특수)는 두 곳 모두 상태 딱지 왼쪽에 같은 모양 딱지로 (v0.16.18).
 import type { CharacterSnapshot } from '../host/risu';
 import { locName, NATION_PINS, type EndedEntry } from '../core/world';
+import { reportBadge } from '../core/journal';
 import { ensureClouds } from './clouds';
 import { ICONS } from './icons';
 import { avatar } from './images';
@@ -173,6 +174,8 @@ export async function aimFlash(key: string): Promise<void> {
   b.classList.add('fx');
   b.setAttribute('aria-pressed', String(on));
   b.setAttribute('title', on ? '해제' : '선택');
+  // 효과를 보는 동안(다시 그리기 전)에도 카드에 고른 테두리(민트 2px)를 같이 켠다: 조준선만 빨갛게 바뀌고 테두리는 회색 1px 그대로였다 (전수점검 눌러2-보통-37)
+  b.closest('.gx-mlist li.gx-mx, .gx-evc')?.classList.toggle('sel', on);
   aimHit.used = true;
   await new Promise((r) => setTimeout(r, on ? AIM_LOCK_MS : AIM_RELEASE_MS));
 }
@@ -239,7 +242,7 @@ function opsRow(c: OpsCard, on: boolean): string {
   const thumb = c.art?.pic ? `<img src="${esc(c.art.pic)}" alt="" loading="lazy">` : `<span class="gx-oprow-ico">${MARK[c.kind]}</span>`;
   return `<li class="gx-oprow k-${c.kind}${on ? ' sel' : ''}${c.ended ? ' ended' : ''}" data-action="ops-sel" data-value="${esc(c.id)}" aria-current="${on}">
     <span class="gx-oprow-pic">${thumb}</span>
-    <span class="gx-oprow-t"><b>${gradeMark(c)}<span>${esc(c.name)}</span>${c.selected ? '<span class="gx-badge gx-goaltag">목표</span>' : ''}${c.ended && c.mine ? '<span class="gx-badge live gx-minetag">내가 출동</span>' : ''}</b><small><span>${c.loc}</span>${statusNote(c)}</small></span>${c.ended && c.rpt ? `<button class="gx-oprpt" data-action="rec-open" data-value="${esc(c.rpt)}" title="보고서" aria-label="${esc(c.name)} 보고서">${ICONS.records}</button>` : depMark(c)}</li>`;
+    <span class="gx-oprow-t"><b>${gradeMark(c)}<span>${esc(c.name)}</span>${c.selected ? '<span class="gx-badge gx-goaltag">목표</span>' : ''}${c.ended && c.mine ? `<span class="gx-badge live gx-minetag">${reportBadge(c)}</span>` : ''}</b><small><span>${c.loc}</span>${statusNote(c)}</small></span>${c.ended && c.rpt ? `<button class="gx-oprpt" data-action="rec-open" data-value="${esc(c.rpt)}" title="보고서" aria-label="${esc(c.name)} 보고서">${ICONS.records}</button>` : depMark(c)}</li>`;
 }
 
 const camNo = (loc: string) => String((Array.from(loc).reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 97, 7) % 89) + 10).padStart(2, '0');
@@ -272,7 +275,7 @@ function evBtns(c: EvCard): string {
   const name = esc(c.name);
   return `${c.rpt ? `<button class="gx-evbtn" data-action="rec-open" data-value="${esc(c.rpt)}" title="보고서" aria-label="${name} 보고서">${ICONS.records}</button>` : ''}
     ${c.name === '이름 미확인' ? '' : `<button class="gx-evbtn" data-action="wiki-goto" data-value="${name}" title="위키" aria-label="${name} 위키">${ICONS.wiki}</button>`}
-    ${c.key ? `<button class="gx-evbtn end${c.confirmEnd ? ' danger' : ''}" data-action="end-event" data-value="${key}" title="${c.confirmEnd ? '한 번 더 누르면 종료' : '상황 종료'}" aria-label="${name} ${c.confirmEnd ? '정말 종료' : '상황 종료'}">${ICONS.trash}</button>` : ''}`;
+    ${c.key ? `<button class="gx-evbtn end${c.confirmEnd ? ' danger' : ''}" data-action="end-event" data-value="${key}" title="${c.confirmEnd ? '한 번 더 누르면 종료' : '상황 종료'}" aria-label="${name} ${c.confirmEnd ? '정말 종료' : '상황 종료'}">${ICONS.trash}${c.confirmEnd ? '<span>정말 종료</span>' : ''}</button>` : ''}`;
 }
 
 /** 위성 보기: 제목이 없어 오른쪽 위 단추 줄 맨 앞에 같은 표식 */
@@ -300,7 +303,8 @@ function opsFeed(c: OpsCard | undefined, clock: string, empty: string): string {
 /** CCTV 큰 보기 한 장 (상황판 왼쪽, 상세 창 공통). cls: 바깥 div에 덧붙일 클래스(와 속성) */
 function feedView(c: EvCard, clock: string, cls = ''): string {
   const name = esc(c.name);
-  const btns = evBtns(c);
+  // 상세 창(cls 있음)은 단추 줄 맨 끝에 닫기. 닫기 자리에 휴지통만 있어 닫으려다 종료를 누를 수 있었다 (전수점검 눌러-보통-3)
+  const btns = evBtns(c) + (cls ? `<button class="gx-evbtn gx-evx" data-action="ev-pop" title="닫기" aria-label="닫기">${ICONS.close}</button>` : '');
   const pic = c.art?.pic ? `<img class="gx-opfeed" src="${esc(c.art.pic)}" alt="">` : `<span class="gx-evart-ico">${MARK[c.kind]}</span>`;
   const desc = c.art?.desc ? `<span class="gx-evc-desc">${esc(c.art.desc)}</span>` : '';
   const loc = c.locCode ?? '';
@@ -313,7 +317,7 @@ function feedView(c: EvCard, clock: string, cls = ''): string {
   return `<div class="gx-opview feed k-${c.kind}${c.ended ? ' ended' : ''}${cls}"${grade}${fxkey}>${pic}${tear}${STATIC}${c.ended ? '' : FX}
     ${c.key && !c.ended ? aimMark(!!c.selected, 'pick-event', c.key) : ''}
     <div class="gx-opbar">${osd(`<span class="rec"><i></i>${c.ended ? 'END' : 'REC'}</span>`, cam, clock)}<span class="gx-evart-act">${btns}</span></div>
-    <div class="gx-opcap"><span class="gx-evart-l1">${gradeMark(c)}<b>${name}</b>${c.ended && c.mine ? '<span class="gx-badge live gx-minetag">내가 출동</span>' : ''}</span>${whoLine(c.chips)}<span class="gx-evart-l2"><small>${c.loc}</small>${statusNote(c)}</span>${c.extra ?? ''}${desc}</div>
+    <div class="gx-opcap"><span class="gx-evart-l1">${gradeMark(c)}<b>${name}</b>${c.ended && c.mine ? `<span class="gx-badge live gx-minetag">${reportBadge(c)}</span>` : ''}</span>${whoLine(c.chips)}<span class="gx-evart-l2"><small>${c.loc}</small>${statusNote(c)}</span>${c.extra ?? ''}${desc}</div>
   </div>`;
 }
 
@@ -342,6 +346,50 @@ function opsMap(cards: OpsCard[], sel: string, url: string | null, clock: string
   const focus = sAt ? `--px:${sAt[2]};--py:${sAt[3] + sN * 4.2}` : '--px:55;--py:50';
   return `<div class="gx-opview map"><div class="gx-opmap">${url ? `<div class="gx-opmapi" style="${focus}"><img src="${esc(url)}" alt="전국 지도">${cross}${pins}</div>` : ''}</div>${url ? SKY : ''}
     <div class="gx-opbar">${osd('<span class="rec sat"><i></i>LIVE</span>', `SAT-02 · TRK ${track(sAt ? sAt[2] : 55, sAt ? sAt[3] + sN * 4.2 : 50)}`, clock)}${s ? `<span class="gx-evart-act">${opsPick(s)}${evBtns(s)}</span>` : ''}</div></div>`;
+}
+
+/** 위성 지도 이름표가 서로 덮으면 뒤엣것을 아래로 내린다. 고른 상황이 먼저 자리를 잡는다 (render 뒤에 부른다)
+ *  (전수점검 눌러-보통-6: 붙어 있는 창원·함안 이름표가 겹쳐 하나가 가려졌다. 폰은 지도가 작아 % 간격이 이름표 높이보다 좁다)
+ *  점(i)은 제자리에 두고 이름표(em)만 내린다. 지도 크기가 바뀌면(창 크기·돌리기) 다시 잰다 */
+let opsRO: ResizeObserver | null = null;
+export function declutterOps(root: HTMLElement): void {
+  opsRO?.disconnect();
+  opsRO = null;
+  const map = root.querySelector<HTMLElement>('.gx-opmapi');
+  if (!map) return;
+  const run = () => {
+    const labs = [...map.querySelectorAll<HTMLElement>('.gx-oppin em')];
+    for (const e of labs) e.style.removeProperty('--dy');
+    const order = labs.map((el, i) => ({ el, i, r: el.getBoundingClientRect() }))
+      .sort((a, b) => Number(b.el.parentElement?.classList.contains('sel')) - Number(a.el.parentElement?.classList.contains('sel')) || a.r.top - b.r.top || a.i - b.i);
+    const placed: { l: number; r: number; t: number; b: number }[] = [];
+    for (const { el, r } of order) {
+      let dy = 0;
+      for (let k = 0; k < 12; k++) {
+        const t = r.top + dy, b = r.bottom + dy;
+        const hit = placed.filter((q) => r.left < q.r && q.l < r.right && t < q.b && q.t < b);
+        if (!hit.length) break;
+        dy = Math.max(...hit.map((q) => q.b)) - r.top + 2;
+      }
+      if (dy) el.style.setProperty('--dy', `${dy}px`);
+      placed.push({ l: r.left, r: r.right, t: r.top + dy, b: r.bottom + dy });
+    }
+  };
+  run();
+  if (typeof ResizeObserver === 'undefined') return;
+  let w = map.clientWidth, h = map.clientHeight;
+  opsRO = new ResizeObserver(() => {
+    if (!map.isConnected) return opsRO?.disconnect();
+    if (map.clientWidth === w && map.clientHeight === h) return;
+    (w = map.clientWidth), (h = map.clientHeight);
+    run();
+  });
+  opsRO.observe(map);
+}
+
+/** 조준선 위에 놓인 글 칸이 넘쳐 스크롤해야 할 때만 눌림을 받게 ovf 를 붙인다 (render 뒤에 부른다, 검토 지적: 눌러-보통-4) */
+export function markCapOverflow(root: HTMLElement): void {
+  for (const el of root.querySelectorAll<HTMLElement>('.gx-opcap, .gx-mx.open .gx-evart-cap')) el.classList.toggle('ovf', el.scrollHeight > el.clientHeight + 1);
 }
 
 /** 관제실 상황판 본문. counts: 일지 제목줄 숫자 (html) */

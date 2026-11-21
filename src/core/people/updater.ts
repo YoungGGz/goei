@@ -11,10 +11,10 @@ import { unknownTo, suspicionShown } from './inject';
 import { seedPerson } from './seed';
 import { temperOf, type RosterRow } from './base';
 import { rhythmClock, rhythmClockLines, rhythmNow, hookActive, parseHookHead, retireHookText, turnAt, type RhythmClock } from './rhythm';
-import { axesView, ensureAxes, isAxis, isDirection, observe, readAxes, setAxes, pruneCandidates } from './axes';
+import { axesView, ensureAxes, isAxis, isDirection, liveEvidence, observe, readAxes, setAxes, pruneCandidates } from './axes';
 import { AXES } from './types';
 import { factionNow, knownFactionCodes, sceneFactionCodes, stageMid, userFactionOf, factionName as factionNameOf } from './faction';
-import { factionCode } from './identity';
+import { factionCode, rankLevel } from './identity';
 import { mentionsAmount, parseWon } from '../wallet';
 import { mentionsPoints, parsePoints } from '../points';
 import { cleanIcon, itemsRule, itemEquip, itemState, stripGrades, itemUses, itemWeight, sameItemName, type ItemEquip, type ItemState, type UsedNow } from '../items';
@@ -22,6 +22,7 @@ import { leftWordIn, offWordIn } from '../itemrules';
 import { nameMatcher, scenePeople, carriedScene, entriesOf, type NameEntry } from './select';
 import { imgTagNames } from '../imgtag';
 import { capScene, changeId, entryId, isAlive, liveChanges, liveEntries, liveness, markRead, messageKey, norm, plain, prunePending, putChange, putDoc, putEntry, renamePerson, sentText, type Liveness } from './store';
+import { OPENNESS_FOLD_REASON } from './prune';
 import { PP_DEFAULTS, type Feature, type PeopleSettings } from './settings';
 import { CUES, DOC_TYPES, FACTION_STAGES, OPENNESS_BASELINES, factionWho, OPENNESS_DELTAS, REGISTERS, RHYTHM_ENGAGEMENT, RHYTHM_HOOK_STAGES, RHYTHM_HOOK_TIERS, RHYTHM_PHASES, SLOTS, SLOT_META, TASTE_MAX, TASTE_MIN, docFeature, opennessStage, slotsFor, type Change, type Cue, type Doc, type DocType, type Entry, type PeopleStore, type Person, type Register, type SlotId } from './types';
 
@@ -154,6 +155,12 @@ export function recordChars(p: Person, live: Liveness): number {
   return SLOTS.filter((s) => s !== 'suspicion').reduce((n, s) => n + liveEntries(p.slots[s], live).reduce((m, e) => m + e.text.length, 0), 0);
 }
 
+/** 모으는 중인 성격 변화 후보 (살아 있는 관찰이 있는 것): 갱신기가 같은 변화를 같은 글로 적어 한 후보로 모이게 (전수점검 중대-3). 성적 축은 설명이 바뀌어도 한 후보라 뺀다 */
+function collectingView(p: Person, live: Liveness): { axes_collecting?: { axis: string; direction: string; pattern: string }[] } {
+  const list = Object.values(p.candidates ?? {}).filter((c) => c.status === 'collecting' && !isSexualAxis(c.axis) && liveEvidence(c, live).length > 0).map((c) => ({ axis: c.axis, direction: c.direction, pattern: c.pattern }));
+  return list.length ? { axes_collecting: list } : {};
+}
+
 export function personPayload(p: Person, live: Liveness, changes: Change[], unknown?: string[], extra: { taste?: boolean; openness?: boolean; axes?: boolean; turnCap?: number; slots?: SlotId[]; qual?: Set<string>; sexual?: PeopleSettings; aff?: AffinityOpts; folded?: number } = {}) {
   const entries: Record<string, { id: string; text: string; target?: string; kind?: string; pin?: true }[]> = {};
   for (const s of extra.slots ?? SLOTS) {
@@ -175,7 +182,7 @@ export function personPayload(p: Person, live: Liveness, changes: Change[], unkn
     ...(extra.taste ? { taste_now: tasteOf(p, changes) } : {}),
     ...(extra.openness && !extra.qual?.has('openness') ? { openness_now: (() => { const v = opennessOf(p, changes); return v === null ? null : { value: v, stage: opennessStage(v).en }; })() } : {}),
     // 성격 6축 (기능 axes): 값·띠 설명, 아직 시작값이 없으면 axes_init_needed, 장기 변화
-    ...(extra.axes ? { axes: axesView(p.axes).map((a) => ({ axis: a.axis, value: a.value, band: a.band })), ...(p.axesFrom === 'default' ? { axes_init_needed: true } : {}), ...(p.patterns?.length ? { patterns: p.patterns } : {}) } : {}),
+    ...(extra.axes ? { axes: axesView(p.axes).map((a) => ({ axis: a.axis, value: a.value, band: a.band })), ...(p.axesFrom === 'default' ? { axes_init_needed: true } : {}), ...(p.patterns?.length ? { patterns: p.patterns } : {}), ...collectingView(p, live) } : {}),
     // 성적 욕망·이상성욕 (sexual.ts): 이 인물이 쓰는 칸만, 현재 글(없으면 null), 아직 빈 칸(init_needed), 어휘 방식
     ...(extra.sexual && sexualAnyOn(extra.sexual) ? (() => {
       const on = SEXUAL_FIELDS.filter((f) => sexualFieldOn(p, f, extra.sexual!));
@@ -206,6 +213,8 @@ export interface BuildOpts {
   only?: string[];
   /** 장부 잔고 (원). 잔고 칸을 쓰지 않으면 null/없음 → 거래 절 없음 */
   wallet?: number | null;
+  /** 이번 응답들에 딸려 프로그램이 이미 장부에 적은 거래 (상점·쇼핑몰·홈쇼핑·필드). 자료 wallet_recorded */
+  walletDone?: { amount: number; memo: string }[];
   /** 백일몽 포인트 잔고 (core/points.ts). 포인트를 쓰지 않으면 null/없음 → 포인트 거래 절 없음 */
   points?: number | null;
   /** 모델 Router 가 본 미등록 이름 (힌트). 자료 name_hints */
@@ -407,6 +416,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     span: span.map(({ index: _i, ...rest }) => rest),
     identity_known: store.identity ? { faction: store.identity.faction, rank: store.identity.rank } : null,
     wallet_now: typeof o.wallet === 'number' ? { balance: o.wallet, unit: 'KRW' } : undefined,
+    wallet_recorded: typeof o.wallet === 'number' && o.walletDone?.length ? o.walletDone : undefined,
     points_now: typeof o.points === 'number' ? { balance: o.points, unit: 'p' } : undefined,
     ...(sexualAnyOn(o.settings) ? { sexual_profile: { sexual_desire_enabled: sexualGlobal(o.settings).desire, paraphilia_enabled: sexualGlobal(o.settings).paraphilia, explicit_sexual_style_enabled: o.settings.explicitStyle, policy: 'sexual_context_only' } } : {}),
     ...(speechVariety(o.settings).level !== 'off' ? { speech_variety: { level: speechVariety(o.settings).level, counted: speechVariety(o.settings).level === 'two' && speechVariety(o.settings).counted, limit: speechVariety(o.settings).limit, mode: speechVariety(o.settings).mode } } : {}),
@@ -447,7 +457,10 @@ export function sectionBody(text: string, name: string): string | null {
   const m = new RegExp(`<<SECTION:${name}>>\\n([\\s\\S]*?)<<END:${name}>>`).exec(text);
   return m ? m[1].replace(/\n$/, '') : null;
 }
-export function assemblePrompt(text: string, enabled: Set<string>, userRules = '', lang: 'ko' | 'en' = 'ko', extra = '', sexualRules = ''): string {
+/** 지침의 수 자리(<<SCENE_MAX>> 등)에 넣는 상한. 빠지면 기본값 (전수점검 사소-17·사소-20: 지침에 6명·8개·2개·24개가 박혀 있었다) */
+export interface PromptCaps { sceneMax: number; entryCap: number; tidyEntryCap: number; cueCap: number }
+const capsDefault = (): PromptCaps => ({ sceneMax: Number(PP_DEFAULTS.scene_max), entryCap: Number(PP_DEFAULTS.entry_cap), tidyEntryCap: Number(PP_DEFAULTS.tidy_entry_cap), cueCap: Number(PP_DEFAULTS.cue_cap) });
+export function assemblePrompt(text: string, enabled: Set<string>, userRules = '', lang: 'ko' | 'en' = 'ko', extra = '', sexualRules = '', caps: PromptCaps = capsDefault()): string {
   // extra: 설정으로 켠 덧붙임 지침(말투 다변화 등). 사용자 지침보다 앞에 둔다 (원본 V3: 내장 규칙이 사용자 규칙 앞)
   // 기록 언어 규칙(설정 lang=en: 기록 본문을 영어로. 이름·인용·호칭·조직·직급은 원문 그대로)은 지침 「인물 기록 갱신기(덧붙임)」 LANG_EN 절
   const rules = [lang === 'en' ? guideTxt('UpdaterExtra', 'LANG_EN') : '', extra.trim(), userRules.trim()].filter(Boolean).join('\n\n').trim();
@@ -465,6 +478,7 @@ export function assemblePrompt(text: string, enabled: Set<string>, userRules = '
     out = out.replace(/<<SECTION:([a-z_]+)>>([\s\S]*?)<<END:\1>>/g, (_m, name: string, body: string) => (on.has(name) ? body : ''));
   }
   // 성적 욕망·이상성욕 절 본문은 설정(켠 칸·발정모드)에 따라 조립된다 (sexual.ts sexualWriterSection)
+  out = out.replace(/<<SCENE_MAX>>/g, String(caps.sceneMax)).replace(/<<ENTRY_CAP>>/g, String(caps.entryCap)).replace(/<<TIDY_ENTRY_CAP>>/g, String(caps.tidyEntryCap)).replace(/<<CUE_CAP>>/g, String(caps.cueCap));
   out = out.replace('<<CUE_TABLE>>', () => cueTable).replace('<<SEXUAL_RULES>>', () => sexualRules.trim()).replace('<<USER_RULES>>', () => rules).replace(/<<(?:SECTION|END):[a-z_]+>>/g, '').replace(/\n{3,}/g, '\n\n').trim();
   if (rules && !text.includes('<<USER_RULES>>')) out += `\n\n${guideTxt('UpdaterExtra', 'USER_RULES.HEAD')}\n${rules}`;
   return out;
@@ -586,6 +600,8 @@ export interface ItemChange {
   /** 판정 (new 에서만 — 갈래는 들어올 때 정한다. update 에서는 받지 않는다). uses: new 는 처음 횟수, update 는 지금 남은 횟수 */
   use?: boolean;
   uses?: number;
+  /** 가진 소모품을 또 얻은 수 (갱신기의 new 가 가진 물건이라 update 로 바꾼 것): 남은 횟수에 더한다 (전수점검 중대-5) */
+  got?: number;
   /** null = 장착 갈래 없음 */
   equip?: ItemEquip | null;
   state?: ItemState;
@@ -857,9 +873,15 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       drop('entry', e, ev, who);
       continue;
     }
+    // 한 번 쓰면 안 고치는 칸(첫인상)은 지우기·합치기도 받지 않는다 (전수점검 보통-15: 아래 once 검사보다 먼저 빠져나가 지워지거나 합쳐졌다)
+    if (SLOT_META[slot].once && (e.op === 'merge' || e.op === 'remove')) {
+      drop('entry', e, '한 번 쓰면 고치지 않는 칸', who);
+      continue;
+    }
     const n = (perPerson.get(who) ?? 0) + 1;
-    if (n > (input.tidy.includes(who) ? 24 : 8)) {
-      drop('entry', e, input.tidy.includes(who) ? '정리 인물당 24개 상한' : '인물당 8개 상한', who);
+    const entryCap = input.tidy.includes(who) ? ctx.settings.tidyEntryCap : ctx.settings.entryCap;
+    if (n > entryCap) {
+      drop('entry', e, input.tidy.includes(who) ? `정리 인물당 ${entryCap}개 상한` : `인물당 ${entryCap}개 상한`, who);
       continue;
     }
     perPerson.set(who, n);
@@ -915,8 +937,8 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       continue;
     }
     const meta = SLOT_META[slot];
-    // 대상 칸(첫인상·현재 평가·호칭 조건…)은 대상이 없으면 유저
-    const target = typeof e.target === 'string' && e.target ? (e.target === '@user' ? '@user' : nameOf(e.target) ?? plain(e.target, 40)) : meta.targeted && slot !== 'relationship' && slot !== 'speech' ? '@user' : undefined;
+    // 대상 칸(첫인상·현재 평가·호칭 조건…)은 대상이 없으면 유저. 대상 이름은 다시 읽기 대상이 아니어도 정식 이름으로 푼다 (전수점검 사소-19)
+    const target = typeof e.target === 'string' && e.target ? (e.target === '@user' ? '@user' : resolveAny(e.target) ?? plain(e.target, 40)) : meta.targeted && slot !== 'relationship' && slot !== 'speech' ? '@user' : undefined;
     // 한 번 쓰면 안 고치는 칸(첫인상): 같은 대상에 이미 있으면 어떤 연산도 받지 않는다
     if (meta.once && cur.some((x) => (x.target ?? '@user') === (target ?? '@user'))) {
       drop('entry', e, '한 번 쓰면 고치지 않는 칸 (이미 있음)', who);
@@ -1071,6 +1093,8 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
   if (ctx.settings.features.has('affinity') && !ctx.settings.qualitative.has('affinity')) {
     const perCue = new Map<string, number>();
     const changes = liveChanges(store, live);
+    // 이번 응답에서 넣은 계기도 같은 검사에 든다 (전수점검 보통-19: 같은 계기 두 줄이 둘 다 들어갔다)
+    const addedNow = new Set<string>();
     for (const c of r.cues ?? []) {
       const who = nameOf(str(c?.who));
       if (!who) {
@@ -1087,17 +1111,21 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         continue;
       }
       const n = (perCue.get(who) ?? 0) + 1;
-      if (n > 2) {
-        drop('cue', c, '인물당 2개 상한', who);
+      if (n > ctx.settings.cueCap) {
+        drop('cue', c, `인물당 ${ctx.settings.cueCap}개 상한`, who);
         continue;
       }
-      perCue.set(who, n);
-      if (changes.some((x) => x.kind === 'cue' && x.who === who && x.anchor === ev.anchor && x.cue === c.cue)) {
+      const dupKey = `${who}|${ev.anchor}|${c.cue}`;
+      if (addedNow.has(dupKey) || changes.some((x) => x.kind === 'cue' && x.who === who && x.anchor === ev.anchor && x.cue === c.cue)) {
         drop('cue', c, '같은 메시지에 같은 계기가 이미 있음', who);
         continue;
       }
+      perCue.set(who, n);
       const seq = nextSeq(ev.anchor);
-      if (putChange(store, { id: changeId(who, 'cue', ev.anchor, seq, c.cue), anchor: ev.anchor, seq, src: 'story', who, kind: 'cue', cue: c.cue as Cue, quote: c.quote, reason: plain(c.reason, 40) || c.cue })) report.applied.cues++;
+      if (putChange(store, { id: changeId(who, 'cue', ev.anchor, seq, c.cue), anchor: ev.anchor, seq, src: 'story', who, kind: 'cue', cue: c.cue as Cue, quote: c.quote, reason: plain(c.reason, 40) || c.cue })) {
+        addedNow.add(dupKey);
+        report.applied.cues++;
+      }
     }
   }
 
@@ -1271,8 +1299,9 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       }
     }
     const key = plain(d.key, 40);
-    // 문서는 구간 전체를 요약한 것이라 인용이 없어도 받는다 (기준 메시지만 확정 구간이면). 인용이 있으면 원문에 있어야
-    const ev = norm(str(d?.quote)).length >= 3 ? evidence(d.m, d.quote) : evidenceLoose(d?.m);
+    // 문서는 구간 전체를 요약한 것이라 인용이 없어도 받는다 (기준 메시지만 확정 구간이면). 인용이 있으면 원문에 있어야.
+    // 지우기는 지침대로 인용이 있어야 한다 (전수점검 사소-18)
+    const ev = d?.op === 'remove' || norm(str(d?.quote)).length >= 3 ? evidence(d.m, d.quote) : evidenceLoose(d?.m);
     if (!key || typeof ev === 'string') {
       drop('doc', d, typeof ev === 'string' ? ev : '이름 없음');
       continue;
@@ -1335,7 +1364,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         drop('suspicion', s, ev, who);
         continue;
       }
-      const target = s.target === '@user' ? '@user' : nameOf(str(s.target)) ?? plain(s.target, 30);
+      const target = s.target === '@user' ? '@user' : resolveAny(str(s.target)) ?? plain(s.target, 30);
       const text = plain(s.text, 200);
       if (!target || !text) {
         drop('suspicion', s, '대상 또는 본문 없음', who);
@@ -1580,7 +1609,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       if (nameCut.cut.length || descCut.cut.length) drop('items', t, `본문에 없는 등급 말을 뺌: ${[...nameCut.cut, ...descCut.cut].join(', ')}`, name);
       const outName = act === 'new' ? nameCut.text || name : listed ?? name;
       const place = plain(t.place, 30);
-      // 가진 물건을 또 얻은 new(→ update): uses 는 「받은 수」라 남은 횟수로 덮지 않는다. 설명의 두고 옴·벗음 말이 안전망에 걸리지 않게 그 설명도 뺀다 (전수검사 11-13)
+      // 가진 물건을 또 얻은 new(→ update): uses 는 「받은 수」라 남은 횟수로 덮지 않고 got 으로 넘겨 더한다 (전수점검 중대-5). 설명의 두고 옴·벗음 말이 안전망에 걸리지 않게 그 설명도 뺀다 (전수검사 11-13)
       const more = action === 'new' && !!listed;
       const desc = more && (leftWordIn(descCut.text) || offWordIn(descCut.text)) ? '' : descCut.text;
       report.items.push({
@@ -1589,6 +1618,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         // 사용·장착 갈래는 새로 얻을 때만 받는다 (update 의 「equip: none」에 갈래가 지워지던 것)
         ...(act !== 'new' ? {} : typeof t.usable === 'boolean' ? { use: t.usable } : /^(true|false)$/i.test(str(t.usable).trim()) ? { use: /^true$/i.test(str(t.usable).trim()) } : {}),
         ...(uses !== undefined && !more ? { uses } : {}),
+        ...(more && uses ? { got: uses } : {}),
         ...(act === 'new' && eq !== undefined ? { equip: eq ?? null } : {}),
         ...(cond === 'ok' || cond === 'damaged' || cond === 'broken' ? { state: itemState(cond) } : {}),
         ...(icon ? { icon } : {}),
@@ -1602,7 +1632,11 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
   // 7. 유저 신분 (상태창에 없을 때 참고값)
   if (r.identity && (r.identity.faction || r.identity.rank) && (!store.identity || store.identity.from !== 'status')) {
     const anchor = messageKey(list[Math.max(...input.indexes)], Math.max(...input.indexes));
-    store.identity = { faction: plain(r.identity.faction, 20), rank: plain(r.identity.rank, 20), level: null, from: 'scan', anchor };
+    // 상태창 신분 칸과 같이 조직 코드·직급 사다리로 읽는다 (전수점검 보통-16: 「초자연재난관리국」 같은 이름 그대로 두어 같은 조직 인물도 외부인으로 시작했다)
+    const org = plain(r.identity.faction, 20);
+    const rank = plain(r.identity.rank, 20);
+    const code = factionCode(org) || Object.keys(input.factionNames).find((c) => input.factionNames[c] && input.factionNames[c] === org) || '';
+    store.identity = { faction: code || org, rank, level: rankLevel(code, rank), from: 'scan', anchor };
     report.applied.identity = true;
   }
 
@@ -1674,8 +1708,11 @@ export function clearStoryRecords(store: PeopleStore, who: string): number {
     p.slots[slot] = keep;
   }
   const before = store.log.length;
-  store.log = store.log.filter((c) => !(c.who === who && c.src === 'story'));
+  // 접어 둔 옛 몫(호감 합·음란도 합친 값)도 이야기 기록이다: 남기면 다시 읽은 계기가 그 위에 한 번 더 더해진다 (전수점검 보통-14)
+  store.log = store.log.filter((c) => !(c.who === who && (c.src === 'story' || (c.kind === 'openness' && c.src === 'seed' && c.reason === OPENNESS_FOLD_REASON))));
   n += before - store.log.length;
+  if (store.folded[who]) n++;
+  delete store.folded[who];
   // 모으는 중·거절된 성격 변화 후보도 이야기 기록이라 지운다 (승인·되돌린 것은 사용자 결정이라 남김)
   for (const [id, c] of Object.entries(p.candidates ?? {})) if (c.status === 'collecting' || c.status === 'rejected') { delete p.candidates[id]; n++; }
   return n;

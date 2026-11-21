@@ -9,7 +9,7 @@ const NEW = '플러그인이 옛 판(v0.21.11)이에요. 새 판 v0.21.14가 나
 
 test('안내 글: 올라온 판이 더 새 판일 때만', () => {
   assert.equal(oldPluginMessage('0.21.11', '0.21.14'), NEW);
-  assert.equal(oldPluginMessage('0.21.9', '0.21.10'), '플러그인이 옛 판(v0.21.9)이에요. 새 판 v0.21.10가 나왔어요. Risu 설정 → 플러그인에서 업데이트해 주세요.');
+  assert.equal(oldPluginMessage('0.21.9', '0.21.10'), '플러그인이 옛 판(v0.21.9)이에요. 새 판 v0.21.10이 나왔어요. Risu 설정 → 플러그인에서 업데이트해 주세요.');
   assert.equal(oldPluginMessage('0.21.14', '0.21.14'), null, '같은 판');
   assert.equal(oldPluginMessage('0.21.14', '0.21.11'), null, '올라온 것이 옛 판');
   assert.equal(oldPluginMessage('0.21.10', '0.21.9'), null, '숫자로 비교');

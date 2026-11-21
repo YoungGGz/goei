@@ -1,3 +1,4 @@
+import { timeMs } from './timing';
 // 호출 진행 상태 (11-09 사용자: 한 턴에 라우터→디렉터→본편→갱신기→인터넷이 어떻게 돌고 있는지 보이게 — 리수폿 MissionProgressPanel·유미 프로바이더 매니저 참고).
 // 턴이 열리면(본편 요청 조립 시작) 그 턴에 돌 단계 계획(core/progplan.ts)을 깔고, 모델 호출이 시작·진행·끝날 때마다 적는다.
 // 화면(host/progwin.ts)은 onProgress 로 구독해 그린다. 이 파일은 Risu API 를 쓰지 않는다 (시험: tests/progress.test.mjs).
@@ -55,8 +56,8 @@ export interface Turn {
   chat?: string;
 }
 
-/** 본편 응답을 이만큼 기다려도 안 오면 실패로 닫는다 */
-export const PROGRESS_WATCHDOG = 10 * 60 * 1000;
+/** 본편 응답을 이만큼 기다려도 안 오면 실패로 닫는다. 진행 감시 시간: 설정 「화면 → 진행 감시」 (core/timing.ts, 전수점검 사소-9) */
+export const progressWatchdog = (): number => timeMs('progWatch');
 
 export type StageState = 'wait' | 'run' | 'done' | 'fail' | 'skip';
 
@@ -119,7 +120,7 @@ export function progressWatch(chat: string, now = Date.now()): void {
     notify();
     return;
   }
-  if (!turn.manual && !turn.replyAt && !turn.endAt && now - turn.at >= PROGRESS_WATCHDOG) progressAbort(turn);
+  if (!turn.manual && !turn.replyAt && !turn.endAt && now - turn.at >= progressWatchdog()) progressAbort(turn);
 }
 
 /** 이 턴에 돌 단계 (본편 요청 조립 때 설정을 보고 미리 깐다). 본편 칸은 없으면 끼운다 */
@@ -179,7 +180,7 @@ function stageFor(t: Turn, label: string): Stage {
 /** 모델 호출 시작 (host/llm.ts runModel). 열린 턴이 없거나 끝났으면 수동 턴을 연다 */
 export function progressCallStart(label: string, model: string, reqTokens: number): number {
   // 본편을 너무 오래 기다린 턴(죽은 턴)에는 붙이지 않는다
-  if (turn && !turn.manual && !turn.replyAt && !turn.endAt && Date.now() - turn.at >= PROGRESS_WATCHDOG) progressAbort(turn);
+  if (turn && !turn.manual && !turn.replyAt && !turn.endAt && Date.now() - turn.at >= progressWatchdog()) progressAbort(turn);
   if (!turn || turn.endAt) {
     turn = { at: Date.now(), plan: [], calls: [], manual: true };
     endWanted = true; // 수동 턴은 도는 호출이 없어지면 바로 끝

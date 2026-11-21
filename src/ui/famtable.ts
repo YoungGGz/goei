@@ -1,5 +1,6 @@
 // 틀별 설정 표 (설정 개편 4단계): 게시판 표(괴담넷·괴담갤·세정게·연어 마켓)와 상점 표(기본 상점·우주 쇼핑몰·포인트몰·망상홈쇼핑).
 // 격자: 줄 = 메뉴, 칸 = 메뉴마다 있는 설정. 그 밖의 값은 같은 틀의 메뉴가 한 값을 같이 쓴다. 사이트에만 있는 줄은 그 사이트 페이지에 남는다.
+import { stepOf } from '../core/stepval';
 import { BOARD_NAME, BOARD_REF_CFG, BOARD_SITES, boardState, isBoardSite, type BoardSite } from '../core/boards';
 import { REF_CHIP_KEYS } from '../core/reffn';
 import { fnGrids, refChipLabels } from './fngrid';
@@ -16,7 +17,7 @@ import { advValue } from '../core/advanced';
 import { GIVE_SHOPS, SHOP_AMOUNTS, SHOP_FNS, SHOP_GIVE_KEYS, shopAmountNone, shopFnNum, shopFnOn, shopGiveOn, type GiveShop } from '../core/shopfn';
 import { siteLogo } from './browser';
 import { ICONS } from './icons';
-import { ckWide, helpBox, mxGrid, numCtl, numSet, setGroup, setRow, setSeg, stepSize, type CkBand } from './setrow';
+import { ckWide, helpBox, mxGrid, numCtl, numSet, setGroup, setRow, setSeg, stepSize, numTxt, numType, type CkBand } from './setrow';
 import type { ShopCol } from './settings';
 
 type State = Record<string, unknown> | undefined;
@@ -62,9 +63,9 @@ export function boardTable(state: State, busy = false): string {
     acts: each((_, site) => PRIV.map(([v]) => `b:${site}:privacy=${v}`)),
     foot: helpBox('사생활은 게시판 사람들이 「보호 대상」을 얼마나 입에 올리는지예요.', [
       ['이목집중', '목격담과 소문이 자주 올라와요.'],
-      ['자율', '이미 유명한 경우에만 멀리서 본 정도로 나와요.'],
-      ['약보호', '평범한 사람으로 다뤄요. 큰 사건의 여파만 나와요.'],
-      ['강보호', '약보호보다 더 줄여요.'],
+      ['자율', '아무도 못 본 사적인 일만 빼요. 큰 일의 여파는 가벼운 소문으로 나와요.'],
+      ['약보호', '이미 유명한 경우에만 멀리서 본 정도로 나와요.'],
+      ['강보호', '평범한 사람으로 다뤄요. 세상에서 손꼽히는 인물이 아니면 평범한 목격담은 안 나와요.'],
       ['언급금지', '본인 이야기는 전혀 없고 행동의 결과만 나와요.'],
     ]) };
   const tx = (st: State, s: BoardSite, k: string, aria: string) => { const v = cur(st, k); return text('fam-text', `b:${s}:${k}`, v === '-' ? '' : v, '', 200, `${BOARD_NAME[s]} ${aria}`, busy); };
@@ -72,21 +73,21 @@ export function boardTable(state: State, busy = false): string {
     label: name(s), cells: [tx(views[i], s, 'subject', '주제'), tx(views[i], s, 'mood', '분위기·말투'), tx(views[i], s, 'protagonist', '보호 대상')],
   })), helpBox('', [
     ['주제', '올라올 글의 주제예요. 비우면 세계관에 맞는 여러 주제가 올라와요.'],
-    ['분위기·말투', '글쓴이들의 말투예요. 비우면 익명 커뮤니티 말투예요.'],
+    ['분위기·말투', '글쓴이들의 말투예요. 비우면 그 게시판 지침의 기본 말투예요.'],
     ['보호 대상', '「사생활」이 지켜 줄 사람의 이름이에요. 비우면 주인공이에요.'],
   ]), '주제와 말투');
   const cnt = (n: number, k: CountKey) => ({ n, lo: COUNT_RANGE[k][0], hi: COUNT_RANGE[k][1] });
-  const amount: CkBand = { title: '양', groups: [
+  const amount: CkBand = { title: '생성량', groups: [
     { name: '게시글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '새 글 댓글 수', opts: ['최소', '최대'], kind: 'num' },
     { name: '활동 댓글 수', opts: ['최소', '최대'], kind: 'num' },
-    { name: '선쪽지', opts: ['받기', '확률 (%)'], kind: 'check' },
-  ], marks: each((st) => { const s = gnetSettings(st); const c = s.counts; return [cnt(c.post[0], 'post'), cnt(c.post[1], 'post'), cnt(c.cmt[0], 'cmt'), cnt(c.cmt[1], 'cmt'), cnt(c.act[0], 'act'), cnt(c.act[1], 'act'), s.incoming, s.incoming ? { n: s.incomingChance, lo: 0, hi: 100, step: 5 } : null]; }),
+    { name: '선쪽지', opts: ['받기', '확률(%)'], kind: 'check' },
+  ], marks: each((st) => { const s = gnetSettings(st); const c = s.counts; return [cnt(c.post[0], 'post'), cnt(c.post[1], 'post'), cnt(c.cmt[0], 'cmt'), cnt(c.cmt[1], 'cmt'), cnt(c.act[0], 'act'), cnt(c.act[1], 'act'), s.incoming, s.incoming ? { n: s.incomingChance, lo: 0, hi: 100 } : null]; }),
     acts: each((st, site) => { const b = `b:${site}`; return [`${b}:post_min`, `${b}:post_max`, `${b}:cmt_min`, `${b}:cmt_max`, `${b}:act_min`, `${b}:act_max`, `${b}:incoming=${gnetSettings(st).incoming ? '0' : '1'}`, `${b}:incoming_chance`]; }),
     foot: helpBox('', [
       ['게시글 수', '새로고침 한 번에 새로 만드는 글의 수예요. 많을수록 토큰을 더 써요.'],
       ['새 글 댓글 수', '새로 만드는 글마다 달리는 댓글의 수예요.'],
-      ['활동 댓글 수', '새 글·댓글·답장 때 지난 글에 새로 붙는 댓글의 수예요.'],
+      ['활동 댓글 수', '글 쓰기·댓글 달기·글 하나 새로고침 때 지난 글에 새로 붙는 댓글의 수예요.'],
       ['선쪽지 받기', '켜면 게시판 사람이 먼저 쪽지를 보낼 수 있어요.'],
       ['선쪽지 확률', '새로고침 한 번에 선쪽지가 올 확률이에요.'],
     ]) };
@@ -148,7 +149,7 @@ export function boardTable(state: State, busy = false): string {
     R('보존할 닉네임 수', N('keyfig_keep'), '주요 인물 닉네임을 이 수만큼 기억해요. 넘으면 오래된 것부터 지워요.'),
     R('새로고침 때 내 글 유지', C('keepown', s0.keepOwn), '켜면 새로고침으로 글이 바뀔 때 내가 쓴 글은 남겨요.'),
     R('내 댓글 있는 글 유지', C('keepreplied', s0.keepReplied), '켜면 내가 댓글을 단 남의 글도 남겨요.'),
-    R('쪽지 자동 정리', `${setSeg('fam-set', 'b:gn:storage', ret.auto ? '1' : '0', ONOFF, busy)}${ret.auto ? numCtl('b:gn:dmkeep', { n: ret.limit, lo: 1, hi: STORAGE_MAX, step: 5 }, '남길 쪽지', '통', busy) : ''}`, '켜면 상대마다 최근 쪽지를 이 수만큼만 남기고 오래된 것은 지워요.'),
+    R('쪽지 자동 정리', `${setSeg('fam-set', 'b:gn:storage', ret.auto ? '1' : '0', ONOFF, busy)}${ret.auto ? numCtl('b:gn:dmkeep', { n: ret.limit, lo: 1, hi: STORAGE_MAX }, '남길 쪽지', '통', busy) : ''}`, '켜면 상대마다 최근 쪽지를 이 수만큼만 남기고 오래된 것은 지워요.'),
     R('선쪽지 뒤 쉬는 턴', N('cooldown'), '선쪽지를 받은 뒤 새 선쪽지가 오지 않는 턴의 수예요.'),
     R('선쪽지에 참조할 받은 쪽지', N('incoming_prev'), '같은 쪽지가 또 오지 않게 선쪽지 요청에 같이 넘기는 받은 쪽지의 수예요. 0이면 전부 넘겨요.'),
   ].join(''));
@@ -267,7 +268,7 @@ export function shopTable(vars: State, busy = false): string {
       ['스티커·상담원', '망상홈쇼핑에서 들춰 본 스티커 밑 글과 전화 주문 상담원의 말이에요.'],
       ['진열', '사지 않은 물건까지 진열대 전체와, 진열과 함께 온 주인의 말이나 쇼핑몰 공지예요. 쇼핑몰은 진열을 받은 턴에만 붙어요.'],
     ]) };
-  const numBox = (key: string, n: number, lo: number, hi: number, unit: string, label: string) => `<div class="st-step adv-step${stepSize(hi, unit, '제한 없음')}"><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.max(lo, n - 1)}" ${n <= lo || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 줄이기">−</button><input class="adv-val" type="number" inputmode="numeric" min="${lo}" max="${hi}" step="1" data-change="fam-num" data-key="${key}" value="${n === 0 ? '' : n}" placeholder="제한 없음" aria-label="최대 양 ${label}"${busy ? ' disabled' : ''}><span>${unit}</span><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.min(hi, n + 1)}" ${n >= hi || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 늘리기">+</button></div>`;
+  const numBox = (key: string, n: number, lo: number, hi: number, unit: string, label: string) => `<div class="st-step adv-step${stepSize(hi, unit, '제한 없음')}"><button class="gx-step" data-action="fam-num" data-value="${key}=${Math.max(lo, n - stepOf(hi))}" ${n <= lo || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 줄이기">−</button><input class="adv-val" ${numType(hi)} min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="fam-num" data-key="${key}" value="${n === 0 ? '' : numTxt(n, hi)}" placeholder="제한 없음" aria-label="최대 양 ${label}"${busy ? ' disabled' : ''}>${n === 0 ? '' : `<span>${unit}</span>`}<button class="gx-step" data-action="fam-num" data-value="${key}=${Math.min(hi, n + stepOf(hi))}" ${n >= hi || busy ? 'disabled' : ''} aria-label="최대 양 ${label} 늘리기">+</button></div>`;
   const HT = HS_MAIN_SET.tokens;
   const HU = HS_MAIN_SET.turns;
   const attachMax = setGroup('', setRow('최대 양', numSet([['대화', numBox('s:shop:main_lines', shopMainLines(v), SHOP_MAIN_LINES.min, SHOP_MAIN_LINES.max, '줄', '대화')], [hsN, numBox('s:hs:main_tokens', hm.tokens, HT.lo, HT.hi, HT.unit, hsN)], ['시청 기록', numBox('s:hs:main_turns', hm.turns, HU.lo, HU.hi, HU.unit, '시청 기록')]]), helpBox('', [
@@ -316,12 +317,12 @@ export function shopTable(vars: State, busy = false): string {
     R('다양성 강화', sw('diverse', s0.diverse), '켜면 싼 것, 비싼 것, 흔한 것, 특이한 것을 섞어 받아요.'),
     R('지난 목록 피하기', sw('prev', s0.avoidPrev), '켜면 지난번에 나온 물건을 다시 내지 않게 해요.'),
     R('문의로 물건 바꾸기', sw('talkstock', s0.talkStock), '끄면 주인이나 운영자가 말로 물건을 더하거나 진열을 새로 짜지 않아요. 문의 요청에서 진열 규칙이 빠져 요청이 짧아져요. 값 흥정은 그대로 돼요.'),
-    R('진열대 물건 수', numCtl('s:shop:shelf', { n: s0.shelf, lo: SHOP_SHELF_LO, hi: SHOP_SHELF_HI, step: 10 }, '진열대 물건 수', '개', busy), '진열대에 남기는 물건 수예요. 파는 물건과 산 물건을 따로 이 수만큼 남겨요.'),
+    R('진열대 물건 수', numCtl('s:shop:shelf', { n: s0.shelf, lo: SHOP_SHELF_LO, hi: SHOP_SHELF_HI }, '진열대 물건 수', '개', busy), '진열대에 남기는 물건 수예요. 파는 물건과 산 물건을 따로 이 수만큼 남겨요.'),
   ].join(''));
   /* ── 3-2. 보관하는 양·참고 글 길이 (「진열대 물건 수」 바로 아래, 같은 수 조작 numCtl): 네 곳이 같이 쓰는 값(core/shop.ts SHOP_LIMITS)과 쇼핑몰 둘의 주문 기록 수(core/orders.ts) ── */
   const lim = shopLimits(v);
-  const limBox = (k: ShopLimit, label: string): [string, string] => { const l = SHOP_LIMITS[k]; return [label, numCtl(`s:shop:limit_${k}`, { n: lim[k], lo: l.min, hi: l.max, step: l.step }, label, l.unit, busy)]; };
-  const ordBox = (id: 'cos' | 'bm', n: number): [string, string] => { const name = rows.find((r) => r.id === id)!.name; return [name, numCtl(`s:${id}:keep_orders`, { n, lo: ORDERS_KEEP_RANGE.min, hi: ORDERS_KEEP_RANGE.max, step: ORDERS_KEEP_RANGE.step }, `${name} 주문 기록`, '건', busy)]; };
+  const limBox = (k: ShopLimit, label: string): [string, string] => { const l = SHOP_LIMITS[k]; return [label, numCtl(`s:shop:limit_${k}`, { n: lim[k], lo: l.min, hi: l.max }, label, l.unit, busy)]; };
+  const ordBox = (id: 'cos' | 'bm', n: number): [string, string] => { const name = rows.find((r) => r.id === id)!.name; return [name, numCtl(`s:${id}:keep_orders`, { n, lo: ORDERS_KEEP_RANGE.min, hi: ORDERS_KEEP_RANGE.max }, `${name} 주문 기록`, '건', busy)]; };
   const keepPart = setGroup('보관하는 양', [
     R('기록', numSet([limBox('prev', '지난 목록'), limBox('sales', '판매 기록'), limBox('notes', '견적·정보'), limBox('talk', '문의 대화')]), `기본 상점과 쇼핑몰 둘이 상점마다 남겨 두는 기록의 수예요. 넘으면 오래된 것부터 지워요. ${hsN}에는 닿지 않아요. 거기는 ${hsN} 설정의 「기억하는 지난 상품 수」·「통화 기록 줄 수」를 따로 써요.`, [
       ['지난 목록', '「지난 목록 피하기」에 쓰는 지난 물건 이름의 수예요.'],

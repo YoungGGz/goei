@@ -12,7 +12,8 @@ await build({
   stdin: {
     contents: `
       export { useBoxCss, markUseSent, sentUseIds, sentOut, sentReroll, dropUseUnlessSent, useLocked, holdUseSettle, setUseLockAt, setUseBlind, useBlind, freeUseLock } from './src/host/usebox';
-      export { setWaiting, isWaiting, setWaitingProbe, WAIT_MS, WAIT_AGAIN_MS } from './src/host/waiting';
+      export { setWaiting, isWaiting, setWaitingProbe } from './src/host/waiting';
+      export { timeMs } from './src/core/timing';
       export { readItemUse, ITEM_USE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, readUsePrev, mergeUse, addItem, itemsVars, readItems, liveItems, lastUserKey, settleItemUse, itemLeft, usesToSend, inventoryText } from './src/core/items';
       export { dropFromUse, itemsAction, itemsTab, itemsUi } from './src/ui/items';
     `,
@@ -151,7 +152,8 @@ test('소지품 창, 보내기 전 버리기: 사용 목록에서도 빠진다 (
 const nOf = (t) => U.readItemUse(t.store.chat.scriptstate).find((u) => u.id === t.id)?.n ?? 0;
 test('소지품 창, 보내기 전: 「한 번 더」를 누르면 ×2', async () => {
   const t = seed(10);
-  assert.match(popupHtml(t), /한 번 더 \(×2\)/);
+  // 단추 글은 늘 지금 넣은 수(사용 ×1), 더 넣을 수 있으면 title 로 알린다 (전수점검 눌러2-보통-24: 「한 번 더 (×2)」와 「사용 ×1」의 셈법이 달랐다)
+  assert.match(popupHtml(t), /title="누르면 한 번 더 넣어요">사용 ×1</);
   await U.itemsAction('items-use', t.id, t.ctx(), t.env);
   assert.equal(nOf(t), 2);
 });
@@ -596,30 +598,30 @@ test('답이 3분보다 늦어도 리수가 아직 만드는 중이면 기다림
   try {
     U.setWaiting(true);
     U.setUseLockAt({ charIndex: 0, chatIndex: 40 });
-    tt.mock.timers.tick(U.WAIT_MS);
+    tt.mock.timers.tick(U.timeMs('mainWait'));
     await flush();
     assert.equal(asked, 1);
     assert.equal(U.isWaiting(), true, '아직 만드는 중');
     assert.equal(U.useLocked(0, 40), true);
-    tt.mock.timers.tick(U.WAIT_AGAIN_MS);
+    tt.mock.timers.tick(U.timeMs('mainAgain'));
     await flush();
     assert.equal(U.isWaiting(), true);
     // 묻는 사이 답이 왔다가 새 요청이 나갔으면 그 요청의 기다림을 끄지 않는다
     busy = false;
-    tt.mock.timers.tick(U.WAIT_AGAIN_MS - 1);
+    tt.mock.timers.tick(U.timeMs('mainAgain') - 1);
     U.setWaiting(false);
     U.setWaiting(true);
     tt.mock.timers.tick(1);
     await flush();
     assert.equal(U.isWaiting(), true);
     // 리수가 멈춰 있으면(실패·중지) 시간이 다 되면 꺼진다
-    tt.mock.timers.tick(U.WAIT_MS);
+    tt.mock.timers.tick(U.timeMs('mainWait'));
     await flush();
     assert.equal(U.isWaiting(), false);
     // 물을 수 없으면(던짐) 전처럼 끈다
     U.setWaitingProbe(async () => { throw new Error('화면 없음'); });
     U.setWaiting(true);
-    tt.mock.timers.tick(U.WAIT_MS);
+    tt.mock.timers.tick(U.timeMs('mainWait'));
     await flush();
     assert.equal(U.isWaiting(), false);
   } finally {

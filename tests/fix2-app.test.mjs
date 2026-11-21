@@ -44,7 +44,7 @@ test('전체 기록에 인터넷 탭 id, 탭 기록에는 넣지 않는다 (shel
 
 test('인터넷 창만: 괴담넷·위키로 가도 그대로 (shell#9)', () => {
   assert.doesNotMatch(src, /netSolo && tab === 'net'/);
-  assert.equal(src.match(/netSolo && inBrowser\(\)/g)?.length, 2);
+  assert.equal(src.match(/netSolo && inBrowser\(\)/g)?.length, 3); // 그리기 두 곳 + 머리줄 감시 (전수점검 보통-73)
 });
 
 test('Esc: 아바타 창·로그인 창은 상태로 닫는다 (shell#10, peopleui#9)', () => {

@@ -49,6 +49,7 @@ test('css#8: 뽑기 예 「상황용」은 있는 강조색(--signal)', () => {
 
 test('peopleui#14: 사원증 닫기 36, 아래 단추 작은 조작 규격', () => {
   assert.match(rule('.gx-agcard-x'), /width: 36px; height: 36px/);
-  assert.match(rule('.gx-agcard-band'), /height: 36px/);
+  // 띠는 공통 닫기(36, 선·바탕)가 위아래 5px 띄워 들어가는 높이 (전수점검 눌러-보통-2)
+  assert.match(rule('.gx-agcard-band'), /height: 46px/);
   assert.match(rule('.gx-agcard-foot button'), /height: var\(--ctl-sm\)/);
 });

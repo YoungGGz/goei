@@ -22,6 +22,10 @@ let stopped = false;
 /** 받기에 실패한 때. 메시지마다 다시 받으려 하지 않게, 카드를 다시 열거나 1분이 지나야 다시 시도한다 */
 let failedAt = 0;
 
+/** 돌고 있는 받기에 사용자가 시킨 시작(카드 열기·햄버거)이 붙었나. 표시 처리기가 먼저 조용히 시작한 받기를 감시·단추가 이어받아도
+ *  실패하면 받기 창이 뜨게 한다 (전수점검 중대-2) */
+let promptWanted = false;
+
 /** 마지막으로 본체를 시작하지 못한 까닭 (받기 창에 보인다) */
 let startError = '';
 /** 본체 코드 자체가 실행되지 않았나 (깨진 글·판 불일치). 본체는 돌았는데 시작 중에 실패한 것과 구분해, 깨진 코드만 저장소에서 지운다 */
@@ -34,7 +38,8 @@ link.__goeiRelaunch = () => {
 };
 
 /** 저장해 둔 본체를 읽고, 없거나 판이 다르면 받는다. 받지 못하면 받기 창을 띄우고 null */
-async function load(prompt: boolean): Promise<Body | null> {
+async function load(first: boolean): Promise<Body | null> {
+  const ask = () => first || promptWanted;
   let code: string | null = null;
   let fromStore = false;
   // 어디서 시간이 가는지 콘솔에 남긴다 (v0.21.0 첫 시작 1분, 사용자 11-07)
@@ -53,7 +58,7 @@ async function load(prompt: boolean): Promise<Body | null> {
     } catch (error) {
       console.log(`[goei] 본체를 받지 못했어요: ${error instanceof Error ? error.message : String(error)}`);
       failedAt = Date.now();
-      if (prompt) showPanel(VERSION, install);
+      if (ask()) showPanel(VERSION, install, '', 'fetch');
       return null;
     }
     lap('본체 받음');
@@ -62,13 +67,14 @@ async function load(prompt: boolean): Promise<Body | null> {
     await save(code);
     lap('본체 저장');
   }
-  const b = await start(code, prompt);
+  const b = await start(code, ask());
   lap(b ? '본체 켜짐' : '본체 시작 실패');
   if (!b) {
     failedAt = Date.now();
     // 저장해 둔 본체가 깨져 있으면(판은 맞는데 실행이 안 됨) 지워서 다음에 다시 받게 한다. 그냥 두면 플러그인 판이 바뀔 때까지 영영 안 뜬다
     if (fromStore && codeBroken) await risuai.pluginStorage.removeItem(BODY_KEY).catch(() => {});
-    if (prompt && !link.__goeiBodyPanel) showPanel(VERSION, install, `본체를 시작하지 못했어요: ${startError}`);
+    // 첫 안내 글이 이미 「시작하지 못했어요」라 여기는 까닭만 (전수점검 사소-5)
+    if (ask() && !link.__goeiBodyPanel) showPanel(VERSION, install, `까닭: ${startError}`, 'start');
   }
   return b;
 }
@@ -146,8 +152,10 @@ async function install(code: string): Promise<void> {
 function ensure(prompt = false): Promise<Body | null> {
   if (body) return Promise.resolve(body);
   if (!prompt && !loading && Date.now() - failedAt < 60_000) return Promise.resolve(null);
+  if (prompt) promptWanted = true;
   loading ??= load(prompt).then((b) => {
     if (!b) loading = null;
+    promptWanted = false;
     return b;
   });
   return loading;
@@ -219,10 +227,10 @@ function watch(): void {
 const MENU_GHOST =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="2.73 3.25 18 18" width="20" height="20" overflow="visible" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 2.5C7.8 2.5 5.5 5.2 5.5 8.8V10.3L3.9 9.1C2.2 7.9 .6 10.1 2 11.5L5.5 15C5.8 19.5 9.3 22 13.7 22C18.1 22 21 19.6 22 16.8C19.4 18.3 17.5 17.8 17.5 15.5V15L21 11.5C22.4 10.1 20.8 7.9 19.1 9.1L17.5 10.3V8.5C17.5 5 15.1 2.5 11.5 2.5Z"/><g fill="currentColor" stroke="none"><ellipse cx="9" cy="9.2" rx="1.4" ry="1.9"/><ellipse cx="14" cy="9.2" rx="1.4" ry="1.9"/><ellipse cx="11.5" cy="13.6" rx="1.1" ry="1.6"/></g></svg>';
 
-// 깡통봇 설치 (설계안 9절): 아무 봇에서나 햄버거 메뉴의 「괴이: ANOMALY 설치·점검」 으로 본체를 꺼내 설치 화면을 연다.
+// 깡통봇 설치 (설계안 9절): 아무 봇에서나 햄버거 메뉴의 「괴이 ː ANOMALY 설치·업데이트」 으로 본체를 꺼내 설치 화면을 연다.
 // 괴이 카드에서는 같은 단추가 점검 화면을 연다
 void risuai
-  .registerButton({ name: '괴이: ANOMALY 설치·점검', icon: MENU_GHOST, iconType: 'html', location: 'hamburger', id: 'goei-plugin-install' }, () => {
+  .registerButton({ name: '괴이 ː ANOMALY 설치·업데이트', icon: MENU_GHOST, iconType: 'html', location: 'hamburger', id: 'goei-plugin-install' }, () => {
     void ensure(true).then((b) => b?.install());
   })
   .catch((error: unknown) => console.log(`[goei] 설치 단추를 두지 못했어요: ${error instanceof Error ? error.message : String(error)}`));

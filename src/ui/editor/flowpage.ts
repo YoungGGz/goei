@@ -3,6 +3,7 @@
 // 흐름: 메인 요청 전 → 메인 응답 → 메인 응답 뒤(부르는 순서, src/body.ts) → 턴과 무관 → 생성 공통. 머리(예상·지난 턴)는 맨 위 한 번.
 // 조작: 줄마다 그 설정의 원래 저장 동작을 그대로 부른다 (fl-do 「동작|값」 → src/ui/app.ts 가 그 동작의 처리기로 넘김). 값을 따로 저장하지 않는다.
 // 같은 줄 목록(flowSections)을 AI 상담(src/ui/editor/consult.ts)이 바꿀 수 있는 설정 목록으로 쓴다.
+import { stepOf } from '../../core/stepval';
 import type { ChatContext } from '../../host/risu';
 import { basicDefaults, basicSettings, basicVars, getPrefs } from '../../core/settings';
 import { peopleSettings, ppValue } from '../../core/people/settings';
@@ -21,7 +22,7 @@ import { baseLabel } from '../../core/progress';
 import { invOn } from '../../core/items';
 import { colConfig } from '../../core/world/statuscols';
 import { isOnOff, switchHtml } from '../controls';
-import { sameStep, stepSizeText } from '../setrow';
+import { sameStep, stepSize, stepSizeText, numTxt, numType } from '../setrow';
 import { flowNodes, flowTokState } from './flow';
 import { traceUi } from './trace';
 
@@ -48,6 +49,8 @@ export interface Ctl {
   unit?: string;
   /** 0일 때 보이는 말 */
   zero?: string;
+  /** 직접 적는 칸이 보내는 「동작|열쇠」 */
+  inp?: string;
   /** 값을 v 로 바꾸는 동작들 「동작|값」 (그 설정 페이지의 단추가 보내는 것과 같다) */
   act(v: string): string[];
   /** 지금은 화면에 안 보이는 조작 (윗 조작 값에 따라) */
@@ -61,9 +64,13 @@ const doBtn = (cls: string, a: string, on: boolean, text: string, more = '') => 
 function ctlHtml(c: Ctl, aria: string): string {
   if (c.kind === 'step') {
     const n = Number(c.cur) || 0;
-    const shown = n === 0 && c.zero ? c.zero : `${n}${c.unit ?? ''}`;
+    // − + 는 그 값으로 바꾸는 동작을, 가운데 칸은 직접 적은 수를 같은 동작으로 보낸다 (inp = 「동작|열쇠」, 뒤에 「=수」가 붙는다)
+    const hi = c.hi ?? n;
     const b = (to: number, sign: string, word: string, off: boolean) => `<button class="gx-step" data-action="${FLOW_DO}" data-value="${esc(c.act(String(to))[0] ?? '')}" ${off ? 'disabled' : ''} aria-label="${esc(aria)} ${word}">${sign}</button>`;
-    return `<div class="st-step${stepSizeText(`${c.hi ?? n}${c.unit ?? ''}`, c.zero ?? '')}">${b(n - 1, '−', '줄이기', n <= (c.lo ?? 0))}<b>${esc(shown)}</b>${b(n + 1, '+', '늘리기', n >= (c.hi ?? n))}</div>`;
+    const mid = c.inp
+      ? `<input class="adv-val" ${numType(hi)} min="${c.lo ?? 0}" max="${hi}" step="${stepOf(hi)}" data-change="${FLOW_DO}" data-key="${esc(c.inp)}" value="${n === 0 && c.zero ? '' : numTxt(n, hi)}"${c.zero ? ` placeholder="${esc(c.zero)}"` : ''} aria-label="${esc(aria)}">${c.unit && !(n === 0 && c.zero) ? `<span>${esc(c.unit)}</span>` : ''}`
+      : `<b>${esc(n === 0 && c.zero ? c.zero : `${n}${c.unit ?? ''}`)}</b>`;
+    return `<div class="st-step${c.inp ? ` adv-step${stepSize(hi, c.unit ?? '', c.zero ?? '')}` : stepSizeText(`${hi}${c.unit ?? ''}`, c.zero ?? '')}">${b(Math.max(c.lo ?? 0, n - stepOf(hi)), '−', '줄이기', n <= (c.lo ?? 0))}${mid}${b(Math.min(hi, n + stepOf(hi)), '+', '늘리기', n >= hi)}</div>`;
   }
   const opts = c.opts ?? [];
   if (isOnOff(opts)) {
@@ -319,14 +326,14 @@ export function flowSections(real0: ChatContext, started: boolean): { sections: 
     { name: hsName(), on: hs.on, call: true, ctls: [sw('hs.on', '', hs.on, (v) => `fam-set|s:hs:on=${v}`), pick('hs.auto', '자동 호출', hs.auto, [['manual', '수동'], ['open', '창을 열 때']], (v) => `fam-set|s:hs:auto=${v}`), pick('hs.model', '모델', hs.shop.model, MODEL2, (v) => `fam-set|s:hs:model=${v}`)], calls: hs.on ? (hs.auto === 'open' ? '창을 열 때 1회' : '수동 (새로고침 때만)') : '호출 없음', est: '', real: real((l) => l.startsWith(`${hsName()} `)), go: ['set:shop', 'r:사용'] }, // 망상홈쇼핑의 사용·자동 호출·모델은 상점 페이지 격자에 있다
     { name: '채팅 보내기', sub: true, on: hs.on && hsF.say, ctls: [sw('hs.say', '', hsF.say, (v) => `hs-cfg|say=${v}`)], calls: '보낼 때마다 1회', go: ['set:hs', 'r:채팅 보내기'] },
     /** 자동 다시 연결은 그 페이지의 단추처럼 한 칸씩만 움직인다 (hs-retry ±) */
-    { name: '자동 다시 연결', sub: true, on: hs.on && retry > 0, ctls: [{ id: 'hs.retry', label: '', kind: 'step', cur: String(retry), lo: HS_RETRY[0], hi: HS_RETRY[1], unit: '회', act: (v) => { const d = Number(v) - retry; return Array.from({ length: Math.abs(d) }, () => `hs-retry|${d > 0 ? '+' : '-'}`); } }], help: `편성을 받지 못하면 「신호 없음」 화면에서 스스로 다시 연결하는 횟수예요(${HS_RETRY[0]}~${HS_RETRY[1]}). 1회마다 호출이 1회 늘어요.`, go: ['set:hs', 'r:자동 다시 연결'] },
+    { name: '자동 다시 연결', sub: true, on: hs.on && retry > 0, ctls: [{ id: 'hs.retry', label: '', kind: 'step', cur: String(retry), lo: HS_RETRY[0], hi: HS_RETRY[1], unit: '회', inp: 'hs-retry|n', act: (v) => [`hs-retry|n=${v}`] }], help: `편성을 받지 못하면 「신호 없음」 화면에서 스스로 다시 연결하는 횟수예요(${HS_RETRY[0]}~${HS_RETRY[1]}). 1회마다 호출이 1회 늘어요.`, go: ['set:hs', 'r:자동 다시 연결'] },
     { name: '포인트몰 1:1 상담', on: desk.on && mallSettings(ps, 'bm').on, call: true, ctls: [sw('desk.on', '', desk.on, (v) => `ms-cfg|bm:desk_on=${v}`), sw('desk.again', '지난 상담사 다시 만나기', desk.again, (v) => `ms-cfg|bm:desk_again=${v}`)], calls: calls('포인트몰 1:1 상담'), help: '켜면 가끔(4번에 1번꼴) 전에 만났던 상담사가 다시 연결돼요. 그때는 연결 호출이 없어요.', est: '', real: real((l) => l.includes('1:1 상담')), go: ['set:bm', 'r:사용@1:1 상담'] },
   ];
 
   /* ── ⑤ 생성 공통: 다시 묻기·다시 보기 (범위와 선택지는 정의표 core/advanced.ts) ── */
   const advStep = (key: string): Ctl => {
     const it = advItem('gen', key);
-    return { id: `gen.${key}`, label: '', kind: 'step', cur: advValue(ds as never, 'gen', key), lo: it?.min ?? 0, hi: it?.max ?? 0, unit: it?.unit ?? '', zero: it?.zero, act: (v) => [`adv-set|gen:${key}=${v}`] };
+    return { id: `gen.${key}`, label: '', kind: 'step', cur: advValue(ds as never, 'gen', key), lo: it?.min ?? 0, hi: it?.max ?? 0, unit: it?.unit ?? '', zero: it?.zero, inp: `adv-set|gen:${key}`, act: (v) => [`adv-set|gen:${key}=${v}`] };
   };
   const retryModel = advItem('gen', 'retry_model');
   const reit = Number(advValue(ds as never, 'gen', 'reiterate')) || 0;

@@ -3,7 +3,8 @@
 // 한 작업이 모델을 부르지 않고 끝나면(done) 남은 것끼리만 보낸다. 각 작업의 검사·재시도·저장은 그대로 각자 한다.
 import { JOINT_KEY, JOINT_LABEL, type JointKind } from '../core/netjoint';
 import { guideTxt } from '../core/guides';
-import { limited, runModel, type LlmMessage, type ModelChoice } from './llm';
+import { isTransient, limited, markTransientDone, runModel, type LlmMessage, type ModelChoice } from './llm';
+import { timeMs } from '../core/timing';
 import { markPrepared, prepareAttachmentGroups } from '../core/attach';
 
 export type { JointKind } from '../core/netjoint';
@@ -156,7 +157,8 @@ export class Joint {
   private fired = false;
 
   // concurrent: 「동시 요청 수」 설정. 묶음이 보내는 요청도 한 건마다 칸 하나를 쓴다 (기다리는 작업은 칸을 안 잡아 교착 없음, 전수검사 11-13)
-  constructor(private model: ModelChoice, private staticModel?: string, kinds: JointKind[] = ['gn', 'phone'], private concurrent?: number) {
+  // transient: 「모델 오류 재시도」 설정. 묶음 요청이 일시 오류로 실패하면 묶음째 다시 보낸다 (전수점검 보통-6: 작업 수만큼 따로 다시 나갔다)
+  constructor(private model: ModelChoice, private staticModel?: string, kinds: JointKind[] = ['gn', 'phone'], private concurrent?: number, private transient = 0) {
     this.left = new Set<JointKind>(kinds);
   }
 
@@ -203,11 +205,21 @@ export class Joint {
     const label = `${kinds.map((k) => JOINT_LABEL[k]).join('+')} 통합`;
     const prompt = this.prompt(kinds);
     let raw = '';
-    try {
-      raw = await limited(this.concurrent, () => runModel(prompt, this.model, this.staticModel, label));
-    } catch (error) {
-      for (const w of this.waits.values()) w.reject(error);
-      return;
+    for (let left = this.transient; ; left--) {
+      try {
+        raw = await limited(this.concurrent, () => runModel(prompt, this.model, this.staticModel, label));
+        break;
+      } catch (error) {
+        if (left > 0 && isTransient(error)) {
+          console.log(`[goei] 통합 자동 확인 일시 오류, 묶음째 다시 보냄: ${error instanceof Error ? error.message.split('\n')[0] : String(error)}`);
+          await new Promise((r) => setTimeout(r, timeMs('retryGap')));
+          continue;
+        }
+        // 묶음에서 이미 다시 보냈으니 작업마다 또 다시 보내지 않는다 (generate 의 일시 오류 재시도를 건너뜀)
+        markTransientDone(error);
+        for (const w of this.waits.values()) w.reject(error);
+        return;
+      }
     }
     // 다 읽은 칸은 쓰고, 잘렸거나 빠진 칸만 다시 보낸다 (전수검사 11-13: 한 칸만 잘려도 전부 버리고 2+N번 불렀다)
     let parts = splitCombined(raw, keys, true);

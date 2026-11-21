@@ -52,8 +52,12 @@ export interface Pick<T> {
  */
 export function pickRecords<T>(items: Pick<T>[], o: { focus: boolean; recent: number; max: number; fits: (kept: T[]) => boolean; cost?: (data: T) => number; room?: number }): T[] {
   const newest = items.slice().sort((a, b) => b.order - a.order);
+  // 「아주 최근」 몫은 공지(free)를 빼고 센다 (공지가 최근 톡 자리를 먹지 않게, 전수점검 보통-85)
+  const rank = new Map<Pick<T>, number>();
+  for (const x of newest) if (!x.free) rank.set(x, rank.size);
+  const isRecent = (x: Pick<T>) => (rank.get(x) ?? 0) < o.recent;
   const rest = o.focus
-    ? [...newest.filter((x, i) => x.free || i < o.recent), ...newest.filter((x, i) => !x.free && i >= o.recent && x.related)]
+    ? [...newest.filter((x) => x.free || isRecent(x)), ...newest.filter((x) => !x.free && !isRecent(x) && x.related)]
     : newest;
   const queue = [...newest.filter((x) => x.pin), ...rest.filter((x) => !x.pin)];
   if (o.cost && o.room !== undefined) {

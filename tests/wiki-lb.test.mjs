@@ -69,4 +69,6 @@ test('위키: 자동 작성 제목 고르기 요청과 응답 읽기', () => {
   assert.equal(acceptTitle('<think>x</think>{"title":"오후역"}', ['오후역', '어둠의 정원']), '오후역');
   assert.equal(acceptTitle('어둠의 정원', ['오후역', '어둠의 정원']), '어둠의 정원');
   assert.throws(() => acceptTitle('{"title":"관리국"}', ['오후역']), /후보에 없는/);
+  // 빈 제목은 첫 후보로 넘어가지 않고 빈 응답 오류 (전수점검 사소-58)
+  assert.throws(() => acceptTitle('   ', ['오후역', '어둠의 정원']), /빈 응답/);
 });

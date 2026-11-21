@@ -47,7 +47,7 @@ async function loadArt(url: string | null): Promise<PaintArt | null> {
 export interface ReportPng { blob: Blob; url: string; name: string }
 
 /** 보고서 → PNG blob + 미리보기 URL + 파일 이름 */
-export async function reportPng(ctx: ChatContext, r: Report, root: Element | null, org = ''): Promise<ReportPng> {
+export async function reportPng(ctx: ChatContext, r: Report, root: Element | null, org = '', faction = ''): Promise<ReportPng> {
   await waitFonts();
   const art = await loadArt(r.kind === 'fd' ? null : evArt(ctx, r.head.name, r.kind, r.head.art).pic);
   const canvas = document.createElement('canvas');
@@ -64,8 +64,10 @@ export async function reportPng(ctx: ChatContext, r: Report, root: Element | nul
     paintReport(g, r, { colors: paintColors(root), sans: FONT_SANS, mono: FONT_MONO, art: null, org });
     blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
   }
-  if (!blob) throw new Error('PNG 로 바꾸지 못했어요');
-  const name = `관리국_보고서_${r.no.replace(/[^\w-]/g, '')}.png`;
+  if (!blob) throw new Error('PNG로 바꾸지 못했어요');
+  // 파일 이름 앞은 내 소속 세력 이름 (없으면 「보고서」부터, 전수점검 보통-68)
+  const who = faction.replace(/[\\/:*?"<>|\s]+/g, '');
+  const name = `${who ? `${who}_` : ''}보고서_${r.no.replace(/[^\w-]/g, '')}.png`;
   return { blob, url: URL.createObjectURL(blob), name };
 }
 

@@ -6,6 +6,7 @@ import type { ChatContext } from '../../host/risu';
 import { notifyInstalled } from '../../host/hooks';
 import { BRAND } from '../brand';
 import { updateGroup } from '../update';
+import { josa } from '../../core/josa';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 const mb = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}MB` : `${Math.max(1, Math.round(n / 1e3))}KB`);
@@ -63,7 +64,7 @@ function statusList(s: InstallState): string {
   const loreOk = s.settingsFolder && s.directory && s.manifest;
   const pics = s.pictures;
   return `<section class="ps-group"><h3>점검</h3><div class="ps-rows gw-inst-list">
-    ${li(loreOk, '카드 로어북', loreOk ? '⚙️설정 폴더 · 명부 · Plugin manifest' : [!s.settingsFolder && '⚙️설정 폴더', !s.directory && '명부(Directory)', !s.manifest && 'Plugin manifest'].filter(Boolean).join(' · ') + ' 없음')}
+    ${li(loreOk, '카드 로어북', loreOk ? '⚙️설정 폴더 · 명부 · 플러그인 정보' : [!s.settingsFolder && '⚙️설정 폴더', !s.directory && '명부', !s.manifest && '플러그인 정보'].filter(Boolean).join(' · ') + ' 없음')}
     ${li(s.loreSettings, '로어북 설정', s.loreSettings ? '봇 설정 사용' : '글로벌 설정 사용 중')}
     ${li(s.firstMessage, '첫 메시지', s.firstMessage ? '시작 안내' : '시작 안내가 아님 (안내판이 안 떠요)')}
     ${li(s.greetings.ok, '인사말', s.greetings.ok ? `${s.greetings.total}개` : `${s.greetings.total - s.greetings.missing.length}/${s.greetings.total}개`)}
@@ -88,9 +89,9 @@ export function installPage(ctx: ChatContext): string {
   const name = String(ctx.char.name ?? '이 캐릭터');
   const head = s.goei
     ? missing.length
-      ? `${esc(name)}: 빠진 것 ${missing.length}개. 오른쪽 단추 하나로 전부 채워요.`
-      : `${esc(name)}: 모두 갖춰져 있어요.`
-    : `${esc(name)}는 아직 ${esc(BRAND.name)} 카드가 아니에요. 오른쪽 단추 하나로 설정 폴더·명부·첫 메시지·인사말·로어북 설정·사진·아이콘·위키 기본 문서·토크나이저를 전부 심어요.`;
+      ? `「${esc(name)}」 카드에 빠진 것이 ${missing.length}개 있어요. 오른쪽 버튼 하나로 전부 채워요.`
+      : `「${esc(name)}」 카드는 모두 갖춰져 있어요.`
+    : `${esc(josa(name, '은', '는'))} 아직 ${esc(BRAND.name)} 카드가 아니에요. 오른쪽 버튼 하나로 설정 폴더·명부·첫 메시지·인사말·로어북 설정·사진·아이콘·위키 기본 문서·토크나이저를 전부 심어요.`;
   const main = busy
     ? `<button class="gx-mini primary" disabled>${esc(instUi.progress || '설치하는 중…')}</button>`
     : allDone
@@ -150,7 +151,7 @@ export async function installAction(action: string, ctx: ChatContext, env: Env):
       const r = await f();
       if (r) done.push(r);
     } catch (error) {
-      failed.push(`${label}: ${error instanceof Error ? error.message : String(error)}`);
+      failed.push(`${label}: ${(error instanceof Error ? error.message : String(error)).replace(/[.\s]+$/, '')}`); // 끝 마침표는 떼고 아래 안내가 붙인다 (마침표 두 번, 전수점검 눌러-보통-30)
     }
   };
   const s = instUi.state;
@@ -158,7 +159,7 @@ export async function installAction(action: string, ctx: ChatContext, env: Env):
     // 한 단계가 실패해도 다음 단계로 간다. 끝에 된 것·안 된 것을 한꺼번에 보여 준다
     await run('로어북·인사말', async () => {
       progress('로어북·첫 메시지·인사말 심는 중…');
-      await installLoreAndGreetings(ctx.charIndex, instUi.setName ? { name: BRAND.name } : {});
+      if (!(await installLoreAndGreetings(ctx.charIndex, instUi.setName ? { name: BRAND.name } : {}))) return null;
       return instUi.setName ? '로어북·인사말·봇 이름' : '로어북·인사말';
     });
     notifyInstalled();

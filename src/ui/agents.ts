@@ -73,7 +73,7 @@ export function agentPanel(items: AgentItem[], view: AgentView, o: { total: numb
 }
 
 /** 요원 사원증 창 (가로 명함 비율): 사진 · 이름·영문명·소속·직급·투입·상황 · 번호와 톡·위키·기록.
- *  hasRecord: 그 이름의 인물 기록(ui/people.ts)이 있으면 「기록」 단추 */
+ *  hasRecord: 그 이름의 인물 기록(ui/people.ts)이 없으면 「기록」 단추를 흐리게 */
 export function agentPopup(hasRecord?: (name: string) => boolean): string {
   const org = lastOrg;
   const a = last.find((x) => x.id === agUi.pop);
@@ -81,16 +81,18 @@ export function agentPopup(hasRecord?: (name: string) => boolean): string {
     agUi.pop = '';
     return '';
   }
-  const btns = (a.wiki !== null
-    ? `<button data-action="agent-talk" data-value="${esc(a.id)}">${ICONS.phone}괴담톡</button><button data-action="wiki-goto" data-value="${esc(a.wiki)}">${ICONS.wiki}위키</button>`
-    : '') + (hasRecord?.(a.name) ? `<button data-action="people-goto" data-value="${esc(a.name)}">${ICONS.group}기록</button>` : '');
+  // 빈 칸이어도 단추 자리는 두고 흐리게 (카드마다 단추 줄 폭이 달랐다, 전수점검 눌러-보통-2)
+  const off = ' disabled aria-disabled="true"';
+  const rec = !!hasRecord?.(a.name);
+  const btns = `<button data-action="agent-talk" data-value="${esc(a.id)}"${a.wiki === null ? off : ''}>${ICONS.phone}괴담톡</button><button data-action="wiki-goto" data-value="${esc(a.wiki ?? '')}"${a.wiki === null ? off : ''}>${ICONS.wiki}위키</button>`
+    + `<button data-action="people-goto" data-value="${esc(a.name)}"${rec ? '' : off}>${ICONS.group}기록</button>`;
   const rows = [['소속', a.dept], ['직급', a.rank], ['투입', a.deployed], ['상황', a.situation || '대기 중']]
     .filter(([, v]) => v)
     .map(([k, v]) => `<dt>${k}</dt><dd${k === '투입' ? ' class="dep"' : ''}>${esc(v)}</dd>`)
     .join('');
   return `<button class="ev-scrim" data-action="agent-info" data-value="${esc(a.id)}" aria-label="닫기"></button>
     <div class="gx-agcard ${a.side}" role="dialog" aria-label="${esc(a.name)}">
-      <div class="gx-agcard-band">AGENT ID<b>${esc(org)}</b><button class="gx-agcard-x" data-action="agent-info" data-value="${esc(a.id)}" aria-label="닫기">✕</button></div>
+      <div class="gx-agcard-band">AGENT ID<b>${esc(org)}</b><button class="gx-agcard-x" data-action="agent-info" data-value="${esc(a.id)}" aria-label="닫기">${ICONS.close}</button></div>
       <div class="gx-agcard-main"><span class="gx-agcard-ph">${a.photo ? `<img src="${esc(a.photo)}" alt="">` : a.face}</span>
         <span class="gx-agcard-t"><span class="nm">${esc(a.name)}</span>${a.english ? `<span class="en">${esc(a.english)}</span>` : ''}<dl>${rows}</dl></span></div>
       <div class="gx-agcard-foot"><span class="code">NO. ${esc(a.id.replace(/^([A-Z]+)(\d)/, '$1-$2'))}<u></u></span>${btns}</div>

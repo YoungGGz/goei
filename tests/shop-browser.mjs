@@ -83,7 +83,7 @@ for (const vp of ['pc', 'phone']) {
   if (!html.includes('data-goei-shop') || html.includes('[shop:')) errorsAll.push(`[${vp}] display card missing or tag left: ${html.slice(-200)}`);
   // 2. 창을 닫고 채팅 속 카드의 「상점 열기」를 누른다 — 실제처럼 상점만 뜬다(상황판 없이, 가짜 보조 모델 응답 1개: 진열대)
   await closeWin(page); await sleep(200);
-  await page.evaluate((h) => { const d = document.createElement('div'); d.id = 'chat-card'; d.style.cssText = 'position:fixed;left:20px;top:20px;width:420px;z-index:1'; d.innerHTML = h; document.body.appendChild(d); }, html);
+  await page.evaluate((h) => { const d = document.createElement('div'); d.id = 'chat-card'; d.style.cssText = 'position:fixed;left:20px;top:20px;width:min(420px, calc(100vw - 20px));z-index:2147483000'; d.innerHTML = h; document.body.appendChild(d); }, html);
   // 카드가 채팅에 그려질 때처럼 display 를 한 번 더 불러 클릭 처리기를 깨운다 (카드 없을 때 누른 클릭이 처리기를 재움)
   await page.evaluate((t) => window.__calls.handlers.display(t), CHAR);
   await page.evaluate((t) => { window.__llm = [t]; }, SHELF);

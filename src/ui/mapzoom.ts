@@ -31,6 +31,9 @@ function clamp(v: View, cw: number, ch: number, lw: number, lh: number): View {
 type Box = { l: number; t: number; r: number; b: number };
 const hit = (a: Box, b: Box) => a.l < b.r && b.l < a.r && a.t < b.b && b.t < a.b;
 const box = (el: Element): Box => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top, r: r.right, b: r.bottom }; };
+const grow = (b: Box, n: number): Box => ({ l: b.l - n, t: b.t - n, r: b.r + n, b: b.b + n });
+/** 이름표와 남의 점 사이 최소 틈(px) */
+const DOT_GAP = 5;
 const rank = (el: Element) => (el.classList.contains('sel') ? 0 : /\bhot/.test(el.className) ? 1 : 2);
 
 /** 이름표끼리 겹치거나 남의 점을 덮으면 그 이름표를 점 위·오른쪽·왼쪽·귀퉁이로 옮겨 보고, 어디에도 자리가 없을 때만 숨기고 점만 남긴다
@@ -53,10 +56,13 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     if (!name || !D) continue;
     const N = box(name);
     const w = N.r - N.l, h = N.b - N.t, my = (D.t + D.b) / 2 - h / 2;
-    // 아래(제자리) → 위 → 오른쪽 → 왼쪽 → 네 귀퉁이
-    const up = D.t - 2 - h, dn = D.b + 2, rt = D.r + 1, lt = D.l - 1 - w;
-    const spots: [number, number][] = [[N.l, N.t], [N.l, up], [D.r + 3, my], [D.l - 3 - w, my], [rt, up], [lt, up], [rt, dn], [lt, dn]];
-    const free = (r: Box) => !placed.some((p) => hit(p, r)) && !dotBox.some((d, j) => j !== i && d && hit(d, r));
+    // 아래(제자리) → 위 → 오른쪽 → 왼쪽 → 네 귀퉁이 → 옆 반 칸 위아래
+    // (옆 반 칸: 귀퉁이까지 막혀 이름표 없는 점이 여럿 남았다, 전수점검 눌러-사소-1·눌러2-보통-7. 점에 닿는 자리만이라 어느 점 이름인지는 그대로 읽힌다)
+    const up = D.t - 2 - h, dn = D.b + 2, rt = D.r + 1, lt = D.l - 1 - w, hh = h / 2 + 1;
+    const spots: [number, number][] = [[N.l, N.t], [N.l, up], [D.r + 3, my], [D.l - 3 - w, my], [rt, up], [lt, up], [rt, dn], [lt, dn],
+      [D.r + 3, my - hh], [D.r + 3, my + hh], [D.l - 3 - w, my - hh], [D.l - 3 - w, my + hh]];
+    // 남의 점과는 조금 띄운다: 맞닿기만 해도 그 점의 이름표로 읽혔다 (전수점검 눌러2-보통-7: 「경남」 이름표가 전남 점에 붙어 있었다)
+    const free = (r: Box) => !placed.some((p) => hit(p, r)) && !dotBox.some((d, j) => j !== i && d && hit(grow(d, DOT_GAP), r));
     let at = -1;
     spots.some(([l, t], k) => {
       const r = { l, t, r: l + w, b: t + h };
@@ -77,6 +83,25 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
   }
 }
 
+/** 확대 단추 줄을 오른쪽·왼쪽 아래 중 점을 덜 덮는 쪽에 둔다. 고른 곳·사건 난 곳의 점은 무겁게 센다
+ *  (전수점검 눌러-중대-2: 오른쪽 아래 +/− 가 울릉·독도 확대창의 목표 핀과 서울 동쪽 구 핀을 덮었다) */
+function placeZoom(canvas: HTMLElement, layer: HTMLElement): void {
+  const zoom = canvas.querySelector<HTMLElement>('.gx-zoom');
+  if (!zoom) return;
+  canvas.classList.remove('zl');
+  const Z = box(zoom);
+  const C = box(canvas);
+  const w = Z.r - Z.l;
+  const right = Z;
+  const left = { l: C.l + (C.r - Z.r), t: Z.t, r: C.l + (C.r - Z.r) + w, b: Z.b };
+  const weight = (el: Element) => (el.classList.contains('sel') ? 100 : /\bhot/.test(el.className) ? 10 : 1);
+  // 점과 함께 고른 곳·사건 난 곳의 이름표도 센다 (점은 비켜도 바로 밑 목표 이름표를 덮었다)
+  const marks = [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')].map((d) => [d, d.querySelector('.gx-dot')] as const)
+    .concat([...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-plab')].filter((l) => rank(l) < 2).map((l) => [l, l.querySelector('.gx-pname')] as const));
+  const score = (z: Box) => marks.reduce((n, [pin, el]) => (el && hit(box(el), z) ? n + weight(pin) : n), 0);
+  canvas.classList.toggle('zl', score(left) < score(right));
+}
+
 /** render() 뒤에 부른다. 지도 칸이 없으면 아무것도 안 한다 */
 export function bindMapZoom(root: HTMLElement): void {
   const canvas = root.querySelector<HTMLElement>('.gx-canvas[data-map]');
@@ -88,6 +113,7 @@ export function bindMapZoom(root: HTMLElement): void {
   const canPan = () => layer.offsetWidth * v.z > canvas.clientWidth + 1 || layer.offsetHeight * v.z > canvas.clientHeight + 1;
 
   const img = canvas.querySelector<HTMLImageElement>('.gx-mapimg');
+  let placed = false;
   const apply = () => {
     // 그림이 불리기 전엔 크기가 0이라 가운데를 못 잰다. 저장하지 않고 load 뒤에 맞춘다 (전수검사 11-13)
     if (Number.isNaN(v.y) && img && !img.complete) {
@@ -101,6 +127,9 @@ export function bindMapZoom(root: HTMLElement): void {
     layer.style.setProperty('--pz', String(Math.pow(v.z, 0.25) / v.z));
     canvas.classList.toggle('zoomed', v.z > 1);
     canvas.classList.toggle('pan', canPan());
+    // 단추 쪽은 그릴 때 한 번만 고른다. 확대·옮길 때마다 고르면 + 를 누른 뒤 단추 줄이 반대쪽으로 뛰어
+    // 다음 누름이 핀에 떨어진다 (검토 지적: 눌러-중대-2)
+    if (!placed) (placed = true), placeZoom(canvas, layer);
     declutter(layer, canvas, v.z);
   };
   /** 칸 안의 한 점(px)을 붙잡은 채 배율을 바꾼다 */

@@ -34,7 +34,7 @@ for (const vp of ['pc', 'phone']) {
   await page.click('#chat-card [data-goei-shop]');
   await page.evaluate(() => { document.getElementById('chat-card').style.visibility = 'hidden'; });
   await page.waitForFunction(() => !!document.querySelector('.gx-netsolo .br-p-cos'), null, { timeout: 8000 }).catch(() => {}); await sleep(400);
-  const solo = await page.evaluate(() => ({ cos: !!document.querySelector('.gx-netsolo .br-p-cos'), nav: [...document.querySelectorAll('.gx-tabs, .gx-nav')].some((e) => e.offsetParent), close: !!document.querySelector('.gx-head [data-action="close"]') }));
+  const solo = await page.evaluate(() => ({ cos: !!document.querySelector('.gx-netsolo .br-p-cos'), nav: [...document.querySelectorAll('.gx-tabs, .gx-nav')].some((e) => e.offsetParent), close: !!document.querySelector('.gx-netsolo [data-action="close"], .gx-head [data-action="close"]') }));
   if (!solo.cos || solo.nav || !solo.close) errorsAll.push(`[${vp}] net solo: ${JSON.stringify(solo)}`);
   await shot('net-solo');
   // 닫고 다시 열면 평소 상황판

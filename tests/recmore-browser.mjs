@@ -158,11 +158,15 @@ for (const [vp, size] of [['pc', { width: 1920, height: 1080, touch: false }], [
   // ── 설정: 한 번에 보일 줄 수 ──
   await openEditor(page, 'set:journal'); await sleep(300);
   const txt = await page.textContent('.gw .gw-setbody');
-  assert.ok(txt.includes('한 번에 보일 줄 수') && txt.includes('30줄'), '설정 줄이 있다');
+  // 수 칸은 직접 적는 칸(input)이라 값은 글자가 아니라 value 에 있다 (56b4967)
+  const cur = await page.evaluate(() => { const i = document.querySelector('.gw input.adv-val[data-change="jr-step"][data-key="list_page"]'); return i ? `${i.value}${i.nextElementSibling?.textContent ?? ''}` : null; });
+  assert.ok(txt.includes('한 번에 보일 줄 수') && cur === '30줄', `설정 줄이 있다 (${cur})`);
   const box = await page.evaluate(() => { const b = document.querySelector('.gw [data-action="jr-step"][data-value="list_page:-"]').closest('.st-step').getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; });
   assert.equal(box.h, 34, '숫자 상자 높이 34 (공통 규격)');
   await page.screenshot({ path: `${OUT}/${vp}-setting.png` });
-  await page.click('.gw [data-action="jr-step"][data-value="list_page:-"]'); await page.waitForFunction(() => window.__chat.scriptstate.$jr_list_page === '20');
+  // −/+ 는 1씩 (56b4967), 직접 적어 11로 → − 한 번에 10
+  await page.click('.gw [data-action="jr-step"][data-value="list_page:-"]'); await page.waitForFunction(() => window.__chat.scriptstate.$jr_list_page === '29');
+  await page.evaluate(() => { const i = document.querySelector('.gw input.adv-val[data-change="jr-step"][data-key="list_page"]'); i.value = '11'; i.dispatchEvent(new Event('change', { bubbles: true })); }); await page.waitForFunction(() => window.__chat.scriptstate.$jr_list_page === '11');
   await page.click('.gw [data-action="jr-step"][data-value="list_page:-"]'); await page.waitForFunction(() => window.__chat.scriptstate.$jr_list_page === '10');
   assert.equal(await page.evaluate(() => document.querySelector('.gw [data-action="jr-step"][data-value="list_page:-"]').disabled), true, '10에서 − 잠김');
   await closeEditor(page, true); await sleep(200);

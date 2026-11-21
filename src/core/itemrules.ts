@@ -28,7 +28,6 @@ export const ITEM_LOG_CAP_VAR = '$it_logcap';
 export const ITEM_LOG_CAP_DEFAULT = 400;
 export const ITEM_LOG_CAP_MIN = 100;
 export const ITEM_LOG_CAP_MAX = 2000;
-export const ITEM_LOG_CAP_STEP = 100;
 export const itemLogCapOf = (vars: Record<string, unknown> | undefined | null): number => {
   const raw = vars?.[ITEM_LOG_CAP_VAR];
   if (raw === undefined || raw === null || raw === '') return ITEM_LOG_CAP_DEFAULT;
@@ -71,7 +70,6 @@ export const ITEM_LIST_CAP_VAR = '$it_list_cap';
 export const ITEM_LIST_CAP_DEFAULT = 200;
 export const ITEM_LIST_CAP_MIN = 50;
 export const ITEM_LIST_CAP_MAX = 1000;
-export const ITEM_LIST_CAP_STEP = 50;
 export const itemListCapOf = (vars: Record<string, unknown> | undefined): number => {
   const raw = vars?.[ITEM_LIST_CAP_VAR];
   const n = raw === undefined || raw === null || raw === '' ? NaN : Number(raw);

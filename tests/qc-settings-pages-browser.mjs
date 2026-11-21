@@ -108,6 +108,11 @@ async function sweepPage(page, pageId, mode, log) {
     const before = await snap(page);
     await clickControl(page, next);
     await settle(page);
+    // 표 줄 지우기는 가운데 확인 팝업을 먼저 띄운다 (115bc97, 전수점검 눌러-보통-28). 「지우기」까지 눌러 저장 범위를 본다 (팝업을 남기면 뒤 팝업이 가려진다)
+    if (await page.$('.gw .gw-confirm [data-action="ed-askdel-yes"]')) {
+      await page.evaluate(() => document.querySelector('.gw .gw-confirm [data-action="ed-askdel-yes"]').click());
+      await settle(page);
+    }
     const after = await snap(page);
     const prefsChanged = before.prefs !== after.prefs;
     const chatChanged = before.chat !== after.chat;
@@ -117,13 +122,10 @@ async function sweepPage(page, pageId, mode, log) {
     if (process.env.QC_VERBOSE) console.log(`  ${label} (${Date.now() - t0}ms)`);
     // 기대: 「이 기기」 배지가 붙은 줄은 어느 페이지든 prefs (인물의 갱신 기록 보관처럼 기능 페이지에도 기기 값이 있다). 기능 페이지의 나머지는 늘 채팅 변수, 그 밖은 범위대로
     const expect = next.device ? 'prefs' : FEATURE.has(pageId) ? 'chat' : next.badge === '이 채팅' ? 'chat' : next.badge === '새 채팅 기본값' ? 'prefs' : mode === 'chat' ? 'chat' : 'prefs';
-    // 확인창을 여는 조작(상황판 끄기)·저장 안 하는 조작은 둘 다 안 바뀔 수 있다: 그건 따로 본다
+    // 상황판 끄기: 확인 칩 없이 바로 채팅 변수에 쓴다 (f1e926c, 전수점검 사소-64 사용자 결정). 확인창이 다시 뜨면 안 되고 기기 설정은 안 건드린다. 범위 검사는 아래 공통 검사로
     if (next.action === 'set-anomaly' && next.value === 'off' && mode === 'chat') {
-      assert.ok(!prefsChanged && !wroteChat, `${label}: 끄기는 확인창만`);
-      assert.ok(await page.$('.gw [data-action="set-anomaly"][data-value="off-yes"]'), `${label}: 확인창`);
-      await page.evaluate(() => document.querySelector('.gw [data-action="set-anomaly"][data-value="off-no"]').click());
-      await settle(page);
-      continue;
+      assert.ok(!prefsChanged, `${label}: 끄기는 기기 설정을 안 건드림`);
+      assert.ok(!(await page.$('.gw [data-action="set-anomaly"][data-value="off-yes"]')), `${label}: 확인창 없이 바로 끔`);
     }
     if (!prefsChanged && !chatChanged && !wroteChat) {
       // 바뀐 게 없는 조작: 기록만 (같은 값으로 저장 생략 등)
@@ -224,13 +226,14 @@ for (const vp of vps) {
     };
     const setAgent = async (_mode, n) => {
       for (let i = 0; i < 30; i++) {
-        const cur = Number((await page.textContent('.gw [data-action="set-agent"] + b, .gw .st-step:has([data-action="set-agent"]) b')).replace(/\D/g, ''));
+        // 수 칸은 직접 입력 칸(input.adv-val)으로 바뀌었다 (56b4967, 11-19 「모든 칸에 직접 입력」)
+        const cur = Number((await page.inputValue('.gw .st-step:has([data-action="set-agent"]) input.adv-val')).replace(/\D/g, ''));
         if (cur === n) break;
         await page.evaluate((d) => document.querySelector(`.gw [data-action="set-agent"][data-value="n:${d}"]`).click(), cur < n ? '+' : '-');
         await settle(page);
       }
     };
-    const shownAgent = () => page.evaluate(() => Number(document.querySelector('.gw .st-step:has([data-action="set-agent"]) b').textContent.replace(/\D/g, '')));
+    const shownAgent = () => page.evaluate(() => Number(document.querySelector('.gw .st-step:has([data-action="set-agent"]) input.adv-val').value.replace(/\D/g, '')));
     await setAgent('chat', 3);
     await bar('save');
     assert.equal((await prefsOf(page)).basic.agentLimit, 3, '기본값으로 저장 → 기본값 3');
@@ -249,9 +252,13 @@ for (const vp of vps) {
     // 괴이 발생 수치 경계: 확률 100 에서 + 잠김, 유지 시간 8760 에서 + 잠김, 0 에서 − 잠김
     const worldBtn = (k, op) => `.gw [data-action="set-world"][data-value="${k}:${op}"]`;
     const pushWorld = async (k, op, times) => { for (let i = 0; i < times; i++) { if (await page.isDisabled(worldBtn(k, op))) break; await page.evaluate((s) => document.querySelector(s).click(), worldBtn(k, op)); await settle(page); } };
+    // − + 는 1씩 움직인다 (56b4967, 11-19 사용자). 경계 가까이는 직접 입력으로 옮긴 뒤 눌러 본다
+    const typeWorld = async (k, n) => { await setInput(page, `.gw input.adv-val[data-change="set-world"][data-key="${k}"]`, String(n)); await settle(page); };
+    await typeWorld('preset_p', 95);
     await pushWorld('preset_p', '+', 12);
     assert.equal(await page.isDisabled(worldBtn('preset_p', '+')), true, '확률 100% 에서 + 잠김');
     assert.equal((await chatOf(page)).scriptstate.$wg_preset_p, '100');
+    await typeWorld('preset_p', 5);
     await pushWorld('preset_p', '-', 12);
     assert.equal(await page.isDisabled(worldBtn('preset_p', '-')), true, '확률 0% 에서 − 잠김');
     assert.equal((await chatOf(page)).scriptstate.$wg_preset_p, '0');
@@ -353,7 +360,9 @@ for (const vp of vps) {
     const genVal = async () => (await chatOf(page)).scriptstate['$gen_retries'];
     const tryAdv = async (t) => { await setInput(page, retries, t); await settle(page); return [await page.$eval(retries, (e) => e.value), await genVal()]; };
     assert.deepEqual(await tryAdv('2'), ['2', '2']);
-    assert.deepEqual(await tryAdv('-5'), ['0', '0'], '음수 → 최소');
+    // 0회는 칸을 비우고 「안 함」을 보인다 (f1e926c, 형식 오류 재시도에 zero: '안 함')
+    assert.deepEqual(await tryAdv('-5'), ['', '0'], '음수 → 최소');
+    assert.equal(await page.$eval(retries, (e) => e.placeholder), '안 함', '0회 → 「안 함」');
     assert.deepEqual(await tryAdv('1.7'), ['2', '2'], '소수 → 반올림');
     assert.deepEqual(await tryAdv('99'), ['3', '3'], '상한');
     assert.deepEqual(await tryAdv(''), ['1', ''], '빈 칸 → 기본값');
@@ -361,7 +370,9 @@ for (const vp of vps) {
     const budget = '.gw input.adv-val[data-key="gen:budget"]';
     await setInput(page, budget, '1200000');
     await settle(page);
-    assert.equal(await page.$eval(budget, (e) => e.value), '200000', '토큰 상한 200000 으로 자름');
+    // 1만 이상인 큰 수 칸은 자릿점을 찍는다 (f1e926c, 전수점검 눌러-사소-39)
+    assert.equal(await page.$eval(budget, (e) => e.value), '200,000', '토큰 상한 200000 으로 자름');
+    assert.equal((await chatOf(page)).scriptstate['$gen_budget'], '200000', '저장 값은 자릿점 없이');
     assert.equal(await page.$('.gw [data-action="adv-reset"]'), null, '칸마다 되돌리기 단추 없음 (11-08 사용자: 초기화는 점검 한 곳)');
     // 화면 페이지: 창 폭 50~100 (PC) · 테마 3종이 창(.gx)·편집 창(.gw)에 적용 · 메뉴 위치 · 바깥 어둡기
     await goNode(page, 'set:screen');

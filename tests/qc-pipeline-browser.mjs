@@ -325,7 +325,8 @@ const unresolved = (t) => [...new Set((t.match(/\{\{[^}]*\}\}/g) ?? []))].filter
     await setVars(page, { $pp_on: '0', $pp_inject: 'split' });
     assert.equal(block(await request(page, base())), undefined, '기능 끔: 블록 없음');
     // 연출형 Director: 보조 모델 1회, 실패해도 요청은 나간다
-    await setVars(page, { $pp_on: '1', $pp_director: 'scene', $pp_director_timeout: '5' });
+    // Router 기본값이 model(보조 1회 추가)로 바뀌어(9c8c025, 11-19) Director 호출만 세려고 Router 는 코드로 둔다
+    await setVars(page, { $pp_on: '1', $pp_director: 'scene', $pp_director_timeout: '5', $pp_router: 'code' });
     await page.evaluate(() => { window.__llm = [{ type: 'success', result: JSON.stringify({ notes: [{ who: '쟈알디', now: '커피를 마신다', react: '짧게 답한다', must_not_reveal: ['비밀'] }] }) }]; window.__calls.llm = []; });
     let out = await request(page, base());
     assert.equal((await page.evaluate(() => window.__calls.llm.length)), 1, 'Director 보조 호출 1회');
@@ -337,6 +338,7 @@ const unresolved = (t) => [...new Set((t.match(/\{\{[^}]*\}\}/g) ?? []))].filter
     assert.ok(!out.some((m) => m.content.startsWith('[Director note]')) && block(out), '실패하면 메모 없이 진행');
     await setVars(page, { $pp_director: 'note' });
     assert.ok(block(await request(page, base())), 'note(메모형) 모드: 호출 없이 블록만');
+    await setVars(page, { $pp_router: 'model' });
     await page.evaluate(() => { delete window.__chat.goeiPeopleV1; });
   });
 

@@ -1,12 +1,13 @@
 // 아바타 고르기 (2026-11-07~08 사용자): 시작 패널(내 페르소나)과 시작한 뒤가 같은 팝업을 쓴다.
 // 남·여를 고르면 그 성별 일반 NPC 프리셋 전부가 정면 대기 동작으로 움직이는 격자에서 하나를 꼭 고른다.
 // 대기 동작은 1배(픽셀 그대로)로 CSS steps 로 돌린다. 고른 것은 이 채팅 변수 $st_look 에 둔다 (core/looks.ts).
-import { LOOK_GENDERS, LOOK_KEY, lookId, looksOf, pickLookAct, type LookGender, type LookRow } from '../core/looks';
+import { LOOK_GENDERS, LOOK_KEY, lookId, looksOf, pickLookAct, pickLookGap, type LookGender, type LookRow } from '../core/looks';
 import { playerAgent } from '../core/player';
 import { idleOf, lookActs, looksStatus, lookRows, ensureLooks, type ActLook, type IdleLook } from '../host/looks';
 import { savePrefs } from '../host/prefs';
 import { updateChat, type ChatContext } from '../host/risu';
 import { ICONS } from './icons';
+import { josaRo } from '../core/josa';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -42,19 +43,22 @@ export function lookSprite(look: IdleLook, cls = ''): string {
 // 대기 한 바퀴가 끝나는 순간에 동작 시트로 바꾸고(첫 장이 대기 자세에서 이어지게), 동작이 끝나면 대기 시트로 되돌린다.
 // 동작 장은 대기 칸보다 넓어서, 대기 칸이 있던 자리에 그대로 겹치도록 바깥 여백을 음수로 준다 (자리·발밑이 안 움직인다).
 
-/** 내 아바타 칸: 동작을 끼울 수 있게 모습 번호와 동작 간격(초, 설정 「아바타 동작 간격」)을 달아 둔다. 간격 0이면 대기만 */
-export function avatarSprite(look: IdleLook, gapSec: number): string {
+/** 내 아바타 칸: 동작을 끼울 수 있게 모습 번호와 동작 간격(초, 설정 「아바타 동작 간격」 최소~최대)을 달아 둔다. 최대가 0이면 대기만 */
+export function avatarSprite(look: IdleLook, gap: [number, number]): string {
   const html = lookSprite(look, 'it-look');
-  if (!look.acts || !(gapSec > 0)) return html;
+  if (!look.acts || !(gap[1] > 0)) return html;
   // 동작 그림을 미리 받아 둔다 (첫 차례에 바로 나오게)
   void lookActs(look.id);
-  return html.replace('<span ', `<span data-look="${esc(look.id)}" data-gap="${gapSec}" `);
+  return html.replace('<span ', `<span data-look="${esc(look.id)}" data-gap="${gap[0]}-${gap[1]}" `);
 }
 
 let actTimer: ReturnType<typeof setInterval> | undefined;
 let lastAct = '';
 /** 마지막 동작이 끝난 때 (아바타가 처음 보인 때부터 센다) */
 let restFrom = 0;
+/** 이번에 서 있기로 뽑은 초와 그때의 설정 (설정이 바뀌거나 동작이 끝나면 다시 뽑는다) */
+let restSec = 0;
+let restOf = '';
 let arming = false;
 
 const stillMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -68,6 +72,7 @@ function playAct(el: HTMLElement, a: ActLook): void {
     el.classList.remove('act');
     el.setAttribute('style', idle);
     restFrom = Date.now();
+    restOf = '';
   };
   el.style.setProperty('--lw', `${a.w}px`);
   el.style.setProperty('--lh', `${a.h}px`);
@@ -107,9 +112,14 @@ function actTick(): void {
   if (arming || stillMotion() || document.hidden) return;
   const el = avatarEl();
   if (!el || !el.getClientRects().length) return void (restFrom = 0);
-  if (!restFrom) restFrom = Date.now();
-  const gap = Number(el.dataset.gap);
-  if (!(gap > 0) || Date.now() - restFrom < gap * 1000) return;
+  const range = el.dataset.gap ?? '';
+  if (!restFrom || restOf !== range) {
+    const [lo, hi] = range.split('-').map(Number);
+    if (!restFrom) restFrom = Date.now();
+    restOf = range;
+    restSec = pickLookGap([lo || 0, hi || 0], Math.random());
+  }
+  if (Date.now() - restFrom < restSec * 1000) return;
   const id = el.dataset.look ?? '';
   const acts = lookActs(id);
   const a = acts && pickLookAct(acts, lastAct, Math.random());
@@ -157,7 +167,7 @@ function chooser(sel: string, g: LookGender | '', withSegs: boolean): string {
  *  g 를 주면(시작 패널에서 성별을 고른 뒤) 그 성별만, 안 주면(시작한 뒤) 팝업 안에 성별 단추 */
 export function lookPopup(sel: string, lockedName = '', g: LookGender | '' = ''): string {
   if (!lookUi.open) return '';
-  const inner = lockedName ? `<p class="gx-hint">${esc(lockedName)}(으)로 플레이 중이라 그 인물 모습을 써요.</p>` : chooser(sel, g || lookUi.g, !g);
+  const inner = lockedName ? `<p class="gx-hint">${esc(josaRo(lockedName))} 플레이 중이라 그 인물 모습을 써요.</p>` : chooser(sel, g || lookUi.g, !g);
   return `<div class="gx-agpop gx-lookpop" data-action="look-close" role="dialog" aria-label="아바타"><div class="gx-agpop-card gx-lookpop-card" data-action="look-keep">
     <div class="gx-lookpop-head"><b>아바타</b><button class="gx-x" data-action="look-close" aria-label="닫기">${ICONS.close}</button></div>
     ${inner}${lookUi.notice ? `<div class="gx-err" role="alert">${esc(lookUi.notice)}</div>` : ''}
@@ -209,13 +219,17 @@ export function flashPick(value: string, then: () => void | Promise<void>): void
 export async function lookAction(action: string, value: string | undefined, ctx: ChatContext, refresh: () => Promise<void>): Promise<boolean> {
   if (lookCommon(action, value)) return true;
   if (action !== 'look' || !lookUi.open || !value) return false;
+  // 고를 때마다 앞 실패 안내를 비우고, 이 채팅에 적지 못했으면 새 채팅 기본값도 바꾸지 않는다 (전수점검 보통-72)
+  lookUi.notice = '';
+  let failed = false;
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[LOOK_KEY] ?? '') === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [LOOK_KEY]: value } })).catch((error) => {
+    failed = true;
     lookUi.notice = error instanceof Error ? error.message : String(error);
     return null;
   });
   // 마지막에 고른 아바타 = 다음 새 채팅 기본
-  await savePrefs((p) => ({ ...p, look: value })).catch(() => {});
-  if (lookUi.notice) {
+  if (!failed) await savePrefs((p) => ({ ...p, look: value })).catch(() => {});
+  if (failed) {
     await refresh();
     return true;
   }
@@ -257,7 +271,7 @@ export const LOOK_CSS = `
 .gx-lookchip:disabled { cursor: default; opacity: .75; }
 .gx-lookface { width: 34px; height: 34px; border-radius: 9px; }
 .gx-lookface .gx-look { position: absolute; left: 50%; top: 0; translate: -50% 0; }
-@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gx-lookg { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
   .gx-lookc { height: 262px; padding: 4px 2px; }
 }

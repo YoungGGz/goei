@@ -133,7 +133,9 @@ test('반영: 항목 add/upsert/remove 보류, 계기 상한·중복, 호칭, �
   const changes = S.liveChanges(store, live);
   assert.equal(A.affinityOf(store.people.쟈알디, changes), 8);
   assert.deepEqual(A.addressOf(store.people.쟈알디, changes), { toUser: '너', register: '반말' });
-  assert.equal(store.identity.faction, '관리국');
+  // 상태창 신분 칸처럼 조직 코드·직급 사다리로 (전수점검 보통-16)
+  assert.equal(store.identity.faction, 'A00');
+  assert.equal(store.identity.level, 0);
   assert.equal(rep.applied.notes, 1);
   assert.deepEqual(U.latestNote(store, '쟈알디', live), { now: 'Guards the door.', mustNot: ['유저의 전직'] });
   assert.deepEqual(S.unreadIndexes(c, store), [1], '읽은 응답은 표시, 앞 응답은 아직');

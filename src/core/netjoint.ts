@@ -1,7 +1,7 @@
 // 인터넷 자동 호출 묶기 (11-09 사용자 결정: 「게시판 넷 + 괴담톡 한 번에」, 쇼핑몰 둘은 따로).
 // 매 턴 자동 호출인 괴담톡·괴담넷·괴담갤·세정게·연어 마켓 가운데 모델(메인/보조·전용 모델 ID)이 같은 것끼리 한 요청(host/joint.ts)으로 보낸다.
 // 켬/끔 스위치 하나($net_joint, 기본 켬) — 괴담톡·괴담넷 설정의 「자동 호출」 아래 「한 번에 요청」. 끄면 하나씩 따로 1회.
-import { BOARD_SITES, boardState, type BoardSite } from './boards';
+import { BOARD_NAME, BOARD_SITES, boardState, type BoardSite } from './boards';
 import type { ScriptState } from './types';
 import { featureModel } from './craft';
 import { gnetSettings } from './gnet';
@@ -11,7 +11,8 @@ type State = ScriptState | undefined;
 
 export const JOINT_VAR = '$net_joint';
 export type JointKind = 'phone' | BoardSite;
-export const JOINT_LABEL: Record<JointKind, string> = { phone: '괴담톡', gn: '괴담넷', gal: '괴담갤', wpf: '세정게', sm: '연어 마켓' };
+/** 호출 이름: 게시판은 지침에서 정한 사이트 이름(BOARD_NAME)을 그대로 따른다 (전수점검 사소-7: 박힌 이름이라 지침에서 이름을 바꾸면 진행 창 칸이 비고 덤 칸이 생겼다) */
+export const JOINT_LABEL: Record<JointKind, string> = { phone: '괴담톡', get gn() { return BOARD_NAME.gn; }, get gal() { return BOARD_NAME.gal; }, get wpf() { return BOARD_NAME.wpf; }, get sm() { return BOARD_NAME.sm; } };
 /** 통합 요청 JSON 의 칸 이름 (괴담넷은 옛 이름 gnet 그대로) */
 export const JOINT_KEY: Record<JointKind, string> = { phone: 'phone', gn: 'gnet', gal: 'gal', wpf: 'wpf', sm: 'sm' };
 

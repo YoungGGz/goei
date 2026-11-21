@@ -1,6 +1,7 @@
 // 세계 편집 창 (docs/설계안_세계편집.md 5장): 패널과 별도의 창. 왼쪽 트리 + 오른쪽 편집기.
 // 저장은 전부 카드 명부(Directory)로: 명부 줄(기존 dirUi 초안)과 세계 덧쓰기(edUi.over)를 한 번에 쓴다.
 import { loreCheckBox } from '../lorecheck';
+import { invOn } from '../../core/items';
 import { bindNeedFill } from '../needfill';
 import { directoryData, withDirectory, readDirectoryData, type Directory, type DirectoryData } from '../../core/world/directory';
 import { renameOrgOverrides, type WorldOverrides } from '../../core/world/records';
@@ -10,7 +11,7 @@ import { LEGACY_DATA } from '../../core/lorebooks';
 import { getPrefs } from '../../core/settings';
 import { updateCharacterLore, type ChatContext } from '../../host/risu';
 import { savePrefs } from '../../host/prefs';
-import { bindCropDrag, cropValue, directoryDraft, directoryExtList, directoryInput, directoryList, directoryPhotoList, directoryView, dirUi, dirty as dirDirty, handleDirectory, resetDirectory, setCrop } from '../directory';
+import { bindCropDrag, cropValue, directoryConfirmPopup, directoryDraft, directoryExtList, directoryInput, directoryList, directoryPhotoList, directoryView, dirUi, dirty as dirDirty, handleDirectory, resetDirectory, setCrop } from '../directory';
 import { handleImgPrompt, imgInput, imgPromptPane } from '../imgprompt';
 import { GHOST_ICON, ICONS } from '../icons';
 import { labelSwitches } from '../controls';
@@ -18,14 +19,15 @@ import { bindMbar } from '../mbar';
 import { bindSwipeBack } from '../swipeback';
 import { NavHistory } from '../../core/navhist';
 import { booksInput, defaultsState } from '../advanced';
-import { rememberPanel } from '../panels';
+import { guardHiddenScroll, rememberPanel, scrollInside } from '../panels';
 import editorCss from './style.css';
-import { recordCount, recordList, recordPage, recordAction, recordInput, recUi, rowsOf } from './record';
+import { recordConfirmPopup, recordCount, recordList, recordPage, recordAction, recordInput, recUi, rowsOf, xnameSync } from './record';
 import { relationsPage, relationsAction, relationsInput } from './relations';
-import { startPage } from './start';
+import { startConfirmPopup, startPage } from './start';
 import { guidePage, guideAction, guideBarSync, guideInput, guideUi } from './guides';
-import { isRuleNode, ruleAction, ruleInput, rulePage, ruleTreeItems } from './rules';
+import { isRuleNode, ruleAction, ruleConfirmPopup, ruleInput, rulePage, ruleTreeItems } from './rules';
 import { callSummary } from './flow';
+import { askPopup } from './askpop';
 import { boardTable, shopTable } from '../famtable';
 import { ensureManage, isManageNode, manageAction, manageInput, managePage, manageConfirmPopup, manUi, type ManageNode, manageFile } from './manage';
 import { installAction, installPage, instUi, refreshInstall } from './install';
@@ -86,6 +88,8 @@ export const edUi = {
   info: '',
   drawer: false,
   confirm: '' as '' | 'close',
+  /** 표 줄 지우기를 묻는 중 (ROW_DEL) */
+  askDel: null as null | { action: string; value?: string; msg: string },
   /** 탭마다 마지막으로 보던 페이지 */
   last: {} as Partial<Record<Tab, EditorNode>>,
   /** 기능 탭 「설정 찾기」 칸에 적은 말 (2026-11-06 사용자 승인, 전수점검 8-10) */
@@ -171,6 +175,8 @@ function ensureRoot(): HTMLElement {
   root = document.createElement('div');
   root.className = 'gw';
   document.body.appendChild(root);
+  // 설정 창도 본 창과 같이: 숨긴 틀이 밀려 머리줄이 잘리지 않게 (전수점검 눌러-중대-1)
+  guardHiddenScroll(root);
   bindNeedFill();
   // 접는 칸(details data-keep)의 펼침을 기억한다: 조작 뒤 창을 다시 그려도 접히지 않게 (2026-10-28 QC: 패널만 기억하고 편집 창은 안 했다)
   root.addEventListener('toggle', (ev) => rememberPanel(ev.target as HTMLDetailsElement), true);
@@ -277,7 +283,12 @@ function ensureRoot(): HTMLElement {
       if (box) box.innerHTML = directoryExtList(ctx);
       return;
     }
-    if (ctx && recordInput(name, el.dataset.key ?? '', el.value, ctx)) return void touched();
+    if (ctx) {
+      const took = recordInput(name, el.dataset.key ?? '', el.value, ctx);
+      if (name === 'ed-extra-name') xnameSync(el as HTMLInputElement);
+      if (took === 'invalid') return;
+      if (took) return void touched();
+    }
     if (ctx && relationsInput(name, el.dataset.key ?? '', el.value, ctx)) return void touched();
     if (guideInput(name, el.dataset.key ?? '', el.value)) {
       touched();
@@ -426,7 +437,7 @@ function touched(): void {
 export const isKind = (n: string): n is WorldKind => ['agent', 'org', 'anomaly', 'site', 'appendix'].includes(n);
 
 const SET_LABEL: Record<SetPage, string> = { screen: '화면', image: '캐릭터 이미지', board: '상황판', status: '상태창', gnet: '괴담넷', gal: '괴담갤', wpf: '세정게', sm: '연어 마켓', cos: '우주 쇼핑몰', bm: '백일몽 포인트몰', hs: '망상홈쇼핑', phone: '괴담톡', wiki: '위키', journal: '일지', wallet: '가계부', items: '소지품', shop: '상점', people: '인물', factions: '세력', lore: '로어북 호출', adv: '생성 공통', update: '업데이트', net: '인터넷' };
-const SET_ICON: Record<SetPage, string> = { screen: ICONS.settings, image: ICONS.cctv, board: ICONS.grid, status: ICONS.list, gnet: siteLogo('gn'), gal: siteLogo('gal'), wpf: siteLogo('wpf'), sm: siteLogo('sm'), cos: siteLogo('cos'), bm: siteLogo('bm'), hs: siteLogo('hs'), phone: ICONS.phone, wiki: ICONS.wiki, journal: ICONS.records, wallet: ICONS.wallet, items: ICONS.bag, shop: ICONS.swap, people: ICONS.group, factions: ICONS.org, lore: ICONS.book, adv: ICONS.pen, update: ICONS.refresh, net: ICONS.net };
+const SET_ICON: Record<SetPage, string> = { screen: ICONS.settings, image: ICONS.cctv, board: ICONS.grid, status: ICONS.list, gnet: siteLogo('gn'), gal: siteLogo('gal'), wpf: siteLogo('wpf'), sm: siteLogo('sm'), cos: siteLogo('cos'), bm: siteLogo('bm'), hs: siteLogo('hs'), phone: ICONS.phone, wiki: ICONS.wiki, journal: ICONS.records, wallet: ICONS.wallet, items: ICONS.bag, shop: ICONS.tag, people: ICONS.group, factions: ICONS.org, lore: ICONS.search, adv: ICONS.pen, update: ICONS.refresh, net: ICONS.net };
 /** [노드, 이름, 아이콘, 배지?, 하위 항목?]. 노드가 `label:…` 이면 누를 수 없는 소제목 줄 (설정 「기록」 아래 하위 메뉴, 2026-11-05 사용자) */
 type TreeItem = [EditorNode | `label:${string}`, string, string, string?, boolean?];
 const setItem = (p: SetPage): TreeItem => [`set:${p}`, SET_LABEL[p], SET_ICON[p]];
@@ -478,6 +489,8 @@ function featureState(ctx: ChatContext | null): Partial<Record<EditorNode, boole
     'set:board': host?.canChat?.() ? worldOn(ctx.chat) : basic.anomalyOn,
     'set:image': basic.assetOn,
     'set:people': ppValue(ss, 'on') === '1',
+    // 사용 켬/끔이 있는 소지품도 같은 표시 (일부 기능에만 「끔」이 붙었다, 전수점검 눌러-사소-22)
+    'set:items': invOn(ss),
   };
 }
 
@@ -497,7 +510,7 @@ const FEATURE_INFO: Partial<Record<SetPage, { desc: string; example: string; off
   wiki: { desc: '위키 문서를 생성·갱신해요. 장면에 나온 문서는 메인 요청에 붙일 수 있어요.', example: '「미술관」 문서: 소재 · 접근 · 규칙 · 목격 기록 — 분량·작성 모드대로 써요.' },
   people: { desc: '메인 응답이 끝날 때마다 보조 모델이 한 번 읽어 인물별 기록(기본정보·성격·현재 상태·인간관계·호감·호칭)을 쌓고, 다음 메인 요청이 그 기록을 읽어요.', example: '「쟈알디 · 호감 +8 → 신뢰 — 함께 임무를 치른 뒤」 — 기록이 이야기에 따라 바뀌어요.', off: '끄면 응답을 읽지 않고, 메인 요청에도 기록을 넣지 않아요.' },
   // 기록(일지·보고서)은 모델을 부르지 않아 켬/끔 배지가 없다 (featureState 에 넣지 않음)
-  journal: { desc: '사건이 끝날 때마다 일지 한 줄과 그때의 보고서를 상황판·인물·가계부 기록에서 만들어요(모델을 부르지 않아요). 채팅에 보고서 카드를 띄울지와 보관 상한을 여기서 정해요.', example: '「RPT-0510-03 · 거울 속 사람 · 내가 출동 · 1시간 24분」 — 왼쪽 메뉴 「기록 → 일지」에 쌓여요.' },
+  journal: { desc: '사건이 끝날 때마다 일지 한 줄과 그때의 보고서를 상황판·인물·가계부 기록에서 만들어요(모델을 부르지 않아요). 채팅에 보고서 카드를 띄울지와 보관 상한을 여기서 정해요.', example: '「RPT-0510-03 · 거울 속 사람 · 내 사건 · 1시간 24분」 — 왼쪽 메뉴 「기록 → 일지」에 쌓여요.' },
   // 2026-11-08 사용자: 안 읽히고, 요청 글 모양(내부 로직)을 예로 보일 까닭이 없다 → 짧게, 예 없음
   wallet: { desc: '응답에 나온 거래를 읽어 잔고와 거래 내역을 기록해요.', example: '' },
   items: { desc: '가진 물건을 기록하고 메인 요청에 넘겨요.', example: '' },
@@ -505,7 +518,7 @@ const FEATURE_INFO: Partial<Record<SetPage, { desc: string; example: string; off
   net: { desc: '괴담넷·괴담갤·세정게·연어 마켓의 설정이에요.', example: '' },
   factions: { desc: '세력(관리국·백일몽·협회…)이 주인공을 어떻게 보는지를 인물 기록 갱신기가 −100~100 값으로 매겨요. 켤지를 여기서 정해요.', example: '' },
   lore: { desc: '세력·괴이·파밍·요원·부록 로어북을 요청에 넣을지 누가 고를지 정해요. 다음 요청에 어떤 로어북이 들어가는지는 아래에서 바로 볼 수 있어요.', example: '' },
-  adv: { desc: '괴담넷·괴담톡·위키·상점(쇼핑몰·망상홈쇼핑 포함) 생성에 공통으로 쓰는 값이에요(재시도는 AI 상담도). 생성 언어, 형식이 틀렸을 때 다시 부르는 횟수, 요청 하나의 토큰 상한(괴담넷·괴담톡·위키).', example: '' },
+  adv: { desc: '괴담넷·괴담톡·위키·상점(쇼핑몰·망상홈쇼핑 포함) 생성에 공통으로 쓰는 값이에요. 생성 언어, 형식이 틀렸을 때 다시 부르는 횟수(AI 상담에도 써요), 요청 하나의 토큰 상한(괴담넷·괴담톡·위키).', example: '' },
 };
 
 /** 설정 페이지: 패널 설정의 묶음을 그대로 (지침은 지침 탭) */
@@ -555,7 +568,7 @@ function settingsPage(ctx: ChatContext, page: SetPage): string {
   // 「기본값으로 저장」「기본값 불러오기」는 설정 전부를 한 번에 다루므로 페이지마다 두지 않고 창 머리(render)에 한 번만 둔다 (2026-10-29 사용자). 확인 띠는 어느 페이지에서든 그 자리에
   const chatPage = page !== 'screen' && page !== 'update';
   act = act.replace(/<span class="ps-defaults">[\s\S]*?<\/span>/, '').trim();
-  const right = chatPage && !canChat ? `<span class="gw-tokens">${chatOnly ? '이 채팅 설정 (시작 전)' : '새 채팅 기본값 (시작 전)'}</span>${act}` : act;
+  const right = chatPage && !canChat ? `<i class="gx-scope ${chatOnly ? 'chat' : 'defaults'}">${chatOnly ? '이 채팅 설정 (시작 전)' : '새 채팅 기본값 (시작 전)'}</i>${act}` : act;
   const info = FEATURE_INFO[page];
   const on = featureState(ctx)[`set:${page}`];
   const badge = on === undefined ? '' : `<span class="gw-state${on ? '' : ' off'}">${on ? '켬' : '끔'}</span>`;
@@ -659,7 +672,8 @@ function findResults(ctx: ChatContext | null): string {
 function flashEl(el: HTMLElement, block: ScrollLogicalPosition): void {
   const box = el.closest('details');
   if (box && !box.open) box.open = true;
-  el.scrollIntoView({ block });
+  // 가장 가까운 스크롤 칸만 움직인다: scrollIntoView 는 숨긴 틀까지 밀었다 (전수점검 눌러-중대-1)
+  scrollInside(el, block === 'center' ? 'center' : block === 'start' ? 'start' : 'nearest');
   el.classList.remove('gw-find-flash');
   void el.offsetWidth; // 같은 자리를 다시 눌러도 효과가 처음부터
   el.classList.add('gw-find-flash');
@@ -720,19 +734,20 @@ function worldFindResults(ctx: ChatContext | null): string {
     .join('')}</div>`;
 }
 
-function tree(ctx: ChatContext | null): string {
+/** 왼쪽 열: [위에 붙는 머리(찾기 칸), 목록]. 머리는 갈래 탭과 함께 위에 붙어, 목록을 내려도 다른 갈래로 바로 간다 (전수점검 눌러-보통-41) */
+function tree(ctx: ChatContext | null): [string, string] {
   const counts = treeCounts(ctx);
   const on = featureState(ctx);
   const tab = tabOf(edUi.node);
   const find = tab === 'set'
     ? `<input class="gw-find" type="search" data-input="ed-sq" value="${esc(edUi.sq)}" placeholder="설정 찾기 (예: 테마, 새로고침)" aria-label="설정 찾기" autocomplete="off">`
     : tab === 'world'
-      ? `<input class="gw-find" type="search" data-input="ed-wq" value="${esc(edUi.wq)}" placeholder="세계 검색 (요원·조직·괴이·파밍·부록)" aria-label="세계 검색" autocomplete="off">`
+      ? `<input class="gw-find" type="search" data-input="ed-wq" value="${esc(edUi.wq)}" placeholder="세계 검색" title="요원·조직·괴이·파밍·부록에서 찾아요" aria-label="세계 검색 (요원·조직·괴이·파밍·부록)" autocomplete="off">`
       : '';
-  if (tab === 'set' && edUi.sq.trim()) return `${find}<div class="gw-find-out">${findResults(ctx)}</div>`;
-  if (tab === 'world' && edUi.wq.trim()) return `${find}<div class="gw-find-out">${worldFindResults(ctx)}</div>`;
+  if (tab === 'set' && edUi.sq.trim()) return [find, `<div class="gw-find-out">${findResults(ctx)}</div>`];
+  if (tab === 'world' && edUi.wq.trim()) return [find, `<div class="gw-find-out">${worldFindResults(ctx)}</div>`];
   const wrap = tab === 'set' || tab === 'world';
-  return find + (wrap ? '<div class="gw-find-out">' : '') + treeGroups(counts, on) + (wrap ? '</div>' : '');
+  return [find, (wrap ? '<div class="gw-find-out">' : '') + treeGroups(counts, on) + (wrap ? '</div>' : '')];
 }
 
 function treeGroups(counts: Partial<Record<EditorNode, number>>, on: Partial<Record<EditorNode, boolean>>): string {
@@ -750,7 +765,7 @@ function guideNodePage(ctx: ChatContext, n: GuideNode): string {
   const g = n.slice(6) as GuideName | 'Image';
   // 길 표시는 메뉴의 묶음 이름 그대로 (전에는 인물 기록 지침도 「기능별 지침」으로 나왔다)
   const crumb = `지침 / ${treeOf('guide').find((gr) => gr.items.some((i) => i[0] === n))?.title ?? '기능별 지침'}`;
-  if (g === 'Image') return `<div class="gw-page gw-set"><header class="gw-head"><h2>이미지(메인 모델)</h2><p class="gx-muted">카드 로어북 대신 플러그인이 만드는 이미지 태그 지침이에요. 지침 틀, 출력 대상 캐릭터(명부에서 자동), 표정 세트를 여기서 관리해요.</p></header><div class="gx-settings gw-setbody gw-imgp">${imgPromptPane(ctx)}</div></div>`;
+  if (g === 'Image') return `<div class="gw-page gw-set"><header class="gw-head"><h2>이미지(메인 모델)<small>${esc(crumb)} · 이 기기 공통</small></h2><p class="gx-muted">카드 로어북 「Asset」 대신 플러그인이 만드는 이미지 태그 지침이에요. 지침 틀, 출력 대상 캐릭터(명부에서 자동), 표정 세트를 여기서 관리해요.</p></header><div class="gx-settings gw-setbody gw-imgp">${imgPromptPane(ctx)}</div></div>`;
   return guidePage(g, crumb);
 }
 
@@ -807,7 +822,13 @@ export function render(): void {
   const confirm = edUi.confirm
     ? `<div class="gw-confirm"><div class="gw-confirm-box"><p>고친 것을 카드에 저장하지 못했어요${edUi.notice ? ` (${esc(edUi.notice)})` : ''}. 저장하지 않고 닫을까요?</p>
         <div class="gx-row-btns"><button class="gx-mini danger" data-action="ed-close-force">저장 안 하고 닫기</button><button class="gx-mini" data-action="ed-confirm-no">취소</button></div></div></div>`
-    : tabOf(edUi.node) === 'set' || tabOf(edUi.node) === 'manage' ? mainDefaultsPopup() || manageConfirmPopup() : '';
+    : edUi.askDel ? askPopup(edUi.askDel.msg, { action: 'ed-askdel-yes' }, { action: 'ed-askdel-no' })
+    : tabOf(edUi.node) === 'set' || tabOf(edUi.node) === 'manage' ? mainDefaultsPopup() || manageConfirmPopup()
+    // 지우기 확인도 같은 가운데 팝업 (전수점검 눌러-보통-28)
+    : isKind(edUi.node) ? recordConfirmPopup(edUi.node)
+    : isRuleNode(edUi.node) ? ruleConfirmPopup()
+    : edUi.node === 'start' ? startConfirmPopup()
+    : edUi.node === 'base' ? directoryConfirmPopup() : '';
   const tab = tabOf(edUi.node);
   edUi.last[tab] = edUi.node;
   const tabs = TABS.map(([id, label, icon]) => `<button class="gw-tab${tab === id ? ' on' : ''}" role="tab" aria-selected="${tab === id}" data-action="ed-tab" data-value="${id}">${icon}<span>${label}</span></button>`).join('');
@@ -846,9 +867,10 @@ export function render(): void {
   // 폰: 갈래 넷과 닫기는 설정 창 전용 서랍에 (늘 떠 있지 않는다). 상황판 서랍과 같은 틀(.gx-cdr)·같은 손짓: 하단 바를 위로 쓸면 올라오고 아래로 쓸면 내려간다 (11-15 사용자)
   const cdr = `<div class="gx-cdr gw-cdr${edCdr ? ' open' : ''}"><div class="gx-cslide"><span class="gx-cgrip" aria-hidden="true"><i></i></span><div class="gx-cpanel ph-tools">${tabTools}<button class="ph-tool" data-action="ed-close" aria-label="설정 닫기" title="설정 닫기">${ICONS.close}<span class="ph-tool-l">닫기</span></button></div></div></div>`;
   const foot = phone ? (host.mobileNav?.() ?? '').replace(/^(\s*<nav\b[^>]*>)/, `$1${cdr}`) : '';
+  const [treeTop, treeList] = tree(ctx);
   const html = `<div class="gw-win${edUi.drawer ? ' drawer' : ''}${phone ? ' phone' : ''}">
     ${top}
-    <nav class="gw-tree"><div class="gw-tabs" role="tablist">${tabs}</div>${tree(ctx)}</nav>
+    <nav class="gw-tree"><div class="gw-tree-top"><div class="gw-tabs" role="tablist">${tabs}</div>${treeTop}</div>${treeList}</nav>
     <main class="gw-body">${ctx ? body(ctx) : '<p class="gx-err">채팅 정보를 읽지 못했어요. 창을 닫고 다시 열어 주세요.</p>'}</main>
     ${tab === 'set' ? `<button class="gw-totop" data-action="ed-top" aria-label="맨 위로" title="맨 위로">${ICONS.up}</button>` : ''}
     ${foot}
@@ -889,7 +911,8 @@ export function render(): void {
   }
 }
 
-/** 기능 설정 우하단 「맨 위로」 (2026-11-08 사용자): 조금 내려갔을 때만 보인다 */
+/** 기능 설정 우하단 「맨 위로」 (2026-11-08 사용자): 조금 내려갔을 때만 보인다.
+ *  그 자리의 지우기 ×·입력값·펼침 화살표를 덮던 것(전수점검 눌러-보통-32)은 보임 규칙이 아니라 자리로 푼다: 기능 설정 본문 오른쪽에 단추 폭만큼 빈 띠(style.css) */
 function syncTop(): void {
   const b = root?.querySelector<HTMLElement>('.gw-totop');
   if (b) b.classList.toggle('show', (root?.querySelector<HTMLElement>('.gw-body')?.scrollTop ?? 0) > 240);
@@ -1020,8 +1043,29 @@ function showHint(btn: HTMLElement): void {
 const run = (action: string, value?: string): Promise<void> =>
   handle(action, value).catch((error: unknown) => console.log(`[goei] 편집 창 조작 실패(${action}): ${error instanceof Error ? error.message : String(error)}`));
 
+/** 설정 표의 줄 지우기: 누르면 바로 지워지고 다음 줄 지우기가 손가락 밑으로 올라와 연달아 지우기 쉬웠다 →
+ *  다른 지우기(기록·규칙·저장소)처럼 가운데 팝업으로 한 번 묻는다 (전수점검 눌러-보통-28·눌러-사소-38) */
+const ROW_DEL: Record<string, string> = {
+  'set-own-del': '이 고유 상점을 지울까요?',
+  'ms-tier-del': '이 값 등급 줄을 지울까요?',
+  'ms-ax-del': '이 주사위 칸을 지울까요?',
+  'ms-fx-del': '이 시그니처 상품을 지울까요?',
+  'set-items-rules-del': '이 판정 표 줄을 지울까요?',
+  'set-items-alias-del': '이 그림 대체 말 줄을 지울까요?',
+};
+
 export async function handle(action: string, value?: string): Promise<void> {
   const ctx = host?.ctx() ?? null;
+  if (ROW_DEL[action]) {
+    edUi.askDel = { action, value, msg: ROW_DEL[action] };
+    return render();
+  }
+  if (action === 'ed-askdel-yes' || action === 'ed-askdel-no') {
+    const ask = edUi.askDel;
+    edUi.askDel = null;
+    if (action === 'ed-askdel-yes' && ask) await host?.handle?.(ask.action, ask.value);
+    return render();
+  }
   if (action.startsWith('ai-')) {
     return consultAction(action, value, { render: () => render(), ctx: () => host?.ctx() ?? null, started: () => host?.canChat?.() ?? true, panel: async (a, v) => { await host?.handle?.(a, v); }, editor: (a, v) => handle(a, v), phone: () => isPhone() });
   }

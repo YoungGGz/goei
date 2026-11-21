@@ -17,3 +17,36 @@ export function markOpen(key: string): void {
   open.delete(`!${key}`);
   open.add(key);
 }
+
+/** 스크롤하지 않는 틀(overflow hidden: 창·본문 틀)이 scrollIntoView·focus 로 밀리면 머리줄이 위로 잘린다 → 바로 제자리로.
+ *  본 창(.gx)과 설정 창(.gw)이 각각 document.body 아래에 따로 붙어서 둘 다 건다 (전수점검 눌러-중대-1·눌러2-보통-10) */
+export function guardHiddenScroll(root: HTMLElement): void {
+  root.addEventListener('scroll', (ev) => {
+    const el = ev.target;
+    if (!(el instanceof HTMLElement) || (!el.scrollTop && !el.scrollLeft)) return;
+    const cs = getComputedStyle(el);
+    if (cs.overflowY === 'hidden' && el.scrollTop) el.scrollTop = 0;
+    if (cs.overflowX === 'hidden' && el.scrollLeft) el.scrollLeft = 0;
+  }, true);
+}
+
+/** 가장 가까운 스크롤 칸만 움직여 el 을 보이게 한다. scrollIntoView 는 overflow hidden 틀(창·본문 틀)까지 밀어 머리줄이 잘렸다 (전수점검 눌러-중대-1) */
+export function scrollInside(el: HTMLElement | null | undefined, block: 'start' | 'center' | 'nearest' = 'nearest', smooth = false): void {
+  if (!el) return;
+  let box = el.parentElement;
+  while (box) {
+    const oy = getComputedStyle(box).overflowY;
+    if ((oy === 'auto' || oy === 'scroll') && box.scrollHeight > box.clientHeight) break;
+    box = box.parentElement;
+  }
+  if (!box) return;
+  const b = box.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  const off = r.top - b.top;
+  let top = box.scrollTop;
+  if (block === 'start') top += off;
+  else if (block === 'center') top += off - (box.clientHeight - r.height) / 2;
+  else if (off < 0) top += off;
+  else if (off + r.height > box.clientHeight) top += off + r.height - box.clientHeight;
+  box.scrollTo({ top: Math.max(0, top), behavior: smooth ? 'smooth' : 'auto' });
+}

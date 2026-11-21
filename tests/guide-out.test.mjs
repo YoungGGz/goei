@@ -63,6 +63,8 @@ const ANSWERED = [
   ["There is no shopkeeper or chat; the \"owner\" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty.", "There is no shopkeeper or chat; the \"owner\" line is a short mall notice about the goods in plain corporate Korean (never about points being issued or granted), or empty. The material about the protagonist (identity, recent story) is for you as the writer: the mall page does not know it, and the notice never refers to the customer or to what they are going through."],
   // 11-15 사용자: 같은 말 되풀이 줄이기. 상태창 이어 쓰기 안내는 직전 상태 블록에서 한 번만 (다시 물을 때의 분석 지시는 11-16 사용자 결정으로 원문 그대로)
   [' block just before the latest user input. Continue from it: advance the time and update the other fields. Older responses do not carry their status lines.', ' block just before the latest user input; follow the note in that block.'],
+  // 전수점검 사소-77: Director 언어를 한국어로 두면 메모가 한국어라 「English reference」가 틀린다
+  ['this English reference does not change it', 'this reference does not change it'],
 ];
 const moved = Object.entries(OLD.sections).flatMap(([file, list]) => list.map(([name, body]) => ({ file, name, body })));
 
@@ -157,7 +159,15 @@ test('기본 지침으로 만든 요청문 = 옮기기 전 코드가 만들던 �
   // 요청문은 JSON 글자열 꼴(따옴표 \\")로 견주므로 두 꼴 모두 입힌다
   const esc = (t) => JSON.stringify(t).slice(1, -1);
   const later = (t) => [...LATER, ...ANSWERED, ...ANSWERED.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t);
-  for (const k of names) assert.equal(BASE[k], later(OLD.calls[k]), k);
+  // 전수점검 보통-36: 우주 쇼핑몰은 값이 정해져 있다(COMMON) — 그 몰 지침의 대화 절에서만 값 바꾸기·할인 문장을 뺐다 (다른 상점 지침은 그대로)
+  const COS_LATER = [
+    ['and prizes it (discounts on it are rare and grudging).', 'and prizes it.'],
+    ['" to add, "~ 이름|새값" to change a price (won, or the agreed payment in words), "- 이름" to remove.', '" to add, "- 이름" to remove. Prices are fixed, so never change one.'],
+    ['answer only, fetch something, re-stock the whole shelf, lower a price, refuse, or end the dealing?', 'answer only, fetch something, re-stock the whole shelf, refuse, or end the dealing? (Prices are fixed: never lower one.)'],
+    ['never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines).', 'never add an item and never re-stock the shelf (no "+" lines, no mode all). Prices stay as listed (no "~" lines); an item may be withdrawn ("-" lines).'],
+  ];
+  const cosLater = (k, t) => (/\.cos\b/.test(k) ? [...COS_LATER, ...COS_LATER.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t) : t);
+  for (const k of names) assert.equal(BASE[k], cosLater(k, later(OLD.calls[k])), k);
 });
 
 test('새 절이 없는 지침(옛 글로 고쳐 둔 것)이면 코드에 남긴 옛 글을 쓴다: 요청문이 같다', () => {

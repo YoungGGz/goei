@@ -39,10 +39,10 @@ import { setItemIconRedraw } from '../host/itemicons';
 import { BRAND } from './brand';
 import { checkLatest, handleUpdate, hasUpdate, updateBanner } from './update';
 import { currentTheme, setCurrentTheme, themeName } from './theme';
-import { bindFootnotes, bindWikiSide, handleWiki, resetWiki, wiki, wikiHomeResults, wikiInput, wikiList, wikiOpenCheck, wikiTab, type WikiEnv } from './wiki';
+import { bindFootnotes, bindWikiSide, handleWiki, resetWiki, wiki, wikiHomeResults, wikiInput, wikiList, wikiTopResults, wikiOpenCheck, wikiTab, type WikiEnv } from './wiki';
 import { bmDeskWinSpec, mallWinSpec, mallAction, mallAskOpen, mallInput, mallOpenCheck, mallSettingsAction, mallTab, resetMalls } from './malls';
 import { isMallSite } from '../core/malls';
-import { homeshopAction, homeshopInput, homeshopMounted, homeshopOpenCheck, homeshopTab, resetHomeshop } from './homeshop';
+import { homeshopAction, homeshopClosed, homeshopInput, homeshopMounted, homeshopOpenCheck, homeshopTab, resetHomeshop } from './homeshop';
 import { hsSettings } from '../core/homeshop';
 import { boardChrome, gnet, gnetDmOpen, gnetDmWinSpec, gnetOpenCheck, gnetTab, handleGnet, resetGnet, useBoardSite, type GnetEnv } from './gnet';
 import { bindPopWins } from './popwin';
@@ -57,9 +57,9 @@ import { savePhoto } from '../host/photo';
 import { readPersona, readUser, userInfo } from '../host/user';
 import { applyAdvanced } from '../core/advanced';
 import { booksInput, defaultsState, handleAdvanced } from './advanced';
-import { rememberPanel } from './panels';
+import { guardHiddenScroll, rememberPanel, scrollInside } from './panels';
 import { startCctvFx, stopCctvFx } from './cctvfx';
-import { elapsedText, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
+import { declutterOps, elapsedText, markCapOverflow, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
 import { evArt } from './evpic';
 import { agentContact, handlePhone, openAgentDm, openCheck, phone, phoneContent, phoneInput, phonePickList, phoneTab, phoneUnread, resetPhone, type PhoneEnv } from './phone';
 import { boardMapUrl, field, handleField, mapTab, mapSuggestFor, missionList, missionTab, newMessage, resetField, showOnMap, type FieldEnv } from './field';
@@ -74,7 +74,7 @@ import { bindCropDrag, cropValue, setCrop, directoryExtList, directoryInput, dir
 import { basicDefaults, basicVars, DIM_DEFAULT, getPrefs, worldDefaults, worldSettings, worldVarsOf } from '../core/settings';
 import { colConfig } from '../core/world/statuscols';
 import { invOn, itemStartOn } from '../core/items';
-import { adjustWallet, walletEditable, aliveAnchors, formatWon, parseWon, readWallet, removeWalletEntry, walletBalance, walletVars, WALLET_MAX, WALLET_START_DEFAULT } from '../core/wallet';
+import { adjustWallet, walletEditable, aliveAnchors, formatWon, parseWon, readWallet, removeWalletEntry, walletBalance, walletVars, WALLET_MAX, WALLET_START_DEFAULT, WALLET_VAR } from '../core/wallet';
 import { walletHeadButton, walletList, walletUi as walletTabUi } from './wallet';
 import { parsePoints, pointsOn, pointsVars, readPoints } from '../core/points';
 import { guideTxt } from '../core/guides';
@@ -183,6 +183,9 @@ function endSolo(): void {
 let repick = false;
 /** 시작 화면에서 연 새 채팅 기본 설정 */
 let pickerPrefs = false;
+/** 시작 전(시작 패널)의 기능 설정: 값은 이 채팅에 적히고, 시작할 때 비어 있는 칸은 새 채팅 기본값(prefs.vars)으로 채워진다.
+ *  그래서 보이는 값과 −/+ 기준도 그 값으로 (전수점검 보통-70: 저장해 둔 기본값 대신 코드 기본값이 보였다) */
+const preCtx = (c: ChatContext): ChatContext => ({ ...c, chat: { ...c.chat, scriptstate: { ...(getPrefs().vars ?? {}), ...(c.chat.scriptstate ?? {}) } } });
 let lastChat = '';
 
 const env: FieldEnv = {
@@ -212,6 +215,10 @@ const recordsEnv: RecordsEnv = settingsEnv;
 let shown = false;
 /** 상황판이 떠 있나 (body.ts: 그동안 호출 진행 창은 숨긴다 — 본 문서의 진행 단추가 상황판 닫기 X 위에 올라와 눌리지 않았다, 11-09 릴리스 점검) */
 export const appShown = (): boolean => shown;
+/** 화면을 어둡게 덮는 팝업이 떠 있나: 호출 진행 단추도 같이 흐리게 (전수점검 눌러2-사소-15).
+ *  상태 하나하나가 아니라 덮개 자체를 본다 — 상점·물건·아바타·보고서·사원증(.gx-agpop), 사건·요원 카드(.ev-scrim), 사진 크게 보기(.at-zoom) */
+const DIM_SEL = '.gx-agpop, .ev-scrim, .at-zoom';
+export const appDimmed = (): boolean => (shown && (shopUi.open || lookUi.open)) || !!document.querySelector(DIM_SEL);
 let shownListener: ((shown: boolean) => void) | null = null;
 export function onAppShown(f: (shown: boolean) => void): void {
   shownListener = f;
@@ -270,6 +277,8 @@ function ensureRoot(): HTMLElement {
   root = document.createElement('div');
   root.className = 'gx';
   document.body.appendChild(root);
+  // 스크롤하지 않는 틀이 밀리면 바로 제자리로 (전수점검 눌러-중대-1·눌러2-보통-10)
+  guardHiddenScroll(root);
   bindNeedFill();
   root.addEventListener('toggle', (ev) => rememberPanel(ev.target as HTMLDetailsElement), true);
   // 실제 사진: 파일 고르기 창은 클릭 안에서 바로 열어야 해서 handle()을 거치지 않는다
@@ -343,6 +352,10 @@ function ensureRoot(): HTMLElement {
       }
       void run(g === 'DR' ? 'br-close' : 'br-reopen', String(br.cur));
     },
+  });
+  // 위키 머리줄 검색 결과를 누를 때 검색칸 포커스를 뺏지 않는다 (포커스가 빠지면 결과 칸이 먼저 닫혀 누른 것이 안 먹음)
+  root.addEventListener('pointerdown', (ev) => {
+    if ((ev.target as HTMLElement).closest?.('.wk .wtres')) ev.preventDefault();
   });
   // 명부 요원 순서 (PC): 손잡이를 끌어 같은 소속 요원 위·아래에 놓는다. 놓으면 dir-move before/after
   root.addEventListener('pointerdown', (ev) => {
@@ -422,7 +435,8 @@ function ensureRoot(): HTMLElement {
     // 창 둘레 기기 틀: 뷰포트 폭·필드 전체화면이 바뀌어 그릴지 말지가 달라질 때만 다시 그린다 (ui/frame.ts)
     const frameWatch = () => {
       if (!root || root.style.display === 'none') return;
-      const fr = frameState(getPrefs().frame, view.kind === 'started');
+      // render() 와 같은 셈 (전수점검 보통-73: 카드로 연 단독 창은 메뉴가 없는데 메뉴 폭으로 셈해 일정 폭에서 크기를 바꿀 때마다 다시 그렸다)
+      const fr = frameState(getPrefs().frame, view.kind === 'started' && !(netSolo && inBrowser()));
       if (root.dataset.frame !== fr.kind || (root.dataset.frameHidden === '1') !== fr.hidden) render();
     };
     window.addEventListener('resize', frameWatch);
@@ -544,10 +558,11 @@ function ensureRoot(): HTMLElement {
     // 우주 쇼핑몰 질문 창 (11-09 사용자: 팝업창처럼 Esc·바깥 누름으로 닫힘)
     if (view.kind === 'started' && inBrowser() && mallAskOpen(curTab().site)) return void handle('mall-ask-close');
     if (view.kind === 'started' && inBrowser() && isBoardSite(curTab().site) && gnetDmOpen()) return void handle('gn-dm-close');
-    // 상점 팝업: 상세 → 폰 서랍 → 팝업 순으로 하나씩 닫는다
-    if (view.kind === 'started' && shopUi.open) return void handle(shopUi.detail ? 'shop-detail-close' : shopUi.drawer ? 'shop-drawer' : 'shop-close');
+    // 아바타 창은 상점 판매 화면 위에도 뜬다: 맨 위 창부터 닫는다 (전수점검 보통-71: 아바타 창 대신 상점이 닫혔다)
     // 아바타 창·인터넷 로그인 창은 상태로 떠 있다: 상태를 닫아야 다음 그리기에 다시 안 뜬다 (전수검사 11-13)
     if (lookUi.open) return void handle('look-close');
+    // 상점 팝업: 상세 → 폰 서랍 → 팝업 순으로 하나씩 닫는다
+    if (view.kind === 'started' && shopUi.open) return void handle(shopUi.detail ? 'shop-detail-close' : shopUi.drawer ? 'shop-drawer' : 'shop-close');
     if (view.kind === 'started' && inBrowser() && br.login) return void handle('br-login');
     const pop = document.querySelector('.gx-agpop');
     if (pop) return void pop.remove();
@@ -563,7 +578,9 @@ function ensureRoot(): HTMLElement {
 
 /** 패널의 change 이벤트 (편집 창의 설정 페이지에서도 같은 함수를 부른다) */
 function panelChange(el: HTMLSelectElement): void {
-  if (el?.dataset?.change) void run(el.dataset.change, el.dataset.key ? `${el.dataset.key}=${el.value}` : el.value);
+  // 큰 수 칸(setrow.ts numTxt)은 자릿점을 찍어 보이므로 보낼 때 뗀다
+  const val = el?.classList?.contains('adv-val') ? el.value.replace(/[,\s]/g, '') : el?.value;
+  if (el?.dataset?.change) void run(el.dataset.change, el.dataset.key ? `${el.dataset.key}=${val}` : val);
 }
 
 let tipLayer: HTMLElement | null = null;
@@ -639,7 +656,10 @@ function panelInput(el: HTMLInputElement): void {
     return;
   }
   if (el?.dataset?.input === 'wiki-query' && view.kind === 'started') {
+    // 머리줄 검색칸: 아래 결과만 다시 그린다 (입력칸 포커스 유지, 서랍 검색과 같이 글자마다)
     wiki.query = el.value;
+    const box = root?.querySelector('.wk .wtres');
+    if (box) box.innerHTML = wikiTopResults(view.ctx);
     return;
   }
   if (el?.dataset?.input === 'wiki-filter' && view.kind === 'started') {
@@ -803,7 +823,7 @@ export async function openInstall(): Promise<void> {
   // (2026-10-29 사용자: 깡통봇 설치 뒤 그 창에서는 슬라이더만 되고 단추가 전부 안 눌렸다 — handle 이 없어 조작이 버려졌다)
   if (view.kind === 'picker') pickerPrefs = true;
   const host = {
-    ctx: () => (view.kind === 'started' || view.kind === 'picker' || view.kind === 'opening' ? view.ctx : installCtx),
+    ctx: () => (view.kind === 'picker' ? preCtx(view.ctx) : view.kind === 'started' || view.kind === 'opening' ? view.ctx : installCtx),
     refresh: async () => {
       installCtx = (await loadContext().catch(() => null)) ?? installCtx;
       if (shown) await refresh();
@@ -868,7 +888,7 @@ async function refresh(): Promise<void> {
         lastChat = chatKey;
         navHist.clear();
         resetField(true);
-        resetWiki();
+        resetWiki(true);
         resetRecords();
         resetItems();
         resetShop();
@@ -889,6 +909,9 @@ async function refresh(): Promise<void> {
         resetDirectory();
         pickerPrefs = false;
         repick = false;
+        // 앞 채팅 시작 패널에 적던 상황·잔고는 새 채팅으로 넘기지 않는다
+        delete draft.situation;
+        delete draft.wallet;
       }
       const cur = currentChoice(ctx.chat);
       const facs = factionList(ctx.char.globalLore);
@@ -898,8 +921,10 @@ async function refresh(): Promise<void> {
       else if (presetStaged && !repick) view = { kind: 'opening', ctx };
       else {
         view = { kind: 'picker', ctx, manifest, staged: phase === 'staged' };
-        draft = { faction: cur.faction ?? draft.faction, lang: cur.lang ?? draft.lang, fm: cur.fm ?? draft.fm, player: cur.player ?? draft.player ?? '', look: lookId(ctx.chat.scriptstate) || draft.look || '' };
-        if (draft.faction && !facs.some((f) => f.code === draft.faction && !f.hidden)) draft = { lang: draft.lang };
+        // 적던 「시작할 상황」과 고친 시작 잔고는 다시 그려도 남긴다 (전수점검 중대-13: 창을 닫았다 열거나 자동 저장이 돌면 지워졌다). 채팅을 옮기면 위에서 비운다
+        const keep = { ...(draft.situation !== undefined ? { situation: draft.situation } : {}), ...(draft.wallet !== undefined ? { wallet: draft.wallet } : {}) };
+        draft = { faction: cur.faction ?? draft.faction, lang: cur.lang ?? draft.lang, fm: cur.fm ?? draft.fm, player: cur.player ?? draft.player ?? '', look: lookId(ctx.chat.scriptstate) || draft.look || '', ...keep };
+        if (draft.faction && !facs.some((f) => f.code === draft.faction && !f.hidden)) draft = { lang: draft.lang, ...keep };
         const fsel = draft.faction ? findFaction(draft.faction, facs) : undefined;
         if (fsel) {
           const list = scenariosFor(fsel, draft.player, ctx.char.globalLore);
@@ -916,6 +941,7 @@ async function refresh(): Promise<void> {
 async function close(): Promise<void> {
   setShown(false);
   resetMore();
+  homeshopClosed();
   endSolo();
   stopCctvFx();
   await risuai.hideContainer();
@@ -992,11 +1018,11 @@ async function handle(action: string, value?: string): Promise<void> {
     // 기능 페이지(gn·ph·wk·hq·pp)는 범위 전환이 없고 늘 이 채팅 값을 보여 준다: 시작 뒤 범위가 「새 채팅 기본값」이어도 이 채팅에
     // (2026-10-28 QC: 고급 페이지에서 기본값으로 바꿔 두고 괴담넷 고급 칩을 누르면 기본값에만 적혀 화면이 안 바뀌었다)
     const scope = feat !== 'gen' ? 'chat' : view.kind === 'started' ? (settingsUi.scope === 'defaults' ? 'defaults' : 'chat') : 'defaults';
-    await handleAdvanced(action, value, view.ctx, { render, refresh }, scope);
+    await handleAdvanced(action, value, view.kind === 'picker' ? preCtx(view.ctx) : view.ctx, { render, refresh }, scope);
     return;
   }
   // 시작 전(시작 패널 → 설정)에도 기능별 설정 페이지가 열려 있으면 그 기능의 단추를 받는다 (2026-10-26 사용자). chat 객체·scriptstate 는 있다
-  const featCtx = view.kind === 'started' || (view.kind === 'picker' && pickerPrefs && settingsUi.page) ? view.ctx : null;
+  const featCtx = view.kind === 'started' ? view.ctx : view.kind === 'picker' && pickerPrefs && settingsUi.page ? preCtx(view.ctx) : null;
   if (action === 'wiki-back' && view.kind === 'started' && !wiki.history.some((h) => h.view !== 'home') && navHist.can(-1)) {
     // 위키 안에서 옮겨 다닌 길이 없으면 뒤로가기는 무조건 이전 화면 (다른 탭·사원증 창 포함, 사용자 2026-10-26)
     const run = navStep(-1);
@@ -1049,7 +1075,7 @@ async function handle(action: string, value?: string): Promise<void> {
     if (action !== 'rec-back' && !(await handleRecords(action, value, featCtx, recordsEnv)) && switching) render();
     return;
   }
-  if (action.startsWith('ip-') && (await handleImgPrompt(action, value, { render }))) return;
+  if (action.startsWith('ip-') && (await handleImgPrompt(action, value, { render, lore: featCtx?.char.globalLore }))) return;
   if (featCtx && action.startsWith('ms-') && (await mallSettingsAction(action, value, featCtx, wikiEnv))) return;
   if (featCtx && action.startsWith('hs-') && (await homeshopAction(action, value, featCtx, wikiEnv))) return;
   if (featCtx && action.startsWith('mall-')) {
@@ -1058,7 +1084,7 @@ async function handle(action: string, value?: string): Promise<void> {
   }
   // 설정 → 인터넷·상점의 격자와 그 아래 줄 (fam-*). 게시판 값은 늘 이 채팅에, 상점 값은 그 페이지의 범위(시작 전 = 새 채팅 기본값)에
   if (action.startsWith('fam-') && (view.kind === 'started' || (view.kind === 'picker' && pickerPrefs))) {
-    const fctx = view.ctx;
+    const fctx = view.kind === 'picker' ? preCtx(view.ctx) : view.ctx;
     const scope = view.kind === 'started' ? 'chat' : 'defaults';
     if (settingsUi.busy) return;
     await famAction(action, value, {
@@ -1078,7 +1104,7 @@ async function handle(action: string, value?: string): Promise<void> {
     if (view.kind === 'picker') pickerPrefs = true; // 시작 전: 설정 단추가 기본값 범위로 가게
     settingsUi.scope = view.kind === 'started' ? (settingsUi.scope === 'defaults' ? 'defaults' : 'chat') : 'defaults';
     openEditor({
-      ctx: () => (view.kind === 'started' || view.kind === 'picker' || view.kind === 'opening' ? view.ctx : null),
+      ctx: () => (view.kind === 'picker' ? preCtx(view.ctx) : view.kind === 'started' || view.kind === 'opening' ? view.ctx : null),
       refresh: () => refresh(),
       theme: () => root?.dataset.theme ?? 'dark',
       handle: (a, v) => handle(a, v),
@@ -1165,6 +1191,11 @@ async function handle(action: string, value?: string): Promise<void> {
             draft.fm = scenariosFor(f, first.id, view.ctx.char.globalLore)[0]?.fm;
           }
         }
+        // 기본 첫 장면을 숨겼으면 보이는 첫 장면으로 (출발 단추가 꺼지지 않게, 전수점검 사소-85)
+        if (view.kind === 'picker') {
+          const list = scenariosFor(f, draft.player, view.ctx.char.globalLore);
+          if (!list.some((x) => x.fm === draft.fm)) draft.fm = list[0]?.fm ?? draft.fm;
+        }
       }
       draft.faction = f.code;
       notice = '';
@@ -1202,7 +1233,8 @@ async function handle(action: string, value?: string): Promise<void> {
     case 'nav-tab':
     case 'tab':
       // PC 왼쪽 메뉴(nav-tab): 이미 보고 있는 탭을 한 번 더 누르면 상황판으로 (2026-10-21 사용자, 모바일 아래 줄(tab)은 그대로)
-      if (action === 'nav-tab' && value === tab && value !== 'board' && !isPhone()) value = 'board';
+      // 인터넷은 보는 사이트에 따라 탭이 gnet·wiki 로 바뀌므로 그때도 「인터넷」을 다시 누른 것으로 본다 (전수점검 보통-74)
+      if (action === 'nav-tab' && (value === tab || (value === 'net' && inBrowser())) && value !== 'board' && !isPhone()) value = 'board';
       if (value === 'settings') return handle('ed-open', 'set:screen');
       if (value === 'wallet') return openWallet();
       // 다른 탭에서 기록으로 들어오면 일지 목록부터 (2026-11-05 사용자: 가계부를 보고 나온 뒤 기록을 누르면 가계부가 다시 열렸다)
@@ -1303,7 +1335,8 @@ async function handle(action: string, value?: string): Promise<void> {
       opsUi.sel = value ?? '';
       field.confirmEnd = null;
       render();
-      if (isPhone()) root?.querySelector('.gx-opview')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      // 큰 보기를 담은 스크롤 칸만 움직인다 (scrollIntoView 는 창 틀까지 밀어 머리줄을 잘랐다, 전수점검 눌러-중대-1)
+      if (isPhone()) scrollInside(root?.querySelector<HTMLElement>('.gx-opview'), 'start', true);
       return;
     case 'ops-mode':
       opsUi.mode = value === 'map' ? 'map' : 'feed';
@@ -1355,16 +1388,30 @@ async function handle(action: string, value?: string): Promise<void> {
       if (view.kind !== 'started' || !walletEditable(view.ctx.chat.scriptstate)) return;
       const pts = walletTabUi.kind === 'p';
       const n = pts ? parsePoints(value ?? '') : parseWon(value ?? '');
-      if (n === null || (pts && Math.abs(n) > WALLET_MAX)) {
+      if (n === null) {
         walletTabUi.notice = pts ? '포인트를 읽을 수 없어요. 숫자 또는 「1만」처럼 적어 주세요.' : '금액을 읽을 수 없어요. 숫자 또는 「120만」처럼 적어 주세요.';
         return render();
       }
+      // 범위는 원·포인트 같이 본다 (전수점검 사소-29: 원은 1조가 넘어도 안내 없이 창이 닫히고 잔고는 그대로였다). 맞춤 거래(차액)가 범위를 넘어도 같은 안내
+      let over = Math.abs(n) > WALLET_MAX;
       const ctx = view.ctx;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-        if (pts) return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(adjustWallet(readPoints(chat.scriptstate), aliveAnchors(chat), n, guideTxt('Main', 'WALLET.MEMO.POINTS_ADJUST'))) } };
+      if (!over) await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+        const alive = aliveAnchors(chat);
+        if (pts) {
+          const p = readPoints(chat.scriptstate);
+          const next = adjustWallet(p, alive, n, guideTxt('Main', 'WALLET.MEMO.POINTS_ADJUST'));
+          if (next === p && walletBalance(p, alive) !== n) { over = true; return null; }
+          return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(next) } };
+        }
         const w = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
-        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(adjustWallet(w, aliveAnchors(chat), n)) } };
+        const next = adjustWallet(w, alive, n);
+        if (next === w && walletBalance(w, alive) !== n) { over = true; return null; }
+        return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(next) } };
       });
+      if (over) {
+        walletTabUi.notice = `${pts ? '포인트가' : '금액이'} 너무 커요. ${WALLET_MAX.toLocaleString('en-US')} 안쪽으로 적어 주세요.`;
+        return render();
+      }
       walletTabUi.notice = '';
       walletTabUi.edit = false;
       return refresh();
@@ -1443,12 +1490,12 @@ async function start(): Promise<void> {
       if (chatPhase(chat) === 'started') throw new StartError('그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
       const next = applyStart(chat, plan);
       if (situation) next.message = [...(next.message ?? []), newMessage(startRecord(situation))];
-      // 새 채팅 기본값(설정 창)을 이 채팅에 적어 둔다. 나중에 기본값을 바꿔도 이 채팅은 그대로 (원본 ensureDefaults)
+      // 새 채팅 기본값(설정 창)을 이 채팅에 적어 둔다. 나중에 기본값을 바꿔도 이 채팅은 그대로 (원본 ensureDefaults) 시작 잔고도 지금 기본값으로 적는다 (전수점검 보통-84)
       const theme = getPrefs().theme ?? 'dark';
       return {
         ...next,
         // 아바타: 페르소나로 시작할 때만 (고유 인물은 그 인물 모습)
-        scriptstate: { ...basicVars(basicDefaults(lore)), ...worldVarsOf(worldDefaults(lore)), $st_fixed_theme: theme, ...(getPrefs().vars ?? {}), ...(next.scriptstate ?? {}), [LOOK_KEY]: draft.player ? '' : (draft.look ?? ''), ...(draft.wallet !== undefined ? walletVars({ start: draft.wallet, log: [] }) : {}) },
+        scriptstate: { ...basicVars(basicDefaults(lore)), ...worldVarsOf(worldDefaults(lore)), $st_fixed_theme: theme, ...(getPrefs().vars ?? {}), ...(next.scriptstate ?? {}), [LOOK_KEY]: draft.player ? '' : (draft.look ?? ''), ...(draft.wallet !== undefined ? walletVars({ start: draft.wallet, log: [] }) : next.scriptstate?.[WALLET_VAR] ? {} : walletVars({ start: getPrefs().walletStart ?? WALLET_START_DEFAULT, log: [] })) },
       };
     });
     if (!saved) throw new StartError('저장하지 못했어요.');
@@ -1542,6 +1589,7 @@ function renderPicker(): void {
     facs[i].className = b.className;
     facs[i].setAttribute('aria-pressed', b.getAttribute('aria-pressed') ?? 'false');
   });
+  showPickedFac();
   const sections = main.querySelectorAll(':scope > section');
   const fresh = tpl.content.querySelectorAll('.gx-body > section');
   if (sections.length !== fresh.length) return render();
@@ -1550,6 +1598,18 @@ function renderPicker(): void {
   const nfoot = tpl.content.querySelector('.gx-foot');
   if (foot && nfoot) foot.replaceWith(nfoot);
   else return render();
+}
+
+/** 세력 카드 가로 줄: 고른 카드가 보이게 (전수점검 눌러-중대-5: 옆으로 밀어 고르면 줄이 맨 앞으로 되감겨 고른 카드가 화면 밖으로 밀렸다) */
+function showPickedFac(left?: number): void {
+  const row = root?.querySelector<HTMLElement>('.gx-facs');
+  if (!row) return;
+  if (left !== undefined) row.scrollLeft = left;
+  const on = row.querySelector<HTMLElement>('.gx-fac.on');
+  if (!on || row.scrollWidth <= row.clientWidth) return;
+  const l = on.offsetLeft - row.offsetLeft;
+  if (l < row.scrollLeft) row.scrollLeft = l;
+  else if (l + on.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = l + on.offsetWidth - row.clientWidth;
 }
 
 const INNER_SCROLL = '.gx-acards, .gx-sidecol, .gx-mbox, .gx-sits, .gx-bd-col > .gx-evcs, .nw-groups, .gx-lookg';
@@ -1577,6 +1637,7 @@ function render(): void {
   const keep = scroller && root.dataset.tab === tab ? scroller.scrollTop : 0;
   // 안쪽 스크롤 칸(편성 요원 목록·사이드 칸 등)도 같은 탭이면 자리를 지킨다
   const inner = root.dataset.tab === tab ? [...root.querySelectorAll<HTMLElement>(INNER_SCROLL)].map((el) => el.scrollTop) : [];
+  const facLeft = root.querySelector<HTMLElement>('.gx-facs')?.scrollLeft;
   // 설정 기능 페이지·위키 문서 칸: 진단 행 펼치기·📌·취소처럼 전체를 다시 그려도 그 칸의 자리를 지킨다 (맨 위로 튀던 문제, 2026-10-26)
   const pageKeep = root.dataset.pk === pageKey() ? [...root.querySelectorAll<HTMLElement>(PAGE_SCROLL)].map((el) => el.scrollTop) : [];
   // 같은 위키 문서면 펼쳐 둔 스포일러 접기도 그대로 (전수검사 11-13)
@@ -1629,7 +1690,7 @@ function render(): void {
   // 명부 통합 검색에서 고른 줄로 (위쪽 고정 줄에 가리지 않게 가운데로)
   if (dirUi.scrollTo) {
     dirUi.scrollTo = '';
-    root.querySelector('.dir-row.open')?.scrollIntoView({ block: 'center' });
+    scrollInside(root.querySelector<HTMLElement>('.dir-row.open'), 'center');
   }
   root.dataset.tab = tab;
   const toastEl = root.querySelector<HTMLElement>('.gx-rectoast');
@@ -1662,6 +1723,7 @@ function render(): void {
   const next = root.querySelector('.gx-body');
   if (next && keep) next.scrollTop = keep;
   if (inner.length) root.querySelectorAll<HTMLElement>(INNER_SCROLL).forEach((el, i) => inner[i] && (el.scrollTop = inner[i]));
+  if (view.kind === 'picker') showPickedFac(facLeft);
   root.dataset.pk = pageKey();
   if (openKeep.length) root.querySelectorAll<HTMLDetailsElement>('.wk .wsc details').forEach((d, i) => openKeep[i] && (d.open = true));
   if (pageKeep.length) root.querySelectorAll<HTMLElement>(PAGE_SCROLL).forEach((el, i) => pageKeep[i] && (el.scrollTop = pageKeep[i]));
@@ -1697,6 +1759,8 @@ function render(): void {
   root.querySelectorAll<HTMLElement>('[data-sh-log]').forEach((el) => (el.scrollTop = el.scrollHeight));
   labelSwitches(root);
   bindMapZoom(root);
+  declutterOps(root);
+  markCapOverflow(root);
   const setDrawer = (open: boolean) => {
     if (cdrOpen === open) return;
     cdrOpen = open;
@@ -1821,6 +1885,9 @@ function navStep(dir: -1 | 1): (() => void) | null {
   if (view.kind === 'picker') return dir < 0 && pickerPrefs ? go('prefs-close') : null;
   if (view.kind === 'opening') return dir < 0 ? go('repick') : null;
   if (view.kind !== 'started') return null;
+  // 아바타 창·상점 창이 떠 있으면 쓸어도 뒤 화면을 넘기지 않는다. 뒤로 쓸면 맨 위 창을 닫는다 (전수점검 보통-75)
+  if (lookUi.open) return dir < 0 ? go('look-close') : null;
+  if (shopUi.open) return dir < 0 ? go(shopUi.detail ? 'shop-detail-close' : shopUi.drawer ? 'shop-drawer' : 'shop-close') : null;
   if (evUi.pop && dir < 0) return () => void run('ev-pop', evUi.pop);
   if (agUi.pop && dir < 0) return () => void run('agent-info', agUi.pop);
   if (tab === 'phone' && phone.pop && dir < 0) return go('ph-pop-close');
@@ -1843,7 +1910,8 @@ function themeOf(): string {
   const ctx = view.kind === 'started' || view.kind === 'opening' || view.kind === 'picker' ? view.ctx : null;
   const v = String(ctx?.chat.scriptstate?.['$st_fixed_theme'] ?? '');
   if (v === 'light' || v === 'paper' || v === 'dark') return v;
-  if (view.kind === 'picker') return getPrefs().theme ?? 'dark';
+  // 시작 화면·「연결 안 됨」 화면은 기기 설정 배색 (밝게 고정하지 않는다, 전수점검 사소-67)
+  if (view.kind === 'picker' || view.kind === 'not-lite') return getPrefs().theme ?? 'dark';
   // 불러오는 중·오류: 지금 배색 그대로 (열 때마다 밝게 번쩍이던 문제, 전수검사 11-13)
   if (view.kind === 'loading' || view.kind === 'error') return currentTheme();
   return 'light';
@@ -1883,13 +1951,16 @@ function body(): string {
       return `${header('오류')}<div class="gx-empty">${esc(view.message)}</div>`;
     case 'not-lite':
       return `${header('연결 안 됨')}<div class="gx-empty">
-        <p><b>${esc(view.name || '이 캐릭터')}</b>는 ${view.goei ? `${BRAND.name} 카드지만 Plugin manifest 가 없어요.` : `${BRAND.name} 카드가 아니에요.`}</p>
-        <p>${view.goei ? '설치 · 점검에서 매니페스트와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
+        <p><b>${esc(view.name || '이 캐릭터')}</b>는 ${view.goei ? `${BRAND.name} 카드지만 플러그인 정보(Plugin manifest)가 없어요.` : `${BRAND.name} 카드가 아니에요.`}</p>
+        <p>${view.goei ? '설치 · 점검에서 플러그인 정보와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
         <button class="gx-start" data-action="install-open">${view.goei ? '설치 · 점검 열기' : `이 봇에 ${BRAND.name} 설치`}</button>
       </div>`;
     case 'started':
       evSeenReset();
-      if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}`;
+      // 카드로 연 상점에서도 판매 화면의 아바타 창이 뜨게 (전수점검 보통-71)
+      if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
+      // 가계부·소지품이 둘 다 꺼졌으면 소지품 탭을 상황판으로 옮긴다 (제목·메뉴·본문이 어긋나지 않게, 전수점검 사소-68)
+      if (tab === 'items' && !invMenuOn(view.ctx)) tab = 'board';
       if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
       return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
     case 'opening':
@@ -1999,7 +2070,7 @@ function tabs(): string {
   const unreadPhone = view.kind === 'started' && phoneUnread(view.ctx);
   const cur: Tab = tab === 'mission' ? 'map' : inBrowser() ? 'net' : tab;
   const item = (id: Tab, label: string, icon: string, cls = '', badge = '') =>
-    `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
+    `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" title="${label}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
   const ctx = view.kind === 'started' ? view.ctx : null;
   return `<nav class="gx-nav" aria-label="주요 화면">
     ${ctx ? brand(ctx) : ''}
@@ -2010,7 +2081,7 @@ function tabs(): string {
     ${item('net', '인터넷', ICONS.net)}
     ${!ctx || invMenuOn(ctx) ? item('items', '소지품', ICONS.bag, 'desk') : ''}
     ${item('records', '기록', ICONS.records, 'desk')}
-    <button class="gx-nb desk" data-action="ed-open" data-value="set:screen">${ICONS.settings}<span>설정</span>${ctx && hasUpdate(ctx) ? '<span class="gx-nbadge dot" aria-label="새 버전"></span>' : ''}</button>
+    <button class="gx-nb desk" data-action="ed-open" data-value="set:screen" title="설정">${ICONS.settings}<span>설정</span>${ctx && hasUpdate(ctx) ? '<span class="gx-nbadge dot" aria-label="새 버전"></span>' : ''}</button>
     <span class="gx-nav-gap"></span>
     ${ctx ? navHistBar() : ''}
     ${mobileBar(item, unreadPhone, ctx)}
@@ -2139,7 +2210,9 @@ function goSite(site: SiteId | ''): void {
 
 /** 설정 창(폰)에 주는 하단 바: 본 창과 같은 항목, 지금 탭 표시 */
 function mobileNavHtml(): string {
-  const ctx = view.kind === 'started' ? view.ctx : null;
+  // 시작 전(새 작전 준비·첫 장면)은 본 창에도 하단 바가 없다: 설정 창에도 게임 메뉴를 두지 않는다. 갈래는 ☰ 목록, 닫기는 머리의 × (전수점검 눌러-중대-6: 메뉴를 눌러도 새 작전 준비로만 돌아갔다)
+  if (view.kind !== 'started') return '';
+  const ctx = view.ctx;
   const unreadPhone = view.kind === 'started' && phoneUnread(view.ctx);
   const cur: Tab = tab === 'mission' ? 'map' : tab;
   const item: NavItem = (id, label, icon, cls = '', badge = '') =>

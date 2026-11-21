@@ -16,8 +16,8 @@ export const VIEWPORTS = {
   phone: { width: 390, height: 844, touch: true },
   land: { width: 844, height: 390, touch: true },
 };
-/** 폰 배치인 뷰포트: 폭 760px 이하, 또는 손가락 화면에서 짧은 쪽이 500px 미만 (2026-11-06: 폰 가로 844×390 도 폰 배치, src/ui/media.ts PHONE_MQ) */
-export const isPhoneVp = (vp) => { const v = typeof vp === 'string' ? VIEWPORTS[vp] : vp; return v.width <= 760 || (v.touch && Math.min(v.width, v.height) < 500); };
+/** 폰 배치인 뷰포트: 폭 600px 이하, 또는 손가락 화면에서 짧은 쪽이 500px 미만 (2026-11-06: 폰 가로 844×390 도 폰 배치, src/ui/media.ts PHONE_MQ) */
+export const isPhoneVp = (vp) => { const v = typeof vp === 'string' ? VIEWPORTS[vp] : vp; return v.width <= 600 || (v.touch && Math.min(v.width, v.height) < 500); };
 
 export function loadFixture(path) {
   const fixture = JSON.parse(readFileSync(path, 'utf8'));
@@ -166,6 +166,8 @@ export async function goNode(page, n) {
   await page.waitForFunction((n) => !!document.querySelector(`.gw [data-action="ed-node"][data-value="${n}"]`), n);
   await page.evaluate((n) => document.querySelector(`.gw [data-action="ed-node"][data-value="${n}"]`).click(), n);
   await page.waitForFunction((n) => document.querySelector(`.gw .gw-tree-item.on`)?.dataset.value === n, n);
+  // 폰: 같은 페이지를 다시 고르면 다시 그리기(morph)라 왼쪽 목록이 .18s 동안 미끄러져 닫힌다 → 다 닫힐 때까지 기다린다 (닫히는 중인 목록을 「가로 넘침」으로 잡지 않게)
+  await page.waitForFunction(() => { const w = document.querySelector('.gw .gw-win'); const t = w?.querySelector('.gw-tree'); if (!t || w.classList.contains('drawer')) return true; const cs = getComputedStyle(t); return cs.position !== 'absolute' || (cs.visibility === 'hidden' && t.getBoundingClientRect().right <= 1); });
 }
 export async function openEditor(page, node = 'set:screen') {
   const picker = await page.$('.gx [data-action="prefs-open"]');

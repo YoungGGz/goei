@@ -33,8 +33,8 @@ const HELP: Record<GuideName, string> = {
   Phone: '괴담톡(연락처·문자) 생성 지침. 절마다 플러그인이 요청에 따라 골라 써요.',
   Wiki: '위키 문서 생성 지침. 절마다 플러그인이 요청에 따라 골라 써요.',
   Directive: '요원 이동·커스텀 임무 때 모델에 주는 장면 지시문. COMMON·OPENING·CONTINUATION·CONTEXT·FORMAT(JSON) 절.',
-  RP: '카드 description 에 있던 RP 지침(세계 설정·진행 원칙). 요청 맨 앞 로어 덩어리에 들어가요. 카드 description 에 「## RP Guidance」가 남아 있으면 넣지 않아요.',
-  Tag: '상황판 태그 지침(괴이·사건·거점 출력 규칙). 상태창 절은 `{status_section}` 자리에 설정 「상태창 → 칸」의 구성대로 자동으로 만들어져요(형식·규칙·예시). 그 자리표와 {{getvar::…}} 자리표는 그대로 두세요.',
+  RP: '카드 설명(description)에 있던 RP 지침(세계 설정·진행 원칙). 요청 맨 앞 로어 덩어리에 들어가요. 카드 설명에 「## RP Guidance」가 남아 있으면 넣지 않아요.',
+  Tag: '상황판 태그 지침(괴이·사건·거점 출력 규칙). 상태창 절은 「{status_section}」 자리에 설정 「상태창 → 칸」의 구성대로 자동으로 만들어져요(형식·규칙·예시). 그 자리표와 {{getvar::…}} 자리표는 그대로 두세요.',
   Shop: '상점 지침: 진열대 짜기·주인 대화·판매 값·메인 응답의 상점 표식. 절마다 플러그인이 요청에 따라 골라 써요. {size}·{line}·{price}·{prev} 자리는 플러그인이 채워요. 상점 판단: SHOP_RULE 은 「지금 상점이 있나」 공용 기준이라 메인 모델 표식 지침(MAIN_TAG)과 갱신기가 같은 글을 읽어요(한 곳만 고치면 양쪽에 들어가요). OWN_SHOPS 는 설정 → 상점 「고유 상점」 표의 켜진 줄({list})이 있을 때 SHOP_RULE 의 {own} 자리에 붙어요. SHOP_JUDGE 는 상점 판단을 갱신기가 맡을 때 갱신기만 더 받는 판단 요령이에요.',
   Updater: '인물 기록 갱신기(자세히판): 응답마다 보조 모델이 인물·사건·장소·세력·소지품 기록을 고칠 때 주는 지침. <<SECTION:이름>>…<<END:이름>> 표식은 설정에서 끈 기능의 절을 빼는 자리라 지우지 마세요.',
   UpdaterCompact: '인물 기록 갱신기(간결판): 설정 「인물 → 갱신 → 지침」을 간결로 골랐을 때 쓰는 지침. 표식은 자세히판과 같아요.',
@@ -67,8 +67,8 @@ export function guidePage(name: GuideName, crumb = ''): string {
     })
     .join('');
   const title = crumb
-    ? `<h2>${esc(GUIDE_LABEL[name])}<small>${esc(crumb)} · 이 기기 공통${guideOverridden(name) ? ' · 고침' : ' · 기본'} · ${parts.length}절</small></h2>`
-    : `<h3>${esc(GUIDE_LABEL[name])} 지침<small>이 기기 공통${guideOverridden(name) ? ' · 고침' : ' · 기본'} · ${parts.length}절</small></h3>`;
+    ? `<h2>${esc(GUIDE_LABEL[name])}<small>${esc(crumb)} · 이 기기 공통${guideOverridden(name) ? ' · 고침' : ' · 기본값'} · ${parts.length}절</small></h2>`
+    : `<h3>${esc(GUIDE_LABEL[name])} 지침<small>이 기기 공통${guideOverridden(name) ? ' · 고침' : ' · 기본값'} · ${parts.length}절</small></h3>`;
   return `<div class="gw-page${crumb ? ' gw-set' : ''}"><header class="gw-head">${title}
       <div class="gw-head-act"><span class="gw-tokens">${tokenizerName() ? '' : '약 '}${tokens(text).toLocaleString()}토큰</span></div>
       <p class="gx-muted">${esc(HELP[name])}</p>${guideUi.info ? `<p class="gx-hint">${esc(guideUi.info)}</p>` : ''}</header>

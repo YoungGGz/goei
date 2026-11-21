@@ -54,7 +54,10 @@ export async function savePhoto(file: Blob): Promise<{ asset: string; preview: s
   g.imageSmoothingQuality = 'high';
   g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  const blob = (await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/webp', 0.86))) ?? (await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.88)));
+  // WebP 를 못 만드는 브라우저(일부 사파리)는 null 대신 PNG 를 준다 — 그때도 JPEG 로
+  const encode = (type: string, q: number) => new Promise<Blob | null>((res) => canvas.toBlob(res, type, q));
+  const webp = await encode('image/webp', 0.86);
+  const blob = webp?.type === 'image/webp' ? webp : await encode('image/jpeg', 0.88);
   if (!blob) throw new PhotoError('사진을 줄이지 못했어요.');
   const bytes = new Uint8Array(await blob.arrayBuffer());
   let asset: unknown;

@@ -7,7 +7,7 @@ import { guideTxt } from '../guides';
 import type { FactionCode } from '../types';
 import { type Catalog, factionNames, presetCanon } from './catalog';
 import { situationShared } from '../sharedpics';
-import { landmarkLoc, locName, POOL, regionMatch, SEALED_LOC, uniqueRegion } from './geo';
+import { landmarkLoc, locName, nameForms, POOL, regionMatch, SEALED_LOC, uniqueRegion } from './geo';
 import {
   type AgState,
   scanAffiliation,
@@ -273,10 +273,11 @@ function remember(w: WorldState, kind: EndedEntry['kind'], e: { name: string; lo
 }
 /** 항목에 적어 두는 그림 후보 수 (새 장소 그림이 카드에 아직 없을 때 다음 후보로 넘어가는 여유) */
 const ART_KEEP = 10;
-/** 진행 중인 항목의 공용 그림을 한 번 정한다. 상황 글이 바뀌거나 끝나도 같은 그림이 되게 항목에 적어 둔다 */
+/** 진행 중인 항목의 공용 그림을 한 번 정한다. 상황 글·이름이 바뀌거나 끝나도 같은 그림이 되게 항목에 적어 둔다 (사용자 11-19: 그림은 도중에 안 바뀜.
+ *  모델이 무작위 괴이 이름을 조금 바꿔 써도 지역으로 같은 항목에 붙으니 다시 고르지 않는다) */
 function fixArt(w: WorldState) {
   const fix = (kind: 'an' | 'in' | 'ms', e: (AnEntry | InEntry | MsEntry) & { situation?: string }) => {
-    if (e.state === '발생대기' || !validName(e.name) || e.art?.for === e.name) return;
+    if (e.state === '발생대기' || !validName(e.name) || e.art) return;
     const pics = situationShared(kind, e.name, e.situation ?? '', locName(e.loc));
     // 끝은 늘 종류별 기본 그림. 앞쪽 후보만 남긴다
     if (pics.length) e.art = { for: e.name, pics: [...pics.slice(0, ART_KEEP), pics[pics.length - 1]] };
@@ -415,11 +416,12 @@ export function expire(w: WorldState, s: WorldSettings) {
 
 /** 응답 한 번마다 한 번: 회차를 올리고, 오래된 항목을 끝내고, 네 그룹을 무작위 순서로 한 번씩 추첨 */
 export function tick(w: WorldState, c: Catalog, s: WorldSettings, rng: Rng) {
+  // 기한 끝내기는 회차를 올리기 전에: 태그로 끝난 것(응답 반영 때, 회차 올리기 전)과 같은 회차로 적혀 상황판에 남는 때·이름 막기가 같아진다 (전수점검 사소-21: 기한으로 끝난 것만 한 응답 더 남았다)
+  expire(w, s);
   w.epoch += 1;
   w.ended = (w.ended ?? []).filter((e) => e.until >= w.epoch);
   // 지난 회차의 이름 막기는 더 뜻이 없으니 지운다 (안 지우면 채팅 저장값이 계속 커졌다) (전수검사 11-13)
   for (const k of Object.keys(w.blocks ?? {})) if (w.blocks[k] < w.epoch) delete w.blocks[k];
-  expire(w, s);
   const groups = ['preset', 'random', 'incident', 'mystic'];
   for (let i = groups.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -502,7 +504,7 @@ function matchAn(w: WorldState, region: string, name: string): AnEntry | undefin
   for (const e of w.an) {
     const ln = locName(e.loc);
     if (!regionMatch(region, ln)) continue;
-    let points = r === ln.replace(/\s+/g, '') ? 10 : 1;
+    let points = nameForms(ln).some((n) => r === n.replace(/\s+/g, '')) ? 10 : 1;
     if (name && (name === e.name || name === e.presetName)) points += 100;
     if (points > score) {
       best = e;
@@ -684,9 +686,11 @@ function applyMysticSites(w: WorldState, c: Catalog, s: WorldSettings, faction: 
 function applyExploration(w: WorldState, target: string | null) {
   if (target === null) return;
   // 목표 칸이 가리킨 항목은 「내가 출동」 근거로 남긴다 (괴이·사건·특수 모두, 종료까지 유지)
-  if (target !== '') for (const e of [...w.an, ...w.inc, ...w.ms]) if (e.name.trim() === target) e.touched = true;
-  const matched = target === '' ? [] : w.an.filter((e) => e.name.trim() === target);
-  if (target !== '' && matched.length === 0) return;
+  const hits = target === '' ? [] : [...w.an, ...w.inc, ...w.ms].filter((e) => e.name.trim() === target);
+  for (const e of hits) e.touched = true;
+  // 이름이 하나도 안 맞으면(오타 등) 그대로 둔다. 사건·특수 장소로 목표를 옮겼으면 괴이 탐사는 끝난다 (전수점검 보통-23: 옛 괴이가 탐사 중으로 남아 기한이 지나도 안 끝났다)
+  if (target !== '' && hits.length === 0) return;
+  const matched = w.an.filter((e) => hits.includes(e));
   for (const e of w.an) e.exploring = matched.includes(e);
 }
 

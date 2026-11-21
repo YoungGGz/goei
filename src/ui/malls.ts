@@ -3,7 +3,10 @@
 //   운영자에게 질문: 넷스케이프 팝업. 상품 화면에서 열면 그 물건이 붙고, 다른 곳은 [물건을 붙인다]. 운영자 답에 물건 이름이 있으면 링크로.
 // 백일몽 포인트몰: 사내 쇼핑몰, 운영자 없음(문의·흥정 X), 로그인해야 씀, 정가로 포인트 구매.
 // 진열·문의 요청문은 상점(core/shop.ts)과 같고, 지침·설정만 사이트 것(core/malls.ts).
-import { setGroup, setRow, stepSizeText } from './setrow';
+import { settingsUi } from './settings';
+import { scrollInside } from './panels';
+import { stepNext } from '../core/stepval';
+import { setGroup, setRow, stepIn } from './setrow';
 import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
@@ -21,7 +24,7 @@ import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
 import { DESK_AVOID_RANGE, DESK_KEEP_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
 import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallSeenKey, mallUnseen, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
-import { SHOP_SIZE_HI, SHOP_SIZE_LO, shopLimits } from '../core/shop';
+import { mergeLate, SHOP_SIZE_HI, SHOP_SIZE_LO, shopLimits } from '../core/shop';
 import { onOffSwitch } from './controls';
 import { shopSource } from './shop';
 import { shopGive } from '../core/shopfn';
@@ -29,6 +32,8 @@ import { itemPic } from './items';
 import { siteLogo } from './browser';
 import { isPhone } from './media';
 import { guideTxt } from '../core/guides';
+import { ICONS } from './icons';
+import { josa } from '../core/josa';
 
 /** 상담 줄 + 그 줄을 쓴 때의 마지막 응답 키 (core/malls.ts mallEvents 가 이 키로 거른다) */
 type DeskLineK = DeskLine & { k?: string };
@@ -82,14 +87,19 @@ function sync(ctx: ChatContext): void {
   ui.cos = fresh();
   ui.bm = fresh();
 }
+/** 뽑기 설정 「기본값으로」를 한 번 누른 몰: 한 번 더 눌러야 되돌린다 (상황판 휴지통과 같은 두 번 누르기, 전수점검 눌러2-보통-38) */
+let rollResetArm = '';
 export function resetMalls(): void {
   uiChat = '';
+  rollResetArm = '';
   ui.cos = fresh();
   ui.bm = fresh();
 }
 export const mallBusy = (site: MallSite): boolean => !!ui[site].loading;
 
 const won = (n: number) => `₩${Math.trunc(n).toLocaleString('en-US')}`;
+/** 이름 뒤 조사만 (받침에 맞춰, 전수점검 사소-32) */
+const pp = (word: string, withBatchim: string, without: string): string => josa(word, withBatchim, without).slice(word.length);
 const pts = (n: number) => `${Math.trunc(n).toLocaleString('en-US')} P`;
 const balanceOf = (ctx: ChatContext, site: MallSite): number => {
   const alive = aliveAnchors(ctx.chat);
@@ -126,22 +136,8 @@ function saleDone<C extends ChatContext['chat']>(chat: C, site: MallSite, itemId
   return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...itemsVars(items), ...mallVarsOf(site, nextShop), ...use } };
 }
 
-/** 답을 기다리는 동안 바뀐 것을 답 결과에 합친다 (전수검사 11-13): 그사이 산 물건은 팔린 채로, 그사이 취소한 판매는 취소된 채로.
- *  now = 저장 직전 상태, next = 답으로 만든 상태, st0 = 요청 전 상태. 나머지는 next 그대로 */
-export function mergeLate(now: ShopState, next: ShopState, st0: ShopState): ShopState {
-  const late = now.items.filter((x) => x.sold && !st0.items.some((y) => y.id === x.id && y.sold));
-  const byId = new Map(late.map((x) => [x.id, x]));
-  let items = next.items.map((x) => byId.get(x.id) ?? x);
-  const missing = late.filter((x) => !next.items.some((y) => y.id === x.id));
-  if (missing.length) {
-    items = [...missing, ...items];
-    // 40개 제한은 안 팔린 것만 뒤에서 잘라 맞춘다
-    let over = items.length - Math.max(40, next.items.length);
-    for (let i = items.length - 1; i >= 0 && over > 0; i--) if (!items[i].sold) { items.splice(i, 1); over--; }
-  }
-  const sell = st0.sell && !now.sell ? null : next.sell;
-  return { ...next, items, sell };
-}
+// mergeLate 는 기본 상점도 같이 쓰도록 core/shop.ts 로 옮겼다 (전수점검 보통-32)
+export { mergeLate };
 
 /** mergeLate 에 넘길 「저장 직전 상태」: 요청 전 상태를 읽을 때와 똑같이 살아 있는 응답 기준으로 읽는다 */
 export const lateNow = (chat: ChatContext['chat'], site: MallSite): ShopState => readMall(chat.scriptstate, site, aliveAnchors(chat));
@@ -207,14 +203,14 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       // 기다리는 동안 결제·판매 취소한 것을 되돌리지 않게 지금 상태와 합친다 (전수검사 11-13)
       // 요청 전 상태(st0)와 같은 기준(살아 있는 응답)으로 읽는다: 산 응답이 지워진 물건을 「기다리는 동안 산 것」으로 잘못 보지 않게 (재검토 11-14)
       const now = lateNow(chat, site);
-      merged = mergeLate(now, next, st0);
+      merged = mergeLate(now, next, st0, s.shelf);
       if (st0.sell && !now.sell) deal = '';
       const saved = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, { ...merged, key }), ...(note !== null ? { [mallNoteKey(site)]: note, [atKey(site)]: turnKey(chat) } : {}) } };
       const done = deal ? saleDone(saved, site, deal) : null;
       if (done) sold = true;
       return done ?? saved;
     });
-    if (sold && sale) { v.info = `「${sale.name}」을 ${won(sale.price as number)}에 팔았다. 입금 완료, 너에게.`; void refreshUseBox(cur.charIndex, cur.chatIndex); }
+    if (sold && sale) { v.info = `「${sale.name}」${pp(sale.name, '을', '를')} ${won(sale.price as number)}에 팔았다. 입금 완료, 너에게.`; void refreshUseBox(cur.charIndex, cur.chatIndex); }
     // 장바구니에서 진열대에 없는 물건은 뺀다
     v.cart = v.cart.filter((id) => shelfItems(merged).some((x) => x.id === id));
   } catch (error) {
@@ -448,19 +444,19 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         ok = true;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...itemsVars(items), ...mallVarsOf(site, nextShop) } };
       });
-      v.info = ok ? `쪽지 「${n.title}」가 소지품에 도착 했다. 내용은 거기서 읽어라.` : short ? '잔고가 모자란다. 입금이 필요하다.' : '살 수 없는 상태다.';
+      v.info = ok ? `쪽지 「${n.title}」${pp(n.title, '이', '가')} 소지품에 도착 했다. 내용은 거기서 읽어라.` : short ? '잔고가 모자란다. 입금이 필요하다.' : '살 수 없는 상태다.';
       await env.refresh();
       return true;
     }
     case 'mall-quote-accept': {
       // 맞춤 주문: 견적을 선납하고 주문 목록에 넣는다. 완성품은 「주문 조회」에서 납기 뒤에 받는다
-      const q = (st.quotes ?? []).find((x) => x.id === value && quoteOpen(x, liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat))));
+      const q = (st.quotes ?? []).find((x) => x.id === value && quoteOpen(x));
       if (site !== 'cos' || !q || v.loading) return true;
       let ok = false; let short = false;
       await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
         const now = readMall(chat.scriptstate, site, aliveAnchors(chat));
-        // 주문한 응답이 지워져 주문이 없어진 견적은 다시 주문할 수 있다 (accepted 를 되돌려 acceptQuote 를 그대로 쓴다)
-        const nextShop = acceptQuote({ ...now, quotes: (now.quotes ?? []).map((x) => (x.id === q.id ? { ...x, accepted: false } : x)) }, q.id, lastBot(chat)?.key ?? '');
+        // 주문한 응답이 지워진 견적은 readMall(reviveShop)이 이미 다시 열어 둔다. 주문 기록이 정리돼 없어진 것은 다시 열지 않는다 (전수점검 보통-30)
+        const nextShop = acceptQuote(now, q.id, lastBot(chat)?.key ?? '');
         if (!nextShop) return null;
         const alive = aliveAnchors(chat);
         let w = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
@@ -497,7 +493,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         const message = settleReady(next, cosReadyMode(next.scriptstate) !== 'off');
         return message ? { ...next, message } : next;
       });
-      v.info = ok ? `「${o.item.name}」을 받았다. 소지품에 들어갔다.` : '받을 수 없는 상태다.';
+      v.info = ok ? `「${o.item.name}」${pp(o.item.name, '을', '를')} 받았다. 소지품에 들어갔다.` : '받을 수 없는 상태다.';
       if (ok) v.took = o.id;
       await env.refresh();
       return true;
@@ -534,8 +530,8 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         first = got[0].item.name;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...bmOrdersVars(list, bmOrdersKeep(chat.scriptstate)) } };
       });
-      if (went) v.info = n > 1 ? `상품 ${n}건을 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.` : `「${first}」을(를) 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.`;
-      else v.info = n > 1 ? `상품 ${n}건을 수령했습니다. 소지품에 들어갔습니다.` : n ? `「${first}」을(를) 수령했습니다. 소지품에 들어갔습니다.` : '수령할 수 없는 상태입니다.';
+      if (went) v.info = n > 1 ? `상품 ${n}건을 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.` : `「${first}」${pp(first, '을', '를')} 수령하러 갑니다. 대여창고에서 받으면 소지품에 들어옵니다.`;
+      else v.info = n > 1 ? `상품 ${n}건을 수령했습니다. 소지품에 들어갔습니다.` : n ? `「${first}」${pp(first, '을', '를')} 수령했습니다. 소지품에 들어갔습니다.` : '수령할 수 없는 상태입니다.';
       await env.refresh();
       return true;
     }
@@ -553,7 +549,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (done) sold = true;
         return done;
       });
-      v.info = sold ? `「${o.name}」을 ${won(o.price as number)}에 팔았다. 입금 완료, 너에게.` : '팔 수 없음, 지금 (물건이 없거나 값이 바뀌었다).';
+      v.info = sold ? `「${o.name}」${pp(o.name, '을', '를')} ${won(o.price as number)}에 팔았다. 입금 완료, 너에게.` : '팔 수 없음, 지금 (물건이 없거나 값이 바뀌었다).';
       if (sold) void refreshUseBox(ctx.charIndex, ctx.chatIndex);
       await env.refresh();
       return true;
@@ -568,7 +564,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       v.page = '';
       v.focus = value ?? '';
       env.render();
-      document.querySelector(`.ms [data-item="${CSS.escape(v.focus)}"]`)?.scrollIntoView({ block: 'center' });
+      scrollInside(document.querySelector<HTMLElement>(`.ms [data-item="${CSS.escape(v.focus)}"]`), 'center');
       return true;
     case 'mall-raw':
       if (v.failRaw) v.notice = `${v.notice.split('\n')[0]}\n${v.failRaw.slice(0, 1500)}`;
@@ -596,7 +592,8 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (!said || v.dl || !d.agent) return true;
         // 줄마다 그때의 마지막 응답 키를 적는다: 창을 열어 둔 채 다음 턴에 이어 말해도 메인 요청에 넘어가게 (전수검사 11-13)
         const me: DeskLineK = { who: 'me', text: said.slice(0, 600), k: lastBot(ctx.chat)?.key ?? '' };
-        const next: DeskState = { ...d, talk: [...d.talk, me] };
+        // 상담 대화도 「보관하는 양」의 문의 대화 줄 수까지만 둔다: 한 턴 안에서 길게 이어 가도 모델에 끝없이 쌓여 가지 않게 (전수점검 사소-34)
+        const next: DeskState = { ...d, talk: [...d.talk, me].slice(-shopLimits(ctx.chat.scriptstate).talk) };
         v.input = '';
         const saved = await saveDesk(ctx, next);
         if (saved) await deskRun({ ...ctx, chat: saved }, env, 'talk', next);
@@ -669,7 +666,7 @@ async function deskRun(ctx: ChatContext, env: MallEnv, kind: 'make' | 'talk', st
     } else {
       const p = deskTalkPrompt(src, st0);
       const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, parseSay, opts);
-      next = { ...st0, talk: [...st0.talk, ...value.map((t): DeskLineK => ({ who: 'op', text: t, k: key }))] };
+      next = { ...st0, talk: [...st0.talk, ...value.map((t): DeskLineK => ({ who: 'op', text: t, k: key }))].slice(-shopLimits(vars).talk) };
     }
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
@@ -743,12 +740,13 @@ function noteCard(st: ShopState, id: string | undefined, v: View): string {
 }
 
 /** 맞춤 주문 견적 카드: 이름·값·납기만 (설명·효과는 받을 때 본다). 선납하면 주문 */
-/** 견적을 (다시) 주문할 수 있나: 아직 안 했거나, 했는데 그 주문이 지운·다시 굴린 응답과 함께 없어졌을 때 */
-const quoteOpen = (q: { id: string; accepted?: boolean }, orders: CosOrder[]): boolean => !q.accepted || !orders.some((o) => o.id === q.id);
-function quoteCard(st: ShopState, id: string | undefined, v: View, orders: CosOrder[] = []): string {
+/** 견적을 (다시) 주문할 수 있나: 아직 안 했을 때만. 주문한 응답을 지우거나 다시 굴리면 readMall(reviveShop)이 accepted 를 되돌린다.
+ *  주문 목록에 없는지로 보면 주문 기록이 「둘 수」를 넘어 정리됐을 때 같은 견적을 또 결제할 수 있었다 (전수점검 보통-30) */
+const quoteOpen = (q: { accepted?: boolean }): boolean => !q.accepted;
+function quoteCard(st: ShopState, id: string | undefined, v: View): string {
   const q0 = id ? (st.quotes ?? []).find((x) => x.id === id) : null;
   if (!q0) return '';
-  const q = { ...q0, accepted: !quoteOpen(q0, orders) };
+  const q = { ...q0, accepted: !quoteOpen(q0) };
   const h = q.hours >= 24 ? `${Math.round((q.hours / 24) * 10) / 10}일` : `${q.hours}시간`;
   return `<div class="q-note q-quote${q.accepted ? ' done' : ''}"><span>🛠 맞춤 주문 견적</span><b>${esc(q.item.name)}</b><em>${won(q.price)}</em><small>납기 ${h}</small>${q.accepted ? '<small class="ok">선납 완료 — 주문 조회에서 받아라</small>' : `<button class="cs-btn" data-action="mall-quote-accept" data-value="${esc(q.id)}"${v.loading ? ' disabled' : ''}>선납하고 주문</button>`}</div>`;
 }
@@ -826,9 +824,8 @@ function cosAsk(ctx: ChatContext, st: ShopState, v: View, mobile: boolean): stri
   const at = mobile ? '' : winStyle(v.win);
   const ufo = siteLogo('cos', 'cs-ufo');
   const chip = st.items.find((x) => x.id === v.chip && !x.sold);
-  const orders = liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat));
   const log = st.talk.length
-    ? st.talk.map((l) => (l.who === 'me' ? `<div class="q-m q-me"><b>나</b><p>${esc(l.text)}</p></div>` : `<div class="q-m q-op"><b>${esc(MALL_OWNER.cos)}</b><p>${opText(l.text, st)}</p>${noteCard(st, l.note, v)}${quoteCard(st, l.quote, v, orders)}</div>`)).join('')
+    ? st.talk.map((l) => (l.who === 'me' ? `<div class="q-m q-me"><b>나</b><p>${esc(l.text)}</p></div>` : `<div class="q-m q-op"><b>${esc(MALL_OWNER.cos)}</b><p>${opText(l.text, st)}</p>${noteCard(st, l.note, v)}${quoteCard(st, l.quote, v)}</div>`)).join('')
     : `<div class="q-m q-op"><b>${esc(MALL_OWNER.cos)}</b><p>안녕하신가! 무엇을 도울까, 만일 상품을 물어보면 붙여라 그것을 여기에.</p></div>`;
   const wait = v.loading === 'talk' ? `<div class="q-m q-op q-wait"><b>${esc(MALL_OWNER.cos)}</b><p>운영자가 입력하는 중…</p></div>` : '';
   const pickList = v.picking ? `<div class="q-pick">${onShelf(st).map((x) => `<button data-action="mall-chip" data-value="${esc(x.id)}">${esc(x.name)} <b>${won(x.price)}</b></button>`).join('') || '<p>없다 붙일 상품.</p>'}</div>` : '';
@@ -888,7 +885,7 @@ function bmCard(it: ShopItem, bal: number, v: View, busy: boolean): string {
   const off = sale ? Math.round((1 - it.price / it.was!) * 100) : 0;
   return `<div class="bp-it${it.tag === 'rare' ? ' bp-rare' : sale ? ' bp-cut' : ''}${v.focus === it.id ? ' on' : ''}" data-item="${esc(it.id)}"><span class="bp-pic">${pic(it)}</span>${lab}
     <b class="bp-nm">${esc(it.name)}</b><p class="bp-ds">${esc(it.desc)}${it.effect ? `<br><i>${esc(it.effect)}</i>` : ''}</p>
-    <div class="bp-pr">${sale ? `<s>${pts(it.was!)}</s> ` : ''}${off > 0 ? `<em>${off}%</em> ` : ''}<b>${Math.trunc(it.price).toLocaleString('en-US')}</b> P</div>
+    <div class="bp-pr">${sale ? `<s>${pts(it.was!)}</s> ` : ''}${off > 0 ? `<em>${off}%</em> ` : ''}${it.pay && !it.price ? '' : `<b>${Math.trunc(it.price).toLocaleString('en-US')}</b> P`}${it.pay ? ` <small>${it.price ? '+ ' : ''}${esc(it.pay)}</small>` : ''}</div>
     <button class="bp-buy" data-action="mall-buy" data-value="${esc(it.id)}" ${poor || busy ? 'disabled' : ''}>${poor ? '포인트 부족' : '포인트로 구매'}</button></div>`;
 }
 
@@ -995,7 +992,6 @@ const tierBad = (x: TierRaw): string => {
   if (!x.hi || b < a) return '상한이 하한보다 작아 이 줄은 안 뽑혀요.';
   return '';
 };
-const stepBox = (action: string, key: string, text: string, down: boolean, up: boolean) => `<div class="st-step"><button class="gx-step" data-action="${action}" data-value="${key}:-" ${down ? '' : 'disabled'} aria-label="줄이기">−</button><b>${text}</b><button class="gx-step" data-action="${action}" data-value="${key}:+" ${up ? '' : 'disabled'} aria-label="늘리기">+</button></div>`;
 /** 값 등급 표: PC 는 제목 줄 + 등급마다 한 줄, 폰은 제목 두 줄 + 등급마다 두 줄 (같은 DOM, 배치만 CSS). 설명은 길어서 줄이 바뀌는 칸(.ms-list) — 잘리지 않게 (2026-11-12 전수점검 D1·D2) */
 function tierTable(vars: Record<string, unknown> | undefined, site: MallSite): string {
   const unit = site === 'bm' ? 'p' : '원';
@@ -1005,18 +1001,19 @@ function tierTable(vars: Record<string, unknown> | undefined, site: MallSite): s
     const k = `${site}:${i}`;
     const bad = tierBad(x);
     const w = x.w === '' || !Number.isFinite(Number(x.w)) || Number(x.w) < 0 ? 1 : Math.min(99, Math.trunc(Number(x.w)));
-    const num = (f: 'lo' | 'hi', label: string) => `<span class="ph-inline"><input class="gx-search ms-num" type="number" min="1" max="1000000000000" data-change="ms-tier" data-key="${k}:${f}" value="${esc(x[f].replace(/[^\d]/g, ''))}" aria-label="${label}"><span>${unit}</span></span>`;
+    // 금액은 자릿점을 찍어 보인다 (7자리·8자리 구분, 전수점검 눌러-중대-18·눌러-사소-39). 저장할 때 숫자만 남긴다(ms-tier)
+    const num = (f: 'lo' | 'hi', label: string) => { const d = x[f].replace(/[^\d]/g, ''); return `<span class="ph-inline"><input class="gx-search ms-num" type="text" inputmode="numeric" maxlength="17" data-change="ms-tier" data-key="${k}:${f}" value="${d ? Number(d).toLocaleString('en-US') : ''}" aria-label="${label}"><span>${unit}</span></span>`; };
     return `<div class="ms-tb-r${bad ? ' bad' : ''}">
       ${cell('n', '이름', `<input class="gx-search" data-change="ms-tier" data-key="${k}:name" value="${esc(x.name)}" maxlength="20" aria-label="이름">`)}
       ${cell('d', '설명(영어)', `<textarea class="gx-search ms-list" rows="1" data-change="ms-tier" data-key="${k}:desc" maxlength="120" aria-label="설명(영어)">${esc(x.desc)}</textarea>`)}
       ${cell('lo', '하한', num('lo', '하한'))}
       ${cell('hi', '상한', num('hi', '상한'))}
-      <div class="ms-tb-c w"><span>가중치</span>${stepBox('ms-tier-w', k, String(w), w > 0, w < 99)}</div>
-      <button class="gx-mini danger ms-tb-x" data-action="ms-tier-del" data-value="${k}" aria-label="지우기">×</button>
+      <div class="ms-tb-c w"><span>가중치</span>${stepIn('ms-tier-w', k, w, 0, 99, '', '가중치')}</div>
+      <button class="gx-mini icon danger ms-tb-x" data-action="ms-tier-del" data-value="${k}" aria-label="지우기" title="지우기">${ICONS.trash}</button>
       ${bad ? `<p class="ms-tb-err">${bad}</p>` : ''}
     </div>`;
   }).join('');
-  return `<div class="ms-tb"><div class="ms-tb-h"><span>이름</span><span>설명(영어)</span><span>하한</span><span>상한</span><span>가중치</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini primary" data-action="ms-tier-add" data-value="${site}" ${rows.length >= 12 ? 'disabled' : ''}>등급 추가</button></div></div>`;
+  return `<div class="ms-tb ms-tiers"><div class="ms-tb-h"><span>이름</span><span>설명(영어)</span><span>하한</span><span>상한</span><span>가중치</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini" data-action="ms-tier-add" data-value="${site}" ${rows.length >= 12 ? 'disabled' : ''}>${ICONS.plus}등급 추가</button></div></div>`;
 }
 /** 상담사 주사위 칸: 한 줄에 칸 이름 + 값(쉼표로 나눈 글 한 칸) + × (v2: 값마다 칩으로 쪼개면 높이가 3.7배가 돼서 한 칸으로) */
 interface AxisRaw { name: string; values: string[] }
@@ -1030,11 +1027,11 @@ function axisTable(vars: Record<string, unknown> | undefined): string {
     return `<div class="ms-ax${bad ? ' bad' : ''}">
       <label class="ms-tb-c n"><span>칸 이름</span><input class="gx-search" data-change="ms-ax-name" data-key="${i}" value="${esc(a.name)}" maxlength="20" placeholder="칸 이름" aria-label="칸 이름"></label>
       <label class="ms-tb-c v"><span>값</span><input class="gx-search" data-change="ms-ax-vals" data-key="${i}" value="${esc(a.values.join(', '))}" maxlength="900" placeholder="값, 값" aria-label="값"></label>
-      <button class="gx-mini danger ms-tb-x" data-action="ms-ax-del" data-value="${i}" aria-label="지우기">×</button>
+      <button class="gx-mini icon danger ms-tb-x" data-action="ms-ax-del" data-value="${i}" aria-label="지우기" title="지우기">${ICONS.trash}</button>
       ${bad ? `<p class="ms-tb-err">${bad}</p>` : ''}
     </div>`;
   }).join('');
-  return `<div class="ms-tb ms-axs"><div class="ms-tb-h"><span>칸 이름</span><span>값</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini primary" data-action="ms-ax-add" ${rows.length >= 12 ? 'disabled' : ''}>칸 추가</button></div></div>`;
+  return `<div class="ms-tb ms-axs"><div class="ms-tb-h"><span>칸 이름</span><span>값</span><span></span></div>${body}<div class="ms-tb-foot"><button class="gx-mini" data-action="ms-ax-add" ${rows.length >= 12 ? 'disabled' : ''}>${ICONS.plus}칸 추가</button></div></div>`;
 }
 function mseg(site: MallSite, key: string, cur: string, items: [string, string][]): string {
   const sw = onOffSwitch(items, cur, 'ms-cfg', (v) => `${site}:${key}=${v}`);
@@ -1062,7 +1059,8 @@ function cosRollGroup(ctx: ChatContext, site: MallSite): string {
   const K = rollKeys(site);
   const D = rollDefaults(site);
   const bm = site === 'bm';
-  const reset = rollChanged(vars, site) || String(vars?.[K.tiers] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-roll-reset" data-value="${site}">기본값으로</button></div>` : '';
+  const armed = rollResetArm === site;
+  const reset = rollChanged(vars, site) || String(vars?.[K.tiers] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini${armed ? ' danger' : ''}" data-action="ms-roll-reset" data-value="${site}" title="${armed ? '한 번 더 누르면 기본값으로 되돌려요' : '뽑기 설정을 기본값으로'}">${armed ? '정말 되돌리기' : '기본값으로'}</button></div>` : '';
   // 기본값은 칸에 진짜 글로 들어 있다 (11-12 사용자: 회색 안내 글이면 한 글자만 쳐도 다 사라진다). 다르게 고친 줄만 「바꾼 줄」 점
   const gSet = defChanged(String(vars?.[K.genres] ?? ''), genresText(D.genres), genresNorm);
   const mark = (on: boolean) => (on ? 'ps-changed' : '');
@@ -1071,7 +1069,9 @@ function cosRollGroup(ctx: ChatContext, site: MallSite): string {
   const money = (x: CosTier) => (bm ? `${x.lo.toLocaleString('ko-KR')}~${x.hi.toLocaleString('ko-KR')}p` : `₩${x.lo.toLocaleString('ko-KR')}~${x.hi.toLocaleString('ko-KR')}`);
   const sample = r.on ? cosDraw(n, s.context, r).map((x, i) => `<li><b>${i + 1}칸</b> ${esc(x.genre)} · ${esc(x.tier.name)} ${money(x.tier)}${x.useful ? ' · <i>상황용</i>' : ''}</li>`).join('') : '';
   const word = bm ? '분류' : '장르';
-  const how = `<p class="ps-note">새로 받을 때마다 코드가 ① 칸 수만큼 ${word}를 뽑고 ② 칸마다 값 등급을 뽑고 ③ 상황용 칸을 정한 뒤, 요청문에 「Item n — ${bm ? 'CATEGORY' : 'GENRE'} · VALUE TIER · ROLE」로 적어요. 모델은 그 칸에 맞는 물건만 짓고, ${word}·등급을 바꾸지 못해요.${bm ? ' 로어북의 가격 예시 물건을 그대로 되풀이하기 어렵게 하는 장치예요.' : ''}</p>`;
+  const how = `<p class="ps-note">새로 받을 때마다 코드가 ① 칸 수만큼 ${word}를 뽑고 ② 칸마다 값 등급을 뽑고 ③ 상황용 칸을 정한 뒤, 요청문에 「Item&nbsp;n — ${bm ? 'CATEGORY' : 'GENRE'} · VALUE TIER · ROLE」로 적어요. 모델은 그 칸에 맞는 물건만 짓고, ${word}·등급을 바꾸지 못해요.${bm ? ' 로어북의 가격 예시 물건을 그대로 되풀이하기 어렵게 하는 장치예요.' : ''}</p>`;
+  // 끄면 아래 칸은 숨긴다: 소지품처럼 (꺼도 켜진 모양으로 남아 값이 쓰이는지 알 수 없었다, 전수점검 눌러-사소-40)
+  if (!r.on) return group('진열 배정', how + row('사용', mseg(site, 'roll_on', '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 배정 없이 모델이 알아서 골라요(같은 물건이 되풀이될 수 있어요).'));
   return group('진열 배정', how + [
     row('사용', mseg(site, 'roll_on', r.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 배정 없이 모델이 알아서 골라요(같은 물건이 되풀이될 수 있어요).'),
     row(`${word} 목록`, `<textarea class="gx-search ms-area ms-list" rows="2" data-change="ms-roll" data-key="${site}:genres">${esc(genresText(r.genres))}</textarea>`, `쉼표로 나눠요. 다 지우면 기본 ${D.genres.length}종으로 돌아가요.`, `ms-wide ${mark(gSet)}`),
@@ -1088,13 +1088,14 @@ function deskGroup(ctx: ChatContext): string {
   const d = deskSettings(ctx.chat.scriptstate);
   const how = '<p class="ps-note">상담을 열 때마다 코드가 아래 칸마다 값을 하나씩 뽑고, 모델이 그 값으로 상담사(이름·직급·부서·소개·말투)를 한 번 만들어 둬요. 대화하는 동안은 그 카드를 매번 같이 보내서 사람이 바뀌지 않아요. 턴이 넘어가거나 「상담 종료」·「다른 상담사 연결」을 누르면 다음엔 새 상담사예요. 업무 지침과 말 규칙은 설정 → 지침 → 포인트몰 1:1 상담에서 고쳐요.</p>';
   const aSet = defChanged(d.axesText, deskAxesDefault(), axesNorm);
-  const reset = aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-desk-reset">기본값으로</button></div>` : '';
+  const reset = aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-desk-reset">초기값으로</button></div>` : '';
+  if (!d.on) return group('1:1 상담', how + row('사용', mseg('bm', 'desk_on', '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 왼쪽 메뉴에 「1:1 상담」이 안 보여요.'));
   return group('1:1 상담', how + [
     row('사용', mseg('bm', 'desk_on', d.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 왼쪽 메뉴에 「1:1 상담」이 안 보여요.'),
     row('상담사 주사위 칸', axisTable(ctx.chat.scriptstate), '칸마다 값을 하나씩 뽑아요. 값은 쉼표로 나눠요. 같은 값을 여러 번 적으면 그만큼 잘 뽑혀요. 다 지우면 기본 칸으로 돌아가요.', `ms-wide ${aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? 'ps-changed' : ''}`),
     row('지난 상담사 다시 만나기', mseg('bm', 'desk_again', d.again ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '켜면 가끔(4번에 1번꼴) 전에 만났던 상담사가 다시 연결돼요.'),
-    row('겹치지 않게 넘길 수', `<div class="st-step${stepSizeText(`${DESK_AVOID_RANGE[1]}명`)}"><button class="gx-step" data-action="ms-desk-step" data-value="-" ${d.avoid > DESK_AVOID_RANGE[0] ? '' : 'disabled'} aria-label="줄이기">−</button><b>${d.avoid}명</b><button class="gx-step" data-action="ms-desk-step" data-value="+" ${d.avoid < DESK_AVOID_RANGE[1] ? '' : 'disabled'} aria-label="늘리기">+</button></div>`, '새 상담사를 만들 때 최근 상담사 몇 명의 요약을 같이 넘겨 「이들과 겹치지 마라」고 해요(0~12).'),
-    row('지난 상담사 보관 수', `<div class="st-step${stepSizeText(`${DESK_KEEP_RANGE[1]}명`)}"><button class="gx-step" data-action="ms-desk-keep" data-value="-" ${d.keep > DESK_KEEP_RANGE[0] ? '' : 'disabled'} aria-label="줄이기">−</button><b>${d.keep}명</b><button class="gx-step" data-action="ms-desk-keep" data-value="+" ${d.keep < DESK_KEEP_RANGE[1] ? '' : 'disabled'} aria-label="늘리기">+</button></div>`, `지난 상담사를 몇 명까지 남겨 둘지예요(${DESK_KEEP_RANGE[0]}~${DESK_KEEP_RANGE[1]}). 넘으면 오래된 상담사부터 지워요. 「다시 만나기」는 남아 있는 상담사 가운데서 골라요.`),
+    row('겹치지 않게 넘길 수', stepIn('ms-desk-step', '', d.avoid, DESK_AVOID_RANGE[0], DESK_AVOID_RANGE[1], '명', '겹치지 않게 넘길 수'), '새 상담사를 만들 때 최근 상담사 몇 명의 요약을 같이 넘겨 「이들과 겹치지 마라」고 해요(0~12).'),
+    row('지난 상담사 보관 수', stepIn('ms-desk-keep', '', d.keep, DESK_KEEP_RANGE[0], DESK_KEEP_RANGE[1], '명', '지난 상담사 보관 수'), `지난 상담사를 몇 명까지 남겨 둘지예요(${DESK_KEEP_RANGE[0]}~${DESK_KEEP_RANGE[1]}). 넘으면 오래된 상담사부터 지워요. 「다시 만나기」는 남아 있는 상담사 가운데서 골라요.`),
   ].join('') + reset);
 }
 
@@ -1121,18 +1122,19 @@ function cosFixedGroup(ctx: ChatContext): string {
   const text = (id: string, key: string, v: string, ph: string, label: string, len: number) =>
     `<input class="gx-search" data-change="ms-fx" data-key="${id}:${key}" value="${esc(v)}" maxlength="${len}" placeholder="${ph}" aria-label="${esc(label)}">`;
   const items = list.map((f) => `<div class="ms-fx${f.on ? '' : ' off'}">
-      <div class="ms-fx-head">${text(f.id, 'name', f.name, '상품 이름', '이름', 40)}<span class="ph-inline"><span>확률</span>${num(f.id, 'pct', f.pct, '25', '확률', 100)}<span>%</span></span>${mseg('cos', `fx_on:${f.id}`, f.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']])}<button class="gx-mini danger" data-action="ms-fx-del" data-value="${esc(f.id)}" aria-label="지우기">×</button></div>
+      <div class="ms-fx-head">${text(f.id, 'name', f.name, '상품 이름', '이름', 40)}<span class="ph-inline"><span>확률</span>${num(f.id, 'pct', f.pct, '25', '확률', 100)}<span>%</span></span>${mseg('cos', `fx_on:${f.id}`, f.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']])}<button class="gx-mini icon danger" data-action="ms-fx-del" data-value="${esc(f.id)}" aria-label="지우기" title="지우기">${ICONS.trash}</button></div>
       <div class="ms-fx-row"><span class="ph-inline"><span>값</span>${num(f.id, 'price', f.price, '999999', '값')}<span>원</span></span><span class="ph-inline"><span>할인 전</span>${num(f.id, 'was', f.was, '비우면 할인 없음', '할인 전 값')}<span>원</span></span></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>설명</span>${text(f.id, 'desc', f.desc, '겉보기 설명 (???·검열됨처럼 숨겨도 돼요)', '설명', 200)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>효과</span>${text(f.id, 'effect', f.effect, '화면에 보이는 광고 문구 (모호·검열·거짓·뚱딴지…)', '보이는 효과', 200)}</span></div>
       <div class="ms-fx-row"><span class="ph-inline ms-fx-wide"><span>진실</span>${text(f.id, 'truth', f.truth, '숨긴 진짜 효과 — 메인 모델만 봐요. 비우면 「아무도 모름」', '진짜 효과', 200)}</span></div>
     </div>`).join('');
-  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini primary" data-action="ms-fx-add" ${list.length >= COS_FIXED_MAX ? 'disabled' : ''}>상품 추가</button></div>`;
+  const foot = `<div class="ps-row gw-rel-foot"><button class="gx-mini" data-action="ms-fx-add" ${list.length >= COS_FIXED_MAX ? 'disabled' : ''}>${ICONS.plus}상품 추가</button></div>`;
   return group('시그니처 상품', `<p class="ps-note">모델이 아니라 코드가 새로고침마다 확률대로 끼워 넣는 상품이에요. 모델에게는 이름을 알리지 않고, 모델이 같은 이름을 내면 버려요. 이미 진열돼 있거나 산 것은 다시 안 넣어요. 다 지우면 안 써요. 「효과」는 화면에 보이는 광고 문구이고 「진실」은 숨긴 진짜 효과예요.</p>${items || '<p class="ps-note">없음.</p>'}${foot}`);
 }
 
 /** 설정 값 바꾸기: ms-cfg 「사이트:키=값」 · ms-step 「사이트:키:±」 · ms-num 「사이트:키=숫자」(상품 수) · ms-text (값 기준) */
 export async function mallSettingsAction(action: string, value: string | undefined, ctx: ChatContext, env: MallEnv): Promise<boolean> {
+  if (action !== 'ms-roll-reset') rollResetArm = ''; // 다른 것을 만지면 「정말 되돌리기」를 거둔다
   if (await deskSettingsAction(action, value, ctx, env)) return true;
   if (await cosExtraAction(action, value, ctx, env)) return true;
   if (action !== 'ms-cfg' && action !== 'ms-step' && action !== 'ms-text' && action !== 'ms-num') return false;
@@ -1201,14 +1203,13 @@ async function deskSettingsAction(action: string, value: string | undefined, ctx
   }
   if (action === 'ms-desk-step') {
     const d = deskSettings(ctx.chat.scriptstate);
-    const n = Math.max(DESK_AVOID_RANGE[0], Math.min(DESK_AVOID_RANGE[1], d.avoid + (value === '+' ? 1 : -1)));
-    return set({ [DESK_KEY.avoid]: String(n) });
+    const n = stepNext(value, d.avoid, DESK_AVOID_RANGE[0], DESK_AVOID_RANGE[1]);
+    return n === null ? true : set({ [DESK_KEY.avoid]: String(n) });
   }
   if (action === 'ms-desk-keep') {
     const d = deskSettings(ctx.chat.scriptstate);
-    // 한 번에 4명씩 (12~100)
-    const n = Math.max(DESK_KEEP_RANGE[0], Math.min(DESK_KEEP_RANGE[1], d.keep + (value === '+' ? 4 : -4)));
-    return set({ [DESK_KEY.keep]: String(n) });
+    const n = stepNext(value, d.keep, DESK_KEEP_RANGE[0], DESK_KEEP_RANGE[1]);
+    return n === null ? true : set({ [DESK_KEY.keep]: String(n) });
   }
   if (action === 'ms-desk-reset') return set({ [DESK_KEY.axes]: '' });
   return false;
@@ -1296,7 +1297,7 @@ async function cosExtraAction(action: string, value: string | undefined, ctx: Ch
       const site = m[1] as MallSite; const f = m[3] as 'name' | 'desc' | 'lo' | 'hi';
       return saveT(site, tierRows(vars, site).map((x, i) => (i === Number(m[2]) ? { ...x, [f]: f === 'name' ? clean(m[4], 20) : f === 'desc' ? clean(m[4], 120) : m[4].replace(/[^\d]/g, '').slice(0, 13) } : x)));
     }
-    if (action === 'ms-tier-w') { const m = /^(cos|bm):(\d+):([+-])$/.exec(value ?? ''); if (!m) return true; const site = m[1] as MallSite; return saveT(site, tierRows(vars, site).map((x, i) => { if (i !== Number(m[2])) return x; const w = x.w === '' || !Number.isFinite(Number(x.w)) ? 1 : Math.trunc(Number(x.w)); return { ...x, w: String(Math.max(0, Math.min(99, w + (m[3] === '+' ? 1 : -1)))) }; })); }
+    if (action === 'ms-tier-w') { const m = /^(cos|bm):(\d+)(:[+-]|=-?\d+)$/.exec(value ?? ''); if (!m) return true; const site = m[1] as MallSite; return saveT(site, tierRows(vars, site).map((x, i) => { if (i !== Number(m[2])) return x; const w = x.w === '' || !Number.isFinite(Number(x.w)) ? 1 : Math.trunc(Number(x.w)); return { ...x, w: String(stepNext(m[3], w, 0, 99) ?? w) }; })); }
     if (action === 'ms-tier-del') { const m = /^(cos|bm):(\d+)$/.exec(value ?? ''); if (!m) return true; const site = m[1] as MallSite; return saveT(site, tierRows(vars, site).filter((_, i) => i !== Number(m[2]))); }
     if (action === 'ms-tier-add') { const site = (value === 'bm' ? 'bm' : 'cos') as MallSite; return saveT(site, [...tierRows(vars, site), { name: '', desc: '', lo: '', hi: '', w: '1' }]); }
   }
@@ -1308,7 +1309,19 @@ async function cosExtraAction(action: string, value: string | undefined, ctx: Ch
     const D = rollDefaults(site);
     return set(m[2] === 'genres' ? { [K.genres]: defStored(m[3], genresText(D.genres), genresNorm) } : { [K.tiers]: defStored(m[3], tiersText(D.tiers), tiersNorm) });
   }
-  if (action === 'ms-roll-reset') return set(Object.fromEntries(Object.values(rollKeys(value === 'bm' ? 'bm' : 'cos')).map((k) => [k, ''])));
+  if (action === 'ms-roll-reset') {
+    // 되돌릴 수 없으니 한 번 더 눌러야 한다 (상황판 휴지통과 같게, 전수점검 눌러2-보통-38)
+    const site = value === 'bm' ? 'bm' : 'cos';
+    if (rollResetArm !== site) {
+      rollResetArm = site;
+      env.render();
+      return true;
+    }
+    rollResetArm = '';
+    // 되돌린 것을 알린다 (말없이 칸만 당겨졌다)
+    settingsUi.info = '뽑기 설정을 기본값으로 되돌렸어요.';
+    return set(Object.fromEntries(Object.values(rollKeys(value === 'bm' ? 'bm' : 'cos')).map((k) => [k, ''])));
+  }
   if (action === 'ms-fx') {
     const m = /^(\w+):(name|pct|price|was|desc|effect|truth)=([\s\S]*)$/.exec(value ?? '');
     if (!m) return true;

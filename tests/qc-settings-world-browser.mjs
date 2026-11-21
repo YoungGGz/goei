@@ -45,8 +45,11 @@ for (const vp of vps) {
     const pickVisible = await page.evaluate(() => { const l = document.querySelector('.gw .gw-list-pick'); return !!l && getComputedStyle(l).display !== 'none'; });
     assert.equal(listVisible, !narrow, `${kind} ${vp}: 목록 ${narrow ? '숨김' : '보임'}`);
     assert.equal(pickVisible, narrow, `${kind} ${vp}: 드롭다운 ${narrow ? '보임' : '숨김'}`);
-    const opts = await page.locator('.gw .gw-list-pick option').count();
+    // 고른 것이 없을 때 맨 위 「…를 고르세요」 안내 줄(value="", disabled)은 항목이 아니다 (전수점검 눌러-중대-21, f1e926c)
+    const opts = await page.locator('.gw .gw-list-pick option:not([value=""])').count();
     assert.equal(opts, n, `${kind}: 드롭다운 항목 수`);
+    const ph = await page.locator('.gw .gw-list-pick option[value=""]').count();
+    assert.ok(ph <= 1, `${kind}: 안내 줄은 많아야 하나`);
     const a = await auditDom(page, '.gw');
     assert.deepEqual(a.missing, [], `${kind} ${vp}: 이름 없는 단추`);
     if (phone) assert.deepEqual(a.overflow, [], `${kind} ${vp}: 가로 넘침`);

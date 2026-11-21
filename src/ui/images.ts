@@ -8,11 +8,14 @@ import type { LoreEntry } from '../core/types';
 import type { CharacterSnapshot } from '../host/risu';
 
 const urls = new Map<string, string | null | 'loading'>();
+/** forgetImages 마다 하나씩 오른다. 그 전에 읽기 시작한 옛 사진이 늦게 끝나도 새 칸에 넣지 않는다 */
+let era = 0;
 let redraw: () => void = () => {};
 let queued = false;
 
 /** 카드 사진을 바꾼 뒤: 읽어 둔 이미지를 잊고 다시 읽는다 */
 export function forgetImages(): void {
+  era++;
   urls.clear();
   schedule();
 }
@@ -76,8 +79,10 @@ export function imageUrl(char: CharacterSnapshot, pic: string | undefined): stri
   if (hit === undefined) {
     urls.set(key, 'loading');
     const { name, crop, tall } = splitPic(pic);
+    const mine = era;
     void assetUrl(char, name).then(async (raw) => {
       const url = raw ? await shrink(raw, crop, tall) : null;
+      if (mine !== era) return;
       urls.set(key, url);
       if (url) schedule();
     });

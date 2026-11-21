@@ -53,6 +53,8 @@ function morphNode(a: Node, b: Node): void {
   }
   const ea = a as Element;
   const eb = b as Element;
+  // 누른 단추가 사라지고 그 자리에 다른 단추(다음 칩 등)가 들어오면, 같은 요소를 다시 쓰느라 포커스 테두리가 새 단추로 옮겨 가 그것을 고른 것처럼 보였다 (전수점검 눌러2-보통-29)
+  if (document.activeElement === ea && ea.tagName === 'BUTTON' && (ea.getAttribute('data-action') !== eb.getAttribute('data-action') || ea.getAttribute('data-value') !== eb.getAttribute('data-value'))) (ea as HTMLElement).blur();
   syncAttrs(ea, eb);
   syncForm(ea, eb);
   if (KEEP.some((q) => ea.matches(q))) return;

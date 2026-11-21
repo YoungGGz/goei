@@ -84,7 +84,7 @@ export function mallUnseen(vars: Record<string, unknown> | undefined, site: Mall
 export const mallTurnRefresh = (chat: Chat, site: MallSite): boolean => mallSettings(chat.scriptstate, site).on && mallSettings(chat.scriptstate, site).auto === 'turn' && readMall(chat.scriptstate, site).loaded;
 
 /** 우주몰 입금 계좌 (사이트 글) */
-export const COS_ACCOUNT = '농협 352-1849-2706-13 (예금주 : 어서오세요)';
+export const COS_ACCOUNT = '농협 352-1849-2706-13 (예금주 : 우주인)'; // 11-08 사용자: 「예금주 : 우주인」 (전수점검 눌러-보통-15)
 
 // ── 우주몰 진열 배정 (구버전 Lua cosBuildRefreshPrompt 방식, 11-09 사용자: 새로고침해도 같은 물건) ──
 // 칸마다 장르(겹치지 않게 섞음)×값 등급(₩구간)을 코드가 굴려 요청에 박는다. 같은 입력이 반복돼도 모델이 같은 진열을 내지 못하게.

@@ -113,3 +113,13 @@ export function migrateRoster(d: DirectoryData): DirectoryData {
   d.roster_v = ROSTER_V;
   return d;
 }
+
+/** 옛 「Phone tabs」 로어북(원본 카드)의 T04 탭 이름 「중립」「다른 세력」은 시작 화면 묶음 이름 「이면의 주민들」로 읽는다 (11-06 사용자 이름 확정, 전수점검 사소-45·눌러2-보통-12).
+ *  읽은 사본만 고친다. 사용자가 다른 이름으로 고친 탭은 그대로 */
+export function renameNeutralTab(tabs: unknown): void {
+  if (!Array.isArray(tabs)) return;
+  for (const t of tabs) {
+    const row = rec(t);
+    if (row?.id === 'T04' && NEUTRAL_GROUP_OLD.includes(s(row.name))) row.name = NEUTRAL_GROUP;
+  }
+}

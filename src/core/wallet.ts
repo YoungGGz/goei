@@ -122,7 +122,6 @@ export const WALLET_CAP_VAR = '$st_wallet_cap';
 export const WALLET_CAP_DEFAULT = 400;
 export const WALLET_CAP_MIN = 100;
 export const WALLET_CAP_MAX = 2000;
-export const WALLET_CAP_STEP = 100;
 export const walletCapOf = (vars: Record<string, unknown> | undefined | null): number => {
   const raw = vars?.[WALLET_CAP_VAR];
   if (raw === undefined || raw === null || raw === '') return WALLET_CAP_DEFAULT;
@@ -249,20 +248,29 @@ export function formatDelta(n: number): string {
 export function parseWon(text: string): number | null {
   const t = String(text ?? '').replace(/\s+/g, '');
   if (!t) return null;
-  const sign = /^[-−]/.test(t) ? -1 : 1;
-  const body = t.replace(/^[-−+]/, '').replace(/^₩/, '').replace(/(원|won|KRW)$/i, '');
+  // 부호는 ₩ 앞·뒤 어느 쪽이든 (「−₩5,000」「₩-5,000」, 전수점검 사소-30)
+  const u = t.replace(/^([-−+]?)₩/, '$1');
+  const sign = /^[-−]/.test(u) ? -1 : 1;
+  const body = u.replace(/^[-−+]/, '').replace(/(원|won|KRW)$/i, '');
   if (/^\d[\d,]*$/.test(body)) {
     const n = Number(body.replace(/,/g, ''));
     return Number.isSafeInteger(n) ? sign * n : null;
   }
-  // 한국어 단위: 억·만·천·백
-  const m = /^(?:(\d+(?:\.\d+)?)억)?(?:(\d+(?:\.\d+)?)만)?(?:(\d+)천)?(?:(\d+)백)?(\d+)?$/.exec(body.replace(/,/g, ''));
+  // 한국어 단위: 억·만·천·백. 단위 앞 숫자가 없으면 1 (「만원」「천원」, 전수점검 사소-30)
+  const m = /^(?:(\d+(?:\.\d+)?)?(억))?(?:(\d+(?:\.\d+)?)?(만))?(?:(\d+)?(천))?(?:(\d+)?(백))?(\d+)?$/.exec(body.replace(/,/g, ''));
   if (!m || m.slice(1).every((x) => x === undefined)) return null;
-  const n = Math.round((Number(m[1] ?? 0) * 1e8) + (Number(m[2] ?? 0) * 1e4) + Number(m[3] ?? 0) * 1000 + Number(m[4] ?? 0) * 100 + Number(m[5] ?? 0));
+  const unit = (num: string | undefined, mark: string | undefined, mul: number) => (mark ? Number(num ?? 1) * mul : 0);
+  const n = Math.round(unit(m[1], m[2], 1e8) + unit(m[3], m[4], 1e4) + unit(m[5], m[6], 1000) + unit(m[7], m[8], 100) + Number(m[9] ?? 0));
   return Number.isSafeInteger(n) && n > 0 ? sign * n : null;
 }
 
 /** 글에 금액이 적혀 있나 (갱신기 거래 검사: 인용에 숫자 금액이 있어야) */
 export function mentionsAmount(text: string): boolean {
   return /(₩\s*\d|\d[\d,]*\s*(?:원|won|KRW)|\d+\s*(?:억|만|천)\s*(?:원)?)/i.test(text);
+}
+
+/** 프로그램이 이미 장부에 적은 거래(상점·쇼핑몰·홈쇼핑·필드) 가운데 이 응답들에 딸린 것. 갱신기가 본문의 같은 거래를 또 적지 않게 자료로 넘긴다 (전수점검 중대-14) */
+export function recordedPaid(w: Wallet, keys: string[]): { amount: number; memo: string }[] {
+  const set = new Set(keys.filter(Boolean));
+  return w.log.filter((e) => (e.src === 'store' || e.src === 'field') && set.has(e.anchor)).map((e) => ({ amount: e.amount, memo: e.memo }));
 }

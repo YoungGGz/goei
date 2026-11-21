@@ -1,6 +1,7 @@
 // 「고급 설정」 접는 칸 (v0.16.27, 사용자 설계): 각 기능 설정 맨 아래, 기본은 닫힘. 손대지 않아도 원본 기본값으로 돈다.
 // 바꾼 항목은 이름 앞 점과 되돌리기 버튼으로 보이고, 닫힌 칸 제목에 바꾼 개수가 뜬다.
-import { groupStep, numSet, setRow, setSeg, stepSize } from './setrow';
+import { stepOf } from '../core/stepval';
+import { groupStep, numSet, setRow, setSeg, stepSize, numTxt, numType } from './setrow';
 import { ADV, advChanged, advItem, advValue, advVar, type AdvFeature, type AdvItem } from '../core/advanced';
 import { ACTIVE_BOOKS_VAR, activeBooks, bookNames, toggleActiveBook, type RefSource } from '../core/refs';
 import { getPrefs } from '../core/settings';
@@ -26,16 +27,16 @@ function control(f: AdvFeature, item: AdvItem, cur: string): string {
       .join('')}</div>`;
   }
   // 숫자: −/+ 단추(사용자 2026-10-27, 상황판 인원 칸과 같은 모양) + 가운데 숫자는 직접 쳐도 된다.
-  // 한 번에 움직이는 폭: 토큰 상한처럼 큰 수(상한 1만 이상)는 500, 나머지는 1. 0이 「공통」「제한 없음」 같은 뜻이면 숫자 대신 그 말
+  // 한 번에 움직이는 폭: 토큰 상한처럼 큰 수(상한 1만 이상)는 100, 나머지는 1. 0이 「공통」「제한 없음」 같은 뜻이면 숫자 대신 그 말
   const min = item.min ?? 0;
   const max = item.max ?? Number.MAX_SAFE_INTEGER;
-  const step = max >= 10000 ? 500 : 1;
+  const step = stepOf(max);
   const n = Math.min(max, Math.max(min, Number(cur) || 0));
   const zero = n === 0 && item.zero;
   const down = Math.max(min, n - step);
   const up = Math.min(max, n + step);
   return `<div class="st-step adv-step${stepSize(max === Number.MAX_SAFE_INTEGER ? 9999999 : max, item.unit ?? '', item.zero ?? '')}"><button class="gx-step" data-action="adv-set" data-value="${id}=${down}" ${n <= min ? 'disabled' : ''} aria-label="${esc(item.label)} 줄이기">−</button>
-    <input class="adv-val" type="number" inputmode="numeric" min="${min}" max="${item.max ?? ''}" step="${step}" data-change="adv-set" data-key="${id}" value="${zero ? '' : n}"${item.zero ? ` placeholder="${esc(item.zero)}"` : ''} aria-label="${esc(item.label)}">${item.unit ? `<span>${esc(item.unit)}</span>` : ''}
+    <input class="adv-val" ${numType(max)} min="${min}" max="${item.max ?? ''}" step="${step}" data-change="adv-set" data-key="${id}" value="${zero ? '' : numTxt(n, max)}"${item.zero ? ` placeholder="${esc(item.zero)}"` : ''} aria-label="${esc(item.label)}">${item.unit && !zero ? `<span>${esc(item.unit)}</span>` : ''}
     <button class="gx-step" data-action="adv-set" data-value="${id}=${up}" ${n >= max ? 'disabled' : ''} aria-label="${esc(item.label)} 늘리기">+</button></div>`;
 }
 
@@ -181,7 +182,19 @@ export async function handleAdvanced(action: string, value: string | undefined, 
     const own = fn ? fnSet(fn[1] as FnFeature, fn[2], fn[3]) : null;
     const hit = fn ? null : parse(v);
     if (own) vars = { [own[0]]: own[1] };
-    else if (hit) vars = { [advVar(hit[0], hit[1])]: hit[2] };
+    else if (hit) {
+      vars = { [advVar(hit[0], hit[1])]: hit[2] };
+      // 최소·최대 짝(「…_min」과 「…」): 최소가 최대를 넘으면 상대도 같이 맞춘다 (게시글·댓글 수 칸과 같게)
+      const [f, item, val] = hit;
+      const mate = item.key.endsWith('_min') ? advItem(f, item.key.slice(0, -4)) : advItem(f, `${item.key}_min`);
+      // 기본값과 같아 비운 값('')도 기본값으로 읽어 짝을 맞추고, 상대에 적는 값도 상대 기본값과 같으면 비운다
+      if (item.type === 'num' && mate?.type === 'num') {
+        const state = scope === 'defaults' ? getPrefs().vars : ctx.chat.scriptstate;
+        const other = Number(advValue(state as never, f, mate.key));
+        const n = Number(val === '' ? item.def : val);
+        if (item.key.endsWith('_min') ? n > other : n < other) vars[advVar(f, mate)] = String(n) === String(mate.def) ? blank(mate) : String(n);
+      }
+    }
   } else if (action === 'adv-books') {
     booksUi.open = !booksUi.open;
     booksUi.q = '';

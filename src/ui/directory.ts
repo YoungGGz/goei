@@ -1,5 +1,7 @@
 // 설정 → 「카드 명부」: 로어북 폴더에서 모은 괴이·미스틱 사이트·요원의 세부값 편집.
 // 고친 값은 카드 로어북 「Directory」에 저장되어 카드와 함께 공유되고, 이 카드의 모든 채팅에 바로 적용된다.
+import { scrollInside } from './panels';
+import { askPopup } from './editor/askpop';
 import {
   agentGroup, assignOrg, directoryData, moveAgent, type Directory, factionDisplayNames, orgAffiliation, orgOf, type OrgRow, phoneTabs, readDirectory, type AgentRow,
   type BaseRow, type PlaceRow, withDirectory, agentGender, loreGender, type AppendixRow,
@@ -15,6 +17,7 @@ import { CUSTOM_FM, agentScene, factionScenes, nextCustomFm } from '../core/scen
 import { updateCharacterLore, updateChat, type ChatContext } from '../host/risu';
 import { imageUrl, picAvatar } from './images';
 import { ICONS } from './icons';
+import { switchHtml } from './controls';
 import { stUi } from './editor/start';
 import { parseStartItems, START_ITEM_COLUMNS, startItemsText } from '../core/startitems';
 import { itemWeight } from '../core/itemtraits';
@@ -278,8 +281,8 @@ export function photoBlock(key: string, ctx: ChatContext): string {
       <button class="gx-mini" data-action="dir-photo-pick" data-value="${esc(`${slot}>${key}`)}">${picking ? '닫기' : '고르기'}</button>
     </div>`;
   };
-  const mainWhy = p.photo ? '직접 고름' : main ? `자동: ${esc(main)}` : '「영문명_default」·「영문명」 이미지가 없어요';
-  const faceWhy = p.face ? '직접 고름' : cut ? '대표 사진에서 잘라요' : face ? `자동: ${esc(splitPic(face).name)}` : '「영문명」 이미지가 없어요';
+  const mainWhy = p.photo ? '직접 고름' : main ? `자동: 「${esc(main)}」 이미지` : '「영문명_default」·「영문명」 이미지가 없어요';
+  const faceWhy = p.face ? '직접 고름' : cut ? '대표 사진에서 잘라요' : face ? `자동: 「${esc(splitPic(face).name)}」 이미지` : '「영문명」 이미지가 없어요';
   const cropping = cut && dirUi.crop === key;
   const cropBtn = cut ? `<button class="gx-mini" data-action="dir-crop" data-value="${esc(key)}">${cropping ? '완료' : '틀 맞추기'}</button>` : '';
   const picking = dirUi.pick ? pickOf(dirUi.pick) : null;
@@ -362,10 +365,8 @@ export function directoryPhotoList(ctx: ChatContext): string {
 export function placePanel(p: PlaceRow, ctx: ChatContext): string {
   const k = (f: string) => `${f}|${p.lore}`;
   return `<div class="dir-panel">
-    <div class="dir-line"><span>무작위 발생 후보</span><div class="gx-segs gx-segs-sm">
-      <button class="gx-seg${p.preset ? ' on' : ''}" data-action="dir-set" data-value="${esc(`preset|1|${p.lore}`)}">ON</button>
-      <button class="gx-seg${!p.preset ? ' on' : ''}" data-action="dir-set" data-value="${esc(`preset|0|${p.lore}`)}">OFF</button></div></div>
-    <p class="gx-muted">OFF여도 직접 고르거나 대화에 나오면 상황판에 기록돼요.</p>
+    <div class="dir-line"><span>무작위 발생 후보</span>${switchHtml({ action: 'dir-set', value: `preset|${p.preset ? 0 : 1}|${p.lore}`, on: !!p.preset })}</div>
+    <p class="gx-muted">꺼져 있어도 직접 고르거나 대화에 나오면 상황판에 기록돼요.</p>
     ${input(k('label'), p.label, '표시 이름', '상황판과 지도에 보이는 이름')}
     ${input(k('english'), p.english, '영문명', '영어 응답에서도 이 이름을 알아봐요')}
     ${input(k('aliases'), p.aliases.join(', '), '별칭', '쉼표로 나눠 적어요')}
@@ -465,7 +466,7 @@ export function orgPanel(o: OrgRow, ctx: ChatContext, d: Directory): string {
     <div class="dir-line"><span>거점</span><div class="dir-chips">${d.bases
       .filter((b) => b.org === o.name)
       .map((b) => chip('dir-base-goto', b.name, b.name, false))
-      .join('')}<button class="gx-chip" data-action="dir-base-new" data-value="${esc(o.name)}">＋ 거점 추가</button></div></div>
+      .join('')}<button class="gx-mini" data-action="dir-base-new" data-value="${esc(o.name)}">${ICONS.plus}거점 추가</button></div></div>
   </div>`;
 }
 
@@ -528,8 +529,8 @@ function basePanel(b: BaseRow, ctx: ChatContext, d: Directory): string {
     ${input(k('aliases'), b.aliases.join(', '), '별칭', '쉼표로 나눠 적어요')}
     <div class="dir-rename"><label class="dir-in"><span>거점 이름</span><input name="dir-base-name" value="${esc(b.name)}" autocomplete="off" data-enter="dir-base-rename"></label>
       <button class="gx-mini" data-action="dir-base-rename" data-take="dir-base-name">이름 바꾸기</button>
-      ${dirUi.confirmDel === `base|${b.name}` ? '' : `<button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`ask|${b.name}`)}">지우기</button>`}</div>
-    ${dirUi.confirmDel === `base|${b.name}` ? `<div class="gx-hint">「${esc(b.name)}」 거점을 지울까요? <button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`yes|${b.name}`)}">지우기</button><button class="gx-mini" data-action="dir-base-del" data-value="${esc(`no|${b.name}`)}">취소</button></div>` : ''}
+      ${dirUi.confirmDel === `base|${b.name}` && !inEditor ? '' : `<button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`ask|${b.name}`)}">${ICONS.trash}지우기</button>`}</div>
+    ${dirUi.confirmDel === `base|${b.name}` && !inEditor ? `<div class="gx-hint">「${esc(b.name)}」 거점을 지울까요? <button class="gx-mini danger" data-action="dir-base-del" data-value="${esc(`yes|${b.name}`)}">지우기</button><button class="gx-mini" data-action="dir-base-del" data-value="${esc(`no|${b.name}`)}">취소</button></div>` : ''}
   </div>`;
 }
 
@@ -570,7 +571,7 @@ function placeRow(p: PlaceRow, ctx: ChatContext, src = ''): string {
 
 function agentRow(a: AgentRow, ctx: ChatContext, d: Directory, names: Record<string, string>, order?: { first: boolean; last: boolean }): string {
   const open = dirUi.open === a.lore;
-  const sub = [a.affiliation ? orgName(d, names, a.affiliation) : '', a.rank, a.department].filter(Boolean).join(' · ');
+  const sub = [a.affiliation ? orgName(d, names, a.affiliation) : '', a.department, a.rank].filter(Boolean).join(' · ');
   // 순서 바꾸기 (검색 중에는 없음): PC는 손잡이를 끌고, 모바일은 ▲▼. 같은 조직 안에서만 움직인다
   const move = order
     ? `<span class="dir-move"><span class="dir-grip" data-drag-agent="${esc(a.lore)}" title="끌어서 순서 바꾸기" aria-hidden="true">${ICONS.grip}</span>`
@@ -631,7 +632,7 @@ export function appendixPanel(r: AppendixRow, ctx: ChatContext, d: Directory): s
     </div></div>
     <p class="gx-muted">호출 단어: ${keys.length ? esc(keys.join(', ')) : '없음'} · 세계 편집기의 부록 기록에서 고쳐요.</p>
     ${input(k('places'), r.places.join(', '), '위치', '상태창의 「위치」 칸에 이 말이 들어 있으면 보내요(주인공이 그 장소에 있을 때). 쉼표로 나눠 적어요')}
-    ${bases.length ? `<div class="dir-line"><span>거점에서 넣기</span><small>등록된 거점(본부·지사 같은 장소) 이름을 위 「위치」 칸에 바로 넣는 단추예요</small><div class="dir-chips">${bases.slice(0, 24).map((n) => chip('dir-app-place', `${n}|${r.lore}`, `＋ ${n}`, false)).join('')}</div></div>` : ''}
+    ${bases.length ? `<div class="dir-line"><span>거점에서 넣기</span><small>등록된 거점(본부·지사 같은 장소) 이름을 위 「위치」 칸에 바로 넣는 버튼이에요</small><div class="dir-chips">${bases.slice(0, 24).map((n) => chip('dir-app-place', `${n}|${r.lore}`, `＋ ${n}`, false)).join('')}</div></div>` : ''}
     ${input(k('agents'), r.agents.join(', '), '동행·투입 요원', '적은 요원이 주인공과 동행 중이거나(상태창 동행 칸) 상황판에서 작전에 투입돼 있으면 보내요. 쉼표로 나눠 적어요')}
     <div class="dir-line"><span>보내지 않는 조건</span><div class="dir-chips">${toggle('needParent', '본 항목을 보내지 않는 요청에는 이 부록도 빼기', r.needParent)}</div></div>
     ${area(k('unlock'), r.unlock, '해금 조건', '비우면 위 조건만 맞으면 바로 보내요. 적으면 해금 전에는 본문 대신 이 조건 한 줄만 모델에게 알리고, 이야기에서 조건이 이루어지면 모델이 응답 끝에 해금 표시를 남겨요. 그 다음 요청부터 본문이 들어가요')}
@@ -640,8 +641,11 @@ export function appendixPanel(r: AppendixRow, ctx: ChatContext, d: Directory): s
   </div>`;
 }
 
+/** 부록 검색: 부록 탭과 통합 검색이 같은 칸(이름·본 항목·위치·요원)을 본다 (전수점검 보통-21: 통합 검색은 위치·요원을 안 봤다) */
+const appendixHit = (r: AppendixRow, q: string): boolean => !q || [r.lore, r.parent, ...r.places, ...r.agents].some((t) => t.toLowerCase().includes(q));
+
 function appendixList(ctx: ChatContext, d: Directory, q: string): string {
-  const rows = d.appendices.filter((r) => !q || [r.lore, r.parent, ...r.places, ...r.agents].some((t) => t.toLowerCase().includes(q)));
+  const rows = d.appendices.filter((r) => appendixHit(r, q));
   if (!rows.length) {
     return q ? '<p class="gx-muted dir-empty">맞는 부록이 없어요.</p>'
       : '<p class="gx-muted dir-empty">부록이 없어요. 로어북에 <code>📎부록</code> 폴더를 만들고 「본 항목 이름 · 설명」으로 항목을 넣으면 여기 들어와요.</p>';
@@ -664,7 +668,7 @@ function searchAll(ctx: ChatContext, d: Directory, q: string, names: Record<stri
     ['agent', '요원', d.agents.filter((r) => matches(r, q)).map((r) => jump('agent', agentRow(r, ctx, d, names)))],
     ['org', '조직', d.orgs.filter((o) => [o.name, o.spec.english].some((t) => t && t.toLowerCase().includes(q))).map((o) => jump('org', orgRow(o, ctx, d, names)))],
     ['base', '거점', d.bases.filter((b) => [b.name, b.label, b.english, b.org, b.gu, ...b.aliases].some((t) => t && t.toLowerCase().includes(q))).map((b) => jump('base', baseRow(b, ctx, d)))],
-    ['appendix', '부록', d.appendices.filter((r) => [r.lore, r.parent].some((t) => t.toLowerCase().includes(q))).map((r) => jump('appendix', appendixRow(r, ctx, d)))],
+    ['appendix', '부록', d.appendices.filter((r) => appendixHit(r, q)).map((r) => jump('appendix', appendixRow(r, ctx, d)))],
   ];
   const hit = groups.filter(([, , rows]) => rows.length);
   if (!hit.length) return '<p class="gx-muted dir-empty">맞는 항목이 없어요.</p>';
@@ -728,7 +732,18 @@ export function directoryBar(): string {
   return barButtons(!dirty() || dirUi.busy);
 }
 
+/** 설정 창 안에서 그리는 중인지: 설정 창에서는 거점 지우기 확인을 다른 확인처럼 가운데 팝업으로 (directoryConfirmPopup, 전수점검 눌러-보통-28) */
+let inEditor = false;
+/** 거점 지우기 확인 팝업 (설정 창 「거점」 화면) */
+export function directoryConfirmPopup(): string {
+  const at = dirUi.confirmDel.indexOf('|');
+  if (dirUi.confirmDel.slice(0, at) !== 'base') return '';
+  const name = dirUi.confirmDel.slice(at + 1);
+  return askPopup(`「${name}」 거점을 지울까요?`, { action: 'dir-base-del', value: `yes|${name}` }, { action: 'dir-base-del', value: `no|${name}` });
+}
+
 export function directoryView(ctx: ChatContext, scoped = false): string {
+  inEditor = scoped;
   const d = draftOf(ctx);
   const kinds: [Kind, string, number][] = [
     ['anomaly', '괴이', d.anomalies.length],
@@ -774,7 +789,7 @@ function addPanel(ctx: ChatContext): string {
   if (dirUi.kind === 'org' || dirUi.kind === 'base') {
     const [name, act, hint] = dirUi.kind === 'org' ? ['dir-org-new', 'dir-org-add', '새 조직 이름'] : ['dir-base-new', 'dir-base-new', '새 거점 이름'];
     return `<div class="dir-ext"><div class="dir-add"><input name="${name}" placeholder="${hint}" aria-label="${hint}" autocomplete="off" data-enter="${act}">
-      <button class="gx-mini" data-action="${act}" data-take="${name}">추가</button></div></div>`;
+      <button class="gx-mini" data-action="${act}" data-take="${name}">${ICONS.plus}추가</button></div></div>`;
   }
   return `<div class="dir-ext"><input class="gx-search" data-input="dir-ext-q" value="${esc(dirUi.addQ)}" placeholder="다른 폴더의 로어북 이름·폴더 검색" aria-label="후보로 넣을 로어북 검색" autocomplete="off">
     <div class="dir-ext-list">${directoryExtList(ctx)}</div></div>`;
@@ -940,6 +955,21 @@ function setPlayable(d: Directory, o: OrgRow, on: boolean): void {
   }
   dirUi.notice = '';
 }
+
+/** 새로 넣은 시작 칸은 지금 보이는 순서의 맨 끝에: 순서를 정한 적이 없으면 플레이 조직이 묶음보다 앞에 정렬돼 새 카드가 중간에 끼었다 (전수점검 눌러2-보통-29) */
+function startToEnd(d: Directory, code: string): void {
+  d.startOrder = [...startSlots(d).map((x) => x.code).filter((c) => c !== code), code];
+}
+
+/** 시작 화면에서 펼친 칸의 편집 칸(목록 아래)으로 화면을 옮긴다. 추가·켜기로 펼쳐도 같이 (반응이 없어 보였다, 전수점검 눌러-보통-45) */
+// 누른 칩이 사라지면 다음 칩이 초점 테두리를 물려받아 고른 것처럼 보였다 → 초점을 놓는다 (눌러2-보통-29)
+const showSel = (): void => {
+  requestAnimationFrame(() => {
+    const a = document.activeElement;
+    if (a instanceof HTMLElement && a.closest('.gw')) a.blur();
+    scrollInside(document.querySelector<HTMLElement>('.gw .st-sel'), 'start', true);
+  });
+};
 
 export async function handleDirectory(action: string, value: string | undefined, ctx: ChatContext, env: DirectoryEnv): Promise<boolean> {
   if (!action.startsWith('dir-')) return false;
@@ -1160,6 +1190,8 @@ export async function handleDirectory(action: string, value: string | undefined,
         dirUi.notice = `「${name}」 거점이 이미 있어요.`;
         break;
       }
+      // 「거점에서 넣기」로 부록 위치에 넣어 둔 옛 이름도 같이 바꾼다 (전수점검 보통-22: 옛 이름이 남아 위치 조건이 조용히 안 먹었다)
+      for (const r of d.appendices) if (r.places.includes(b.name)) r.places = [...new Set(r.places.map((p) => (p === b.name ? name : p)))];
       b.name = name;
       dirUi.open = name;
       dirUi.notice = '';
@@ -1185,7 +1217,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       stUi.sel = stUi.sel === v ? '' : v;
       stUi.confirm = '';
       // 펼친 칸의 상세는 목록 아래에 그려져서, 열면 그 자리로 내려간다 (안 내려가면 눌러도 바뀐 게 안 보인다)
-      if (stUi.sel) requestAnimationFrame(() => document.querySelector('.gw .st-sel')?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+      if (stUi.sel) showSel();
       break;
     case 'dir-start-show': {
       const [on, code] = v.split('|');
@@ -1232,8 +1264,10 @@ export async function handleDirectory(action: string, value: string | undefined,
       for (let n = 2; d.startGroups.some((g) => g.name === name) || d.orgs.some((o) => o.name === name); n++) name = `새 묶음 ${n}`;
       d.startGroups.push({ name, code, blurb: '', english: '', hidden: false });
       d.usedCodes = [...d.usedCodes, code];
+      startToEnd(d, code);
       stUi.sel = code;
       dirUi.done = '';
+      showSel();
       break;
     }
     case 'dir-group-del': {
@@ -1303,7 +1337,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       else if (!o.faction) {
         setPlayable(d, o, arg === '1');
         // 시작 화면 페이지에서 켰으면 그 칸을 바로 펼친다
-        if (arg === '1' && o.spec.playable && o.spec.code) stUi.sel = o.spec.code;
+        if (arg === '1' && o.spec.playable && o.spec.code) { startToEnd(d, o.spec.code); stUi.sel = o.spec.code; showSel(); }
         else if (arg === '0' && stUi.sel === o.spec.code) stUi.sel = '';
       }
       dirUi.done = '';

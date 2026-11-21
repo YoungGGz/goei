@@ -1,5 +1,6 @@
 // 「위키」 탭: 목록·검색·작성 화면·문서 보기. 생성은 "위키 작성 시작"·"새로고침"을 눌렀을 때만 한 번 부른다.
 // 생성은 창을 닫아도 계속되고, 끝나면 원래 채팅의 로어북에 저장한다.
+import { scrollInside } from './panels';
 import { defGroups, type Wire } from './setrow';
 import { WIKI_SET } from '../core/setdef/wiki';
 import { turnKeyAt } from '../core/shop';
@@ -74,8 +75,10 @@ export const wiki: WikiState = {
   view: 'home', title: '', query: '', homeQuery: '', history: [], inherited: [], previousTitle: null, direct: false, confirmDelete: null, failure: null, notice: '', info: '', listOpen: false, tab: 'all', filter: '', newTitle: '', docReq: '', rewrite: null, rewritePrev: true,
 };
 
-export function resetWiki() {
+/** newChat: 다른 채팅으로 옮겼을 때. 앞 채팅의 「최근 실패 원문」·알림도 비운다 (전수점검 사소-59) */
+export function resetWiki(newChat = false) {
   Object.assign(wiki, { view: 'home', title: '', query: '', homeQuery: '', history: [], inherited: [], previousTitle: null, direct: false, confirmDelete: null, notice: '', newTitle: '', docReq: '', rewrite: null });
+  if (newChat) Object.assign(wiki, { failure: null, info: '' });
 }
 
 interface Job {
@@ -102,10 +105,17 @@ function registry(ctx: ChatContext): Registry {
   return regCache.reg;
 }
 const source = (ctx: ChatContext): RefSource => playerSource({ char: ctx.char as RefSource['char'], chat: ctx.chat, persona: personaText() } as RefSource);
-function canon(ctx: ChatContext) {
+/** byEntry: 명부 항목 문서로도 잇는다 (entries 자신이 부를 때는 false: 서로 부르지 않게) */
+function canon(ctx: ChatContext, byEntry = true) {
   const r = registry(ctx);
   const src = source(ctx);
-  return (t: string) => ownDoc(ctx, t) ?? canonicalTitle(r, src, t).title;
+  return (t: string) => ownDoc(ctx, t) ?? (byEntry ? entryDoc(ctx, canonicalTitle(r, src, t).title) : canonicalTitle(r, src, t).title);
+}
+/** 정식 이름 문서가 없으면 그 이름을 가진 명부 항목의 문서 (조직 「발푸르기스」 → 기본 문서 「발푸르기스 협회」, 전수점검 보통-65) */
+function entryDoc(ctx: ChatContext, t: string): string {
+  if (!t || findDoc(ctx.chat, t, ctx.char.globalLore)) return t;
+  const e = entries(ctx).find((x) => x.title !== t && (x.name === t || x.terms.includes(t)) && findDoc(ctx.chat, x.title, ctx.char.globalLore));
+  return e?.title ?? t;
 }
 /** 그 제목 그대로 된 문서가 있으면 별칭보다 먼저 (거점 「백일몽 본사」는 조직 「백일몽」과 다른 문서, 2026-10-21 사용자) */
 function ownDoc(ctx: ChatContext, t: string): string | null {
@@ -155,7 +165,8 @@ function search(ctx: ChatContext, q: string): boolean {
   wiki.query = query;
   if (!query) return false;
   const own = ownDoc(ctx, query);
-  const c = own ? { title: own, known: true } : canonicalTitle(registry(ctx), source(ctx), query);
+  const found = own ? { title: own, known: true } : canonicalTitle(registry(ctx), source(ctx), query);
+  const c = { ...found, title: entryDoc(ctx, found.title) };
   if (findDoc(ctx.chat, c.title, ctx.char.globalLore)) return go('doc', c.title, query), true;
   if (c.known) return openTitle(ctx, c.title, 'direct'), true;
   // 여러 개가 걸리면 검색 화면에서 고르게. 하나도 없으면 「없어요 · 작성하기」 (바로 작성 화면으로 가지 않는다)
@@ -279,7 +290,8 @@ export async function autoWriteWiki(ctx: ChatContext, messageIndex: number, open
       return;
     }
     const old = findDoc(cur.chat, title, cur.char.globalLore);
-    await generate(cur, target, title, !!old && !old.base);
+    // 다시 쓸 때도 사용자가 적어 둔 「이 문서 지침」을 그대로 넘긴다 (빠지면 저장할 때 지워진다, 전수점검 보통-66)
+    await generate(cur, target, title, !!old && !old.base, old && !old.base ? old.meta?.docRequest ?? '' : '');
   } finally {
     if (target === quietEnv) wiki.notice = notice;
   }
@@ -344,7 +356,7 @@ let entryCache: { lore: unknown; stamp: number; viewer: string; list: Entry[] } 
 function entries(ctx: ChatContext): Entry[] {
   const viewer = String(ctx.chat.scriptstate?.['$st_faction'] ?? '');
   if (entryCache && entryCache.lore === ctx.char.globalLore && entryCache.stamp === moduleAssetStamp() && entryCache.viewer === viewer) return entryCache.list;
-  const c = canon(ctx);
+  const c = canon(ctx, false);
   const list: Entry[] = [];
   const dir = readDirectory(ctx.char.globalLore);
   // 괴이 폴더 밖에서 발생 후보로 들어온 요원·세력 로어북(흡혈귀·탐미주의 등)은 인물·조직 항목으로만 보인다
@@ -360,11 +372,12 @@ function entries(ctx: ChatContext): Entry[] {
   } catch {
     /* 목록 로어북이 없으면 거점만 뺀다 */
   }
-  for (const a of dir.agents) list.push({ cat: 'ag', name: a.name, title: c(a.lore || a.name), sub: [a.rank, a.department].filter(Boolean).join(' · ') || a.english, photo: mainPic(ctx.char, a), face: facePic(ctx.char, a, true), terms: [a.name, a.english, ...a.aliases] });
+  for (const a of dir.agents) list.push({ cat: 'ag', name: a.name, title: c(a.lore || a.name), sub: [a.department, a.rank].filter(Boolean).join(' · ') || a.english, photo: mainPic(ctx.char, a), face: facePic(ctx.char, a, true), terms: [a.name, a.english, ...a.aliases] });
   // 조직: 명부의 조직 전부 (플레이 세력이면 시작 화면 이름). 문서는 세력 폴더 로어북 이름 (발푸르기스 → 발푸르기스 협회)
   const lore = ctx.char.globalLore ?? [];
   const facs = factionList(lore);
   const hasLore = new Set(lore.map((e) => String(e.comment ?? '').trim()));
+  const docTitles = listDocs(ctx.chat, lore).map((d) => d.title);
   for (const o of dir.orgs) {
     const f = o.faction ? facs.find((x) => x.code === o.faction) : facs.find((x) => !x.builtin && x.affiliation === o.name);
     if (f?.hidden) continue;
@@ -372,7 +385,8 @@ function entries(ctx: ChatContext): Entry[] {
     if (!f && !hasLore.has(doc)) continue; // 요원 소속에만 있는 이름(미분류 등)
     const name = f?.name ?? o.name;
     // 문서 제목: 로어북 이름(이슬람 서울중앙성원)과 기본 문서 제목(이슬람)이 다를 수 있어 문서가 있는 쪽 (2026-10-21)
-    const title = [c(doc), c(o.name), c(name)].find((t) => findDoc(ctx.chat, t, lore)) ?? c(doc);
+    // 그래도 없으면 조직 이름 뒤에 말을 붙인 정식 이름 문서 (조직 「발푸르기스」 ↔ 문서 「발푸르기스 협회」, 11-20 사용자: 그림이 안 붙음)
+    const title = [c(doc), c(o.name), c(name)].find((t) => findDoc(ctx.chat, t, lore)) ?? docTitles.find((t) => [o.name, name].some((n) => n && t.startsWith(`${n} `))) ?? c(doc);
     list.push({ cat: 'org', name, title, sub: o.name !== name ? o.name : '', photo: mainPic(ctx.char, { ...o.spec, shared: o.shared }), face: facePic(ctx.char, { ...o.spec, shared: o.shared }), terms: [name, o.name, doc, o.spec.english ?? ''] });
   }
   // 같은 문서로 이어지는 항목은 하나만
@@ -534,6 +548,12 @@ export function wikiHomeResults(ctx: ChatContext): string {
   return q ? `<div class="wls">${searchRows(ctx, q)}</div>` : '';
 }
 
+/** 머리줄 검색칸 아래 결과: 서랍 검색처럼 글자마다 바뀐다 (11-20 사용자). 검색칸에 포커스가 있을 때만 보인다 (CSS) */
+export function wikiTopResults(ctx: ChatContext): string {
+  const q = wiki.query.trim();
+  return q ? `<div class="wls">${searchRows(ctx, q)}</div>` : '';
+}
+
 /** 서랍 목록: 검색칸에 글이 있으면 걸러서, 없으면 분류 탭 + 가나다 묶음 */
 export function wikiList(ctx: ChatContext): string {
   const q = wiki.filter.trim();
@@ -556,7 +576,7 @@ export function wikiList(ctx: ChatContext): string {
     return `<h4 data-ksec="${k}">${head}</h4>${rows.map((d) => linkRow(ctx, d.title, { dot: tab !== 'story' && !d.base })).join('')}`;
   }).join('');
   const index = keys.length > 1
-    ? `<div class="nw-kgrid" hidden><div class="nw-kgrid-in" role="group" aria-label="가나다 색인">${KEYS.map((k) => `<button type="button" data-k="${k}" ${keys.includes(k) ? '' : 'disabled'}>${k}</button>`).join('')}</div></div>`
+    ? `<div class="nw-kgrid" hidden><div class="nw-kgrid-in" role="group" aria-label="가나다 색인"><button type="button" class="nw-kx" aria-label="닫기" title="닫기">${ICONS.close}</button>${KEYS.map((k) => `<button type="button" data-k="${k}" ${keys.includes(k) ? '' : 'disabled'}>${k}</button>`).join('')}</div></div>`
     : '';
   return `${chips}<div class="wls">${groups}</div>${index}`;
 }
@@ -570,14 +590,13 @@ function docCat(ctx: ChatContext, d: WikiDoc): Exclude<Tab, 'all' | 'story'> {
 const inTab = (ctx: ChatContext, d: WikiDoc, t: Tab) => (t === 'all' ? true : t === 'story' ? !d.base : docCat(ctx, d) === t);
 
 /** 머리줄 (시안 WKTOP·WKMAIN): 로고, 최근 변경·임의 문서, 목록 단추, (대문은 임의 문서 단추) 검색칸 */
-function topBar(main: boolean): string {
+function topBar(): string {
   const open = wiki.listOpen;
   const wlb = `<button type="button" class="wlb wk-menu${open ? ' on' : ''}" data-action="wiki-list" aria-expanded="${open}" aria-label="${open ? '목록 접기' : '목록 펼치기'}" title="목록">${LIST_ICO}</button>`;
-  const nav = main
-    ? `<nav><button type="button" data-action="wiki-recent">${ni(CLOCK)}최근 변경</button></nav>`
-    : `<nav><button type="button" data-action="wiki-recent">${ni(CLOCK)}최근 변경</button><button type="button" data-action="wiki-random">${ni(SHUFFLE)}임의 문서</button></nav>`;
-  const rnd = main ? `<button type="button" class="rnd" data-action="wiki-random" title="임의 문서" aria-label="임의 문서"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#00a495" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SHUFFLE}</svg></button>` : '';
-  const sr = `<label class="sr"><input class="wk-in" type="search" name="wiki-q" data-input="wiki-query" data-enter="wiki-search" placeholder="${main ? '여기에서 검색' : '문서 제목 검색'}" value="${esc(wiki.query)}" aria-label="위키 검색" autocomplete="off"><button type="button" class="sg" data-action="wiki-search" data-take="wiki-q" aria-label="검색">${SRCH}</button></label>`;
+  // 머리 띠는 대문과 문서·다른 화면이 같은 모양 (사용자 11-08: 나머지 화면도 대문과 같은 모양)
+  const nav = `<nav><button type="button" data-action="wiki-recent">${ni(CLOCK)}최근 변경</button></nav>`;
+  const rnd = `<button type="button" class="rnd" data-action="wiki-random" title="임의 문서" aria-label="임의 문서"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#00a495" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${SHUFFLE}</svg></button>`;
+  const sr = `<label class="sr"><input class="wk-in" type="search" name="wiki-q" data-input="wiki-query" data-enter="wiki-search" placeholder="여기에서 검색" value="${esc(wiki.query)}" aria-label="위키 검색" autocomplete="off"><button type="button" class="sg" data-action="wiki-search" data-take="wiki-q" aria-label="검색">${SRCH}</button></label>`;
   return `<div class="top wk-top"><button type="button" class="lg wk-logo" data-action="wiki-home" aria-label="괴이위키 대문">${LOGO}괴이위키</button>${nav}${wlb}${rnd}${sr}</div>`;
 }
 
@@ -593,14 +612,16 @@ function todayDoc(ctx: ChatContext, docs: WikiDoc[]): { doc: WikiDoc; text: stri
 function homeView(ctx: ChatContext): string {
   const docs = sortedDocs(ctx);
   const pick = (t: string) => `<button type="button" class="wl" data-action="wiki-pick" data-value="${esc(t)}">${esc(shownName(ctx, t))}</button>`;
-  const links = (list: WikiDoc[], tab: Tab) => [...list.slice(0, 9).map((d) => pick(d.title)), `<button type="button" class="wl" data-action="wiki-browse" data-value="${tab}">[전체]</button>`].join(' · ');
+  // [전체]는 그 줄의 숫자에 든 분류 탭마다 (괴담·장소 = 괴이 + 특수, 전수점검 사소-56)
+  const all = (tabs: Tab[]) => tabs.map((t) => `<button type="button" class="wl" data-action="wiki-browse" data-value="${t}">[${tabs.length > 1 ? `${TABS.find(([x]) => x === t)?.[1]} ` : ''}전체]</button>`);
+  const links = (list: WikiDoc[], tabs: Tab[]) => [...list.slice(0, 9).map((d) => pick(d.title)), ...all(tabs.filter((t) => list.some((d) => docCat(ctx, d) === t)))].join(' · ');
   const places = docs.filter((d) => ['an', 'ms'].includes(docCat(ctx, d)));
   const people = docs.filter((d) => docCat(ctx, d) === 'ag');
   const today = todayDoc(ctx, docs);
   const rows = [
     today ? [IROW_ICO.doc, `오늘의 문서 · ${esc(shownName(ctx, today.doc.title))}`, `${esc(today.text)} <button type="button" class="wl" data-action="wiki-pick" data-value="${esc(today.doc.title)}">[더 보기]</button>`] : null,
-    places.length ? [IROW_ICO.pin, `괴담·장소 <small>${places.length}</small>`, links(places, 'an')] : null,
-    people.length ? [IROW_ICO.person, `인물 <small>${people.length}</small>`, links(people, 'ag')] : null,
+    places.length ? [IROW_ICO.pin, `괴담·장소 <small>${places.length}</small>`, links(places, ['an', 'ms'])] : null,
+    people.length ? [IROW_ICO.person, `인물 <small>${people.length}</small>`, links(people, ['ag'])] : null,
     [IROW_ICO.pen, '새 문서 요청', '찾는 문서가 없으면 <button type="button" class="wl" data-action="wiki-new">문서 작성 요청</button>을 남겨 주세요.'],
   ].filter((r): r is string[] => !!r);
   const story = docs.filter((d) => !d.base).sort((a, b) => (b.meta?.created ?? 0) - (a.meta?.created ?? 0));
@@ -776,13 +797,14 @@ export function wikiTab(ctx: ChatContext, env?: WikiEnv): string {
   const open = wiki.listOpen;
   const main = wiki.view === 'home';
   // 목록 서랍 (시안 wk_list): 머리줄 아래 설정한 쪽(기본 오른쪽)에서. 폰은 오른쪽 아래 「목록」 책갈피
+  // 판 머리에 닫기 (판 밖 어두운 띠를 눌러도 닫히지만 닫기라는 표시가 없었다)
   const drawer = `<aside class="wdr${open ? ' open' : ''}" aria-label="위키 목록"${open ? '' : ' inert'}>
-      <label class="wsr">${SRCH}<input type="search" name="wiki-filter" data-input="wiki-filter" placeholder="이름·제목 검색" value="${esc(wiki.filter)}" aria-label="이름·제목 검색" autocomplete="off"></label>
+      <div class="wdh"><label class="wsr">${SRCH}<input type="search" name="wiki-filter" data-input="wiki-filter" placeholder="이름·제목 검색" value="${esc(wiki.filter)}" aria-label="이름·제목 검색" autocomplete="off"></label><button type="button" class="wdx" data-action="wiki-list" data-value="close" aria-label="목록 접기" title="목록 접기">${ICONS.close}</button></div>
       <div class="wlist">${wikiList(ctx)}</div>${fail}</aside>`;
   const grab = `<button type="button" class="wgrab" data-action="wiki-list" data-value="open" aria-label="목록 펼치기">‹<span>목록</span></button>`;
   const scrim = open ? '<button type="button" class="wscrim" data-action="wiki-list" data-value="close" aria-label="목록 접기" tabindex="-1"></button>' : '';
   return `<main class="gx-body wk hasdr${main ? ' nm' : ''}${open ? ' dr-open' : ''}">
-    ${topBar(main)}
+    ${topBar()}<div class="wtres">${wikiTopResults(ctx)}</div>
     <div class="wsc">${status ? `<div class="wst nw-status">${status}</div>` : ''}${paneHtml(ctx)}</div>
     ${grab}${drawer}${scrim}
     ${note}
@@ -851,7 +873,7 @@ export function bindFootnotes(root: HTMLElement): void {
     hide();
     const li = doc.querySelector<HTMLElement>(`.nw-notes li[data-fn="${sup.dataset.fn}"]`);
     if (!li) return;
-    li.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    scrollInside(li, 'center', true); // 숨긴 틀까지 밀지 않게 (전수점검 눌러-중대-1)
     li.classList.remove('hit');
     void li.offsetWidth;
     li.classList.add('hit');
@@ -897,6 +919,10 @@ export function bindWikiSide(root: HTMLElement, act: (value: string) => void): v
     if (!grid) return;
     if (t.closest('[data-kpick]')) {
       grid.hidden = false;
+      return;
+    }
+    if (t.closest('.nw-kx')) {
+      grid.hidden = true;
       return;
     }
     const k = t.closest<HTMLElement>('.nw-kgrid [data-k]')?.dataset.k;
@@ -1013,6 +1039,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
       }
       wiki.history = [];
       wiki.homeQuery = '';
+      wiki.query = '';
       openTitle(ctx, v, 'search');
       // 고르면 목록을 접어 문서를 넓게
       if (wiki.view !== 'home') wiki.listOpen = false;
@@ -1024,6 +1051,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
     case 'wiki-write':
       if (!v.trim()) break;
       wiki.newTitle = '';
+      wiki.query = '';
       openTitle(ctx, v, 'direct');
       if (wiki.view === 'compose' || wiki.view === 'doc') wiki.listOpen = false;
       break;
@@ -1072,7 +1100,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
       // 접힌 정답 문단 속 소제목이면 펼치고 간다
       const fold = el?.closest('details');
       if (fold) fold.open = true;
-      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollInside(el, 'start', true);
       return true;
     }
     case 'wiki-request':
@@ -1129,6 +1157,6 @@ export function previewWikiAuto(ctx: ChatContext): { title: LlmMessage[] | null;
   if (!title) return { title: titleMsgs, article: null };
   const old = findDoc(ctx.chat, title, ctx.char.globalLore);
   const regenerate = !!old && !old.base;
-  const p = articlePrompt(ctx, title, { inherited: regenerate ? (old?.meta && !old.meta.direct ? old.meta.primarySources : []) : [], previousDoc: regenerate && s.refreshPrevious ? old : null, writingRequest: String(ctx.chat.scriptstate?.['$nw_writing_request'] ?? ''), docRequest: '', direct: regenerate ? !!old?.meta?.direct : false });
+  const p = articlePrompt(ctx, title, { inherited: regenerate ? (old?.meta && !old.meta.direct ? old.meta.primarySources : []) : [], previousDoc: regenerate && s.refreshPrevious ? old : null, writingRequest: String(ctx.chat.scriptstate?.['$nw_writing_request'] ?? ''), docRequest: regenerate ? old?.meta?.docRequest ?? '' : '', direct: regenerate ? !!old?.meta?.direct : false });
   return { title: titleMsgs, article: p.messages };
 }

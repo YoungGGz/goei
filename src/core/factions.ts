@@ -216,6 +216,9 @@ export function factionList(lore: LoreEntry[] | undefined): Faction[] {
 
 /** 새 세력 (명부 조직 중 플레이로 켠 것). 시작 묶음은 세력이 아니라서 뺀다 */
 export const extraFactions = (lore: LoreEntry[] | undefined) => factionList(lore).filter((f) => !f.builtin && !f.group);
+/** 「모든 세력에게 열린 괴담톡 탭」을 같이 여는 코드: 새 세력과 시작 묶음(「이면의 주민들」 등). 묶음 인물로 시작하면 소속 코드가 묶음 코드로 남을 수 있다
+ *  (core/start.ts effectiveFaction: 인물의 원 소속이 플레이 세력이 아닐 때). 전용 탭(extraTabs)은 새 세력에만 (전수점검 중대-8) */
+export const openTabCodes = (lore: LoreEntry[] | undefined) => factionList(lore).filter((f) => !f.builtin).map((f) => f.code);
 /** 시작 묶음 코드인가 */
 export const isGroupCode = (lore: LoreEntry[] | undefined, code: string) => !!factionList(lore).find((f) => f.code === code)?.group;
 /** 요원 목록 공개 대상 등에 쓰는 코드 전체 */
@@ -259,12 +262,15 @@ export function factionVars(lore: LoreEntry[] | undefined): ScriptState {
   const extras = extraFactions(lore);
   const tag = loreText(lore ?? [], TAG_BOOK);
   const gmName = (f: Faction) => f.gmName || f.org || f.name;
+  // 이미 배치 칸에 있는 세력: 태그 글 전체가 아니라 그 줄의 「|」 칸과 통째로 같은 이름만 (「세광특별시」에 「세광」이 걸리지 않게, 전수점검 사소-87)
+  const poolLine = /\n[ \t]*- Faction pool:([^\n]*)/.exec(tag)?.[1] ?? '';
+  const inPool = new Set(poolLine.split('|').map((x) => x.trim()).filter(Boolean));
   return {
     $fac_codes: extras.map((f) => ` | ${f.code}`).join(''),
     $fac_ac: extras.map((f) => `\n   - ${f.code} = ${gmName(f)}`).join(''),
     $fac_pool: extras
       .map((f) => f.org ?? f.name)
-      .filter((n) => !tag.includes(n))
+      .filter((n) => !inPool.has(n))
       .map((n) => ` | ${n}`)
       .join(''),
     $fac_extra: extras

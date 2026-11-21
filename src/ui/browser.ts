@@ -3,6 +3,7 @@
 // 사이트마다 로고·디자인이 다르고 창 테마를 따라가지 않는다. 사이트 화면은 app.ts 가 그리고, 여기서는 틀(탭·주소창·즐겨찾기·로그인)만.
 import { needAttr } from './needfill';
 import { guideTxt } from '../core/guides';
+import { josaRo } from '../core/josa';
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export type SiteId = 'gn' | 'gal' | 'wpf' | 'sm' | 'cos' | 'wk' | 'bm' | 'hs';
@@ -20,7 +21,7 @@ export interface Site {
 /** 쇼핑몰·망상홈쇼핑 이름은 지침 절(우주 쇼핑몰·백일몽 포인트몰 MALL_NAME · 망상홈쇼핑 CHANNEL_NAME)을 읽을 때마다 부른다: 화면과 요청이 같은 글 (고친 지침이 바로 보이게) */
 export const SITES: Site[] = [
   { id: 'gn', name: '괴담넷', title: '괴담넷 - 자유게시판', host: 'goedam.net', path: '/board/free' },
-  { id: 'gal', name: '괴담 갤러리', title: '괴담 갤러리 - 괴담갤', host: 'gall.goedam.co.kr', path: '/board/lists/?id=horror' },
+  { id: 'gal', name: '괴담갤', title: '괴담 갤러리 - 괴담갤', host: 'gall.goedam.co.kr', path: '/board/lists/?id=horror' },
   { id: 'wpf', name: '세정게', title: '::: 世界政治 게시판 :::', host: 'www.wpf.or.kr', path: '/zboard/zboard.php?id=politics' },
   { id: 'sm', name: '연어 마켓', title: '연어 마켓 | 미친 세상을 거슬러 오르는 우리들', host: 'salmon-market.kr', path: '' },
   { id: 'cos', get name() { return guideTxt('Cos', 'MALL_NAME'); }, get title() { return `★${guideTxt('Cos', 'MALL_NAME')}★에 오는 것을 환영하는 것이다`; }, host: 'cosmic-mall.alien', path: '/~shop/index.html' },
@@ -230,7 +231,7 @@ export function chromeHtml(o: ChromeOpts): string {
     <button class="br-tb pc" data-action="br-reload" aria-label="새로고침">${ic(IC.rel)}</button>
     <button class="br-tb mo" data-action="br-home" aria-label="새 탭">${ic(IC.home)}</button>
     <div class="br-omni">${omni}</div>
-    <button class="br-prof${o.nick ? ' in' : ''}" data-action="br-login" aria-label="${o.nick ? `${esc(o.nick)}(으)로 로그인됨` : '로그인'}">${prof}</button>
+    <button class="br-prof${o.nick ? ' in' : ''}" data-action="br-login" aria-label="${o.nick ? `${esc(josaRo(o.nick))} 로그인됨` : '로그인'}">${prof}</button>
     <button class="br-tabn mo" data-action="br-list" aria-label="탭 ${br.tabs.length}개">${br.tabs.length}</button>
   </div>
   <div class="br-bms">${bms}</div>`;
@@ -244,7 +245,7 @@ export function loginHtml(o: ChromeOpts): string {
   return `<div class="br-lgn" role="dialog" aria-label="로그인"><h4>로그인</h4><div class="br-face">${face}</div>
     <input class="br-in" name="br-nick" data-enter="br-login-save" value="${esc(nick)}" placeholder="닉네임" maxlength="36" aria-label="닉네임">
     <button class="br-b1" data-action="br-login-save" data-take="br-nick"${needAttr('br-nick', nick)}>로그인</button><hr>
-    <button class="br-b2" data-action="br-login-guest">${o.nick ? '로그아웃' : '닫기'}</button></div>`;
+    <button class="br-b2" data-action="br-login-guest">${o.nick ? '로그아웃' : '로그인하지 않고 계속'}</button></div>`;
 }
 
 /** 폰: 탭 목록 화면 */
