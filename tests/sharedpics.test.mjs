@@ -84,6 +84,21 @@ test('「~호」는 호수·배·열차·사람 이름을 가른다 (2026-11-19 
   assert.match(top('김민호 씨 자택'), /^Home/);
 });
 
+test('전수점검 보통-77·78·79: 두 글자 강·산, 탈것의 객실, 「~실」로 끝나는 보통 낱말', () => {
+  assert.match(top('한강'), /^RiversidePark/);
+  assert.match(top('한강에서'), /^RiversidePark/);
+  assert.match(top('남산'), /^Forest/);
+  for (const n of ['생강 밭', '재산 분쟁', '대강 훑기', '일산 호수공원 옆 골목', '통산 3회', '인강', '도산']) assert.ok(!/^(Forest|RiversidePark)/.test(top(n)), n);
+  assert.equal(top('무궁화호 객실'), 'Subway 2');
+  assert.match(top('여객선 객실'), /^Ferry/);
+  assert.equal(top('호텔 객실'), 'Lodging 2');
+  assert.equal(top('가온 객실'), 'Lodging 2');
+  assert.ok(!/Indoor/.test(top('현실 붕괴 현상', '', '전북특별자치도 임실군')));
+  assert.match(top('현실 붕괴 현상', '', '전북특별자치도 임실군'), /^Generic Country/);
+  assert.match(top('기억 상실 구역', '', '서울특별시 강남구'), /^Generic City/);
+  assert.equal(situationShared('ms', '현실 상담소')[0], 'Situation Mystic Room');
+});
+
 test('상황 글은 이름에서 못 고를 때만, 다른 곳을 가리키는 말과 한 글자 낱말은 빼고', () => {
   assert.match(top('은하 목욕탕', '지하철 타고 온 손님'), /^Bathhouse/);
   assert.match(top('세광병원 옥상', '목격자는 인근 경찰서로 이송'), /^Rooftop/);

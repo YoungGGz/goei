@@ -72,6 +72,8 @@ export function resetSettings(): void {
   settingsUi.notice = '';
   settingsUi.scope = 'chat';
   settingsUi.confirm = '';
+  imgUi.info = '';
+  imgUi.notice = '';
 }
 
 import { updateGroup } from './update';

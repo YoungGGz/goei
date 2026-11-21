@@ -273,10 +273,11 @@ function remember(w: WorldState, kind: EndedEntry['kind'], e: { name: string; lo
 }
 /** 항목에 적어 두는 그림 후보 수 (새 장소 그림이 카드에 아직 없을 때 다음 후보로 넘어가는 여유) */
 const ART_KEEP = 10;
-/** 진행 중인 항목의 공용 그림을 한 번 정한다. 상황 글이 바뀌거나 끝나도 같은 그림이 되게 항목에 적어 둔다 */
+/** 진행 중인 항목의 공용 그림을 한 번 정한다. 상황 글·이름이 바뀌거나 끝나도 같은 그림이 되게 항목에 적어 둔다 (사용자 11-19: 그림은 도중에 안 바뀜.
+ *  모델이 무작위 괴이 이름을 조금 바꿔 써도 지역으로 같은 항목에 붙으니 다시 고르지 않는다) */
 function fixArt(w: WorldState) {
   const fix = (kind: 'an' | 'in' | 'ms', e: (AnEntry | InEntry | MsEntry) & { situation?: string }) => {
-    if (e.state === '발생대기' || !validName(e.name) || e.art?.for === e.name) return;
+    if (e.state === '발생대기' || !validName(e.name) || e.art) return;
     const pics = situationShared(kind, e.name, e.situation ?? '', locName(e.loc));
     // 끝은 늘 종류별 기본 그림. 앞쪽 후보만 남긴다
     if (pics.length) e.art = { for: e.name, pics: [...pics.slice(0, ART_KEEP), pics[pics.length - 1]] };

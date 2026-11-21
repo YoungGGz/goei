@@ -410,7 +410,7 @@ export const messageKey = (m: ChatMessage, index: number) => {
   return typeof id === 'string' && id ? id : `#${index + 1}`;
 };
 /** 읽음 판정용 내용 해시: 이미지 태그·생각(<thoughts>)·HTML 주석·공백 차이는 무시한다.
- *  갱신기 뒤에 보조 모델 이미지 태그 보충(host/asset.ts)이 본문을 다시 쓰며 <img=> 를 끼우고 <thoughts>·주석을 지운다 (core/asset.ts splitNarrative).
+ *  갱신기 뒤에 보조 모델 이미지 태그 보충(host/asset.ts)이 본문을 다시 쓰며 <img=> 를 끼운다 (core/asset.ts splitNarrative·applyPatches. 주석·생각은 그대로 두지만 단락을 못 찾으면 지운 글로 저장).
  *  그걸 「바뀐 응답」으로 보면 방금 읽은 응답이 턴마다 「지난 응답 안 읽음」으로 쌓였다 (2026-11-07 사용자) */
 export const messageHash = (m: ChatMessage) =>
   hash(

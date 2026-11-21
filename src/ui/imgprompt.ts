@@ -10,12 +10,14 @@ import { userInfo } from '../host/user';
 import { copyBtn } from './copy';
 import { tokens } from '../core/gnet';
 import { ICONS } from './icons';
+import { josa } from '../core/josa';
+import type { LoreEntry } from '../core/types';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
 export const imgUi = { template: null as string | null, extra: '', keywords: null as string | null, info: '', notice: '', preview: false };
 
-export interface ImgEnv { render(): void }
+export interface ImgEnv { render(): void; lore?: LoreEntry[] }
 
 /** 페이지 본문 (settings.ts featurePage 가 머리를 붙인다) */
 export function imgPromptPane(ctx: ChatContext): string {
@@ -29,7 +31,7 @@ export function imgPromptPane(ctx: ChatContext): string {
   const keywords = imgUi.keywords ?? cfg.keywords.join(', ');
   const rows = cands.map((c) => `<label class="ip-name${off.has(c.name.toLowerCase()) ? ' off' : ''}"><input type="checkbox" data-change="ip-toggle" data-key="${esc(c.name)}" ${off.has(c.name.toLowerCase()) ? '' : 'checked'}><span>${esc(c.name)}</span>${c.korean ? `<small>${esc(c.korean)}</small>` : ''}${c.source === 'extra' ? `<button class="gx-mini pp-mini danger" data-action="ip-extra-del" data-value="${esc(c.name)}" title="임의 추가 이름 지우기">지움</button>` : ''}</label>`).join('');
   const state = !s.assetOn ? '에셋 출력이 꺼져 있어 지침을 넣지 않아요.' : s.assetModel === 'main' ? `메인 모델 요청 끝에 이 지침을 끼워요. 지금 대상 ${picked.length}명.` : `보조 모델이 태그를 붙여요. 이 목록과 표정 세트를 보조 모델 자료에도 써요. 지금 대상 ${picked.length}명.`;
-  const preview = imgUi.preview ? `<div class="gw-copyto gw-copybox"><pre class="ip-preview">${esc(buildImgPrompt(cfg, picked, s.assetPlayer))}</pre>${copyBtn('조립 결과 복사')}</div>` : '';
+  const preview = imgUi.preview ? `<div class="gw-copyto gw-copybox"><pre class="ip-preview">${esc(buildImgPrompt(cfg, picked, s.assetPlayer, me?.name || userInfo().name))}</pre>${copyBtn('조립 결과 복사')}</div>` : '';
   return `<article class="nw-doc pp-doc ip-pane">
     ${imgUi.notice ? `<div class="gx-err" role="alert">${esc(imgUi.notice)}</div>` : ''}
     <p class="ps-note pp-intro">${esc(state)} 주인공 이미지 설정(${s.assetPlayer ? '켬' : '끔'})은 캐릭터 이미지 설정에서 바꿔요. 이 기기의 모든 채팅에 같이 적용돼요.</p>
@@ -55,6 +57,7 @@ export function imgInput(name: string, value: string): boolean {
 export async function handleImgPrompt(action: string, value: string | undefined, env: ImgEnv): Promise<boolean> {
   const v = value ?? '';
   imgUi.notice = '';
+  imgUi.info = '';
   switch (action) {
     case 'ip-template-save':
       // 기본과 같은지는 지금의 지침 절(지침 탭에서 고친 글 포함)과 견준다: 불러올 때의 파일 글과 견주면 고친 절과 같은 글이 따로 저장돼, 그 뒤 지침 탭에서 고친 것이 안 먹힌다 (2026-11-15)
@@ -81,9 +84,15 @@ export async function handleImgPrompt(action: string, value: string | undefined,
     case 'ip-extra-add': {
       const name = v.replace(/[<>"{}_\n]/g, '').trim().slice(0, 40);
       if (!name) { imgUi.notice = '영문명을 적어 주세요.'; env.render(); return true; }
+      // 명부에 이미 있는 이름은 더하지 않는다 (더하면 목록에 안 보여 지울 수도 없다)
+      if (imgCandidates(env.lore, imgPromptConfig(getPrefs())).some((c) => c.name.toLowerCase() === name.toLowerCase())) {
+        imgUi.notice = `「${name}」${josa(name, '은', '는').slice(name.length)} 이미 목록에 있어요.`;
+        env.render();
+        return true;
+      }
       await savePrefs((p) => ({ ...p, imgNamesExtra: [...new Set([...(p.imgNamesExtra ?? []), name])] }));
       imgUi.extra = '';
-      imgUi.info = `「${name}」을 더했어요.`;
+      imgUi.info = `「${name}」${josa(name, '을', '를').slice(name.length)} 더했어요.`;
       env.render();
       return true;
     }

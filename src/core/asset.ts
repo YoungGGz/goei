@@ -79,7 +79,8 @@ export function stripImageTags(content: string): string {
 }
 
 /** 이미지 태그를 붙일 본문과, 건드리지 않을 앞쪽(Risu 생각 칸 <Thoughts>·<think>)·뒤쪽(상태창 [▣| / [◎| 블록부터) */
-export function splitNarrative(content: string): { leading: string; narrative: string; trailing: string } {
+/** narrative: 번호를 매겨 보조 모델에 보낼 본문(주석·생각 칸 뺌), raw: 태그를 끼워 저장할 본문(주석·생각 칸·빈 줄 그대로, 옛 태그만 뺌) */
+export function splitNarrative(content: string): { leading: string; narrative: string; trailing: string; raw: string } {
   // 맨 앞 생각 칸은 번호·인물 판정에서 빼고 저장 본문에는 그대로 둔다 (전수검사 11-13)
   // 상황판 쪽과 같은 기준: 이어진 블록 전부, <Thoughts>·<think> 둘 다, 대소문자 안 가림 (재검토 11-14 F-7)
   const { head: leading, body: rest } = splitThoughts(content);
@@ -91,6 +92,7 @@ export function splitNarrative(content: string): { leading: string; narrative: s
     leading,
     narrative: stripImageTags(stripThoughts(narrative).replace(/<!--[\s\S]*?-->/g, '')).trim(),
     trailing,
+    raw: stripImageTags(narrative).trim(),
   };
 }
 
@@ -157,8 +159,32 @@ export function parsePatches(raw: string): { line: number; tag: string }[] {
     .map((p) => ({ line: Number(p.line), tag: typeof p.tag === 'string' ? p.tag : '' }));
 }
 
-/** 단락 뒤에 태그를 끼운다. 단락당 하나, 캐릭터별 limit개까지, 목록에 있는 이름·키워드만 */
-export function applyPatches(paras: string[], patches: { line: number; tag: string }[], limit: number, d: ImageData): string {
+/** 원래 본문(raw)에서 단락마다 끝난 자리를 찾아 그 뒤에 태그를 끼운다. 주석·생각 칸·빈 줄 수를 그대로 둔다. 단락을 못 찾으면 null */
+function placeTags(raw: string, paras: string[], inserts: Map<number, string>): string | null {
+  let out = '';
+  let at = 0;
+  for (let i = 0; i < paras.length; i++) {
+    const tag = inserts.get(i + 1);
+    if (!tag) continue;
+    // 그 단락의 줄들을 차례로 찾아 마지막 줄 끝으로 간다
+    let end = at;
+    for (const line of paras[i].split('\n')) {
+      const t = line.trim();
+      if (!t) continue;
+      const found = raw.indexOf(t, end);
+      if (found < 0) return null;
+      end = found + t.length;
+    }
+    const nl = raw.indexOf('\n', end);
+    end = nl < 0 ? raw.length : nl;
+    out += `${raw.slice(at, end)}\n\n${tag}`;
+    at = end;
+  }
+  return out + (at < raw.length ? (raw.slice(at).startsWith('\n\n') ? '' : '\n') + raw.slice(at) : '');
+}
+
+/** 단락 뒤에 태그를 끼운다. 단락당 하나, 캐릭터별 limit개까지, 목록에 있는 이름·키워드만. raw 를 주면 그 본문 그대로에 끼운다 */
+export function applyPatches(paras: string[], patches: { line: number; tag: string }[], limit: number, d: ImageData, raw?: string): string {
   const sorted = [...d.characters].sort((a, b) => b.length - a.length);
   const inserts = new Map<number, string>();
   const count = new Map<string, number>();
@@ -178,6 +204,8 @@ export function applyPatches(paras: string[], patches: { line: number; tag: stri
     inserts.set(ln, `<img=${name}_${kwFix}>`);
     count.set(name, cur + 1);
   }
+  const placed = raw ? placeTags(raw, paras, inserts) : null;
+  if (placed !== null) return placed;
   const out: string[] = [];
   paras.forEach((para, i) => {
     out.push(para);
@@ -194,25 +222,27 @@ export interface AssetJob {
   /** 앞에 그대로 붙일 생각 칸 */
   leading: string;
   trailing: string;
+  /** 태그를 끼워 저장할 본문 (주석·생각 칸 그대로) */
+  raw?: string;
   messages: { role: 'user'; content: string }[];
 }
 
 /** 태그를 붙일 것이 없으면 null */
 /** exclude: 태그하지 않을 영문명 (주인공 이미지를 끈 채 캐릭터로 플레이할 때 그 요원) */
 export function planAsset(content: string, d: ImageData, limit: number, exclude: string[] = []): AssetJob | null {
-  const { leading, narrative, trailing } = splitNarrative(content);
+  const { leading, narrative, trailing, raw } = splitNarrative(content);
   if (!narrative) return null;
   const active = activeCharacters(narrative, d).filter((name) => !exclude.includes(name));
   if (!active.length) return null;
   const paras = paragraphs(narrative);
   if (!paras.length) return null;
-  return { original: content, paras, leading, trailing, messages: assetPrompt(active, paras, d, limit) };
+  return { original: content, paras, leading, trailing, raw, messages: assetPrompt(active, paras, d, limit) };
 }
 
 export function finishAsset(job: AssetJob, response: string, d: ImageData, limit: number): string | null {
   const patches = parsePatches(response);
   if (!patches.length) return null;
-  const body = applyPatches(job.paras, patches, limit, d);
+  const body = applyPatches(job.paras, patches, limit, d, job.raw);
   const out = job.trailing ? `${body}\n${job.trailing}` : body;
   return (job.leading ?? '') + out;
 }

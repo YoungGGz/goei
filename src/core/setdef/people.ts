@@ -60,7 +60,7 @@ export const PEOPLE_SET: SetPage = {
       title: '갱신(메인 응답 뒤)',
       rows: [
         { key: 'model', label: '모델', ctl: { t: 'seg', opts: [['main', '메인 모델'], ['aux', '보조 모델']] }, help: '응답을 읽고 기록을 쓸 모델이에요. 보조 모델 = Risu의 보조 모델(싸고 빠름), 메인 모델 = 메인 응답과 같은 모델' },
-        { key: 'prompt', label: '지침', ctl: { t: 'seg', opts: [['detailed', '자세히'], ['compact', '간결']] }, help: '자세히 = 규칙과 설명 전부. 간결 = 같은 규칙·설명 축약, 글자 수가 약 30% 적음. 지침 글은 설정 「지침 → 인물 기록 지침」에서 고쳐요.' },
+        { key: 'prompt', label: '지침', ctl: { t: 'seg', opts: [['detailed', '자세히'], ['compact', '간결']] }, help: '자세히 = 규칙과 설명 전부. 간결 = 같은 규칙·설명 축약, 글자 수가 약 30% 적음. 지침 글은 설정 「지침 → 인물 기록 → 인물 기록 갱신기(자세히)·(간결)」에서 고쳐요.' },
       ],
     },
     {

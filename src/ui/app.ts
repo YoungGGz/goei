@@ -1074,7 +1074,7 @@ async function handle(action: string, value?: string): Promise<void> {
     if (action !== 'rec-back' && !(await handleRecords(action, value, featCtx, recordsEnv)) && switching) render();
     return;
   }
-  if (action.startsWith('ip-') && (await handleImgPrompt(action, value, { render }))) return;
+  if (action.startsWith('ip-') && (await handleImgPrompt(action, value, { render, lore: featCtx?.char.globalLore }))) return;
   if (featCtx && action.startsWith('ms-') && (await mallSettingsAction(action, value, featCtx, wikiEnv))) return;
   if (featCtx && action.startsWith('hs-') && (await homeshopAction(action, value, featCtx, wikiEnv))) return;
   if (featCtx && action.startsWith('mall-')) {

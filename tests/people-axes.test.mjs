@@ -86,7 +86,7 @@ test('갱신기: axes_init 은 한 번, 관찰은 인물당 2개·축/방향 검
   assert.ok(input.data.slots.includes('affinity.appraisal') && input.data.slots.includes('register.context') && input.data.slots.includes('perception.secret'));
   assert.ok(!input.data.slots.includes('openness.context'), '꺼진 기능의 칸은 없음');
   for (const txt of [P.UPDATER_DETAILED, P.UPDATER_COMPACT]) {
-    assert.ok(U.assemblePrompt(txt, U.enabledSections(settings()), '').includes('7a. Personality axes'));
+    assert.ok(U.assemblePrompt(txt, U.enabledSections(settings()), '').includes('7. Personality axes'));
     assert.ok(U.assemblePrompt(txt, U.enabledSections(settings()), '').includes('"axes_init"'));
   }
   const six = { relationalInitiative: 70, expressionDirectness: 40, emotionalExpressiveness: 30, guardedness: 55, impulsivity: 20, relationshipPersistence: 80 };

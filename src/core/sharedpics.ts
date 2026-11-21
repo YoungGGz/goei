@@ -42,6 +42,8 @@ function pick(seed: string, n: number): number {
 
 // 한 글자 낱말은 낱말 끝에서만 (유계역·북한산은 맞고 광역시·지역·부산은 안 맞음). '폐'는 낱말 앞 (폐공장)
 const STOP = /부산|울산|안산|군산|익산|경산|양산|서산|오산|논산|아산|얼굴|지역|구역|영역|전역/g;
+/** 「~실」로 끝나도 방이 아닌 말(현실·상실): 실내 단서(IN_CUE)·「실」 낱말에 걸리지 않게 뺀다. 낱말 앞에서만 (조사실·검사실은 방) */
+const NOT_ROOM = /(?<![가-힣])(현실|상실|사실|확실|진실|손실|분실|과실|결실|충실|성실|절실|착실|부실|소실|유실|망실|멸실|매실|건실|독실|허실|득실|여실)/g;
 const one = new Map<string, RegExp>();
 function hit(text: string, w: string): boolean {
   if (w.length > 1) return text.includes(w);
@@ -49,7 +51,7 @@ function hit(text: string, w: string): boolean {
   if (!re) one.set(w, (re = w === '폐' ? /(?<![가-힣])폐[가-힣]/ : new RegExp(`[가-힣]${w}(?![가-힣])|(?<![가-힣])${w}(?![가-힣])`)));
   return re.test(text);
 }
-const clean = (text: string) => text.replace(STOP, ' ');
+const clean = (text: string) => text.replace(STOP, ' ').replace(NOT_ROOM, ' ');
 const score = (words: string[], text: string) => words.reduce((n, w) => n + (hit(text, w) ? w.length : 0), 0);
 
 /** 낱말이 많이 맞는 순(이름은 두 배), 같으면 이름으로 돌린 순서. 하나도 안 맞는 것은 뒤에 (그것도 이름으로 돌린 순서) */
@@ -62,12 +64,13 @@ function rank(table: Table, name: string, text: string, seed: string): string[] 
 }
 
 // ── 괴이·사건: 그림 한 장마다 낱말 ──
-interface Pic { n: number; w: string[]; in?: boolean; inc?: string[] }
+/** s: 다른 장소의 일부이기도 한 낱말(객실: 열차·배에도 있음). 이름에 다른 장소 낱말이 있으면 그 장소가 먼저 */
+interface Pic { n: number; w: string[]; s?: string[]; in?: boolean; inc?: string[] }
 /** pics 가 없으면 그림 한 장(이름 = k, 숫자 없음). s: 어느 장소에나 딸린 길 낱말(산책로): 이름에 다른 장소 낱말이 있으면 그 뒤로 간다 */
 interface Place { k: string; w?: string[]; s?: string[]; pics?: Pic[]; g?: { w: string[]; p: number[] }; near?: string; inc?: string[]; base?: boolean }
 const PLACES = (pw as { places: Place[] }).places;
 
-/** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고, 같은 글자로 끝나는 다른 낱말은 뺀다 */
+/** 낱말 끝에 붙어 장소를 알려 주는 한 글자 (옥정호·중랑천·북한산·유계역). 세 글자 이상인 낱말의 끝에서만 보고(두 글자는 TWO 에 있는 강·산 이름만), 같은 글자로 끝나는 다른 낱말은 뺀다 */
 const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
   호: { to: 'Lake', n: 1, not: ['번호', '신호', '보호', '간호', '구호', '암호', '경호', '수호', '변호', '상호', '기호', '부호', '애호', '옹호', '양호', '괄호', '점호', '전호', '엄호', '원호', '칭호', '존호', '방호', '참호', '산호', '미호', '호호', '선호', '환호', '연호', '국호', '시호', '묘호', '당호', '아호', '별호', '작호', '군호', '문호', '가호', '비호', '맹호', '백호', '흑호', '념호', '집호'] },
   천: { to: 'RiversidePark', not: ['온천', '수천', '추천', '원천', '실천', '황천'] },
@@ -82,6 +85,11 @@ const SUFFIX: Record<string, { to: string; n?: number; not: string[] }> = {
   섬: { to: 'IslandVillage', not: [] },
   숲: { to: 'Forest', not: [] },
   댐: { to: 'Lake', n: 1, not: [] },
+};
+/** 두 글자인데도 강·산 이름인 낱말 (한강·남산). 두 글자 「~강」「~산」은 보통 낱말(생강·통산·인강·도산)이 훨씬 많아 이 목록에 있는 것만 끝말로 본다 */
+const TWO: Record<string, string[]> = {
+  강: ['한강', '금강', '남강', '섬강', '동강', '서강'],
+  산: ['남산'],
 };
 /** 「~교」로 끝나지만 다리가 아닌 말 (사전에서 「교」로 끝나는 3자 이상 낱말 732개를 갈라 뽑음). 학교류는 표의 낱말이 먼저 받는다 */
 const GYO_NOT = ['학교', '장교', '외교', '대주교', '좌주교', '부주교', '설교', '조교', '비교', '기교', '등교', '하교', '휴교', '모교', '본교', '타교', '국교', '배교', '친교', '절교', '순교', '함교', '근교', '소방교', '탑승교', '실험교', '자매교'];
@@ -105,7 +113,7 @@ for (const n of [...Object.values(SIDO_NAME), ...Object.values(SIGUN).flat()]) {
   if (short.length >= 2) REGION.add(short);
 }
 // 장소 낱말과 같은 지역 줄임말(광산구의 광산)은 장소로 본다
-for (const p of PLACES) for (const w of [...(p.w ?? []), ...(p.s ?? []), ...(p.g?.w ?? []), ...(p.pics ?? []).flatMap((x) => x.w)]) REGION.delete(w);
+for (const p of PLACES) for (const w of [...(p.w ?? []), ...(p.s ?? []), ...(p.g?.w ?? []), ...(p.pics ?? []).flatMap((x) => [...x.w, ...(x.s ?? [])])]) REGION.delete(w);
 /** 낱말 뒤에 붙은 조사·자리 말 (중랑천변, 옥정호에서) */
 const TAIL = /(에서|에|의|변|가|길|앞|뒤|옆|쪽|인근|근처|부근|일대|주변|방면)$/;
 const IN_CUE = /\d\s?층|지하\s?\d|[가-힣]실(\s|$)|복도|내부|실내|로비|호실|\d\s?호(\s|$)|객실|병동|안쪽/;
@@ -151,7 +159,10 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
     for (const w of p.w ?? []) add(p, w);
     for (const w of p.s ?? []) add(p, w, undefined, undefined, true);
     for (const w of p.g?.w ?? []) add(p, w, undefined, true);
-    for (const pic of p.pics ?? []) for (const w of pic.w) add(p, w, pic.n);
+    for (const pic of p.pics ?? []) {
+      for (const w of pic.w) add(p, w, pic.n);
+      for (const w of pic.s ?? []) add(p, w, pic.n, undefined, true);
+    }
   }
   // 끝말 (이름에만). 같은 자리에서 표의 낱말이 이미 맞았으면 끝말은 보지 않는다 (세월호·기차역)
   if (byPosition) {
@@ -162,8 +173,8 @@ function findPlaces(text: string, byPosition: boolean, ctx = text): Hit[] {
     };
     const person = PERSON_CUE.test(text);
     for (const { stem, end } of tokenEnd) {
-      if (stem.length < 3) continue;
       const last = stem.slice(-1);
+      if (stem.length < 3 && !(stem.length === 2 && TWO[last]?.includes(stem))) continue;
       if (last === '호' && /\d/.test(stem.slice(-2, -1))) continue;
       // 종교 이름(유대교·○○신교)은 「대교」 같은 표의 낱말보다 먼저 가른다
       if (last === '교' && !GYO_NOT.some((x) => stem.endsWith(x)) && (FAITH.some((x) => stem.endsWith(x)) || (!taken.has(end) && FAITH_CUE.test(ctx.replace(stem, ' '))))) {
@@ -213,7 +224,7 @@ function picsOf(h: Hit, cue: 'in' | 'out' | '', seed: string): string[] {
 /** 어느 장소 낱말도 안 맞을 때의 넓은 갈래 */
 function broad(name: string, text: string, loc: string): string {
   const all = `${name} ${text}`;
-  if (IN_CUE.test(name) || /실내|건물 안|집 안|방 안|천장|벽지|문틈/.test(all)) return 'Indoor';
+  if (IN_CUE.test(clean(name)) || /실내|건물 안|집 안|방 안|천장|벽지|문틈/.test(all)) return 'Indoor';
   if (/수변|물가|낚시|수면|물안개|익사|수심|강물|파도|물속|물에 /.test(all)) return 'Water';
   if (/등산|능선|조난|산속|산중|약초|산불|벌목|골짜기|산자락/.test(all)) return 'Mountain';
   if (/군(\s|$)/.test(loc) || /이장|농민|경운기|농가|읍내|면사무소|마을/.test(all)) return 'Country';
@@ -251,7 +262,7 @@ export function situationShared(kind: string, name: string, text = '', loc = '')
   const group = broad(name, text, loc);
   const out: string[] = [];
   if (kind === 'an') {
-    const cue = IN_CUE.test(name) ? 'in' : OUT_CUE.test(name) ? 'out' : '';
+    const cue = IN_CUE.test(clean(name)) ? 'in' : OUT_CUE.test(name) ? 'out' : '';
     for (const h of places) out.push(...picsOf(h, cue, name));
     for (const h of places) if (h.place.near) out.push(h.place.near);
     const wide = BROAD_AN[group];

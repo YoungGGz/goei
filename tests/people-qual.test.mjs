@@ -67,7 +67,7 @@ test('지침: 수치 절과 정성 절은 하나만 들어가고 겹친 절도 �
 const count = (t, part) => t.split(part).length - 1;
 const CUE_NAMES = ['작은친절', '도움', '큰도움', '헌신', '실망', '무시', '배신', '파탄', '중대위반'];
 /** 고치기 전 지침 글: cue_table 표식과 <<CUE_TABLE>> 자리만 걷어 낸 것 */
-const beforeA8 = (txt) => txt.replace('<<SECTION:cue_table>>\n### 7.8 Cues', '### 7.8 Cues').replace(/<<(?:SECTION|END):cue_table>>/g, '').replace('<<CUE_TABLE>>', '');
+const beforeA8 = (txt) => txt.replace('<<SECTION:cue_table>>\n### 8.8 Cues', '### 8.8 Cues').replace(/<<(?:SECTION|END):cue_table>>/g, '').replace('<<CUE_TABLE>>', '');
 
 test('계기표: 호감 수치가 켜져 있으면 조립 결과가 고치기 전과 같고 표는 한 번', () => {
   for (const txt of [P.UPDATER_DETAILED, P.UPDATER_COMPACT]) {
@@ -83,7 +83,7 @@ test('계기표: 호감 수치가 켜져 있으면 조립 결과가 고치기 �
       onOld.delete('cue_table');
       assert.equal(now, U.assemblePrompt(old, onOld, '내 규칙'), JSON.stringify(state));
       assert.equal(count(now, '| 작은친절 |'), 1);
-      assert.equal(count(now, '### 7.8 Cues (what the program scores)'), 1);
+      assert.equal(count(now, '### 8.8 Cues (what the program scores)'), 1);
       assert.ok(!/<<[A-Z_:a-z]+>>/.test(now));
     }
   }
@@ -103,7 +103,7 @@ test('계기표: 호감 글로만(또는 끔) + 세력 평판 수치면 표가 �
       const q = U.assemblePrompt(txt, on, '');
       assert.equal(count(q, table), 1, '표 글이 그대로 한 번');
       assert.equal(count(q, '| 작은친절 |'), 1);
-      assert.equal(count(q, '### 7.8 Cues (what the program scores)'), 1, '「7.8 표」가 가리키는 제목');
+      assert.equal(count(q, '### 8.8 Cues (what the program scores)'), 1, '「8.8 표」가 가리키는 제목');
       for (const n of CUE_NAMES) assert.ok(q.includes(`| ${n} |`), n);
       // 호감 수치 전용 문장은 없다
       assert.ok(!q.includes("Report only events in which the USER'S CHARACTER") && !q.includes('Never a cue:') && !q.includes('Initial values') && !q.includes('극도의 적대') && !q.includes('"cues":['));
@@ -113,8 +113,8 @@ test('계기표: 호감 글로만(또는 끔) + 세력 평판 수치면 표가 �
       assert.ok(!q.includes('there is no `cues` list') && !q.includes('no `cues`,'));
       if (st.features.has('affinity')) assert.ok(q.includes('Qualitative mode') && /Affinity numbers are off[^.]*?(there are no person cues,|: no person cues,)/.test(q));
       // 표는 호감 절(7) 뒤, 8절 앞
-      if (st.features.has('affinity')) assert.ok(q.indexOf('### 7.8 Qualitative mode') < q.indexOf('| 작은친절 |'));
-      assert.ok(q.indexOf('| 작은친절 |') < q.indexOf('## 8. Relationship, address and speech register'));
+      if (st.features.has('affinity')) assert.ok(q.indexOf('### 8.8 Qualitative mode') < q.indexOf('| 작은친절 |'));
+      assert.ok(q.indexOf('| 작은친절 |') < q.indexOf('## 9. Relationship, address and speech register'));
     }
   }
 });
@@ -125,7 +125,7 @@ test('계기표: 호감 수치도 세력 평판 수치도 없으면 표가 없�
       const on = U.enabledSections(St.peopleSettings({ ...a, ...f }));
       assert.ok(!on.has('cue_table'));
       const q = U.assemblePrompt(txt, on, '');
-      assert.ok(!q.includes('| 작은친절 |') && !q.includes('| Cue | Base | Meaning |') && !q.includes('7.8 Cues'));
+      assert.ok(!q.includes('| 작은친절 |') && !q.includes('| Cue | Base | Meaning |') && !q.includes('8.8 Cues'));
       assert.ok(!/<<[A-Z_:a-z]+>>/.test(q));
       assert.equal(q, U.assemblePrompt(beforeA8(txt), on, ''), '표 말고는 그대로');
     }

@@ -33,38 +33,43 @@ def main():
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     src = sys.argv[1]
+    # 잘못된 폴더를 주면 넣어 둔 동작 그림을 지우지 않고 멈춘다
+    if not glob.glob(os.path.join(src, 'char-*', 'char.json')):
+        sys.exit(f'옛 팩 폴더가 아니에요 (char-N/char.json 없음): {src}')
     pick = json.load(open(os.path.join(ROOT, '그림', '모습', '동작_고른것.json'), encoding='utf-8'))['동작']
     total = 0
     for d in sorted(glob.glob(os.path.join(LOOKS, 'char-*'))):
         ch = os.path.basename(d)[5:]
         sd = os.path.join(src, f'char-{ch}')
         cj = os.path.join(d, 'char.json')
+        # 옛 팩에 이 인물이 없으면 넣어 둔 그림·acts 를 그대로 둔다
+        if not os.path.isdir(sd):
+            continue
         mine = json.load(open(cj, encoding='utf-8'))
         for f in glob.glob(os.path.join(d, 'act_*.webp')):
             os.remove(f)
         acts = {}
-        if os.path.isdir(sd):
-            A = json.load(open(os.path.join(sd, 'char.json'), encoding='utf-8'))['A']
-            idle = mine['A']['50']
-            # 대기 칸의 캔버스 자리
-            ix, iy = (CANVAS - idle['w']) // 2 + idle['ox'], idle['oy']
-            for k, m in pick.items():
-                if m['뺌'] or ch in m['못씀'] or k not in A:
-                    continue
-                fr = frames(sd, k, A[k])
-                al = np.max([np.asarray(f)[..., 3] for f in fr], axis=0)
-                xs = np.where(al.max(axis=0) > 0)[0]
-                ys = np.where(al.max(axis=1) > 0)[0]
-                x0, x1 = min(int(xs.min()), ix), max(int(xs.max()) + 1, ix + idle['cw'])
-                y0, y1 = min(int(ys.min()), iy), max(int(ys.max()) + 1, iy + idle['ch'])
-                w, h = x1 - x0, y1 - y0
-                sheet = Image.new('RGBA', (w * len(fr), h), (0, 0, 0, 0))
-                for i, f in enumerate(fr):
-                    sheet.paste(f.crop((x0, y0, x1, y1)), (i * w, 0))
-                name = f'act_{k}.webp'
-                sheet.save(os.path.join(d, name), lossless=True, method=6)
-                acts[k] = {'name': m['이름'], 'file': name, 'n': len(fr), 'cw': w, 'ch': h, 'dx': ix - x0, 'dy': iy - y0, 'sec': round(1 / m['초당장'], 3)}
-                total += 1
+        A = json.load(open(os.path.join(sd, 'char.json'), encoding='utf-8'))['A']
+        idle = mine['A']['50']
+        # 대기 칸의 캔버스 자리
+        ix, iy = (CANVAS - idle['w']) // 2 + idle['ox'], idle['oy']
+        for k, m in pick.items():
+            if m['뺌'] or ch in m['못씀'] or k not in A:
+                continue
+            fr = frames(sd, k, A[k])
+            al = np.max([np.asarray(f)[..., 3] for f in fr], axis=0)
+            xs = np.where(al.max(axis=0) > 0)[0]
+            ys = np.where(al.max(axis=1) > 0)[0]
+            x0, x1 = min(int(xs.min()), ix), max(int(xs.max()) + 1, ix + idle['cw'])
+            y0, y1 = min(int(ys.min()), iy), max(int(ys.max()) + 1, iy + idle['ch'])
+            w, h = x1 - x0, y1 - y0
+            sheet = Image.new('RGBA', (w * len(fr), h), (0, 0, 0, 0))
+            for i, f in enumerate(fr):
+                sheet.paste(f.crop((x0, y0, x1, y1)), (i * w, 0))
+            name = f'act_{k}.webp'
+            sheet.save(os.path.join(d, name), lossless=True, method=6)
+            acts[k] = {'name': m['이름'], 'file': name, 'n': len(fr), 'cw': w, 'ch': h, 'dx': ix - x0, 'dy': iy - y0, 'sec': round(1 / m['초당장'], 3)}
+            total += 1
         if acts:
             mine['acts'] = acts
         else:

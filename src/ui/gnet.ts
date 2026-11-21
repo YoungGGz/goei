@@ -625,10 +625,10 @@ function settingsView(ctx: ChatContext, back = true): string {
 const PAGE = 20;
 const LOGO_SM = (id: BoardSite, cls = 'bs-logo') => siteLogo(id === 'gal' ? 'gal' : id === 'wpf' ? 'wpf' : id === 'sm' ? 'sm' : 'gn', cls);
 /** 목록에 보일 글 (분류·찾기·정렬) */
-/** 연어 마켓 말머리 (전수검사 11-13, 사용자 8-1): 「구합니다」류도 삽니다, 「정보」가 들어간 말머리도 오컬트 정보 */
+/** 연어 마켓 말머리 (전수검사 11-13, 사용자 8-1): 「구합니다」류도 삽니다, 정보 말머리(지침 POST.TRADE_TAG.INFO)가 들어간 말머리도 오컬트 정보 */
 const smWant = (p: GPost): boolean => { const t = p.tag ?? ''; const buy = smTag('BUY'); return (!!buy && t.includes(buy)) || /구합니다|구해요|구함|구매|매입/.test(t); };
 const tagHit = (site: BoardSite, p: GPost, cat: string): boolean =>
-  site === 'sm' && cat === smTag('BUY') ? smWant(p) : site === 'sm' && cat === '정보' ? (p.tag ?? '').includes('정보') : p.tag === cat;
+  site === 'sm' && cat === smTag('BUY') ? smWant(p) : site === 'sm' && cat === smTag('INFO') ? (p.tag ?? '').includes(cat) : p.tag === cat;
 function shownPosts(st: GState, site: BoardSite): GPost[] {
   const q = gnet.q.trim().toLowerCase();
   // 보관함의 글(새로고침으로 게시판에서 빠진 내 글·스크랩)은 「내가 쓴 글」「스크랩」에만 이어 붙는다 (2026-11-10 사용자)
@@ -720,8 +720,8 @@ function smPicUrl(p: GPost): string | null {
   return name ? iconQuiet(() => titleIconUrl(name)) : null;
 }
 const CAMERA = '<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M4 7h3l2-3h6l2 3h3v13H4z" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="13" r="3.6" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
-/** 연어 마켓 글쓰기 거래 구분 (목록·본문이 이 말머리로 사진 칸·꼬리표를 정한다). 글쓴이가 고른 말머리는 글 요청에 그대로 가므로 지침 「연어 마켓」 POST.TRADE_TAG.<SELL|BUY|FREE> 절을 읽는다 (화면 칩·비교와 같은 글) */
-const smTag = (k: 'SELL' | 'BUY' | 'FREE'): string => guideTxt('Salmon', `POST.TRADE_TAG.${k}`);
+/** 연어 마켓 글쓰기 거래 구분 (목록·본문이 이 말머리로 사진 칸·꼬리표를 정한다). 글쓴이가 고른 말머리는 글 요청에 그대로 가므로 지침 「연어 마켓」 POST.TRADE_TAG.<SELL|BUY|FREE|INFO> 절을 읽는다 (화면 칩·비교와 같은 글) */
+const smTag = (k: 'SELL' | 'BUY' | 'FREE' | 'INFO'): string => guideTxt('Salmon', `POST.TRADE_TAG.${k}`);
 const smTags = (): string[] => [smTag('SELL'), smTag('BUY'), smTag('FREE')];
 const SM_BG = ['cloth', 'news', 'floor', 'wood', 'desk', 'dark'];
 
@@ -735,7 +735,7 @@ function siteHead(site: BoardSite, st: GState, unreadDm: number): string {
       return `<div class="ban">${home(`<b>世界政治 게시판</b><small>WORLD POLITICS FORUM</small>${LOGO_SM(site, 'bs-logo wlogo')}`, 'bh0')}</div>${narrow() ? `
         <div class="bar">${wpfMenu(st, unreadDm)}</div>` : ''}`;
     case 'sm':
-      return `<div class="hd">${home(`${LOGO_SM(site)}${esc(BOARD_NAME.sm)}`)}<nav>${catBtn('', '중고거래')}${catBtn(smTag('BUY'), smTag('BUY'))}${catBtn('정보', '오컬트 정보')}</nav><label class="sr">${searchInput('물건 이름으로 찾기')}</label>${writeBtn('wr')}<button class="ch" data-action="gn-sub" data-value="dm">내 채팅${unreadDm ? `<em>${unreadDm}</em>` : ''}</button></div>
+      return `<div class="hd">${home(`${LOGO_SM(site)}${esc(BOARD_NAME.sm)}`)}<nav>${catBtn('', '중고거래')}${catBtn(smTag('BUY'), smTag('BUY'))}${catBtn(smTag('INFO'), '오컬트 정보')}</nav><label class="sr">${searchInput('물건 이름으로 찾기')}</label>${writeBtn('wr')}<button class="ch" data-action="gn-sub" data-value="dm">내 채팅${unreadDm ? `<em>${unreadDm}</em>` : ''}</button></div>
         <div class="note">⚠ 직거래는 사람 많은 곳에서 하세요. 연어 마켓은 거래하다 생긴 일을 책임지지 않습니다.</div>`;
     default: {
       const nav = `<nav><button class="${!dmTakes() && gnet.sort !== 'hot' ? 'on' : ''}" data-action="gn-home">커뮤니티</button>${dmBtn(st, unreadDm, '쪽지')}<button class="${!dmTakes() && gnet.sort === 'hot' ? 'on' : ''}" data-action="gn-sort" data-value="hot">랭킹</button></nav>`;
