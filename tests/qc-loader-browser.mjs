@@ -7,7 +7,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { distPackFiles, distWorldPack } from './data-init.mjs';
 
 const require = createRequire(execSync('npm root -g').toString().trim() + '/');

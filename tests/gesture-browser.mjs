@@ -7,7 +7,7 @@
 //   5) 그냥 오른쪽 클릭은 메뉴를 막지 않고, 끈 뒤에만 막음. 제스처가 아닌 모양은 아무 일 없음. 입력 칸에서 시작하면 제스처가 아님
 //   6) 닫은 탭은 채팅($br_tabs)에 남아 새로 고친 뒤에도 되살아남
 // 사용법: node tests/gesture-browser.mjs <fixture.json> [--report]   (--report: 틀려도 멈추지 않고 표만 찍는다)
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, launch, loadFixture, openWin, sleep } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);

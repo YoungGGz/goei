@@ -14,7 +14,7 @@ const LIMIT = {
   heapGrowMB: 5,         // 열고 닫기·채팅 전환 100번 뒤 heap 증가. 측정 +0.5 / +0.1
 };
 import { readFileSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { launch, boot, open } from './qc-static-harness.mjs';
 
 const fixture = JSON.parse(readFileSync(process.argv[2], 'utf8'));

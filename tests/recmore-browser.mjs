@@ -2,7 +2,7 @@
 // 「그 더보기는 해당 창 벗어나면 다시 초기화」). 일지·연대기·가계부 거래·소지품 기록이 같은 규칙 (ui/more.ts, core/paging.ts).
 // 사용: node tests/recmore-browser.mjs <fixture.json> [사진 폴더]
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, closeEditor, closeWin, launch, loadFixture, openEditor, openWin, sleep } from './qc-settings-harness.mjs';
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));

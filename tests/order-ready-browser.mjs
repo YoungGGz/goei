@@ -1,7 +1,7 @@
 // 맞춤 주문 완성 알림 확인 (작업용): node tests/order-ready-browser.mjs <사진 폴더>
 // 응답 처리가 완성된 응답 끝에 표식 [shop-ready: …] 을 적고, 화면이 카드로 바꾸고, 「받으러 가기」가 우주 쇼핑몰 창을 연다. 받으면 표식이 지워진다
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, launch, loadFixture } from './qc-settings-harness.mjs';
 
 const OUT = process.argv[2] || '.scratch/order-ready';

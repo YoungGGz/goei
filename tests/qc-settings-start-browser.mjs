@@ -3,7 +3,7 @@
 // 사용법: node tests/qc-settings-start-browser.mjs <fixture.json> [pc|phone|land|all]
 import { distPack } from './data-init.mjs';
 import { sceneOf } from './qc-host.mjs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { readFileSync } from 'node:fs';
 import { boot, chatOf, closeWin, goNode, launch, loadFixture, openEditor, closeEditor, openWin, setChat, sleep, isPhoneVp, VIEWPORTS } from './qc-settings-harness.mjs';
 

@@ -5,7 +5,7 @@
 // ⑥ 못 쓰는 줄은 붉은 글 ⑦ 숫자 상자는 공통 .st-step ⑧ 가로 넘침 없음 ⑨ 시작 전(새 채팅 기본값)에서도 된다.
 // 사용: node tests/fields-browser.mjs <fixture.json> [사진 폴더]
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, closeEditor, goNode, launch, loadFixture, openEditor, openWin, prefsOf, sleep } from './qc-settings-harness.mjs';
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));

@@ -3,7 +3,7 @@
 // 사용법: node tests/qc-pipeline-browser.mjs <fixture.json>
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { launch, boot, startChat, request, output, display, input, chat, setVars, counts, resetCounts, waitLite, runner, testBodyCode, sceneOf } from './qc-host.mjs';
 
 const fxPath = process.argv[2];

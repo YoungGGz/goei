@@ -3,7 +3,7 @@
 // ① 저장값이 없으면 칸에 기본값이 진짜 글로 들어 있다 ② 한 군데만 고쳐도 나머지가 남는다 ③ 기본값과 같으면 저장하지 않는다
 // ④ 다르게 고친 줄만 「바꾼 줄」 점 ⑤ 다 지우면·「기본값으로」를 누르면 기본값으로 돌아간다.  사용: node tests/graybox-browser.mjs <fixture.json> [사진 폴더] [--shots-only]
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, closeEditor, goNode, launch, loadFixture, openEditor, openWin, sleep } from './qc-settings-harness.mjs';
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));

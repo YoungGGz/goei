@@ -3,7 +3,7 @@
 // 각 단계가 실제로 호출되는지·결과가 저장되는지 본다. 사용법: node tests/qc-people-live-browser.mjs <fixture.json>
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { launch, boot, startChat, request, output, setVars, runner, sceneOf } from './qc-host.mjs';
 
 const fxPath = process.argv[2];

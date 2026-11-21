@@ -5,7 +5,7 @@
 // ④ 「컨텍스트 포함」을 끄면 그 줄 나머지가 잠기고 값은 남는다 ⑤ 「최대 양」 수 상자(공통 규격, 큰 것) ⑥ 닫았다 열어도 같다 ⑦ 가로 넘침 없음 ⑧ 시작 전(새 채팅 기본값).
 // 사용: node tests/shopctx-browser.mjs <fixture.json> [사진 폴더]
 import { mkdirSync } from 'node:fs';
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, closeEditor, launch, loadFixture, openEditor, openWin, prefsOf, sleep } from './qc-settings-harness.mjs';
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));

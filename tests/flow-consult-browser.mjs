@@ -5,7 +5,7 @@
 // 4) AI 상담: 열기·닫기·자리, 묻기 → 바꾸자고 함(적용 안 됨) → 동의 → 적용 → 판 → 되돌리기, 목록에 없는 설정·고를 수 없는 값·범위 밖 수·
 //    깨진 꼴·모델 실패, 동의 없이 바로 바꾸려는 답, 대화가 채팅(메시지·상태값)과 메인 요청에 한 글자도 안 들어가는지, 폰 판
 // 사용법: node tests/flow-consult-browser.mjs <fixture.json>
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, chatOf, clickSel, goNode, launch, loadFixture, openEditor, openWin, sleep } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);

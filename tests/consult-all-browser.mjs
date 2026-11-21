@@ -7,7 +7,7 @@
 // 5) 글 칸(길이·줄바꿈·꺾쇠·기본값과 같으면 저장 안 함), 못 바꾸는 줄·잠긴 줄, <open> 은 한 번만, <go>, 대화 지우기(다른 채팅·설정은 그대로),
 //    요청 토큰 상한, 증상 지식의 줄 이름이 목록에 있는지, 폰
 // 사용법: node tests/consult-all-browser.mjs <fixture.json> [결과 폴더]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { boot, chatOf, clickSel, closeEditor, closeWin, goNode, launch, loadFixture, openEditor, openWin, setChat, sleep } from './qc-settings-harness.mjs';
 

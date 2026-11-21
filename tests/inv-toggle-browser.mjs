@@ -1,6 +1,6 @@
 // 소지품·가계부·상점 켜고 끄기 연계 (2026-11-08 전수점검): 진행 중에 끄고 다시 켤 때 상점 방문·표식·사용 자리·칸 구성 기록·메뉴가 맞게 바뀌는지, PC·폰.
 // 사용법: node tests/inv-toggle-browser.mjs   (시험 카드 .scratch/fixture/fixture.json)
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { boot, chatOf, closeEditor, closeWin, goNode, launch, loadFixture, openEditor, openWin, sleep } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(new URL('../.scratch/fixture/fixture.json', import.meta.url).pathname);

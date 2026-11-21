@@ -2,7 +2,7 @@
 // 값이 기기 설정(prefs) 또는 채팅 변수(setChatToIndex)에 맞게 저장되는지, 범위(이 채팅/새 채팅 기본값/시작 전)가 섞이지 않는지,
 // 경계값·잘못된 입력, 다시 열었을 때 같은 값이 보이는지를 본다. 세 뷰포트.
 // 사용법: node tests/qc-settings-pages-browser.mjs <fixture.json> [pc|phone|land|all]
-import assert from 'node:assert/strict';
+import assert from './soft-assert.mjs';
 import { auditDom, boot, chatOf, closeEditor, closeWin, goNode, launch, loadFixture, openEditor, openWin, prefsOf, setChat, setInput, sleep, isPhoneVp, VIEWPORTS } from './qc-settings-harness.mjs';
 
 const fx = loadFixture(process.argv[2]);
