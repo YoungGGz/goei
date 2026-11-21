@@ -5857,3 +5857,10 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-field .gx-sitbar .gx-chip { gap: 3px; padding: 0 7px; }
   .gx-field .gx-sitbar .gx-unplace { margin-left: 0; }
 }
+
+/* 폴드 펼친 화면 같은 좁은 PC 창(601~860 폭): 시작 패널도 본 창과 같은 폭으로 (3:4 로 자르면 본 창보다 좁고 소속 카드가 한 줄에 하나씩이라 「출발」까지 여러 화면을 내려야 했다).
+   커스텀의 펼친 목표 카드는 정사각형으로 (4:3 이면 210px 과녁이 위아래로 잘렸다) */
+@media (min-width: 601px) and (max-width: 860px) {
+  .gx-panel.pre.pick { width: min(90%, 1024px); }
+  .gx-mlist .gx-mx.open .gx-mx-art { aspect-ratio: 1 / 1; }
+}
