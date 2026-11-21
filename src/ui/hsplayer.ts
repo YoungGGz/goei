@@ -223,12 +223,12 @@ export function siteFit(page: HTMLElement | null | undefined): void {
   page.classList.toggle('hs-s', pc && page.clientHeight < SITE_SHORT);
 }
 
-/** 방송 칸이 쓸 수 있는 폭: 채팅 칸이 옆에 있으면(넓은 PC) 채팅 칸 최소 폭 260 + 사이 14 를 뺀다 · 방송 칸 테두리 2 */
+/** 방송 칸이 쓸 수 있는 폭: PC 는 옆 채팅 칸을 뺀다(넓은 창 최소 260 + 사이 14, 좁은 창 .hs-n 210 + 사이 10) · 방송 칸 테두리 2 */
 function roomWidth(wrap: HTMLElement, page: HTMLElement): number {
   const cs = getComputedStyle(wrap);
   const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const side = !page.classList.contains('hs-m') && !page.classList.contains('hs-n');
-  return (side ? inner - 274 : inner) - 2;
+  if (page.classList.contains('hs-m')) return inner - 2;
+  return inner - (page.classList.contains('hs-n') ? 220 : 274) - 2;
 }
 
 /** 「자동·폭 맞춤」 배율: 방송 칸이 화면을 다 차지하지 않게, 사이트 칸 폭(넓은 PC 는 채팅 칸을 뺀 폭)과 보이는 높이 안에서.
@@ -274,6 +274,11 @@ function layout(): void {
   cg!.style.height = `${small ? h * k : h}px`;
   cg!.style.transform = small || k === 1 ? '' : `scale(${k})`;
   if (small) stage.style.fontSize = '';
+  // 좁은 PC 창(.hs-n): 채팅 칸을 방송 화면 높이에 맞춘다 → 첫 화면에 방송과 채팅(입력·보내기까지)이 나란히 (11-21 사용자: 채팅창 어디 갔냐)
+  const page = stage.closest<HTMLElement>('.hs');
+  const chat = page?.querySelector<HTMLElement>('.hs-bd > .hs-chat');
+  const tv = stage.closest<HTMLElement>('.hs-tv');
+  if (chat) chat.style.height = page!.classList.contains('hs-n') && tv ? `${tv.offsetHeight}px` : '';
 }
 
 /** 마지막으로 찾은 물건 그림 주소: tick 마다 그림 팩(5천여 줄)을 다시 뒤지지 않게. 찾은 것만 기억한다(팩이 늦게 받혀도 다시 찾게) (전수검사 11-13) */

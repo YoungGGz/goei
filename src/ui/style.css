@@ -5709,9 +5709,16 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs.hs-n .hs-tel small { display: none; }
 .hs.hs-n .hs-menu { flex: none; order: 3; width: 100%; height: 40px; margin: 4px -10px 0; overflow-x: auto; scrollbar-width: none; }
 .hs.hs-n .hs-menu::-webkit-scrollbar { display: none; }
-.hs.hs-n .hs-bd { display: block; }
-.hs.hs-n .hs-main { width: auto; }
-.hs.hs-n .hs-chat { height: 240px; margin-top: 12px; }
+.hs.hs-n .hs-bd { grid-template-columns: minmax(0, 1fr) 210px; gap: 10px; align-items: start; } /* 채팅 칸은 방송 옆에 그대로 (11-21 사용자: 채팅창 어디 갔냐). 좁은 만큼 채팅 칸만 210, 높이는 hsplayer layout 이 방송 화면에 맞춤 */
+.hs.hs-n .hs-main { display: contents; } /* 방송 화면만 채팅 옆, 상품 칸·주문 단추는 두 칸 폭 전체로 (좁은 칸에서 상품 글이 한 글자씩 세로로 쌓였다) */
+.hs.hs-n .hs-tv { grid-column: 1; grid-row: 1; }
+.hs.hs-n .hs-bar { flex-wrap: wrap; height: auto; row-gap: 4px; padding: 6px 10px; }
+.hs.hs-n .hs-bar b { order: 9; flex-basis: 100%; } /* 좁은 방송 칸에서 방송 제목이 「…」로만 남거나 아예 사라졌다 → 제목은 둘째 줄 */
+.hs.hs-n .hs-bar .hs-pt { margin-left: auto; }
+.hs.hs-n .hs-bd > .hs-chat { grid-column: 2; grid-row: 1; }
+.hs.hs-n .hs-prod, .hs.hs-n .hs-ord { grid-column: 1 / -1; }
+.hs.hs-n .hs-ord button { flex: 1 1 0; min-width: 0; padding: 10px 6px; font-size: 13px; white-space: normal; word-break: keep-all; } /* nowrap 이면 단추 줄이 383 밑으로 안 줄어 방송 칸 폭을 넘었다 */
+.hs.hs-n .hs-ord .call { flex: 1.3 1 0; font-size: 14px; }
 .hs.hs-n .hs-dim { padding: 8px; }
 /* 낮은 창의 전화 주문: 결제 고르기 칸이 두 줄도 안 보였다 → 왼쪽 칸(상품·결제·조건·주문 단추)을 통째로 스크롤 */
 .hs.hs-s .hs-side { overflow-y: auto; }
