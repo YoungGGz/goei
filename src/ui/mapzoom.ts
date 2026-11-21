@@ -66,9 +66,11 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     let at = -1;
     spots.some(([l, t], k) => {
       const r = { l, t, r: l + w, b: t + h };
-      if ((k === 0 || inFrame(r)) && (rank(el) === 0 && k === 0 || free(r))) return (at = k), placed.push(r), true;
+      if ((k === 0 || inFrame(r)) && free(r)) return (at = k), placed.push(r), true;
       return false;
     });
+    // 고른 핀은 숨기지 않는다: 빈자리가 없을 때만 제자리 (전에는 늘 제자리라 옆 점이 「중구」 이름표를 덮어 「ㅇ구」로 읽혔다, 눌러3-PC-2)
+    if (at < 0 && rank(el) === 0) at = 0, placed.push({ l: N.l, t: N.t, r: N.r, b: N.b });
     const blocked = at < 0;
     el.classList.toggle('lab-off', blocked);
     if (at > 0) {

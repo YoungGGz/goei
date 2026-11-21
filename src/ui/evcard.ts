@@ -359,19 +359,27 @@ export function declutterOps(root: HTMLElement): void {
   if (!map) return;
   const run = () => {
     const labs = [...map.querySelectorAll<HTMLElement>('.gx-oppin em')];
-    for (const e of labs) e.style.removeProperty('--dy');
+    for (const e of labs) e.style.removeProperty('--dy'), e.style.removeProperty('--dx');
+    // 남의 점도 피한다: 점이 고른 상황 이름표를 덮어 「QC 지점」이 가려졌다 (눌러3-PC 상황판 위성 지도).
+    // 보이는 지도 칸 오른쪽 끝을 넘는 이름표는 점 왼쪽으로 돌린다 (「인류의 신비전」이 「인류의 신비」로 잘렸다)
+    const R = (map.closest('.gx-opmap') ?? map).getBoundingClientRect().right - 4;
+    const dots = labs.map((el) => { const d = el.parentElement!.querySelector('i')!.getBoundingClientRect(); return { l: d.left - 3, r: d.right + 3, t: d.top - 3, b: d.bottom + 3 }; });
     const order = labs.map((el, i) => ({ el, i, r: el.getBoundingClientRect() }))
       .sort((a, b) => Number(b.el.parentElement?.classList.contains('sel')) - Number(a.el.parentElement?.classList.contains('sel')) || a.r.top - b.r.top || a.i - b.i);
-    const placed: { l: number; r: number; t: number; b: number }[] = [];
-    for (const { el, r } of order) {
+    const placed: typeof dots = [];
+    for (const { el, i, r: q0 } of order) {
+      const dx = q0.right > R ? dots[i].l - 3 - q0.width - q0.left : 0;
+      const r = { left: q0.left + dx, right: q0.right + dx, top: q0.top, bottom: q0.bottom };
+      const blocks = placed.concat(dots.filter((_, j) => j !== i));
       let dy = 0;
       for (let k = 0; k < 12; k++) {
         const t = r.top + dy, b = r.bottom + dy;
-        const hit = placed.filter((q) => r.left < q.r && q.l < r.right && t < q.b && q.t < b);
+        const hit = blocks.filter((q) => r.left < q.r && q.l < r.right && t < q.b && q.t < b);
         if (!hit.length) break;
         dy = Math.max(...hit.map((q) => q.b)) - r.top + 2;
       }
       if (dy) el.style.setProperty('--dy', `${dy}px`);
+      if (dx) el.style.setProperty('--dx', `${dx}px`);
       placed.push({ l: r.left, r: r.right, t: r.top + dy, b: r.bottom + dy });
     }
   };
