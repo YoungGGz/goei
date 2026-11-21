@@ -59,7 +59,7 @@ import { applyAdvanced } from '../core/advanced';
 import { booksInput, defaultsState, handleAdvanced } from './advanced';
 import { guardHiddenScroll, rememberPanel, scrollInside } from './panels';
 import { startCctvFx, stopCctvFx } from './cctvfx';
-import { declutterOps, elapsedText, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
+import { declutterOps, elapsedText, markCapOverflow, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
 import { evArt } from './evpic';
 import { agentContact, handlePhone, openAgentDm, openCheck, phone, phoneContent, phoneInput, phonePickList, phoneTab, phoneUnread, resetPhone, type PhoneEnv } from './phone';
 import { boardMapUrl, field, handleField, mapTab, mapSuggestFor, missionList, missionTab, newMessage, resetField, showOnMap, type FieldEnv } from './field';
@@ -1740,6 +1740,7 @@ function render(): void {
   labelSwitches(root);
   bindMapZoom(root);
   declutterOps(root);
+  markCapOverflow(root);
   const setDrawer = (open: boolean) => {
     if (cdrOpen === open) return;
     cdrOpen = open;

@@ -348,26 +348,47 @@ function opsMap(cards: OpsCard[], sel: string, url: string | null, clock: string
 }
 
 /** 위성 지도 이름표가 서로 덮으면 뒤엣것을 아래로 내린다. 고른 상황이 먼저 자리를 잡는다 (render 뒤에 부른다)
- *  (전수점검 눌러-보통-6: 붙어 있는 창원·함안 이름표가 겹쳐 하나가 가려졌다. 폰은 지도가 작아 % 간격이 이름표 높이보다 좁다) */
+ *  (전수점검 눌러-보통-6: 붙어 있는 창원·함안 이름표가 겹쳐 하나가 가려졌다. 폰은 지도가 작아 % 간격이 이름표 높이보다 좁다)
+ *  점(i)은 제자리에 두고 이름표(em)만 내린다. 지도 크기가 바뀌면(창 크기·돌리기) 다시 잰다 */
+let opsRO: ResizeObserver | null = null;
 export function declutterOps(root: HTMLElement): void {
+  opsRO?.disconnect();
+  opsRO = null;
   const map = root.querySelector<HTMLElement>('.gx-opmapi');
   if (!map) return;
-  const pins = [...map.querySelectorAll<HTMLElement>('.gx-oppin')];
-  for (const p of pins) p.style.removeProperty('--dy');
-  const order = pins.map((el, i) => ({ el, i, r: el.getBoundingClientRect() }))
-    .sort((a, b) => Number(b.el.classList.contains('sel')) - Number(a.el.classList.contains('sel')) || a.r.top - b.r.top || a.i - b.i);
-  const placed: { l: number; r: number; t: number; b: number }[] = [];
-  for (const { el, r } of order) {
-    let dy = 0;
-    for (let k = 0; k < 12; k++) {
-      const t = r.top + dy, b = r.bottom + dy;
-      const hit = placed.filter((q) => r.left < q.r && q.l < r.right && t < q.b && q.t < b);
-      if (!hit.length) break;
-      dy = Math.max(...hit.map((q) => q.b)) - r.top + 2;
+  const run = () => {
+    const labs = [...map.querySelectorAll<HTMLElement>('.gx-oppin em')];
+    for (const e of labs) e.style.removeProperty('--dy');
+    const order = labs.map((el, i) => ({ el, i, r: el.getBoundingClientRect() }))
+      .sort((a, b) => Number(b.el.parentElement?.classList.contains('sel')) - Number(a.el.parentElement?.classList.contains('sel')) || a.r.top - b.r.top || a.i - b.i);
+    const placed: { l: number; r: number; t: number; b: number }[] = [];
+    for (const { el, r } of order) {
+      let dy = 0;
+      for (let k = 0; k < 12; k++) {
+        const t = r.top + dy, b = r.bottom + dy;
+        const hit = placed.filter((q) => r.left < q.r && q.l < r.right && t < q.b && q.t < b);
+        if (!hit.length) break;
+        dy = Math.max(...hit.map((q) => q.b)) - r.top + 2;
+      }
+      if (dy) el.style.setProperty('--dy', `${dy}px`);
+      placed.push({ l: r.left, r: r.right, t: r.top + dy, b: r.bottom + dy });
     }
-    if (dy) el.style.setProperty('--dy', `${dy}px`);
-    placed.push({ l: r.left, r: r.right, t: r.top + dy, b: r.bottom + dy });
-  }
+  };
+  run();
+  if (typeof ResizeObserver === 'undefined') return;
+  let w = map.clientWidth, h = map.clientHeight;
+  opsRO = new ResizeObserver(() => {
+    if (!map.isConnected) return opsRO?.disconnect();
+    if (map.clientWidth === w && map.clientHeight === h) return;
+    (w = map.clientWidth), (h = map.clientHeight);
+    run();
+  });
+  opsRO.observe(map);
+}
+
+/** 조준선 위에 놓인 글 칸이 넘쳐 스크롤해야 할 때만 눌림을 받게 ovf 를 붙인다 (render 뒤에 부른다, 검토 지적: 눌러-보통-4) */
+export function markCapOverflow(root: HTMLElement): void {
+  for (const el of root.querySelectorAll<HTMLElement>('.gx-opcap, .gx-mx.open .gx-evart-cap')) el.classList.toggle('ovf', el.scrollHeight > el.clientHeight + 1);
 }
 
 /** 관제실 상황판 본문. counts: 일지 제목줄 숫자 (html) */

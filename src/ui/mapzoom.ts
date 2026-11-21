@@ -113,6 +113,7 @@ export function bindMapZoom(root: HTMLElement): void {
   const canPan = () => layer.offsetWidth * v.z > canvas.clientWidth + 1 || layer.offsetHeight * v.z > canvas.clientHeight + 1;
 
   const img = canvas.querySelector<HTMLImageElement>('.gx-mapimg');
+  let placed = false;
   const apply = () => {
     // 그림이 불리기 전엔 크기가 0이라 가운데를 못 잰다. 저장하지 않고 load 뒤에 맞춘다 (전수검사 11-13)
     if (Number.isNaN(v.y) && img && !img.complete) {
@@ -126,7 +127,9 @@ export function bindMapZoom(root: HTMLElement): void {
     layer.style.setProperty('--pz', String(Math.pow(v.z, 0.25) / v.z));
     canvas.classList.toggle('zoomed', v.z > 1);
     canvas.classList.toggle('pan', canPan());
-    placeZoom(canvas, layer);
+    // 단추 쪽은 그릴 때 한 번만 고른다. 확대·옮길 때마다 고르면 + 를 누른 뒤 단추 줄이 반대쪽으로 뛰어
+    // 다음 누름이 핀에 떨어진다 (검토 지적: 눌러-중대-2)
+    if (!placed) (placed = true), placeZoom(canvas, layer);
     declutter(layer, canvas, v.z);
   };
   /** 칸 안의 한 점(px)을 붙잡은 채 배율을 바꾼다 */

@@ -2188,9 +2188,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-opmapi { position: absolute; top: 4px; bottom: 8px; left: 50%; transform: translateX(-50%); aspect-ratio: 1100 / 880; max-width: calc(100% - 16px); }
 .gx-opmapi > img { width: 100%; height: 100%; display: block; filter: grayscale(.85) sepia(.25) hue-rotate(120deg) brightness(.62) contrast(1.3) saturate(1.4); }
 .gx-opmapi::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(79, 209, 181, .13) 0 1px, transparent 1px 34px), repeating-linear-gradient(90deg, rgba(79, 209, 181, .13) 0 1px, transparent 1px 34px), radial-gradient(ellipse at center, transparent 55%, rgba(5, 10, 12, .55) 100%); }
-.gx-oppin { position: absolute; z-index: 2; transform: translate(-6px, calc(-50% + var(--dy, 0px))); display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; }
+.gx-oppin { position: absolute; z-index: 2; transform: translate(-6px, -50%); display: flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; }
 .gx-oppin i { width: 12px; height: 12px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 25%, transparent), 0 0 14px var(--c); }
-.gx-oppin em { font-style: normal; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: rgba(8, 12, 14, .78); white-space: nowrap; }
+.gx-oppin em { transform: translateY(var(--dy, 0px)); font-style: normal; font-size: 11.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; background: rgba(8, 12, 14, .78); white-space: nowrap; }
 .gx-oppin.sel em { background: #5fe6c6; color: #0c1a17; } .gx-oppin.sel i { outline: 2px solid #fff; outline-offset: 2px; }
 .gx-oppin.k-an { --c: #ff8a7a; } .gx-oppin.k-in { --c: #ffc35a; } .gx-oppin.k-ms { --c: #8cc8ff; }
 .gx-opcross { position: absolute; z-index: 1; width: 64px; height: 64px; transform: translate(-50%, -50%); border: 1px solid rgba(79, 209, 181, .7); border-radius: 50%; pointer-events: none; }
@@ -2338,7 +2338,8 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-agcard-foot .code { margin-right: auto; display: flex; align-items: center; gap: 10px; font: 700 11.5px var(--mono); letter-spacing: .14em; color: var(--dim); white-space: nowrap; }
 .gx-agcard-foot .code u { width: 96px; height: 18px; text-decoration: none; opacity: .5; background: repeating-linear-gradient(90deg, var(--text) 0 1px, transparent 1px 3px, var(--text) 3px 5px, transparent 5px 6px, var(--text) 6px 7px, transparent 7px 10px); }
 .gx-agcard-foot button { display: flex; align-items: center; justify-content: center; gap: 6px; width: 92px; height: var(--ctl-sm); padding: 0; border: 0; border-radius: 9px; background: var(--panel2); color: var(--text); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-.gx-agcard-foot button:hover { color: var(--signal); }
+.gx-agcard-foot button:hover:not(:disabled) { color: var(--signal); }
+.gx-agcard-foot button:disabled { opacity: .4; }
 .gx-agcard-foot button svg { width: 15px; height: 15px; }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gx-agwall { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: auto; gap: 6px; padding: 6px; }
@@ -2402,9 +2403,11 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
    칸 높이 = 본문 높이 − (지역 줄 34 + 칸 사이 10×2 + 필터·카드 세 줄 342 + 틀 2) */
 @media (min-width: 761px) and (min-height: 500px), (min-width: 761px) and (pointer: fine), (min-width: 761px) and (pointer: none) {
   .gx-map .gx-mapbar .gx-select, .gx-map .gx-mapbar .gx-search { height: var(--ctl-sm); min-height: var(--ctl-sm); }
-  .gx-map > .gx-mapcol > .gx-canvas:not(.ph) { width: 100%; margin: 0; height: calc(min((100vh - 28px) * .9, 950px) - 98px - 398px); background: #0c1315; }
+  .gx-map > .gx-mapcol > .gx-canvas:not(.ph) { width: 100%; margin: 0; flex: 1 1 0; min-height: calc(min((100vh - 28px) * .9, 950px) - 98px - 398px); max-height: max-content; background: #0c1315; }
   .gx-map .gx-canvas:not(.ph) > .gx-mapzoom { width: 100%; }
   .gx-map .gx-mapimg { width: 100%; max-width: none; max-height: none; }
+  /* 칸 높이는 최소값. 목록이 짧으면 지도 칸이 남은 높이를 그림 높이까지 쓰고, 목록이 길면 목록이 줄어 스크롤 (전수점검 눌러-사소-1: 지도 아래 빈 자리) */
+  .gx-map > .gx-mapcol > .gx-sits { flex: 0 1 auto; }
 }
 /* 카드 가운데 선택 과녁 (evcard.ts aimMark, 2026-10-29). 선은 늘 1px(크기와 무관), 중심은 고정(단추 크기 그대로, 그림만 scale).
    안 고름: 크고 얇고 흐리게, 바깥 눈금이 천천히 돌고 안 원이 숨 쉰다. 고름: 2/3 로 조여들며 붉게 잠김. 해제: 흰 고리와 함께 다시 커짐 */
@@ -2538,6 +2541,10 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-opview.ev-pop .gx-opcap { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .45) transparent; }
 /* 글 칸은 조준선 위에 (조준선이 글자 사이로 지나가 읽기 어려웠다). 신호 끊김 화면(z 4)은 그대로 위. 화면이 번쩍여도 읽히게 글자 둘레를 짙게 (전수점검 눌러-보통-4·눌러2-보통-6) */
 .gx-opcap, .gx-mx.open .gx-evart-cap { z-index: 3; }
+/* 글 칸이 조준선 아래쪽을 덮어도 조준선이 눌리게, 글 칸은 눌림을 흘려보낸다. 단추·딱지만 받는다.
+   글이 넘쳐 스크롤해야 할 때(ovf, evcard.ts markCapOverflow)만 글 칸 전체가 받는다 (검토 지적: 눌러-보통-4) */
+:is(.gx-opcap, .gx-mx.open .gx-evart-cap):not(.ovf) { pointer-events: none; }
+:is(.gx-opcap, .gx-mx.open .gx-evart-cap):not(.ovf) :is(a, button, [data-action], .gx-pchip, .gx-badge) { pointer-events: auto; }
 :is(.gx-opcap, .gx-mx.open .gx-evart-cap) :is(b, small, .gx-evc-sit, .gx-evc-desc) { text-shadow: 0 0 2px rgba(0, 0, 0, .95), 0 1px 6px rgba(0, 0, 0, .9); }
 .gx-mx.open .gx-evart-name small { color: rgba(255, 255, 255, .9); }
 /* CCTV 괴이 효과 (2026-10-21 사용자, ui/cctvfx.ts가 fx-* 클래스를 잠깐 붙인다) */
