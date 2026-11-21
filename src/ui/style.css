@@ -3147,6 +3147,13 @@ button.gx-jr-row:hover { background: color-mix(in srgb, var(--text) 4%, transpar
   .gx-rptpop { padding: 14px 20px; align-items: start; }
   .gx-rptpop .gx-rptcard { width: 100%; max-height: calc(100% - 28px); padding: 14px 14px 20px; border-radius: 18px; }
 }
+/* 폴드 펼침(PC 배치, 기록 상자 ~480px): 화면 너비가 아니라 기록 상자 너비로 같은 줄바꿈 — 이름·부제가 단추 셋에 밀려 4줄로 꺾이던 문제 (11-21) */
+.gx-rec-pane { container: gxrec / inline-size; }
+@container gxrec (max-width: 620px) {
+  .ph-room-head { flex-wrap: wrap; }
+  .ph-room-head .ph-room-title { flex: 1 1 0; min-width: 0; }
+  .ph-room-head .ph-act { flex: 1 1 100%; justify-content: flex-end; }
+}
 .gx-png-title { font-size: 14px; font-family: var(--mono); color: var(--dim); padding-right: 36px; }
 .gx-png-img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--void); }
 .gx-pngcard .ps-note { margin: 0; font-size: 13px; color: var(--sub); }
@@ -3618,6 +3625,11 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .sh-dlg-name { display: flex; align-items: center; gap: 10px; height: 24px; padding: 0 12px; font-size: 15px; font-weight: 700; color: var(--text); }
 .sh-dlg-name small { font-size: 12.5px; font-weight: 500; color: var(--dim); }
 .sh-dlg-box { flex: none; height: calc(14px * 1.6 * 8 + 20px); /* 8줄 (2026-11-07 사용자: 5줄은 몇 줄 안 보임) */ overflow-y: auto; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+/* 폴드 펼친 화면처럼 손가락 화면인데 PC 배치이고 높이가 낮을 때 (2026-11-21 실기 폴드: 주인 칸이 창 절반을 먹어 팔기 화면 소지품이 한 줄만 보임): 대사 상자는 남는 높이만큼 5~8줄 */
+@media (pointer: coarse) and (min-width: 601px) and (max-height: 900px) {
+  .sh-dlg-box { height: clamp(calc(14px * 1.6 * 5 + 20px), calc(100dvh - 600px), calc(14px * 1.6 * 8 + 20px)); }
+  .sh-wrap-card:has(.sh-pick) .sh-dlg-box { height: calc(14px * 1.6 * 5 + 20px); }
+}
 .sh-dlg-box p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); }
 .sh-dlg-box p + p { margin-top: 6px; }
 /* 내가 한 말: 주인 대사와 바로 구분되게 다른 색 + 「나」 표 (2026-11-07 사용자) */
@@ -3876,6 +3888,39 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-items .it-av { flex: none; width: 128px; }
   .gx-items .it-usebox { flex: 1 1 100%; min-height: 96px; }
   .gx-items .it-eqslots .it-wt { display: none; } /* 칸이 59보다 작아 무게 글자가 그림을 가린다 (폰과 같음) */
+}
+/* 폭도 좁고 높이도 낮은 창 (폴드 펼침 677×674 실기, 2026-11-21 사용자: 「밑에 소지품 영역이 쥐똥만큼 보이잖아」 — 장착 띠가 410 이라 격자가 한 줄도 안 보였다).
+   짜임은 그대로 두고 낮게만: [아바타 전신 절반 크기 | 칸 수·무게 / 장착 8칸 한 줄(손 2 · 장비 6) / 사용칸 한 줄]. 띠 410 → 약 160, 격자가 두 줄 넘게 보인다.
+   창 높이 = 화면의 90%(.gx-panel) 라서 화면 높이로 가른다: 920 부터는 위의 넓은 모양으로도 격자 두 줄이 들어간다 */
+@media (min-width: 601px) and (max-height: 919px) {
+  @container (max-width: 603px) {
+    .gx-items.it-fix .it-eqin { display: grid; grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 6px 12px; --slot: min(59px, calc((100cqw - 64px - 12px - 7 * 6px) / 8)); }
+    .gx-items.it-fix .it-av { grid-column: 1; grid-row: 1 / span 2; width: 64px; min-width: 0; height: 128px; align-self: end; }
+    .gx-items.it-fix .it-av .gx-look { zoom: .5; } /* 전신을 자르지 않고 절반 크기로 (도트 2배 화면에서 딱 1:1). 끼우는 동작 장의 음수 여백도 같이 줄어 발밑이 안 움직인다 */
+    .gx-items.it-fix .it-eqcol { grid-column: 2; grid-row: 1; gap: 6px; min-width: 0; }
+    .gx-items.it-fix .it-eqslots { grid-template-columns: repeat(8, var(--slot)); gap: 6px; }
+    .gx-items.it-fix .it-slot { padding: 4px; border-radius: 10px; }
+    .gx-items.it-fix .it-slot .it-dmg { left: 3px; top: 3px; padding: 0 3px; font-size: 9px; }
+    .gx-items.it-fix .it-eqslots .it-slot:nth-child(4n) .it-tip { left: calc(100% + 8px); right: auto; }
+    .gx-items.it-fix .it-eqslots .it-slot:nth-child(n+5) .it-tip { left: auto; right: calc(100% + 8px); }
+    .gx-items.it-fix .it-usebox { grid-column: 2; grid-row: 2; flex-direction: row; align-items: center; gap: 10px; min-width: 0; min-height: 0; padding: 4px 10px; }
+    .gx-items.it-fix .it-usebox .it-ulab { flex: none; }
+    .gx-items.it-fix .it-usebox .it-uchips { flex: 1 1 auto; }
+  }
+}
+/* 상점 팔기도 같은 창 크기에서 같은 모양으로 낮춘다: [아바타 절반 크기 | 장착 8칸 한 줄]. 띠 282 → 152 (본문 .sh-body 가 통째로 스크롤이라 띠가 낮을수록 소지품 구획이 위로 올라온다) */
+@media (min-width: 601px) and (max-height: 919px) {
+  @container (max-width: 780px) { /* 752 폭 폴드 펼침(본문 약 700)도 들어가게 (2026-11-21 실기 752×749), PC 980 창(본문 약 944)은 안 걸림 */
+    .sh-body .it-eqbox.sell .it-eqin { align-items: center; --slot: min(59px, calc((100cqw - 2 * var(--zp) - 2px - 64px - 14px - 7 * 6px) / 8)); }
+    .sh-body .it-eqbox.sell .it-av { width: 64px; height: 128px; }
+    .sh-body .it-eqbox.sell .it-av .gx-look { zoom: .5; }
+    .sh-body .it-eqbox.sell .it-eqslots { grid-template-columns: repeat(8, var(--slot)); gap: 6px; }
+    .sh-body .it-eqbox.sell .it-slot { padding: 4px; border-radius: 10px; }
+    .sh-body .it-eqbox.sell .it-slot .it-dmg { left: 3px; top: 3px; padding: 0 3px; font-size: 9px; }
+    .sh-body .it-eqbox.sell .it-eqslots .it-wt { display: none; }
+    .sh-body .it-eqbox.sell .it-eqslots .it-slot:nth-child(4n) .it-tip { left: calc(100% + 8px); right: auto; }
+    .sh-body .it-eqbox.sell .it-eqslots .it-slot:nth-child(n+5) .it-tip { left: auto; right: calc(100% + 8px); }
+  }
 }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gx-items .it-eqin { gap: 10px; flex-wrap: wrap; --slot: min(59px, calc((100vw - 32px - 24px - 128px - 10px - 8px) / 2)); }
@@ -4220,7 +4265,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-sm .ph.want{background:#fffdf8;border:1.5px dashed #c9b9a6;box-shadow:none;place-items:start;align-content:start;padding:16px;gap:10px;text-align:left}
 .bs-sm .ph.want b{background:#3a322c;color:#fff;font-size:12px;padding:3px 8px;border-radius:4px;justify-self:start}
 .bs-sm .ph.want p{margin:0;font-size:13.5px;line-height:1.55;color:#5b524a}
-.bs-sm.bs-m .c .bs-sm .ph.want{padding:8px;gap:6px}.bs-sm.bs-m .c .bs-sm .ph.want p{font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.bs-sm.bs-m .c .ph.want{padding:8px;gap:6px}.bs-sm.bs-m .c .ph.want p{font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .bs-sm .ph.dark{background:radial-gradient(circle at 50% 40%,#4b4640,#24211e)}
 .bs-sm .ph .tag{position:absolute;left:8px;top:8px;padding:2px 7px;border-radius:3px;background:rgba(43,38,34,.85);color:#fff;font-size:11px;font-weight:700}
 .bs-sm .ph .tag.g{background:#3d7a58}
@@ -4248,7 +4293,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-sm.bs-m .bar2{flex-wrap:wrap;row-gap:8px}.bs-sm.bs-m .bar2 .loc{order:1}.bs-sm.bs-m .sort{order:2}.bs-sm.bs-m .cats{order:3;width:100%;overflow-x:auto;scrollbar-width:none}
 .bs-sm.bs-m .grid{grid-template-columns:minmax(0,1fr);gap:0}
 .bs-sm.bs-m .c{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid #e4ddd3}
-.bs-sm.bs-m .c .bs-sm .ph{border-radius:6px}.bs-sm.bs-m .c .bs-sm .ph img{width:85px;height:85px}.bs-sm.bs-m .c .nm{margin-top:2px}
+.bs-sm.bs-m .c .ph{border-radius:6px}.bs-sm.bs-m .c .ph img{width:85px;height:85px}.bs-sm.bs-m .c .nm{margin-top:2px}
 
 /* 첨부 공통 */
 .bs .ax{margin:12px 0;max-width:min(100%,520px)}
@@ -5022,6 +5067,18 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk .wdr .nw-kgrid-in { background: #fff; border-color: #ccc; border-radius: 6px; }
 .wk .wdr .nw-kgrid-in button { border: 1px solid #ccc; border-radius: 4px; background: #fafafa; color: #1f5a4f; display: grid; place-items: center; }
 .wk .wdr .nw-fail { flex: none; margin: 0 12px 12px; font-size: 12.5px; color: #555; }
+/* 위키 칸 자체가 좁을 때 (폴드 펼침 PC 배치 ~511): 오른쪽 「최근 변경」 칸을 본문 아래로, 정보 상자는 띄우지 않고 한 줄 전체.
+   화면 폭이 아니라 위키 스크롤 칸 폭 기준이라 1280 PC 는 두 칸 그대로. 폰 규칙(아래 @media)이 뒤에 와서 폰은 폰대로 */
+.wk .wsc { container: wkw / inline-size; }
+@container wkw (max-width: 700px) {
+  .wk .wrap { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px 16px; }
+  .wk .doc { padding: 20px 22px; }
+  .wk .wst { padding: 12px 16px 0; }
+  /* 띄우지 않되 PC 와 같은 300px 로 가운데 — 폭 전체면 사진이 첫 화면을 다 채움 (11-21) */
+  .wk .nw-infobox { float: none; width: min(100%, 300px); margin: 0 auto 14px; }
+  /* 사진은 PC 와 같은 정사각 자르기 그대로, 크기만 170px — 펼친 폴드 첫 화면에 정보표 줄·본문이 보이게 */
+  .wk .nw-infobox td.nw-ibphoto img { width: 170px; max-width: 100%; margin: 0 auto; }
+}
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .wk .top { padding: 0 12px; }
   .wk .top nav, .wk .wlb { display: none; }
@@ -5035,6 +5092,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .wst { padding: 8px 8px 0; }
   .wk .doc { padding: 16px 14px; }
   .wk .nw-infobox { float: none; width: 100%; margin: 0 0 14px; }
+  .wk .nw-infobox td.nw-ibphoto img { width: 100%; }
   .wk .h1r { flex-direction: column; gap: 4px; }
   .wk .dbtn { margin: 0 0 4px; }
   .wk .rr { flex-wrap: wrap; }
@@ -5106,6 +5164,10 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs .gn-dmwin-hd b svg { width: 16px; height: 16px; }
 .bs .gn-dmwin-bd { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 10px 12px; }
 .bs .gn-dmwin-bd > .ph-room, .bs .gn-dmwin-bd > .ph-form { flex: 1; min-height: 0; }
+/* 쪽지·채팅 창이 낮으면(폴드 펼침 등) 새 쪽지 「보내기」가 창 밑으로 잘리던 것: 쓰는 칸만 스크롤, 보내기 줄은 늘 보이게 */
+.bs .gn-dmwin-bd > .ph-form { display: flex; flex-direction: column; }
+.bs .gn-dmwin-bd > .ph-form > .ph-form-body { flex: 1; min-height: 0; overflow-y: auto; align-content: start; }
+.bs .gn-dmwin-bd > .ph-form > .ph-form-foot { flex: none; }
 .bs .gn-dmwin-bd .ph-log { flex: 1; min-height: 0; overflow-y: auto; }
 .bs .gn-dmwin-bd .ph-list { overflow-y: auto; min-height: 0; }
 .bs .gn-dmwin-bd .bs-dmh { justify-content: flex-end; margin-bottom: 6px; }
@@ -5646,11 +5708,28 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs.hs-m .hs-ord button { flex: 1; padding: 11px 0; font-size: 13.5px; }
 .hs.hs-m .hs-chat { height: 240px; margin-top: 12px; }
 .hs.hs-m .hs-sec h4 { flex-wrap: wrap; gap: 2px 10px; }
-.hs.hs-m .hs-lu:not(.col) { grid-template-columns: 1fr 1fr; }
+.hs.hs-m .hs-lu:not(.col) { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } /* 1fr 만 쓰면 카드 글 폭만큼 칸이 벌어져 좁은 폰(344)에서 오른쪽 카드가 잘렸다 */
 .hs.hs-m .hs-lc .st { position: absolute; right: 6px; top: 6px; }
 .hs.hs-m .hs-ol .bar { display: none; }
 .hs.hs-m .hs-dim { place-items: end center; padding: 0; position: fixed; }
 .hs.hs-m .hs-pop { position: relative; top: auto; bottom: auto; width: 100%; max-height: 82%; border-radius: 14px 14px 0 0; border-bottom: 0; }
+/* 좁은 PC 창 (11-21 사용자 실기: 폴드 펼친 화면에서 잘린다. 창 폭이 600 을 넘어 PC 배치인데 사이트 칸은 510~580 이라 채팅 칸이 오른쪽 밖으로 나가고 머리띠 글이 겹쳤다).
+   ui/hsplayer.ts siteFit 이 사이트 칸 폭 720 미만이면 .hs-n, 높이 480 미만이면 .hs-s 를 붙인다. PC 배치 그대로 두고 자리만 다시 잡는다 */
+.hs.hs-n .hs-gnb { flex-wrap: wrap; height: auto; gap: 0 12px; padding: 8px 16px 0; }
+.hs.hs-n .hs-logo { flex: 1; font-size: 22px; }
+.hs.hs-n .hs-tel { font-size: 16px; }
+.hs.hs-n .hs-tel small { display: none; }
+.hs.hs-n .hs-menu { flex: none; order: 3; width: 100%; height: 40px; margin: 4px -10px 0; overflow-x: auto; scrollbar-width: none; }
+.hs.hs-n .hs-menu::-webkit-scrollbar { display: none; }
+.hs.hs-n .hs-bd { display: block; }
+.hs.hs-n .hs-main { width: auto; }
+.hs.hs-n .hs-chat { height: 240px; margin-top: 12px; }
+.hs.hs-n .hs-dim { padding: 8px; }
+/* 낮은 창의 전화 주문: 결제 고르기 칸이 두 줄도 안 보였다 → 왼쪽 칸(상품·결제·조건·주문 단추)을 통째로 스크롤 */
+.hs.hs-s .hs-side { overflow-y: auto; }
+.hs.hs-s .hs-side > .sc { flex: none; overflow: visible; }
+/* 단독 창: 창(전화 주문·스티커·방청)이 떠 있는 동안 창 닫기 단추가 그 창의 닫기 단추를 덮지 않게 어둠막 아래로 */
+.gx-netsolo:has(.hs .hs-dim) .br-solox { z-index: 4; }
 
 
 /* 닫기·취소 단추 공통 (2026-11-13 사용자: X 가 상자 가운데에서 삐뚤다 → 다른 창도 같은 규칙으로).
@@ -5708,8 +5787,21 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .bs-sm:not(.bs-m) .hd .lg { flex: none; white-space: nowrap; }
   .bs-sm:not(.bs-m) .hd nav { flex: 1 1 calc(100% - 180px); gap: 14px; white-space: nowrap; }
   .bs-sm:not(.bs-m) .hd .sr { flex: 1 1 160px; width: auto; min-width: 0; margin-left: 0; }
+  /* 752 폭(실기 폴드 펼침): 「근처 매물」이 두 줄로 꺾이고 거래 구분 칩이 줄 사이로 흩어지던 것 → 제목·정렬 한 줄, 칩은 다음 줄 */
+  .bs-sm:not(.bs-m) .note { padding: 8px 14px; }
+  .bs-sm:not(.bs-m) .sec { padding: 14px; }
+  .bs-sm:not(.bs-m) .bar2 { flex-wrap: wrap; row-gap: 8px; }
+  .bs-sm:not(.bs-m) .bar2 .loc { white-space: nowrap; }
+  .bs-sm:not(.bs-m) .bar2 .cats { order: 3; flex: 1 1 100%; flex-wrap: wrap; }
+  /* 매물 격자: PC 처럼 세 칸, 물건 그림은 칸에 맞춰 줄임 */
+  .bs-sm:not(.bs-m) .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 20px 14px; }
+  .bs-sm:not(.bs-m) .grid .ph img { width: 78%; height: auto; }
+  /* 매물 글: 그림 400px 고정이라 글 칸이 150px 로 눌리던 것 */
+  .bs-sm:not(.bs-m) .detail { grid-template-columns: 220px minmax(0, 1fr); gap: 20px; padding: 14px; }
+  .bs-sm:not(.bs-m) .detail .ph img { width: 180px; height: 180px; }
+  .bs-gal .bs-x, .bs-sm .bs-x { padding: 10px 14px 0; }
   /* 괴담넷 본문: 왼쪽 글 목록 칸을 좁혀 글·새 글 칸에 폭을 준다 (글 칸이 170~200px 라 답글 안내가 세로로 쌓였다) */
-  .bs-gn:not(.bs-m) .wrap { grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  .bs-gn:not(.bs-m) .wrap { grid-template-columns: minmax(150px, 32%) minmax(0, 1fr); gap: 12px; padding: 14px; } /* 752 폭에서 왼쪽 글 목록 제목이 4~5글자에서 잘리던 것: 폭의 1/3 까지 */
   .bs-gn:not(.bs-m) .side { padding: 6px; }
   .bs-gn:not(.bs-m) .side button { padding: 8px; }
   .bs-gn:not(.bs-m) .side h6 { margin: 10px 8px 4px; }
@@ -5727,4 +5819,85 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   /* 기록 › 인물 머리: 단추 셋을 다음 줄로 내려 이름 아래 설명이 4~5줄로 꺾이지 않게 */
   .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) { flex-wrap: wrap; }
   .ph-room-head.ph-wrapsub:has(> .ph-act > :nth-child(3)) > .ph-act { flex: 1 0 100%; justify-content: flex-end; }
+}
+
+/* 폴드 펼침 임무 (커스텀 줄·목록 제목) */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  /* 커스텀 위 줄: 종류 칩 + 「⇆ 임무」 한 줄 (전환 단추만 혼자 한 줄을 먹었다), 다음 줄에 검색 + 취소. 왼쪽 끝은 목록 카드와 맞춘다 */
+  .gx-mission .gx-mfilter { gap: 6px; }
+  .gx-mission .gx-mfilter > .gx-chip { order: 1; padding: 0 10px; }
+  .gx-mission .gx-mfilter > .gx-mswap { order: 2; height: var(--ctl-sm); padding: 0 10px 0 8px; margin-left: auto; }
+  .gx-mission .gx-mfilter > .gx-search { order: 3; flex: 1 1 calc(100% - 80px); min-width: 0; margin-left: 0; }
+  .gx-mission .gx-mfilter > .gx-unplace { order: 4; }
+  /* 목록 카드 제목: 왼쪽 칸이 230px 남짓이라 이름이 「얼굴 없는 …」으로 잘렸다 → 두 줄까지 접어 다 보이게 */
+  /* 띠 높이는 글에 맞춰 늘린다 (68px 아래로는 안 줄임). 영어 이름도 두 줄까지 */
+  .gx-mx:not(.open) .gx-mx-art { display: flex; align-items: center; height: auto; min-height: 68px; }
+  .gx-mx:not(.open) .gx-evart-cap { position: relative; inset: auto; transform: none; flex: 1; margin: 9px 56px 9px 12px; }
+  .gx-mx:not(.open) .gx-mx-art:has(> .gx-evart-top) .gx-evart-cap { margin-right: 120px; }
+  .gx-mx:not(.open) .gx-evart-name small { line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .gx-mx:not(.open) .gx-evart-name b { font-size: 15px; line-height: 1.25; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+  .gx-field :is(.gx-evc-name b, .gx-evart-l1 > b) { line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+/* 폴드 펼침 임무 (편성 카드) */
+/* 지원 인원 카드: −/+ 가 이름 자리를 먹어 「지원 …」「등록 …」(673 폭은 「지」「등」)만 남았다 → −/+ 를 이름 아래 줄로 (752·673 모두).
+   요원 카드: 편성 칸이 좁을 때(673 폭, 카드 215px 안팎)만 톡·위키 단추가 이름 줄을 먹어 4글자 이름이 「고그...」로 잘리고,
+   소속·직급도 잘리고, 고른 표시(✓)가 소속 끝을 덮었다. 그때만 단추를 카드 오른쪽에 위아래로 세우고 이름·소속을 두 줄까지 꺾고,
+   ✓는 사진 오른쪽 아래 모서리로 옮긴다. 752 폭(카드 238px 안팎)은 이미 다 보여 그대로 둔다 */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  .gx-acard.pick.gx-scard { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 6px; align-items: center; }
+  .gx-acard.pick.gx-scard > .gx-ava { grid-row: 1 / span 2; }
+  .gx-acard.pick.gx-scard .gx-acard-txt small { white-space: normal; word-break: keep-all; line-height: 1.35; }
+  .gx-acard.pick.gx-scard > .gx-scard-step { grid-column: 2; }
+  .gx-acards.pick:has(> .gx-acard.pick.wide) { container-type: inline-size; }
+  @container (max-width: 225px) {
+    .gx-acard.pick.wide { height: auto; min-height: var(--acard-h, 96px); align-self: start; }
+    .gx-acard.pick.wide .gx-acard-act { top: 6px; right: 4px; flex-direction: column; gap: 2px; }
+    .gx-acard.pick.wide .gx-acard-txt { padding-right: 36px; }
+    .gx-acard.pick.wide .gx-acard-top { padding-right: 0; flex-wrap: wrap; row-gap: 4px; }
+    .gx-acard.pick.wide .gx-acard-top b { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.3; }
+    .gx-acard.pick.wide .gx-acard-txt > * { flex: none; }
+    .gx-acard.pick.wide .gx-acard-txt small { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.35; }
+    .gx-acard.pick.wide .gx-acard-check { z-index: 1; top: 50%; bottom: auto; left: 46px; right: auto; transform: translateY(8px); width: 20px; height: 20px; font-size: 12px; box-shadow: 0 0 0 2px var(--void); }
+  }
+/* 폴드 펼침 임무 (지도 이름표·거르기 칩) */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  /* 왼쪽 칸이 230~265px 라 지도가 작다. 이름표를 줄여 겹쳐서 숨는 이름표(서울·대전·대구 등)를 줄인다. 자리 비키기·숨기기는 mapzoom 의 declutter 그대로 */
+  .gx-field .gx-pname { gap: 3px; padding: 0 4px; border-radius: 5px; font-size: 11px; line-height: 1.35; }
+  .gx-field .gx-pin.nation .gx-pname { font-size: 11.5px; }
+  .gx-field .gx-pname b { padding: 0 4px; font-size: 10.5px; }
+  /* 거르기 칩 다섯 개(전체·괴이·사건·특수·취소)가 752 폭(폴드 펼침)에서 한 줄에 들게 옆 여백·틈만 줄인다 (높이 34px 그대로. 더 좁으면 전처럼 둘째 줄로) */
+  .gx-field .gx-sitbar { gap: 4px; }
+  .gx-field .gx-sitbar .gx-chip { gap: 3px; padding: 0 7px; }
+  .gx-field .gx-sitbar .gx-unplace { margin-left: 0; }
+}
+
+/* 폴드 펼친 화면 같은 좁은 PC 창(601~860 폭): 시작 패널도 본 창과 같은 폭으로 (3:4 로 자르면 본 창보다 좁고 소속 카드가 한 줄에 하나씩이라 「출발」까지 여러 화면을 내려야 했다).
+   커스텀의 펼친 목표 카드는 정사각형으로 (4:3 이면 210px 과녁이 위아래로 잘렸다) */
+@media (min-width: 601px) and (max-width: 860px) {
+  .gx-panel.pre.pick { width: min(90%, 1024px); }
+  .gx-mlist .gx-mx.open .gx-mx-art { aspect-ratio: 1 / 1; }
+/* 폴드 펼친 화면(601~860 폭) · 인터넷 틀과 두 쇼핑몰 (11-21 훑기). PC 배치는 그대로, 폭만 맞춘다.
+   즐겨찾기 줄: 511px 에 일곱 개가 안 들어가 「괴이위키」가 잘리고 포인트몰·망상홈쇼핑이 화면 밖에 있었다 → 두 줄로 접는다.
+   우주몰·포인트몰: 왼쪽 메뉴 170px 가 본문의 3분의 1을 먹어 우주몰 상품이 96px 세 줄(단추 글자가 세로로 쌓임), 포인트몰은 273px 한 줄이었다 → 메뉴를 좁히고 두 줄.
+   상담 창: 창 높이에서 위 108px 를 비워 677×674 에서 대화 칸이 290px 였다 → 위 여백을 줄인다 */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  .br-bms { flex-wrap: wrap; height: auto; min-height: 30px; padding: 3px 6px; gap: 2px; }
+  .br .br-bm { padding: 0 7px; gap: 6px; }
+  .ms-cos .cs-fr { grid-template-columns: 124px minmax(0, 1fr); }
+  .ms-cos .cs-lf { padding: 10px 6px; }
+  .ms-cos .cs-lt { font-size: 12.5px; }
+  .ms-cos .cs-ufo.cs-big { width: 64px; height: 48px; }
+  .ms-cos .cs-cnt span { letter-spacing: 1px; }
+  .ms-cos .cs-mn { padding: 12px 12px 20px; }
+  .ms-cos .cs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ms-cos .cs-bt { flex-wrap: wrap; }
+  .ms-cos .cs-askwin { top: 12px; right: 12px; width: min(440px, calc(100% - 24px)); height: min(540px, calc(100% - 24px)); }
+  .ms-bm .bp-wrap { grid-template-columns: 128px minmax(0, 1fr); gap: 14px; padding: 16px; }
+  .ms-bm .bp-side button { padding: 9px 12px; }
+  .ms-bm .bp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .ms-bm .bp-it { padding: 10px; }
+  .ms-bm .bp-pic { height: 100px; }
+  .ms-bm .bd-win { top: 12px; right: 12px; width: min(420px, calc(100% - 24px)); height: min(560px, calc(100% - 24px)); }
+}
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px) and (max-height: 760px) {
+  .br-ntp { padding-top: 32px; }
 }

@@ -212,17 +212,34 @@ function build(): void {
   chatLog.className = 'hs-chlog';
 }
 
-/** 「자동·폭 맞춤」 배율: 방송 칸이 화면을 다 차지하지 않게, 사이트 칸 폭(PC 는 채팅 칸을 뺀 폭)과 보이는 높이 안에서.
+/** 사이트 칸이 좁거나 낮은 PC 창(폴드 펼친 화면 등: 창 폭 600 초과라 PC 배치인데 사이트 칸은 510~580): 채팅 칸을 옆에 둘 자리가 없어 오른쪽이 잘렸다 (11-21 사용자 실기).
+ *  .hs-n = 폭 720 미만 → 채팅을 방송 칸 아래로, 머리띠 두 줄. .hs-s = 높이 480 미만 → 전화 주문 창 왼쪽 칸을 통째로 스크롤. 폰 배치(.hs-m)는 그대로 */
+const SITE_NARROW = 720;
+const SITE_SHORT = 480;
+export function siteFit(page: HTMLElement | null | undefined): void {
+  if (!page || !page.clientWidth) return;
+  const pc = !page.classList.contains('hs-m');
+  page.classList.toggle('hs-n', pc && page.clientWidth < SITE_NARROW);
+  page.classList.toggle('hs-s', pc && page.clientHeight < SITE_SHORT);
+}
+
+/** 방송 칸이 쓸 수 있는 폭: 채팅 칸이 옆에 있으면(넓은 PC) 채팅 칸 최소 폭 260 + 사이 14 를 뺀다 · 방송 칸 테두리 2 */
+function roomWidth(wrap: HTMLElement, page: HTMLElement): number {
+  const cs = getComputedStyle(wrap);
+  const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  const side = !page.classList.contains('hs-m') && !page.classList.contains('hs-n');
+  return (side ? inner - 274 : inner) - 2;
+}
+
+/** 「자동·폭 맞춤」 배율: 방송 칸이 화면을 다 차지하지 않게, 사이트 칸 폭(넓은 PC 는 채팅 칸을 뺀 폭)과 보이는 높이 안에서.
  *  1배·2배처럼 정수가 들어가면 정수로 (도트가 고르게), 1배도 안 들어가면 그 폭에 맞춰 줄인다 (11-11 사용자: 큰 화면에서 2배로 커져 나머지가 안 보였다) */
 function fitScale(w: number, h: number): number {
   const wrap = stage?.closest<HTMLElement>('.hs-wrap');
   const page = stage?.closest<HTMLElement>('.hs');
   if (!wrap || !page) return 1;
   const phone = page.classList.contains('hs-m');
-  const cs = getComputedStyle(wrap);
-  const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  // PC: 채팅 칸 최소 폭 260 + 사이 14 · 방송 칸 테두리 2. 높이: 보이는 높이의 60% (아래 상품 칸·주문 단추가 첫 화면에 같이 보이게)
-  const roomW = (phone ? inner : inner - 274) - 2;
+  // 높이: 보이는 높이의 60% (아래 상품 칸·주문 단추가 첫 화면에 같이 보이게)
+  const roomW = roomWidth(wrap, page);
   const roomH = (page.clientHeight || window.innerHeight) * (phone ? 0.5 : 0.6) - 36;
   const fit = Math.max(0.25, Math.min(roomW / w, roomH / h));
   return fit >= 2 ? 2 : fit >= 1 ? 1 : fit;
@@ -233,15 +250,12 @@ function widthScale(w: number): number {
   const wrap = stage?.closest<HTMLElement>('.hs-wrap');
   const page = stage?.closest<HTMLElement>('.hs');
   if (!wrap || !page) return 1;
-  const phone = page.classList.contains('hs-m');
-  const cs = getComputedStyle(wrap);
-  const inner = wrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-  const roomW = (phone ? inner : inner - 274) - 2;
-  return Math.max(0.25, roomW / w);
+  return Math.max(0.25, roomWidth(wrap, page) / w);
 }
 
 function layout(): void {
   if (!stage || !canvas || !feed) return;
+  siteFit(stage.closest<HTMLElement>('.hs'));
   const w = feed.art?.pack.w ?? 512;
   const h = feed.art?.pack.h ?? 384;
   // 0 = 자동(보이는 자리에 맞춤), -1 = 폭 맞춤
