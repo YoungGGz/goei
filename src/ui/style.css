@@ -5756,6 +5756,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
     .gx-acard.pick.wide .gx-acard-txt small { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.35; }
     .gx-acard.pick.wide .gx-acard-check { z-index: 1; top: 50%; bottom: auto; left: 46px; right: auto; transform: translateY(8px); width: 20px; height: 20px; font-size: 12px; box-shadow: 0 0 0 2px var(--void); }
   }
+  /* 752 폭(폴드 펼침 실기): 편성 목록이 요원 카드 3장 반만 보였다 → 카드 높이만 줄여 4장 넘게 (배치는 그대로) */
+  @container (min-width: 226px) { .gx-acard.pick.wide { --acard-h: 84px; padding: 4px 10px; } .gx-acard.pick.wide .gx-acard-txt { gap: 2px; } }
+}
 /* 폴드 펼침 임무 (지도 이름표·거르기 칩) */
 @media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
   /* 왼쪽 칸이 230~265px 라 지도가 작다. 이름표를 줄여 겹쳐서 숨는 이름표(서울·대전·대구 등)를 줄인다. 자리 비키기·숨기기는 mapzoom 의 declutter 그대로 */
