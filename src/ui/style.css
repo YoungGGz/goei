@@ -3898,7 +3898,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 }
 /* 상점 팔기도 같은 창 크기에서 같은 모양으로 낮춘다: [아바타 절반 크기 | 장착 8칸 한 줄]. 띠 282 → 152 (본문 .sh-body 가 통째로 스크롤이라 띠가 낮을수록 소지품 구획이 위로 올라온다) */
 @media (min-width: 601px) and (max-height: 919px) {
-  @container (max-width: 660px) {
+  @container (max-width: 780px) { /* 752 폭 폴드 펼침(본문 약 700)도 들어가게 (2026-11-21 실기 752×749), PC 980 창(본문 약 944)은 안 걸림 */
     .sh-body .it-eqbox.sell .it-eqin { align-items: center; --slot: min(59px, calc((100cqw - 2 * var(--zp) - 2px - 64px - 14px - 7 * 6px) / 8)); }
     .sh-body .it-eqbox.sell .it-av { width: 64px; height: 128px; }
     .sh-body .it-eqbox.sell .it-av .gx-look { zoom: .5; }
