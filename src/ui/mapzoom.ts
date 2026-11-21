@@ -10,6 +10,10 @@ interface View { z: number; x: number; y: number }
 /** 지역별 확대 상태. 다시 그려도 보던 자리를 지킨다 */
 const views = new Map<string, View>();
 
+/** 지도 칸 크기가 바뀌면(창 크기·늦게 잡히는 배치) 지금 그려진 지도의 채우기·자리를 다시 맞춘다. 관찰자는 하나만 둔다 */
+let reapply: (() => void) | null = null;
+let sizeWatch: ResizeObserver | null = null;
+
 /** nation: 지역 지도일 때 맨 아래 「전국」 (v0.16.17: 지도 위 줄에 있던 ← 전국을 확대 버튼 밑으로).
  *  원래 크기 버튼은 맨 위: 확대하면 생기는데 아래에 두면 +/− 가 한 칸씩 밀려 올라갔다 (v0.16.18) */
 export function mapZoomControls(nation = false): string {
@@ -44,7 +48,8 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
   const dots = [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')];
   if (!labs.length) return;
   for (const el of labs) el.style.removeProperty('--lx'), el.style.removeProperty('--ly');
-  const F = box(frame);
+  // 칸 테두리(1px)에서 1px 더 안쪽까지만 (이름표가 칸 위 끝을 3px 넘어 검색 칸을 덮었다, 752×749 실리수)
+  const F = grow(box(frame), -2);
   const inFrame = (r: Box) => r.l >= F.l && r.r <= F.r && r.t >= F.t && r.b <= F.b;
   const dotBox = dots.map((d) => { const dot = d.querySelector('.gx-dot'); return dot ? box(dot) : null; });
   const order = labs.map((el, i) => ({ el, i })).sort((a, b) => rank(a.el) - rank(b.el) || a.i - b.i);
@@ -54,8 +59,14 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     const name = el.querySelector('.gx-pname');
     const D = dotBox[i];
     if (!name || !D) continue;
-    const N = box(name);
-    const w = N.r - N.l, h = N.b - N.t, my = (D.t + D.b) / 2 - h / 2;
+    const N0 = box(name);
+    const w = N0.r - N0.l, h = N0.b - N0.t;
+    // 점이 칸 안에 보이는데 제자리 이름표가 칸 밖으로 삐져나가면 칸 안으로 밀어 넣는다 (확대해 칸 밖으로 나간 점은 그대로)
+    const dIn = D.l >= F.l && D.r <= F.r && D.t >= F.t && D.b <= F.b;
+    const nl = dIn && w <= F.r - F.l ? Math.min(Math.max(N0.l, F.l), F.r - w) : N0.l;
+    const nt = dIn && h <= F.b - F.t ? Math.min(Math.max(N0.t, F.t), F.b - h) : N0.t;
+    const N = { l: nl, t: nt, r: nl + w, b: nt + h };
+    const my = (D.t + D.b) / 2 - h / 2;
     // 아래(제자리) → 위 → 오른쪽 → 왼쪽 → 네 귀퉁이 → 옆 반 칸 위아래
     // (옆 반 칸: 귀퉁이까지 막혀 이름표 없는 점이 여럿 남았다, 전수점검 눌러-사소-1·눌러2-보통-7. 점에 닿는 자리만이라 어느 점 이름인지는 그대로 읽힌다)
     const up = D.t - 2 - h, dn = D.b + 2, rt = D.r + 1, lt = D.l - 1 - w, hh = h / 2 + 1;
@@ -73,9 +84,9 @@ function declutter(layer: HTMLElement, frame: HTMLElement, z: number): void {
     if (at < 0 && rank(el) === 0) at = 0, placed.push({ l: N.l, t: N.t, r: N.r, b: N.b });
     const blocked = at < 0;
     el.classList.toggle('lab-off', blocked);
-    if (at > 0) {
-      el.style.setProperty('--lx', `${(spots[at][0] - N.l) / z}px`);
-      el.style.setProperty('--ly', `${(spots[at][1] - N.t) / z}px`);
+    if (at >= 0 && (spots[at][0] !== N0.l || spots[at][1] !== N0.t)) {
+      el.style.setProperty('--lx', `${(spots[at][0] - N0.l) / z}px`);
+      el.style.setProperty('--ly', `${(spots[at][1] - N0.t) / z}px`);
     }
     const d = dots[i];
     d.toggleAttribute('title', blocked);
@@ -104,6 +115,14 @@ function placeZoom(canvas: HTMLElement, layer: HTMLElement): void {
   canvas.classList.toggle('zl', score(left) < score(right));
 }
 
+/** 이름표가 칸 끝에 잘리지 않게 핀 범위 양쪽에 두는 여유(px) */
+const PIN_PAD = 16;
+/** 지금 지도의 핀 점 좌우 범위 (겹 폭에 대한 비율 0~1). 핀은 field.ts 가 left:% 로 놓는다 */
+function pinSpan(layer: HTMLElement): { l: number; r: number } | null {
+  const xs = [...layer.querySelectorAll<HTMLElement>('.gx-pin.gx-pdot')].map((p) => parseFloat(p.style.left) / 100).filter((n) => Number.isFinite(n));
+  return xs.length ? { l: Math.min(...xs), r: Math.max(...xs) } : null;
+}
+
 /** render() 뒤에 부른다. 지도 칸이 없으면 아무것도 안 한다 */
 export function bindMapZoom(root: HTMLElement): void {
   const canvas = root.querySelector<HTMLElement>('.gx-canvas[data-map]');
@@ -111,7 +130,7 @@ export function bindMapZoom(root: HTMLElement): void {
   if (!canvas || !layer) return;
   const key = canvas.dataset.map ?? '';
   // 처음엔 가운데 (PC 임무 탭은 칸이 그림보다 낮아 위아래가 잘린다. 2026-10-21 사용자: 끌어서 본다)
-  let v = views.get(key) ?? { z: 1, x: 0, y: Number.NaN };
+  let v = views.get(key) ?? { z: 1, x: Number.NaN, y: Number.NaN };
   const canPan = () => layer.offsetWidth * v.z > canvas.clientWidth + 1 || layer.offsetHeight * v.z > canvas.clientHeight + 1;
 
   const img = canvas.querySelector<HTMLImageElement>('.gx-mapimg');
@@ -122,7 +141,24 @@ export function bindMapZoom(root: HTMLElement): void {
       layer.style.transform = '';
       return;
     }
-    if (Number.isNaN(v.y)) v = { ...v, y: (canvas.clientHeight - layer.offsetHeight) / 2 };
+    // 폴드 펼침 폭(601~860, CSS --gx-mapfill: 1): 칸이 남은 높이를 다 쓰므로 그림을 칸 높이까지 키운다.
+    // 칸보다 넓어진 그림은 좌우로 끌어서 본다. 핀은 겹(.gx-mapzoom) 기준 %라 겹 폭만 바꾸면 제자리를 지킨다
+    const fill = getComputedStyle(canvas).getPropertyValue('--gx-mapfill').trim() === '1';
+    // 단, 처음 화면에 모든 핀이 보이게 겹 폭에 상한을 둔다: 핀 좌우 범위(+이름표 여유 PIN_PAD 양쪽)가 칸 폭 안에 들어오게.
+    // 상한에 걸려 그림이 칸보다 낮아지면 위아래는 clamp 가 가운데에 둔다(남는 띠는 칸 배경색)
+    const cw = canvas.clientWidth, ch = canvas.clientHeight;
+    const span = pinSpan(layer);
+    if (fill && img?.naturalWidth && img.naturalHeight) {
+      const cap = span && span.r > span.l ? (cw - PIN_PAD * 2) / (span.r - span.l) : Number.POSITIVE_INFINITY;
+      const w = Math.max(cw, Math.min((ch * img.naturalWidth) / img.naturalHeight, cap));
+      layer.style.width = `${Math.floor(w)}px`;
+    } else layer.style.removeProperty('width');
+    if (Number.isNaN(v.y)) v = { ...v, y: (ch - layer.offsetHeight) / 2 };
+    // 처음엔 좌우도 가운데: 그림이 칸보다 넓으면 그림 가운데가 아니라 핀 범위 가운데를 칸 가운데에
+    if (Number.isNaN(v.x)) {
+      const lw = layer.offsetWidth;
+      v = { ...v, x: lw > cw && span ? cw / 2 - ((span.l + span.r) / 2) * lw : (cw - lw) / 2 };
+    }
     v = clamp(v, canvas.clientWidth, canvas.clientHeight, layer.offsetWidth, layer.offsetHeight);
     views.set(key, v);
     layer.style.transform = v.z === 1 && !v.x && !v.y ? '' : `translate(${v.x}px, ${v.y}px) scale(${v.z})`;
@@ -146,13 +182,19 @@ export function bindMapZoom(root: HTMLElement): void {
   };
   if (img && !img.complete) img.addEventListener('load', apply, { once: true });
   apply();
+  reapply = apply;
+  if (typeof ResizeObserver !== 'undefined') {
+    sizeWatch ??= new ResizeObserver(() => reapply?.());
+    sizeWatch.disconnect();
+    sizeWatch.observe(canvas);
+  }
 
   canvas.querySelector('.gx-zoom')?.addEventListener('click', (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>('[data-zoom]');
     if (!b) return;
     e.stopPropagation();
     const w = canvas.clientWidth / 2, h = canvas.clientHeight / 2;
-    if (b.dataset.zoom === 'reset') (v = { z: 1, x: 0, y: Number.NaN }), apply();
+    if (b.dataset.zoom === 'reset') (v = { z: 1, x: Number.NaN, y: Number.NaN }), apply();
     else zoomAt(v.z * (b.dataset.zoom === 'in' ? 1.6 : 1 / 1.6), w, h);
   });
 

@@ -2452,6 +2452,12 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   /* 칸 높이는 최소값. 목록이 짧으면 지도 칸이 남은 높이를 그림 높이까지 쓰고, 목록이 길면 목록이 줄어 스크롤 (전수점검 눌러-사소-1: 지도 아래 빈 자리) */
   .gx-map > .gx-mapcol > .gx-sits { flex: 0 1 auto; }
 }
+/* 폴드 펼침 폭 (752×749 실리수: 상황 목록이 짧으면 왼쪽 칸 아래 ~130px 가 비었다). 배치는 그대로, 크기만:
+   지도 칸이 남은 높이를 끝까지 쓰고(max-height 풀기), 그림은 칸 높이에 맞춰 키운다(mapzoom.ts 가 --gx-mapfill 을 보고 겹 폭을 정함).
+   목록이 길면 지금처럼 목록이 스크롤되고 지도 칸은 최소 높이로 줄어든다 */
+@media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
+  .gx-map > .gx-mapcol > .gx-canvas:not(.ph) { max-height: none; --gx-mapfill: 1; }
+}
 /* 카드 가운데 선택 과녁 (evcard.ts aimMark, 2026-10-29). 선은 늘 1px(크기와 무관), 중심은 고정(단추 크기 그대로, 그림만 scale).
    안 고름: 크고 얇고 흐리게, 바깥 눈금이 천천히 돌고 안 원이 숨 쉰다. 고름: 2/3 로 조여들며 붉게 잠김. 해제: 흰 고리와 함께 다시 커짐 */
 .gx-aim { position: absolute; left: 50%; top: 50%; z-index: 3; display: grid; place-items: center; width: 210px; height: 210px; padding: 0; border: 0; border-radius: 50%; background: none; color: #fff; transform: translate(-50%, -50%); cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -5145,6 +5151,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 /* 겹친 이름표는 위·옆으로 옮기고, 자리가 없으면 숨기고 점만 (mapzoom.ts declutter) */
 .gx-mapzoom .gx-pin.gx-plab { transform: translate(calc(-50% + var(--lx, 0px)), calc(-50% + var(--ly, 0px))) scale(var(--pz, 1)); }
 .gx-pin.gx-plab.lab-off { visibility: hidden; }
+/* 고른 핀(이름표·점)은 다른 핀·거점 점보다 위에 (752×749 실리수: 파란 거점 점이 「마포구」 이름표를 덮어 「마▢▢」로 읽혔다) */
+.gx-mapzoom .gx-pin.sel { z-index: 1; }
 /* 뒤로 단추는 어디서나 36 (11-09 점검 17: 폰은 40이었다). 인터넷 사이트(.bs) 안은 사이트 모양 그대로 */
 .ph-room-head > .ph-tool.ph-back { width: 36px; height: 36px; }
 .bs .ph-room-head > .ph-tool.ph-back { width: 34px; height: 34px; }
@@ -5894,6 +5902,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
     .gx-acard.pick.wide .gx-acard-txt small { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; line-height: 1.35; }
     .gx-acard.pick.wide .gx-acard-check { z-index: 1; top: 50%; bottom: auto; left: 46px; right: auto; transform: translateY(8px); width: 20px; height: 20px; font-size: 12px; box-shadow: 0 0 0 2px var(--void); }
   }
+  /* 752 폭(폴드 펼침 실기): 편성 목록이 요원 카드 3장 반만 보였다 → 카드 높이만 줄여 4장 넘게 (배치는 그대로) */
+  @container (min-width: 226px) { .gx-acard.pick.wide { --acard-h: 84px; padding: 4px 10px; } .gx-acard.pick.wide .gx-acard-txt { gap: 2px; } }
 }
 /* 폴드 펼침 임무 (지도 이름표·거르기 칩) */
 @media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
