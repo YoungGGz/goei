@@ -5735,6 +5735,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-mx:not(.open) .gx-evart-name small { line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .gx-mx:not(.open) .gx-evart-name b { font-size: 15px; line-height: 1.25; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
   .gx-field :is(.gx-evc-name b, .gx-evart-l1 > b) { line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+}
 /* 폴드 펼침 임무 (편성 카드) */
 /* 지원 인원 카드: −/+ 가 이름 자리를 먹어 「지원 …」「등록 …」(673 폭은 「지」「등」)만 남았다 → −/+ 를 이름 아래 줄로 (752·673 모두).
    요원 카드: 편성 칸이 좁을 때(673 폭, 카드 215px 안팎)만 톡·위키 단추가 이름 줄을 먹어 4글자 이름이 「고그...」로 잘리고,
