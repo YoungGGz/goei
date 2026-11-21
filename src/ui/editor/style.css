@@ -1211,3 +1211,7 @@
 .gw .dir-ext-item > b:has(+ span) { grid-row: 1 / 3; }
 /* 손가락으로 누르는 기기: 누른 줄에 :hover 채움이 남아, 체크를 푼 상시 로어북 줄이 고른 것처럼 초록으로 보였다 → 마우스가 없으면 올림 채움을 안 쓴다 */
 @media (hover: none) { .gw .dir-ext-item:hover { background: none; } }
+/* 폰 표(.ck-ph): 줄 이름은 한 줄(「망상홈쇼/핑」처럼 낱말 중간 꺾임 X, 0.21.24 처럼), 이름 칸은 글 폭만큼, 판보다 넓으면 표 안에서 옆으로 민다 (11-22) */
+.gw .ck-ph > .ps-rows { grid-template-columns: max-content repeat(var(--ck-n), minmax(min-content, 1fr)); }
+.gw .ck-ph .ck-name { white-space: nowrap; padding-right: 6px; min-width: max-content; }
+.gw .ck-ph .ck-name * { white-space: nowrap; overflow-wrap: normal; flex-shrink: 0; }
