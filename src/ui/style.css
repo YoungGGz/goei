@@ -5915,8 +5915,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
    우주몰·포인트몰: 왼쪽 메뉴 170px 가 본문의 3분의 1을 먹어 우주몰 상품이 96px 세 줄(단추 글자가 세로로 쌓임), 포인트몰은 273px 한 줄이었다 → 메뉴를 좁히고 두 줄.
    상담 창: 창 높이에서 위 108px 를 비워 677×674 에서 대화 칸이 290px 였다 → 위 여백을 줄인다 */
 @media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
-  .br-bms { padding: 0 4px; gap: 0; }
-  .br .br-bm { padding: 0 5px; gap: 4px; letter-spacing: -.02em; }
+  .br-bms { padding: 0 2px; gap: 0; }
+  .br .br-bm { padding: 0 3px; gap: 3px; letter-spacing: -.03em; } /* 여덟 개(포인트몰·망상홈쇼핑 포함)가 582px 한 줄에 들어오게 */
   .ms-cos .cs-fr { grid-template-columns: 124px minmax(0, 1fr); }
   .ms-cos .cs-lf { padding: 10px 6px; }
   .ms-cos .cs-lt { font-size: 12.5px; }
