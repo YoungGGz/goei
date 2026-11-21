@@ -3884,6 +3884,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .br-face img, .br-face .br-i { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; object-position: top; image-rendering: pixelated; background: #cfe0f7; }
 .br-in { width: 100%; box-sizing: border-box; height: 36px; border: 1px solid #5f6368; border-radius: 6px; background: transparent; padding: 0 10px; color: #e8eaed; font: inherit; }
 .br-lgn .br-b1 { width: 100%; margin-top: 10px; height: 36px; border-radius: 18px; background: #8ab4f8; color: #202124; font-weight: 700; }
+.br-lgn .br-b1:disabled { background: #3c4043; color: #9aa0a6; }
 .br-lgn hr { border: 0; border-top: 1px solid #3c4043; margin: 16px 0; }
 .br-lgn .br-b2 { width: 100%; height: 36px; border-radius: 18px; border: 1px solid #5f6368; color: #8ab4f8; font-weight: 600; }
 /* 새 탭 */
@@ -3961,6 +3962,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs .ph-form-body .gx-search { width: 100%; box-sizing: border-box; border: 1px solid var(--bs-line); background: var(--bs-bg); color: inherit; border-radius: 4px; padding: 8px; font: inherit; }
 .bs .ph-form-foot { padding-top: 10px; }
 .bs .ph-form-foot .gx-start { padding: 8px 18px; background: var(--bs-ac); color: #fff; border-radius: 4px; font-weight: 800; }
+.bs .ph-form-foot .gx-start:disabled { opacity: .45; }
 .bs .gn-to { margin: 0; }
 .bs .nw-busy { display: flex; gap: 8px; align-items: center; padding: 8px 10px; margin-bottom: 10px; border-radius: 4px; background: var(--bs-chip); color: var(--bs-dim); font-size: 13px; }
 .bs .gn-me { color: var(--bs-ac); }
@@ -3970,12 +3972,16 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-sm { --bs-bg: #f6f3ee; --bs-card: #fff; --bs-line: #e4ddd3; --bs-ink: #2b2622; --bs-dim: #9a8f84; --bs-ac: #c9573d; --bs-chip: #efe9e1; font-size: 13.5px; }
 .bs h2, .bs h3 { color: var(--bs-ink); }
 .bs { --void: transparent; --text: var(--bs-ink); --sub: var(--bs-ink); --dim: var(--bs-dim); --line: var(--bs-line); --line2: var(--bs-line); --panel: var(--bs-chip); --panel2: var(--bs-line); --amber: var(--bs-ac); --accent-bg: color-mix(in srgb, var(--bs-ac) 10%, transparent); --accent: var(--bs-ac); }
-.gx-body.gn.bs > * { max-width: none; margin-left: 0; margin-right: 0; }
+.gx-body.gn.bs > :not(.gx-toast) { max-width: none; margin-left: 0; margin-right: 0; }
+/* 알림은 여러 줄로 감싸고(위 줄이 폭 제한을 풀어 한 줄로 화면 밖까지 뻗었다), 아래 댓글·쪽지 입력칸을 덮지 않게 위에 띄운다. 실패 원문 펼침은 사이트 색 */
+.gx-body.gn.bs > .gx-toast { bottom: auto; top: 12px; white-space: normal; overflow-wrap: anywhere; }
+.bs .nw-fail summary { color: var(--bs-ac); font-weight: 700; }
+.bs .nw-fail p { color: var(--bs-dim); }
 /* 아래는 시안 CSS 그대로 (선택자만 사이트 이름으로) */
 .bs-gn{--bg:#c7ccc6;--bg2:#d6dad3;--card:#e4e7e1;--line:#a9b0a8;--ink:#1d2320;--dim:#5f6862;--hd:#28302c;--hdi:#d9e0da;--ac:#2f6b5f;--red:#8e2b2b;--chip:#cfd4cd;
  background:var(--bg) radial-gradient(ellipse at 50% -10%,rgba(255,255,255,.35),transparent 60%);color:var(--ink);min-height:100%;font:14px 'Pretendard','Noto Sans KR',sans-serif}
 .bs-gn .hd{display:flex;align-items:center;gap:26px;height:58px;padding:0 28px;background:var(--hd);color:var(--hdi);border-bottom:3px solid var(--red)}
-.bs-gn .hd .lg{font-weight:900;font-size:21px;color:var(--hdi);letter-spacing:-.6px;display:flex;align-items:center;gap:8px}
+.bs-gn .hd .lg{font-weight:900;font-size:21px;color:var(--hdi);letter-spacing:-.6px;display:flex;align-items:center;gap:8px;flex:none;white-space:nowrap}
 .bs-gn .hd .lg small{color:var(--hdi)!important;opacity:.5}
 .bs-gn .hd nav{display:flex;gap:20px;color:var(--hdi);opacity:.75;font-size:14px;font-weight:600}.bs-gn .hd nav button.on{opacity:1}
 .bs-gn .hd .sr{margin-left:auto;width:280px;height:34px;border-radius:4px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);display:flex;align-items:center;gap:8px;padding:0 12px;color:var(--hdi);opacity:.7;font-size:13px}
@@ -4082,7 +4088,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-wpf .lm .cnt span{font-family:'Courier New',monospace;background:#000;color:#0f0;padding:0 3px}
 .bs-wpf .lm .poll{margin-top:10px;border:1px solid #999;background:#fff;padding:5px;font-size:11px;line-height:1.7}
 .bs-wpf .ct{padding:10px}
-.bs-wpf .warn{border:1px solid #f00;background:#fff0f0;color:#c00;font-weight:bold;padding:5px 7px;margin-bottom:8px}
+.bs-wpf .warn{border:1px solid #f00;background:#fff0f0;color:#c00;font-weight:bold;padding:5px 7px;margin-bottom:8px;word-break:keep-all}
 .bs-wpf .tot{font-size:11px;color:#555;margin-bottom:3px;display:flex;justify-content:space-between}
 .bs-wpf table{width:100%;border-collapse:collapse}
 .bs-wpf th{background:#5a5a7a url();color:#fff;font-weight:bold;height:22px;border-top:2px solid #333;font-size:11px}
@@ -4109,7 +4115,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-wpf.bs-m .pgn{font-size:14px;word-spacing:4px}
 .bs-wpf.bs-m .bb{font-size:13px;padding:5px 14px}
 .bs-wpf.bs-m .tot{display:none}
-.bs-wpf .ft{border-top:1px solid #999;margin-top:8px;padding:6px;text-align:center;font:9px Verdana,sans-serif;color:#777}
+.bs-wpf .ft{border-top:1px solid #999;margin-top:8px;padding:6px;text-align:center;font:11px Verdana,sans-serif;color:#666}
 .bs-wpf.bs-m{padding:0}.bs-wpf.bs-m .cols{grid-template-columns:minmax(0,1fr)}.bs-wpf.bs-m .lm,.bs-wpf.bs-m .nav2 .sch{display:none}.bs-wpf.bs-m .ct{padding:8px}.bs-wpf.bs-m table{table-layout:fixed}.bs-wpf.bs-m td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bs-wpf.bs-m td.t{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.bs-wpf.bs-m th:nth-child(1),.bs-wpf.bs-m td:nth-child(1),.bs-wpf.bs-m th:nth-child(5),.bs-wpf.bs-m td:nth-child(5){display:none}.bs-wpf.bs-m th:nth-child(3){width:70px!important}.bs-wpf.bs-m .ban{height:64px}.bs-wpf.bs-m .ban b{font-size:22px;top:10px;left:12px}.bs-wpf.bs-m .ban small{top:42px;left:13px}.bs-wpf.bs-m .ban svg{width:50px;height:50px}
 
 /* ── 연어 마켓: 덜 쨍하게, 사진 느낌 ── */
@@ -4195,7 +4201,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-gn .gpost .bs .ax-ph .fr,.bs-gn .gpost .bs .ax-img{border-color:var(--line)}
 .bs-gn .gpost .acts{display:flex;justify-content:center;gap:10px;padding:10px 0 16px;border-bottom:1px dashed var(--line)}
 .bs-gn .gpost .acts button{border:1px solid var(--line);padding:7px 16px;border-radius:3px;font-weight:700;font-size:13.5px;color:var(--ink);background:var(--bg2)}
-.bs-gn .gpost .acts .up{background:var(--red);color:#fff;border-color:var(--red)}
+.bs-gn .gpost .acts .up{background:var(--bg2);color:var(--red);border-color:var(--red)}
 .bs-gn .gpost .cmh{padding:12px 0 6px;font-weight:800;color:var(--ink)}
 .bs-gn .gpost .cmh b{color:var(--red)}
 .bs-gn .gpost .cm{padding:10px 2px;border-bottom:1px dashed var(--line);color:var(--ink);font-size:14px}
@@ -4298,7 +4304,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-gn .side button { display: block; width: 100%; text-align: left; }
 .bs-gn .side button.on { background: var(--hd); color: var(--hdi); font-weight: 800; }
 .bs-gn .bh .w { padding: 7px 14px; border-radius: 3px; background: var(--red); color: #fff; font-weight: 800; font-size: 13px; }
-.bs-gn .sort button.on { color: var(--ink); font-weight: 800; }
+.bs-gn .sort button.on { color: var(--ink); font-weight: 800; text-decoration: underline 2px var(--red); text-underline-offset: 6px; }
 .bs-gn .row { display: grid; }
 .bs-gn .row .tt em { font-style: normal; }
 .bs-gn .row .th svg { color: var(--dim); }
@@ -4309,13 +4315,58 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-gn.bs-m .mchips button.on { background: var(--hd); border-color: var(--hd); color: var(--hdi); }
 .bs-gn .gpost .gn-nick b, .bs-gn .gpost .mt .gn-me { color: var(--ink); }
 .bs-gn .gpost .acts button.on:not(.up) { border-color: var(--red); color: var(--red); }
-.bs-gn .gpost .acts .up.on { box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .25); }
+/* 추천: 누르기 전은 빨간 테두리, 누른 뒤는 꽉 찬 빨강 (전에는 처음부터 꽉 차 있어 눌렀는지 몰랐다) */
+.bs-gn .gpost .acts .up.on { background: var(--red); color: #fff; }
 .bs-gn .gpost .bt { gap: 6px; }
 .bs-gn .gpost .bt button:disabled { opacity: .5; }
 .bs-gn .ph-compose { background: var(--bg2); border-color: var(--line); }
-.bs-gn .ph-compose .ph-send { background: var(--hd); color: var(--hdi); }
+.bs-gn .ph-compose .ph-send { background: var(--red); color: #fff; }
 .bs-gn .pg { align-items: center; }
 .bs-gn .pg button { padding: 0 4px; }
+/* 게시판 입력줄·첨부 (전수점검 11-21): 보내기 단추는 그림자 없이 사이트 색, 빈 칸이면 흐리게. 첨부 빼기 ✕·항목은 사이트 색 테두리 단추 (.bs button 이 테두리·여백을 지워 「›」 조각만 보였다) */
+.bs .ph-compose .ph-send { box-shadow: none; }
+.bs .ph-compose .ph-send:disabled { opacity: .45; }
+.bs .ph-compose .ph-plus, .bs .ph-compose .ph-plus.on { color: var(--bs-ink); opacity: 1; }
+.bs .at-item .gx-mini { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid var(--bs-line); border-radius: 4px; background: var(--bs-chip); color: var(--bs-ink); font-size: 14px; }
+.bs .at-add { min-height: 34px; padding: 4px 10px; border: 1px dashed var(--bs-line); border-radius: 999px; color: var(--bs-ink); }
+.bs .at-add.at-add-image { border-style: solid; color: var(--bs-ink); }
+.bs .at-add:disabled { opacity: .45; }
+.bs .gn-c-none { padding: 14px 0; }
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  /* 사이트 안 누름 칸 34 (모양은 그대로 두고 누를 자리만 넓힘) */
+  .br .br-prof { width: 34px; height: 34px; border: 3px solid transparent; background-clip: padding-box; box-sizing: border-box; margin: 0 1px; }
+  .br .br-tabn { position: relative; }
+  .br .br-tabn::after { content: ''; position: absolute; inset: -8px; }
+  .br-tcard .br-tx { width: 36px; height: 36px; }
+  .br .br-bm { height: 34px; }
+  .bs-gn .sort button, .bs-gal .lt button { min-height: 34px; }
+  .bs-wpf .bar button { min-height: 34px; padding: 0 4px; }
+  .bs .gn-reply { min-height: 34px; padding: 0 10px; }
+  .bs .gn-nick { position: relative; text-decoration: underline; text-underline-offset: 3px; }
+  .bs .gn-nick::after { content: ''; position: absolute; inset: -9px -2px; }
+  .wk .sg2 button { min-height: 34px; padding: 0 12px; }
+  .wk .top .sr .sg { width: 34px; height: 100%; display: grid; place-items: center; }
+  .wk .wls h4 button { min-height: 34px; display: inline-flex; align-items: center; padding: 0 10px; border: 1px solid #cfdcd9; border-radius: 6px; }
+  .wk .nw-toc a { padding: 4px 0; }
+  .wk .nw-link, .wk .nw-fn { padding: 6px 2px; }
+  .wk .wtabs button { min-height: 34px; padding: 0 12px; }
+  .wk .dbtn button { min-height: 34px; }
+  .gx[data-wiki-side="left"] .wk .wrap { padding-right: 8px; padding-left: 42px; }
+}
+/* 위키 목록 판: 머리에 닫기, 자음판은 판 안에 들어가게·글자 진하게·닫기 */
+.wk .wdh { flex: none; display: flex; align-items: center; gap: 6px; margin: 12px; }
+.wk .wdh .wsr { flex: 1; min-width: 0; margin: 0; }
+.wk .wdx { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 4px; color: #555; }
+.wk .wdx svg { width: 20px; height: 20px; }
+.wk .wdr .nw-kgrid { padding: 8px; }
+.wk .wdr .nw-kgrid-in { grid-template-columns: repeat(4, minmax(0, 52px)); max-width: 100%; box-sizing: border-box; padding: 10px; }
+.wk .wdr .nw-kgrid-in button { height: 48px; font-size: 18px; font-weight: 700; }
+.wk .wdr .nw-kgrid-in .nw-kx { grid-column: 1 / -1; justify-self: end; width: 36px; height: 36px; border: 0; background: none; color: #555; }
+.wk .wdr .nw-kgrid-in .nw-kx svg { width: 20px; height: 20px; }
+/* 각주 안 스포일러도 본문 스포일러와 같은 상자 */
+.wk .nw-spoil.fn { display: block; margin: 4px 0; border: 1px solid #ccc; border-radius: 4px; background: #fafafa; }
+.wk .nw-spoil.fn > summary { display: block; padding: 10px 14px; }
+.wk .nw-spoil.fn .nw-fn-t { display: block; padding: 8px 14px; }
 /* 괴담갤 */
 .bs-gal .hd .lg { display: flex; align-items: center; gap: 8px; color: #fff; }
 .bs-gal .hd .lg .bs-logo { background: #fff; border-radius: 5px; }
@@ -4725,11 +4776,12 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk .wlb { margin-left: auto; width: 34px; height: 32px; border-radius: 4px; background: #fff; color: #27685b; display: grid; place-items: center; flex: none; }
 .wk .wlb.on { background: #cfe9e4; box-shadow: inset 0 0 0 2px #fff; }
 .wk .wlb + .sr { margin-left: -10px; }
-.wk.nm .top { background: #00a495; }
-.wk.nm .wlb { color: #00a495; }
-.wk.nm .top .rnd { flex: none; width: 34px; height: 32px; background: #fff; color: #00a495; border-radius: 4px 0 0 4px; display: grid; place-items: center; font-weight: 900; border-right: 1px solid #ddd; }
-.wk.nm .top .wlb + .rnd { margin-left: -8px; }
-.wk.nm .top .rnd + .sr { margin-left: -18px; border-radius: 0 4px 4px 0; }
+/* 머리 띠는 대문과 다른 화면이 같은 모양 (사용자 11-08: 나머지 화면도 대문과 같은 모양) */
+.wk .top { background: #00a495; }
+.wk .wlb { color: #00a495; }
+.wk .top .rnd { flex: none; width: 34px; height: 32px; background: #fff; color: #00a495; border-radius: 4px 0 0 4px; display: grid; place-items: center; font-weight: 900; border-right: 1px solid #ddd; }
+.wk .top .wlb + .rnd { margin-left: -8px; }
+.wk .top .rnd + .sr { margin-left: -18px; border-radius: 0 4px 4px 0; }
 /* 머리줄 검색 결과 (11-20): 검색칸에 포커스가 있고 글이 있을 때만. PC는 검색칸 바로 아래 같은 폭, 폰은 머리줄 폭 전체 */
 .wk .wtres { display: none; position: absolute; top: 52px; right: 24px; width: 300px; z-index: 20; }
 .wk .top:focus-within + .wtres:not(:empty) { display: block; }
@@ -4870,7 +4922,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk .wtabs button small { margin-left: 4px; color: #999; }
 .wk .wtabs button.on { background: #27685b; border-color: #27685b; color: #fff; }
 .wk .wtabs button.on small { color: #cfe; }
-.wk.nm .wtabs button.on { background: #00a495; border-color: #00a495; }
+.wk .wtabs button.on { background: #00a495; border-color: #00a495; }
 .wk .wls { overflow: auto; flex: 1; padding: 4px 0; }
 .wk .wls h4 { margin: 0; padding: 8px 14px 4px; font-size: 13px; color: #27685b; }
 .wk .wls h4 b { font-weight: 400; color: #999; margin-left: 6px; font-size: 11px; }
@@ -4885,7 +4937,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .wk .wls .wnone { margin: 0; padding: 10px 14px; color: #888; font-size: 13px; }
 .wk .wdr .nw-kgrid { background: rgba(255, 255, 255, .8); }
 .wk .wdr .nw-kgrid-in { background: #fff; border-color: #ccc; border-radius: 6px; }
-.wk .wdr .nw-kgrid-in button { border: 1px solid #ccc; border-radius: 4px; background: #fafafa; color: #27685b; display: grid; place-items: center; }
+.wk .wdr .nw-kgrid-in button { border: 1px solid #ccc; border-radius: 4px; background: #fafafa; color: #1f5a4f; display: grid; place-items: center; }
 .wk .wdr .nw-fail { flex: none; margin: 0 12px 12px; font-size: 12.5px; color: #555; }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .wk .top { padding: 0 12px; }
@@ -4893,8 +4945,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .top .sr { flex: 1; }
   .wk .wtres { left: 0; right: 0; width: auto; }
   .wk .wtres .wls { max-height: 55vh; border-radius: 0; }
-  .wk.nm .top .rnd { margin-left: auto; }
-  .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 8px; }
+  .wk .top .rnd { margin-left: auto; }
+  /* 「‹ 목록」 손잡이(34 폭)가 본문 상자 테두리에 얹히지 않게 그만큼 비워 둔다 (왼쪽이면 위 규칙이 왼쪽을 비움) */
+  .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 8px 42px 8px 8px; }
   .wk .side { display: none; }
   .wk .wst { padding: 8px 8px 0; }
   .wk .doc { padding: 16px 14px; }
@@ -4906,8 +4959,8 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .wk .rr .bt { flex: 1; text-align: center; justify-content: center; }
   .wk.nm table.irow td.ic { width: 48px; padding: 6px; }
   .wk.nm table.irow td.ic svg { width: 30px; height: 30px; }
-  .wk .wgrab { display: flex; position: absolute; right: 0; bottom: 96px; z-index: 4; height: 110px; width: 30px; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0 0; border: 1px solid #ccc; border-right: 0; border-radius: 12px 0 0 12px; background: #fff; color: #27685b; font: 800 18px 'Noto Sans KR', sans-serif; box-shadow: -3px 4px 12px -6px rgba(0, 0, 0, .4); }
-  .wk.nm .wgrab { color: #00a495; }
+  .wk .wgrab { display: flex; position: absolute; right: 0; bottom: 96px; z-index: 4; height: 110px; width: 34px; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0 0; border: 1px solid #ccc; border-right: 0; border-radius: 12px 0 0 12px; background: #fff; color: #27685b; font: 800 18px 'Noto Sans KR', sans-serif; box-shadow: -3px 4px 12px -6px rgba(0, 0, 0, .4); }
+  .wk .wgrab { color: #00a495; }
   .wk .wgrab span { writing-mode: vertical-rl; font-size: 12.5px; letter-spacing: .2em; color: #555; }
   .wk.dr-open .wgrab { display: none; }
   .wk .wdr { width: 84%; max-width: none; box-shadow: -10px 0 24px rgba(0, 0, 0, .2); }
@@ -4961,6 +5014,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 
 /* ── 게시판 쪽지함 팝업창 (11-09 사용자: 우주 쇼핑몰 질문 창처럼). sticky 0 높이 틀 → 글을 내려도 같은 자리 ── */
 .bs .gn-dmhost { position: sticky; top: 0; height: 0; z-index: 30; overflow: visible; }
+/* 쪽지함 창 높이는 보이는 사이트 칸(.br-page) 기준: 화면 높이(100vh) 기준이라 인터넷 창 밖으로 아래가 잘렸다. 바탕을 보이는 칸에 겹쳐 두고 창만 누르게 */
+.br-page > .bs .gn-dmhost { position: absolute; inset: 0; height: auto; pointer-events: none; }
+.br-page > .bs .gn-dmwin { pointer-events: auto; height: min(600px, calc(100% - 76px)); }
 .bs .gn-dmwin { position: absolute; top: 56px; right: 24px; width: 420px; height: min(600px, calc(100vh - 220px)); min-width: 320px; min-height: 280px; display: flex; flex-direction: column; background: var(--card, #fff); color: var(--text); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 12px 32px -8px rgba(0, 0, 0, .35), 0 2px 6px rgba(0, 0, 0, .12); overflow: hidden; }
 .bs .gn-dmwin-hd { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 40px; padding: 0 6px 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); cursor: move; user-select: none; }
 .bs .gn-dmwin-hd b { display: flex; align-items: center; gap: 6px; font-size: 14px; }

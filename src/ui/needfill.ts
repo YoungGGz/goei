@@ -17,8 +17,13 @@ export function bindNeedFill(doc: Document = document): void {
       const el = ev.target as HTMLInputElement | null;
       const name = el?.getAttribute?.('name');
       if (!name) return;
-      doc.querySelectorAll<HTMLButtonElement>(`button[data-need="${CSS.escape(name)}"]:not([data-busy])`).forEach((b) => {
-        b.disabled = !el!.value.trim();
+      // data-need 에 칸 이름을 여럿(띄어 쓴) 달면 그 칸이 모두 차야 켠다 (괴담넷 새 쪽지: 받는 사람·내용)
+      doc.querySelectorAll<HTMLButtonElement>(`button[data-need~="${CSS.escape(name)}"]:not([data-busy])`).forEach((b) => {
+        const names = (b.getAttribute('data-need') ?? '').split(/\s+/).filter(Boolean);
+        b.disabled = names.some((n) => {
+          const f = n === name ? el : doc.querySelector<HTMLInputElement>(`[name="${CSS.escape(n)}"]`);
+          return !!f && !f.value.trim();
+        });
       });
     },
     true,
