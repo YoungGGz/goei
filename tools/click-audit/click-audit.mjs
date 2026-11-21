@@ -33,6 +33,9 @@ import { distPack } from '../../tests/data-init.mjs';
 // 갤럭시 Z 폴드 기준 기기 (사용자: 커버 디스플레이 좁은 폭 포함). 커버 344×882, 펼친 안쪽 673×841 (CSS px 근사)
 VIEWPORTS.fold_c = { width: 344, height: 882, touch: true };
 VIEWPORTS.fold_i = { width: 673, height: 841, touch: true };
+VIEWPORTS.fold_v = { width: 677, height: 674, touch: true }; // 실기 폴드 펼침에서 호스트 앱 위아래를 뺀 보이는 영역 (11-21)
+VIEWPORTS.pc1280 = { width: 1280, height: 800, touch: false };
+VIEWPORTS.fold_r = { width: 752, height: 749, touch: true }; // 실기 폴드 펼침 실측(사용자 캡처, DPR 약 1.8, 11-21)
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const opt = { vp: ['pc', 'phone'], start: ['board', 'picker', 'items', 'shop', 'gnet'], depth: 6, perAction: 8, exploreValues: 0, maxClicks: 0, workers: Math.max(2, os.cpus().length + 1), out: '.scratch/click-audit', fixture: '.scratch/fixture/fixture.json', scope: '', from: [] };
