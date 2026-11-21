@@ -3776,7 +3776,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-cpanel .ph-tool-l { font-size: 11px; }
   .gx-cpanel .gx-nbadge.dot { position: absolute; top: 4px; left: calc(50% + 8px); }
   /* 폰 소지품: 4열, 찾기는 둘째 줄, 토글은 오른쪽 끝, 말풍선 없음 */
-  .it-grid { grid-template-columns: repeat(auto-fill, minmax(max(72px, min(calc(25% - 6px), 104px)), 1fr)); gap: 8px; } /* 폰 폭에선 늘 4열. 펼친 폴드를 모바일 배치로 쓸 때(넓은 폭)는 칸이 커지지 않게 열 수가 는다 */
+  .it-grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; } /* 칸은 344 폰 크기(72px)부터: 폰 폭(344~430)에선 4열, 펼친 폴드를 모바일 배치로 쓸 때(752)는 9열로 늘어 칸이 커지지 않는다 (첫 화면에서 이름이 아래 줄에 가리지 않게) */
   .it-tools { flex-wrap: wrap; }
   .it-tools .gx-segs { margin-left: auto; }
   .it-tools .it-q { width: auto; flex: 1 1 100%; }
