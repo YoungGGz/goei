@@ -5882,15 +5882,19 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .gx-field :is(.gx-evc-name b, .gx-evart-l1 > b) { line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
 }
 /* 폴드 펼침 임무 (편성 카드) */
-/* 지원 인원 카드: −/+ 가 이름 자리를 먹어 「지원 …」「등록 …」(673 폭은 「지」「등」)만 남았다 → −/+ 를 이름 아래 줄로 (752·673 모두).
+/* 지원 인원 카드: −/+ 가 이름 자리를 먹어 「지원 …」「등록 …」(673 폭은 「지」「등」)만 남았다 → 한 줄(그림 | 이름 | −/+) 그대로,
+   그림·틈·수 글자만 줄이고 설명은 두 줄까지 꺾는다 (−/+ 단추는 작은 조작 크기 34 그대로. 배치를 바꾸지 않는다).
    요원 카드: 편성 칸이 좁을 때(673 폭, 카드 215px 안팎)만 톡·위키 단추가 이름 줄을 먹어 4글자 이름이 「고그...」로 잘리고,
    소속·직급도 잘리고, 고른 표시(✓)가 소속 끝을 덮었다. 그때만 단추를 카드 오른쪽에 위아래로 세우고 이름·소속을 두 줄까지 꺾고,
    ✓는 사진 오른쪽 아래 모서리로 옮긴다. 752 폭(카드 238px 안팎)은 이미 다 보여 그대로 둔다 */
 @media (min-width: 601px) and (max-width: 860px) and (min-height: 500px), (min-width: 601px) and (max-width: 860px) and (pointer: fine), (min-width: 601px) and (max-width: 860px) and (pointer: none) {
-  .gx-acard.pick.gx-scard { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; row-gap: 6px; align-items: center; }
-  .gx-acard.pick.gx-scard > .gx-ava { grid-row: 1 / span 2; }
-  .gx-acard.pick.gx-scard .gx-acard-txt small { white-space: normal; word-break: keep-all; line-height: 1.35; }
-  .gx-acard.pick.gx-scard > .gx-scard-step { grid-column: 2; }
+  .gx-acard.pick.gx-scard { gap: 8px; padding-left: 10px; padding-right: 8px; }
+  .gx-acard.pick.gx-scard > .gx-ava { width: 40px; height: 40px; border-radius: 11px; }
+  .gx-acard.pick.gx-scard > .gx-ava svg { width: 22px; height: 22px; }
+  .gx-acard.pick.gx-scard .gx-acard-top b { font-size: 14px; }
+  .gx-acard.pick.gx-scard .gx-acard-txt small { font-size: 12px; white-space: normal; word-break: keep-all; line-height: 1.35; }
+  .gx-scard-step { gap: 2px; }
+  .gx-scard-step b { min-width: 16px; font-size: 14px; }
   .gx-acards.pick:has(> .gx-acard.pick.wide) { container-type: inline-size; }
   @container (max-width: 225px) {
     .gx-acard.pick.wide { height: auto; min-height: var(--acard-h, 96px); align-self: start; }
