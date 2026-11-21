@@ -5670,6 +5670,10 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   /* 상황판: CCTV 화면과 상황 목록을 위아래로 (두 칸이면 CCTV 시각이 세로로 깨지고 괴이·사건·특수 글이 한 글자씩 꺾였다) */
   .gx-ops { display: flex; flex-direction: column; height: auto; }
   .gx-opview { height: 320px; flex: none; }
+  /* 위성 지도는 지도 그림 비율(5:4) 그대로: 넓고 낮은 칸이면 위아래가 잘려 제주 칸과 그 안 표시가 안 보였다 (11-21 폴드 펼침 점검) */
+  .gx-opview.map { height: auto; aspect-ratio: 5 / 4; }
+  /* 보고서 창: 680px 카드가 창 밖으로 넘쳐 닫기 단추가 창 가장자리에 걸렸다 → 좌우 여백을 늘려 창 안에 */
+  .gx-rptpop { padding: 20px 60px; }
   /* 상황 목록·요원 칸은 안쪽 스크롤 없이 창 본문 한 줄 스크롤로 (11-21: 보이는 높이 약 520px 안에 목록 260px·요원 칸이 각자 스크롤해서
      목록은 두 줄 반, 요원은 한 줄 반만 보였다). 요원 모니터는 세 칸 정사각, 목록은 한 줄 54px */
   .gx-oplog > ul { flex: none; max-height: none; overflow: visible; overscroll-behavior: auto; }
