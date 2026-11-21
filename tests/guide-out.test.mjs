@@ -159,7 +159,15 @@ test('기본 지침으로 만든 요청문 = 옮기기 전 코드가 만들던 �
   // 요청문은 JSON 글자열 꼴(따옴표 \\")로 견주므로 두 꼴 모두 입힌다
   const esc = (t) => JSON.stringify(t).slice(1, -1);
   const later = (t) => [...LATER, ...ANSWERED, ...ANSWERED.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t);
-  for (const k of names) assert.equal(BASE[k], later(OLD.calls[k]), k);
+  // 전수점검 보통-36: 우주 쇼핑몰은 값이 정해져 있다(COMMON) — 그 몰 지침의 대화 절에서만 값 바꾸기·할인 문장을 뺐다 (다른 상점 지침은 그대로)
+  const COS_LATER = [
+    ['and prizes it (discounts on it are rare and grudging).', 'and prizes it.'],
+    ['" to add, "~ 이름|새값" to change a price (won, or the agreed payment in words), "- 이름" to remove.', '" to add, "- 이름" to remove. Prices are fixed, so never change one.'],
+    ['answer only, fetch something, re-stock the whole shelf, lower a price, refuse, or end the dealing?', 'answer only, fetch something, re-stock the whole shelf, refuse, or end the dealing? (Prices are fixed: never lower one.)'],
+    ['never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines).', 'never add an item and never re-stock the shelf (no "+" lines, no mode all). Prices stay as listed (no "~" lines); an item may be withdrawn ("-" lines).'],
+  ];
+  const cosLater = (k, t) => (/\.cos\b/.test(k) ? [...COS_LATER, ...COS_LATER.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t) : t);
+  for (const k of names) assert.equal(BASE[k], cosLater(k, later(OLD.calls[k])), k);
 });
 
 test('새 절이 없는 지침(옛 글로 고쳐 둔 것)이면 코드에 남긴 옛 글을 쓴다: 요청문이 같다', () => {

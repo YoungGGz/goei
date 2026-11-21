@@ -25,8 +25,10 @@ export interface PopSpec {
   save(b: WinBox): void;
 }
 
-/** 저장해 둔 자리·크기 → 인라인 스타일 (없으면 CSS 기본 자리) */
-export const winStyle = (b: WinBox | null | undefined): string => (b ? ` style="left:${b.x}px;top:${b.y}px;width:${b.w}px;height:${b.h}px;right:auto;bottom:auto"` : '');
+/** 저장해 둔 자리·크기 → 인라인 스타일 (없으면 CSS 기본 자리).
+ *  옮겨 둔 뒤 브라우저를 줄여도 창이 바탕 밖에 남지 않게, 크기는 바탕을 넘지 않고 자리는 바탕 안으로 당긴다 (끌 때 막는 범위와 같게, 전수점검 사소-36) */
+export const winStyle = (b: WinBox | null | undefined): string =>
+  b ? ` style="width:min(${b.w}px,100%);height:min(${b.h}px,100%);left:max(0px,min(${b.x}px,calc(100% - min(${b.w}px,100%))));top:max(0px,min(${b.y}px,calc(100% - 40px)));right:auto;bottom:auto"` : '';
 
 export function bindPopWins(root: HTMLElement, render: () => void, specs: PopSpec[]): void {
   root.addEventListener('pointerdown', (ev) => {

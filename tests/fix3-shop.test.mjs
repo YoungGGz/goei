@@ -110,12 +110,14 @@ test('쇼핑몰 첫 진열 지침은 가게 정체의 currency 줄을 청하지 
 });
 
 test('지난 문의 대화: 기본은 전부, 줄 수를 정하면 진열·문의 요청에 최근 줄만 넘긴다 (방금 한 말은 늘 넘긴다)', () => {
-  assert.equal(S.SHOP_AMOUNTS.talk.max, 40);
+  assert.equal(S.SHOP_AMOUNTS.talk.max, S.SHOP_LIMITS.talk.max);
   assert.equal(S.shopGive({}, 'cos', 'talk').talk, 40, '기본 = 저장해 둔 줄 전부');
+  assert.equal(S.shopGive({ [S.SHOP_LIMITS.talk.key]: '200' }, 'cos', 'talk').talk, 200, '보관 양을 늘리면 기본도 따라 (전수점검 보통-33)');
   assert.equal(S.shopGive({ [S.shopFnVar('talk', 'talk')]: '6' }, 'cos', 'talk').talk, 6);
   assert.equal(S.shopGive({ [S.shopFnVar('talk', 'talk')]: '6' }, 'cos', 'shelf').talk, 40, '기능마다 따로');
   assert.equal(S.shopFnNum({ [S.shopFnVar('shelf', 'talk')]: '0' }, 'shelf', 'talk'), 0);
-  assert.equal(S.shopFnNum({ [S.shopFnVar('shelf', 'talk')]: '99' }, 'shelf', 'talk'), 40, '범위 밖이면 기본');
+  assert.equal(S.shopFnNum({ [S.shopFnVar('shelf', 'talk')]: '999' }, 'shelf', 'talk'), 40, '범위 밖이면 기본');
+  assert.equal(S.shopFnNum({ [S.shopFnVar('shelf', 'talk')]: '120' }, 'shelf', 'talk'), 120, '40 위로도 정할 수 있다');
   assert.equal(S.shopAmountNone('desk', 'talk'), true);
   assert.equal(S.shopAmountNone('say', 'talk'), true);
   assert.equal(S.shopAmountNone('talk', 'talk'), false);

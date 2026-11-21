@@ -7,7 +7,7 @@ import type { RefToggles } from './advanced';
 import { mallKey, mallSettings, type MallSite } from './malls';
 import { REF_CHIP_KEYS, type RefChip } from './reffn';
 import { referenceEntries, type Registry } from './world/registry';
-import { SHOP_CTX_VAR, shopSettings } from './shop';
+import { SHOP_CTX_VAR, SHOP_LIMITS, shopLimits, shopSettings } from './shop';
 
 type Vars = Record<string, unknown> | undefined;
 
@@ -55,8 +55,8 @@ export function shopGiveOn(vars: Vars, shop: GiveShop, key: GiveKey): boolean {
 export const SHOP_AMOUNTS = {
   turns: { label: '챗로그', min: 1, max: 8, unit: '턴' },
   refs: { label: '참조 로어북', min: 0, max: 12, unit: '개' },
-  /** 진열(새로 받기)·문의 요청에 같이 넘기는 지난 문의 대화. 저장해 두는 줄 수(40)가 상한이자 기본값 (= 전부) */
-  talk: { label: '지난 대화', min: 0, max: 40, unit: '줄' },
+  /** 진열(새로 받기)·문의 요청에 같이 넘기는 지난 문의 대화. 상한은 「보관하는 양」 문의 대화의 상한, 기본값은 그 채팅에 저장해 두는 줄 수 (= 전부) (전수점검 보통-33) */
+  talk: { label: '지난 대화', min: 0, max: SHOP_LIMITS.talk.max, unit: '줄' },
 } as const;
 export type ShopAmount = keyof typeof SHOP_AMOUNTS;
 export const isShopAmount = (v: string): v is ShopAmount => v === 'turns' || v === 'refs' || v === 'talk';
@@ -70,13 +70,13 @@ export function shopFnOn(vars: Vars, fn: ShopFn, key: GiveKey): boolean {
   const v = vars?.[shopFnVar(fn, key)];
   return v === '1' || v === '0' ? v === '1' : key === 'ctx' ? true : FN_DEF[key];
 }
-/** 이 기능의 양. 따로 정하지 않았으면 $sh_turns · $sh_refs (지난 대화는 전부) */
+/** 이 기능의 양. 따로 정하지 않았으면 $sh_turns · $sh_refs (지난 대화는 저장해 두는 줄 전부) */
 export function shopFnNum(vars: Vars, fn: ShopFn, key: ShopAmount): number {
   const raw = vars?.[shopFnVar(fn, key)];
   const n = Number(raw);
   const a = SHOP_AMOUNTS[key];
   if (raw !== undefined && raw !== null && String(raw).trim() !== '' && Number.isInteger(n) && n >= a.min && n <= a.max) return n;
-  return key === 'talk' ? a.max : shopSettings(vars)[key];
+  return key === 'talk' ? shopLimits(vars).talk : shopSettings(vars)[key];
 }
 
 const TOGGLE: Record<RefChip, keyof RefToggles> = { desc: 'description', authors: 'authors', persona: 'persona', active: 'active', related: 'related', secondary: 'secondary' };
