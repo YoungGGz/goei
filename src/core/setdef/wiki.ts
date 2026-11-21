@@ -39,7 +39,7 @@ export const WIKI_SET: SetPage = {
         { key: 'mode', label: '작성 모드', ctl: { t: 'seg', opts: [['expand', '확장'], ['faithful', '원본 충실']] }, help: '확장 = 원본 사실은 지키고 비어 있는 곳을 어울리는 새 내용으로 채워요 · 원본 충실 = 새 사건·능력·관계를 더하지 않고 있는 내용만 풀어 써요' },
         { key: 'images', label: '그림', ctl: { t: 'seg', opts: [['off', '끔'], ['infobox', '정보칸만'], ['body', '본문까지']] }, help: '본문까지면 괴이·특수·거점·조직 그림을 본문에 넣고, 인물 문서는 정보칸 표정을 모델이 골라요. 인물 그림은 본문에 넣지 않아요' },
         { key: 'footnotes', label: '주석', ctl: { t: 'seg', opts: [['pop', '뜨는 창'], ['inline', '펼치기']] }, help: '펼치기는 주석을 본문 안에 괄호로 둬요. 폰에서 읽기 편해요' },
-        { key: 'request', label: '공용 지침', ctl: { t: 'area', ph: '모든 문서에 덧붙일 말투·형식·관점', rows: 3, cls: 'nw-reqbox' } },
+        { key: 'request', label: '공용 지침', ctl: { t: 'area', ph: '모든 문서에 덧붙일 말투·형식·관점', rows: 3, cls: 'nw-reqbox', labeled: true }, help: '모든 위키 문서 요청에 덧붙여요.' },
       ],
     },
     {

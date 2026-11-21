@@ -79,13 +79,13 @@ export type IconMissLevel = 'kind-near' | 'kind-base' | 'none';
 export interface IconMiss { name: string; icon: string; level: IconMissLevel; file: string }
 const misses: IconMiss[] = [];
 const ICON_MISS_MAX = 100;
-/** 이번 실행에서 ②③·상자로 떨어진 물건 (설정 「그림 못 찾은 말」 — 뽑을 에셋 고르기용) */
+/** 이번 실행에서 ②③·상자로 떨어진 물건 (설정 「그림을 못 찾은 물건」 — 뽑을 에셋 고르기용) */
 export const readIconMisses = (): IconMiss[] => misses.slice();
 export function clearIconMisses(): void {
   misses.length = 0;
   gen++;
 }
-/** 그 안의 매칭은 「그림 못 찾은 말」에 적지 않는다 (연어 마켓 매물 제목처럼 소지품 물건이 아닌 것, 릴리스 점검 11-09) */
+/** 그 안의 매칭은 「그림을 못 찾은 물건」에 적지 않는다 (연어 마켓 매물 제목처럼 소지품 물건이 아닌 것, 릴리스 점검 11-09) */
 let quiet = 0;
 export function iconQuiet<T>(f: () => T): T {
   quiet++;

@@ -8,6 +8,7 @@ import { switchHtml } from '../controls';
 import { ICONS } from '../icons';
 import { copyBtn } from '../copy';
 import { keepOpen, markOpen } from '../panels';
+import { askPopup } from './askpop';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -55,18 +56,25 @@ export function ruleTreeItems(): [string, string, string][] {
   return [['rule:all', '추가 규칙', n ? `<i class="gw-tree-badge">${n}</i>` : '']];
 }
 
+/** 규칙 지우기 확인 팝업 (ed-rule-del 로 묻는 중일 때) */
+export function ruleConfirmPopup(): string {
+  if (!ruleUi.confirmDel) return '';
+  const r = getUserRules().find((x) => x.id === ruleUi.confirmDel);
+  if (!r) return '';
+  return askPopup(`이 추가 규칙(「${r.title.trim() || '제목 없음'}」)을 지울까요? 지운 규칙은 되돌릴 수 없어요.`, { action: 'ed-rule-del-yes', value: r.id }, { action: 'ed-rule-del-no' });
+}
+
 /** 규칙 하나의 편집 칸 (접는 칸 안) */
 function ruleBox(r: UserRule): string {
   const chips = RULE_TARGETS.map((t) => `<button class="gx-chip${r.to.includes(t) ? ' on' : ''}" data-action="ed-rule-to" data-value="${esc(`${r.id}|${t}`)}" aria-pressed="${r.to.includes(t)}">${RULE_TARGET_LABEL[t]}</button>`).join('');
-  const del = ruleUi.confirmDel === r.id
-    ? `<button class="gx-mini danger" data-action="ed-rule-del-yes" data-value="${esc(r.id)}">정말 지우기</button><button class="gx-mini" data-action="ed-rule-del-no">취소</button>`
-    : `<button class="gx-mini danger" data-action="ed-rule-del" data-value="${esc(r.id)}">${ICONS.trash}지우기</button>`;
+  // 누르면 가운데 확인 팝업 (ruleConfirmPopup, 전수점검 눌러-보통-28)
+  const del = `<button class="gx-mini danger" data-action="ed-rule-del" data-value="${esc(r.id)}">${ICONS.trash}지우기</button>`;
   const key = `rule-${r.id}`;
   return `<details class="ps-adv gw-rule" data-keep="${esc(key)}"${keepOpen(key)}><summary class="ps-adv-sum"><b>${esc(r.title.trim() || '(제목 없음)')}</b><span class="adv-count">${r.to.map((t) => RULE_TARGET_LABEL[t]).join(' · ') || '붙일 곳 없음'} · ${tokenizerName() ? '' : '약 '}${tokens(r.text).toLocaleString()}토큰</span><span class="gw-state${r.on ? '' : ' off'}">${r.on ? '켬' : '끔'}</span></summary><div class="ps-adv-body">
     <div class="ps-rows">
       <div class="ps-row"><div class="ps-label"><b>사용</b><small>끄면 어느 지침에도 붙지 않아요. 글은 남아요.</small></div><div class="ps-ctl">${switchHtml({ action: 'ed-rule-on', value: r.id, on: r.on })}</div></div>
       <div class="ps-row"><div class="ps-label"><b>제목</b><small>규칙 글 위에 작은 제목으로 들어가요.</small></div><div class="ps-ctl"><input class="gw-rule-title" data-input="ed-rule-title" data-key="${esc(r.id)}" value="${esc(r.title)}" placeholder="예: 대사 길이" autocomplete="off" maxlength="${RULE_TITLE_MAX}"></div></div>
-      <div class="ps-row"><div class="ps-label"><b>붙일 곳</b><small>RP = RP 지침 끝 · 이동·임무 = COMMON 절 · 괴담넷 = 게시판 절 · 괴담톡 = COMMON 절 · 위키 = 작성 안내 절</small></div><div class="ps-ctl"><div class="dir-chips">${chips}</div></div></div>
+      <div class="ps-row"><div class="ps-label"><b>붙일 곳</b><small>RP = RP 지침 끝 · 이동·임무·괴담톡 = 그 지침의 공통 절 끝 · 괴담넷·괴담갤·세정게·연어 마켓 = 그 게시판 지침의 게시판 절 끝 · 위키 = 작성 안내 절 끝</small></div><div class="ps-ctl"><div class="dir-chips">${chips}</div></div></div>
       <div class="ps-row"><div class="ps-label"><b>본문</b><small>모델에게 그대로 가요. 지침 언어(영어)와 맞추면 더 잘 따라요.</small></div>
         <div class="gw-copyto gw-copybox"><textarea data-input="ed-rule-text" data-key="${esc(r.id)}" rows="6" placeholder="규칙 글" maxlength="${RULE_TEXT_MAX}">${esc(r.text)}</textarea>${copyBtn()}</div></div>
       <div class="ps-row gw-rel-foot">${del}</div>
@@ -78,7 +86,7 @@ export function rulePage(_node: string): string {
   const rules = getUserRules();
   return `<div class="gw-page gw-set"><header class="gw-head"><h2>추가 규칙<small>이 기기 공통</small></h2>
       <div class="gw-head-act"><span class="gw-tokens">${rules.length}/${RULE_MAX}</span><button class="gx-mini primary" data-action="ed-rule-new" ${rules.length >= RULE_MAX ? 'disabled' : ''}>${ICONS.plus}새 규칙</button></div>
-      ${ruleUi.info ? `<p class="gx-hint">${esc(ruleUi.info)}</p>` : ''}<p class="gx-muted">기본 지침을 고치지 않고 내 규칙을 덧붙여요. 규칙마다 어느 지침에 붙일지 고르면, 그 지침의 늘 쓰이는 절 끝에 「User Rules」로 들어가요. 이 기기의 모든 채팅에 적용돼요. 바꾸면 바로 저장돼요. 예) 「대사 길이」 규칙을 RP·괴담톡에 붙이기: "한 번에 한 사람이 세 문장 넘게 말하지 않는다."</p></header>
+      ${ruleUi.info ? `<p class="gx-hint">${esc(ruleUi.info)}</p>` : ''}<p class="gx-muted">기본 지침을 고치지 않고 내 규칙을 덧붙여요. 규칙마다 어느 지침에 붙일지 고르면, 그 지침의 늘 쓰이는 절 끝에 덧붙여져요. 이 기기의 모든 채팅에 적용돼요. 바꾸면 바로 저장돼요. 예) 「대사 길이」 규칙을 RP·괴담톡에 붙이기: "한 번에 한 사람이 세 문장 넘게 말하지 않는다."</p></header>
     <div class="gx-settings gw-setbody">${rules.length ? rules.map(ruleBox).join('') : '<p class="ps-note">아직 규칙이 없어요. 「새 규칙」을 눌러 하나 만들어요.</p>'}</div>
   </div>`;
 }

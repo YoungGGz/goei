@@ -3,7 +3,7 @@
 import { defRow, setGroup, setRow } from './setrow';
 import { PEOPLE_SET } from '../core/setdef/people';
 import { findDef } from '../core/setdef/types';
-import { onOffSwitch } from './controls';
+import { onOffSwitch, switchHtml } from './controls';
 import type { Chat } from '../core/types';
 import { messageText } from '../core/refs';
 import { tokens } from '../core/gnet';
@@ -250,7 +250,7 @@ const FEATURE_HELP: Record<Feature, [string, string]> = {
   taste: ['취향 띠(첫인상)', '인물마다 주인공이 자기 취향에 맞는 정도(−3~+3)를 호감과 별개로 기록해요. 오를 땐 한 칸씩, 내릴 땐 여러 칸.'],
   openness: ['음란도', '성인 인물의 성적 개방도(0~300)와 피임 태도를 기록해요. 시작값은 근거가 있을 때만, 그 뒤는 실제 반응마다. 성인용 기능'],
   rhythm: ['서사 리듬', '장면 국면(준비·절정·여운…)·장(章) 흐름·떡밥 단계를 문서로 두고 Director 메모에 「지금은 긴장을 올릴 때/떡밥 회수」를 넣어요. 카드 지침과 부딪치면 꺼 두세요.'],
-  faction_rep: ['세력 평판', '세력이 주인공을 어떻게 보는지 −100~100 값으로 둬요. 그 세력이 주인공을 보는 눈이 바뀔 만한 일인지는 갱신기 모델이 본문 근거를 들어 판단해요. 구성원 한 명의 사적인 감정은 그 인물 기록에만 남아요.'],
+  faction_rep: ['세력 평판', '세력이 주인공을 어떻게 보는지 −100~100 값으로 매겨요. 그 세력이 주인공을 보는 눈이 바뀔 만한 일인지는 갱신기 모델이 본문 근거를 들어 판단해요. 구성원 한 명의 사적인 감정은 그 인물 기록에만 남아요.'],
   npc_emotion: ['인물끼리 감정', '인물이 다른 인물에게 느끼는 감정·관계도 기록해요 (유저 대상만이 아니라)'],
 };
 
@@ -261,7 +261,10 @@ const NUMERIC_HELP: Record<NumericFeature, string> = {
 };
 
 const n = (v: number) => v.toLocaleString();
-const tok = (s: number, text?: string) => (text ? `${n(s)}자 · 약 ${n(tokens(text))}tok` : `${n(s)}자 · 약 ${n(Math.ceil(s * 0.6))}tok`);
+const tok = (s: number, text?: string) => (text ? `${n(s)}자 · 약 ${n(tokens(text))}토큰` : `${n(s)}자 · 약 ${n(Math.ceil(s * 0.6))}토큰`);
+/** 갱신 기록 줄의 단계·까닭을 우리말로 (전수점검 눌러-보통-31: 「실패 · model」「… · turn」이 그대로 보였다) */
+const DIAG_STAGE: Record<string, string> = { build: '자료 만들기', model: '모델 호출', parse: '답 읽기', save: '저장', skip: '건너뜀', budget: '입력 상한' };
+const DIAG_REASON: Record<string, string> = { turn: '매 턴', manual: '직접 실행', reread: '다시 읽기', backfill: '지난 응답 채우기', consolidate: '정리', router: 'Router' };
 const when = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -270,7 +273,7 @@ const when = (iso: string) => {
 };
 
 /** 진단 묶음의 두 줄: 「모든 채팅 보기」 토글과 기록 표(또는 안내). 설정 줄 모양으로 넣으려고 나눠 돌려준다 (2026-11-05 사용자: 진단 구조 지저분) */
-function diagTable(ctx: ChatContext, keepRaw: boolean): { toggle: string; body: string } {
+function diagTable(ctx: ChatContext, keepRaw: boolean): { toggle: string; body: string; count?: string } {
   const list = peopleUi.diag;
   if (list === null) {
     void loadDiag().then((d) => {
@@ -281,8 +284,10 @@ function diagTable(ctx: ChatContext, keepRaw: boolean): { toggle: string; body: 
   }
   const here = chatId(ctx);
   const mine = (peopleUi.diagAll ? list : list.filter((r) => r.chat === here)).slice().reverse();
-  const toggle = `<label class="pp-check"><input type="checkbox" data-change="pp-diag-all" ${peopleUi.diagAll ? 'checked' : ''}> 전부 ${list.length}건 중 이 채팅 ${list.filter((r) => r.chat === here).length}건</label>`;
-  if (!mine.length) return { toggle, body: `<p class="ps-note">${peopleUi.diagAll ? '아직 갱신 기록이 없어요.' : '이 채팅의 갱신 기록이 아직 없어요.'}</p>` };
+  // 켬/끔은 다른 줄처럼 스위치, 개수는 설명에 (체크 상자 옆 개수 글이라 무엇을 켜는지 몰랐다, 전수점검 눌러-보통-43)
+  const toggle = switchHtml({ action: 'pp-diag-all', value: peopleUi.diagAll ? '0' : '1', on: peopleUi.diagAll, label: '모든 채팅 보기' });
+  const count = `끄면 이 채팅의 갱신 기록만 보여요. 전부 ${list.length}건 중 이 채팅 ${list.filter((r) => r.chat === here).length}건이에요.`;
+  if (!mine.length) return { toggle, count, body: `<p class="ps-note">${peopleUi.diagAll ? '아직 갱신 기록이 없어요.' : '이 채팅의 갱신 기록이 아직 없어요.'}</p>` };
   const rows = mine.map((r) => {
     const id = `${r.at}|${r.indexes.join(',')}`;
     const open = peopleUi.diagOpen.has(id);
@@ -295,7 +300,7 @@ function diagTable(ctx: ChatContext, keepRaw: boolean): { toggle: string; body: 
           : '<span class="gx-badge live">반영</span>'
       : r.stage === 'budget'
         ? `<span class="gx-badge bad">거부 · 입력 상한</span><small class="pp-err">${esc(r.error ?? '')}</small>`
-        : `<span class="gx-badge bad">실패 · ${esc(r.stage ?? '')}</span><small class="pp-err">${esc(r.error ?? '')}</small>`;
+        : `<span class="gx-badge bad">실패 · ${esc(DIAG_STAGE[r.stage ?? ''] ?? r.stage ?? '')}</span><small class="pp-err">${esc(r.error ?? '')}</small>`;
     const sysText = r.system ?? '';
     const dataText = r.data ?? '';
     const sizes = `지침 ${r.sizes.system ? tok(r.sizes.system, sysText || undefined) : '-'} / 자료 ${r.sizes.data ? tok(r.sizes.data, dataText || undefined) : '-'} / 구간 ${r.sizes.span ? tok(r.sizes.span) : '-'}`;
@@ -316,10 +321,10 @@ function diagTable(ctx: ChatContext, keepRaw: boolean): { toggle: string; body: 
       : '';
     return `<li class="pp-diag${open ? ' open' : ''}"><button class="pp-diag-row" data-action="pp-diag-toggle" data-value="${esc(id)}" aria-expanded="${open}">
         <span class="pp-diag-top"><b>${esc(when(r.at))}</b><span class="pp-diag-who">${esc(r.people.length ? r.people.join(', ') : '(대상 없음)')}</span><span class="pp-diag-res">${result}</span></span>
-        <span class="pp-diag-sub">${esc(sizes)} · 출력 ${n(r.outChars)}자 · ${n(r.ms)}ms · ${r.model === 'main' ? '메인' : '보조'} · ${esc(r.reason)}</span>
+        <span class="pp-diag-sub">${esc(sizes)} · 출력 ${n(r.outChars)}자 · ${(r.ms / 1000).toFixed(1)}초 · ${r.model === 'main' ? '메인' : '보조'} 모델 · ${esc(DIAG_REASON[r.reason] ?? r.reason)}</span>
       </button>${detail}</li>`;
   });
-  return { toggle, body: `<ul class="pp-diags">${rows.join('')}</ul>` };
+  return { toggle, count, body: `<ul class="pp-diags">${rows.join('')}</ul>` };
 }
 
 function prettyJson(s: string): string {
@@ -372,7 +377,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
   const nodes: Node[] = [
     { name: '입력', sub: '유저 메시지', kind: 'plain', on: s.on, calls: '' },
     { name: 'Router', sub: '장면 인물 고르기', kind: 'aux', on: routerOn, model: modelOf('router'), calls: routerOn ? '보조 1회' : '호출 없음 (코드가 고름)', control: seg('router', s.router, [['code', 'OFF'], ['model', 'ON']]), block: 'pp-blk-router' },
-    { name: 'Director', sub: '이번 턴 연기 지시', kind: 'aux', on: sceneOn, model: modelOf('director'), calls: sceneOn ? (s.directorSearch ? '보조 1회 (검색 땐 2회)' : '보조 1회') : s.director === 'note' ? '호출 없음 (갱신에 얹음)' : '호출 없음', control: seg('director', s.director, [['off', '사용 안 함'], ['note', '메모형'], ['facts', '사실형'], ['scene', '연출형']]), block: 'pp-blk-director' },
+    { name: 'Director', sub: '이번 턴 연기 지시', kind: 'aux', on: sceneOn, model: modelOf('director'), calls: sceneOn ? (s.directorSearch ? '보조 1회 <span class="pp-fn-nb">(검색 땐 2회)</span>' : '보조 1회') : s.director === 'note' ? '호출 없음 (갱신에 얹음)' : '호출 없음', control: seg('director', s.director, [['off', '사용 안 함'], ['note', '메모형'], ['facts', '사실형'], ['scene', '연출형']]), block: 'pp-blk-director' },
     { name: '메인', sub: '응답 생성', kind: 'main', on: true, model: '메인 모델', calls: '메인 1회' },
     { name: '갱신', sub: '응답을 읽어 기록', kind: 'aux', on: updateOn, model: modelOf('update'), calls: updateOn ? `${s.model === 'main' ? '메인' : '보조'} 1회` : s.on ? '수동 (누를 때만)' : '호출 없음', control: seg('when', s.when, [['manual', '수동'], ['turn', '매 턴']]), block: 'pp-blk-update' },
     { name: '정리', sub: '상한 넘긴 기록 합치기', kind: 'aux', on: tidyOn, model: modelOf('tidy'), calls: tidyOn ? '넘긴 인물마다 1회' : '호출 없음 (갱신에 얹음)', control: seg('tidy', s.tidy, [['same', 'OFF'], ['separate', 'ON']]), block: 'pp-blk-tidy' },
@@ -451,7 +456,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
     ...(s.router === 'model' ? [
       stageModel('router', 'Router 호출에 쓸 모델이에요. 갱신과 같게 = 위 갱신 모델'),
       ppRow('router_timeout', String(s.routerTimeout)),
-      `<div class="pp-rules one">${ruleBox('pp-router-rules', 'Router 에 덧붙일 지침', v('router_rules'), '장면 인물을 고를 때 규칙을 더해요 (예: 어떤 인물은 늘 빼기). 기본 지침 전체는 설정 「지침 → 인물 기록 지침 → Router」에서 고쳐요', 2000, '예: 관리국 요원만 고르고 민간인은 빼라', 'pp-rrules-save')}</div>`,
+      `<div class="pp-rules one">${ruleBox('pp-router-rules', '장면 인물 고르기(Router)에 덧붙일 지침', v('router_rules'), '장면 인물을 고를 때 규칙을 더해요 (예: 어떤 인물은 늘 빼기). 기본 지침 전체는 설정 「지침 → 인물 기록 지침 → Router」에서 고쳐요', 2000, '예: 관리국 요원만 고르고 민간인은 빼라', 'pp-rrules-save')}</div>`,
     ] : []),
   ].join('');
   const director = [
@@ -505,9 +510,9 @@ export function peopleDiagPane(ctx: ChatContext, canChat = true): string {
   const dg = diagTable(ctx, s.keepRaw);
   return group('진단', [
     ppRow('update_now', '', { ctl: updateBar(ctx, canChat) }),
-    dg.toggle ? ppRow('diag_all', '', { ctl: dg.toggle }) : '',
+    dg.toggle ? ppRow('diag_all', '', { ctl: dg.toggle, ...(dg.count ? { help: dg.count } : {}) }) : '',
     `<div class="ps-row wide"><div class="ps-label"><b>갱신 기록</b><small>${esc(`최근 갱신의 입력 크기·결과·실패 이유예요. 이 기기 플러그인 저장소에 성공 ${diagKeep().ok}건·실패 ${diagKeep().fail}건까지 두고 오래된 것부터 지워요. 토큰은 한글 1자=1, 그 외 0.3으로 어림했어요.`)}</small></div><div class="ps-ctl">${dg.body}</div></div>`,
-    ppRow('diag-clear', '', { ctl: `<button class="gx-mini danger" data-action="pp-diag-clear" ${peopleUi.diag?.length ? '' : 'disabled'}>진단 지우기</button>` }),
+    ppRow('diag-clear', '', { ctl: `<button class="gx-mini danger" data-action="pp-diag-clear" ${peopleUi.diag?.length ? '' : 'disabled'}>${ICONS.trash}진단 지우기</button>` }),
   ].join(''));
 }
 

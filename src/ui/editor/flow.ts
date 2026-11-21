@@ -183,7 +183,7 @@ export function flowNodes(ctx: ChatContext): { pre: Node[]; main: Node; post: No
       const on = g.enabled && g.auto;
       return { name: `${BOARD_NAME[site]} 새로고침`, sub: site === 'sm' ? '매물·댓글·쪽지' : '게시판 글·댓글·쪽지', kind: 'aux', on, model: on ? id(featureModel(sv, 'gn')) || mm(g.model) : undefined, calls: !g.enabled ? '호출 없음 (사이트 끔)' : g.auto ? jointText(site).calls : g.autoOpen ? '창 열 때 1회' : '수동 (새로고침 때만)', page: 'set:net', to: 'r:자동 호출', sure: on ? jointText(site).sure : 0, maybe: 0 };
     }),
-    { name: '관전', sub: `${VIEW_PRESETS[vw.preset]} 이어 쓰기`, kind: 'aux', on: vw.auto === 'turn', model: vw.auto === 'turn' ? phoneModel : undefined, calls: vw.auto === 'turn' ? '1회' : vw.auto === 'open' ? '괴담톡 열 때 1회' : '수동 (「관전」 단추)', page: 'set:phone', to: 'r:자동 호출@보기 전용 방', sure: vw.auto === 'turn' ? 1 : 0, maybe: 0 },
+    { name: '관전', sub: `${VIEW_PRESETS[vw.preset]} 이어 쓰기`, kind: 'aux', on: vw.auto === 'turn', model: vw.auto === 'turn' ? phoneModel : undefined, calls: vw.auto === 'turn' ? '1회' : vw.auto === 'open' ? '괴담톡 열 때 1회' : '수동 (「관전」 버튼)', page: 'set:phone', to: 'r:자동 호출@보기 전용 방', sure: vw.auto === 'turn' ? 1 : 0, maybe: 0 },
     { name: '위키 자동 작성', sub: '이번 턴 소재로 문서 한 편', kind: 'aux', on: wikiOn, model: wikiOn ? id(featureModel(ss, 'nw')) || mm(nw.model) : undefined, calls: wikiOn ? '2회 (제목 고르기 + 본문)' : nw.auto === 'open' ? '위키 열 때' : '수동', page: 'set:wiki', to: 'r:자동 호출', sure: wikiOn ? 2 : 0, maybe: 0 },
     ...(['cos', 'bm'] as MallSite[]).map((site): Node => {
       const m = mallSettings(ss, site);
@@ -235,11 +235,14 @@ export function callSummary(ctx: ChatContext, page: string): string {
   // 인터넷 페이지는 호출 줄을 두지 않는다 (격자의 「자동 호출」이 그 내용)
   if (page === 'net') return '';
   const mine = [...pre, ...post, ...manual].filter((n) => n.page === `set:${page}`);
-  if (!mine.length) return '';
+  // 우주 쇼핑몰: 진열·문의 호출 칸은 상점 페이지에 모여 있어(모델·자동 호출 표) 이 페이지엔 호출 칸이 없다. 다른 쇼핑몰처럼 줄과 「호출 흐름 →」를 두고 어디서 정하는지 적는다 (전수점검 눌러-사소-20).
+  // 호출 칸이 없는 다른 페이지(소지품·세력·생성 공통·상황판)는 갱신기 같은 다른 호출에 얹혀 있어 「호출 없음」이라 적으면 틀린 말이라 두지 않는다 (검토 지적)
+  if (!mine.length) return page === 'cos' ? `<p class="gw-calls"><span class="gw-call-lead">이 기능의 호출 · 진열·문의 호출은 「상점」 페이지에서 정해요</span>${FLOW_BACK}</p>` : '';
   const auto = mine.filter((n) => n.on);
   const sure = auto.reduce((s, n) => s + n.sure, 0);
   const maybe = auto.reduce((s, n) => s + n.maybe, 0);
-  const lead = auto.length ? `매 턴 보조 <b>${sure}회</b>${maybe ? ` (조건에 따라 최대 ${sure + maybe}회)` : ''}` : '매 턴 자동 호출 없음';
-  const parts = mine.map((n) => `<span class="gw-call${n.on ? ' on' : ''}">${esc(n.name)}<small>${esc(n.calls)}</small></span>`).join('');
+  // 0회는 「자동 호출 없음」 한 말로, 칩의 민트는 실제로 호출하는 칸만 (「매 턴 보조 0회」와 섞이고 호출 없는 칩이 고른 것처럼 보였다, 눌러2-사소-28)
+  const lead = sure + maybe ? `매 턴 보조 <b>${sure}회</b>${maybe ? ` (조건에 따라 최대 ${sure + maybe}회)` : ''}` : '매 턴 자동 호출 없음';
+  const parts = mine.map((n) => `<span class="gw-call${n.on && n.sure + n.maybe > 0 ? ' on' : ''}">${esc(n.name)}<small>${esc(n.calls)}</small></span>`).join('');
   return `<p class="gw-calls"><span class="gw-call-lead">이 기능의 호출 · ${lead}</span>${parts}${FLOW_BACK}</p>`;
 }

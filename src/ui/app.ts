@@ -183,6 +183,9 @@ function endSolo(): void {
 let repick = false;
 /** 시작 화면에서 연 새 채팅 기본 설정 */
 let pickerPrefs = false;
+/** 시작 전(시작 패널)의 기능 설정: 값은 이 채팅에 적히고, 시작할 때 비어 있는 칸은 새 채팅 기본값(prefs.vars)으로 채워진다.
+ *  그래서 보이는 값과 −/+ 기준도 그 값으로 (전수점검 보통-70: 저장해 둔 기본값 대신 코드 기본값이 보였다) */
+const preCtx = (c: ChatContext): ChatContext => ({ ...c, chat: { ...c.chat, scriptstate: { ...(getPrefs().vars ?? {}), ...(c.chat.scriptstate ?? {}) } } });
 let lastChat = '';
 
 const env: FieldEnv = {
@@ -575,7 +578,9 @@ function ensureRoot(): HTMLElement {
 
 /** 패널의 change 이벤트 (편집 창의 설정 페이지에서도 같은 함수를 부른다) */
 function panelChange(el: HTMLSelectElement): void {
-  if (el?.dataset?.change) void run(el.dataset.change, el.dataset.key ? `${el.dataset.key}=${el.value}` : el.value);
+  // 큰 수 칸(setrow.ts numTxt)은 자릿점을 찍어 보이므로 보낼 때 뗀다
+  const val = el?.classList?.contains('adv-val') ? el.value.replace(/[,\s]/g, '') : el?.value;
+  if (el?.dataset?.change) void run(el.dataset.change, el.dataset.key ? `${el.dataset.key}=${val}` : val);
 }
 
 let tipLayer: HTMLElement | null = null;
@@ -818,7 +823,7 @@ export async function openInstall(): Promise<void> {
   // (2026-10-29 사용자: 깡통봇 설치 뒤 그 창에서는 슬라이더만 되고 단추가 전부 안 눌렸다 — handle 이 없어 조작이 버려졌다)
   if (view.kind === 'picker') pickerPrefs = true;
   const host = {
-    ctx: () => (view.kind === 'started' || view.kind === 'picker' || view.kind === 'opening' ? view.ctx : installCtx),
+    ctx: () => (view.kind === 'picker' ? preCtx(view.ctx) : view.kind === 'started' || view.kind === 'opening' ? view.ctx : installCtx),
     refresh: async () => {
       installCtx = (await loadContext().catch(() => null)) ?? installCtx;
       if (shown) await refresh();
@@ -1012,11 +1017,11 @@ async function handle(action: string, value?: string): Promise<void> {
     // 기능 페이지(gn·ph·wk·hq·pp)는 범위 전환이 없고 늘 이 채팅 값을 보여 준다: 시작 뒤 범위가 「새 채팅 기본값」이어도 이 채팅에
     // (2026-10-28 QC: 고급 페이지에서 기본값으로 바꿔 두고 괴담넷 고급 칩을 누르면 기본값에만 적혀 화면이 안 바뀌었다)
     const scope = feat !== 'gen' ? 'chat' : view.kind === 'started' ? (settingsUi.scope === 'defaults' ? 'defaults' : 'chat') : 'defaults';
-    await handleAdvanced(action, value, view.ctx, { render, refresh }, scope);
+    await handleAdvanced(action, value, view.kind === 'picker' ? preCtx(view.ctx) : view.ctx, { render, refresh }, scope);
     return;
   }
   // 시작 전(시작 패널 → 설정)에도 기능별 설정 페이지가 열려 있으면 그 기능의 단추를 받는다 (2026-10-26 사용자). chat 객체·scriptstate 는 있다
-  const featCtx = view.kind === 'started' || (view.kind === 'picker' && pickerPrefs && settingsUi.page) ? view.ctx : null;
+  const featCtx = view.kind === 'started' ? view.ctx : view.kind === 'picker' && pickerPrefs && settingsUi.page ? preCtx(view.ctx) : null;
   if (action === 'wiki-back' && view.kind === 'started' && !wiki.history.some((h) => h.view !== 'home') && navHist.can(-1)) {
     // 위키 안에서 옮겨 다닌 길이 없으면 뒤로가기는 무조건 이전 화면 (다른 탭·사원증 창 포함, 사용자 2026-10-26)
     const run = navStep(-1);
@@ -1078,7 +1083,7 @@ async function handle(action: string, value?: string): Promise<void> {
   }
   // 설정 → 인터넷·상점의 격자와 그 아래 줄 (fam-*). 게시판 값은 늘 이 채팅에, 상점 값은 그 페이지의 범위(시작 전 = 새 채팅 기본값)에
   if (action.startsWith('fam-') && (view.kind === 'started' || (view.kind === 'picker' && pickerPrefs))) {
-    const fctx = view.ctx;
+    const fctx = view.kind === 'picker' ? preCtx(view.ctx) : view.ctx;
     const scope = view.kind === 'started' ? 'chat' : 'defaults';
     if (settingsUi.busy) return;
     await famAction(action, value, {
@@ -1098,7 +1103,7 @@ async function handle(action: string, value?: string): Promise<void> {
     if (view.kind === 'picker') pickerPrefs = true; // 시작 전: 설정 단추가 기본값 범위로 가게
     settingsUi.scope = view.kind === 'started' ? (settingsUi.scope === 'defaults' ? 'defaults' : 'chat') : 'defaults';
     openEditor({
-      ctx: () => (view.kind === 'started' || view.kind === 'picker' || view.kind === 'opening' ? view.ctx : null),
+      ctx: () => (view.kind === 'picker' ? preCtx(view.ctx) : view.kind === 'started' || view.kind === 'opening' ? view.ctx : null),
       refresh: () => refresh(),
       theme: () => root?.dataset.theme ?? 'dark',
       handle: (a, v) => handle(a, v),
@@ -1931,9 +1936,9 @@ function body(): string {
       return `${header('오류')}<div class="gx-empty">${esc(view.message)}</div>`;
     case 'not-lite':
       return `${header('연결 안 됨')}<div class="gx-empty">
-        <p><b>${esc(view.name || '이 캐릭터')}</b>는 ${view.goei ? `${BRAND.name} 카드지만 Plugin manifest 가 없어요.` : `${BRAND.name} 카드가 아니에요.`}</p>
-        <p>${view.goei ? '설치·업데이트에서 매니페스트와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
-        <button class="gx-start" data-action="install-open">${view.goei ? '설치·업데이트 열기' : `이 봇에 ${BRAND.name} 설치`}</button>
+        <p><b>${esc(view.name || '이 캐릭터')}</b>는 ${view.goei ? `${BRAND.name} 카드지만 플러그인 정보(Plugin manifest)가 없어요.` : `${BRAND.name} 카드가 아니에요.`}</p>
+        <p>${view.goei ? '설치 · 점검에서 플러그인 정보와 인사말을 다시 심으면 시작 화면이 열려요.' : `이 봇에 ${BRAND.name}를 설치하면(설정 폴더·명부·인사말·사진·아이콘을 심어요) 여기서 바로 쓸 수 있어요. 기존 로어북·인사말·에셋은 그대로 둬요.`}</p>
+        <button class="gx-start" data-action="install-open">${view.goei ? '설치 · 점검 열기' : `이 봇에 ${BRAND.name} 설치`}</button>
       </div>`;
     case 'started':
       evSeenReset();

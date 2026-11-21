@@ -191,6 +191,8 @@
 .gw .gx-chip small { font-size: 11.5px; color: var(--dim); }
 .gw .gx-mini:hover:not(:disabled), .gw .gx-chip:hover:not(:disabled), .gw .gw-pre:hover:not(:disabled) { border-color: var(--accent-line); }
 .gw .gx-mini.on, .gw .gx-chip.on, .gw .gw-pre.on { background: var(--accent-bg); border-color: var(--accent-line); color: var(--text); }
+/* 켜고 끄는 칩(aria-pressed)은 켠 칩 앞에 체크: 모두 켜져 있으면 색만으로는 켠 것인지 그냥 단추인지 몰랐다 (전수점검 눌러2-사소-21) */
+.gw .gx-chip[aria-pressed="true"]::before { content: ''; flex: none; width: 9px; height: 5px; margin: -3px 1px 0 0; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
 .gw .gx-mini.primary { background: var(--signal); border-color: var(--signal); color: var(--on-signal); font-weight: 600; }
 .gw .gx-mini.danger { color: var(--danger); }
 .gw .gx-mini.danger:hover:not(:disabled) { border-color: var(--danger); }
@@ -257,6 +259,8 @@
 .gw .gw-variants select { font: inherit; }
 .gw .gw-fmove { display: inline-flex; gap: 4px; }
 .gw .gw-xname { width: 220px; font-weight: 700; }
+.gw .gw-xname[aria-invalid] { border-color: var(--danger); }
+.gw .gw-xname-warn { margin: 0 0 6px; font-size: 12px; color: var(--danger); }
 .gw .gw-ro { margin: 6px 2px 0; font-size: 12.5px; color: var(--dim); }
 .gw .gw-add-field { display: flex; flex-wrap: wrap; gap: var(--gap); margin-top: 10px; }
 .gw .gw-add-field input[name] { flex: 1; min-width: 160px; }
@@ -269,6 +273,9 @@
 .gw .gw-map th, .gw .gw-map td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--hair); }
 .gw .gw-preview { display: block; max-height: 420px; margin: 0 0 20px; padding: 12px var(--pad); overflow: auto; font: 12.5px/1.55 var(--mono); white-space: pre-wrap; }
 .gw .gw-anote { margin: 0 0 20px; padding: 0 var(--pad) 12px; }
+/* 펼친 괴이 공통 머리말은 오른쪽 상세 칸 맨 위 (눌러-사소-27). 비어 있는 상세 칸(가운데 정렬)에서도 폭을 다 쓴다 */
+.gw .gw-detail > .gw-anote.wide { align-self: stretch; width: 100%; }
+.gw-detail.empty:has(> .gw-anote.wide) { display: block; }
 .gw .gw-list-pane > .gw-anote { flex: none; margin: 0 10px 8px; padding: 0 12px; }
 .gw .gw-list-pane > .gw-anote:not([open]) { padding-bottom: 0; }
 .gw .gw-list-pane > .gw-anote summary { min-height: var(--h); font-size: 13px; }
@@ -349,8 +356,8 @@
 
 /* ── 본문 칸이 좁을 때 (폰 가로 844·창 폭 50~60% 등, 화면은 760 넘지만 조작 칸이 320 이 안 됨): 줄만 한 열로.
    이름 칸 200 옆에 단계 선택·막대가 다 안 들어가 창 밖으로 넘쳤다 (2026-10-28 QC). 화면 760 이하 규칙과 같은 줄 모양 ── */
-.gw-body { container-type: inline-size; }
-@container (max-width: 600px) {
+.gw-body { container: gwbody / inline-size; }
+@container gwbody (max-width: 600px) {
   .gw .ps-row, .gw .dir-line, .gw .dir-in, .gw .st-col-row { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'label' 'ctl' 'hint'; }
   .gw .st-col-row { grid-template-areas: 'label label' 'use show' 'hint hint'; grid-template-columns: auto auto; justify-content: start; }
   .gw .st-col-row.st-col-all > .gx-segs { grid-column: 1 / -1; grid-row: 2; }
@@ -362,6 +369,18 @@
   .gw-list-pane .gw-list, .gw-list-pane .dir-search, .gw-list-pane .gw-list-title { display: none; }
   .gw-list-pane .gw-list-pick { display: block; flex: 1; min-width: 0; }
   .gw-head h2 .gw-hmove { display: inline-flex; }
+  .gw .dir-in:has(> .dir-photo) > span:first-child, .gw .dir-in > .dir-photo, .gw .dir-in:has(> .dir-photo) > small, .gw .dir-in:has(> .dir-photo) > .dir-ext { grid-column: 1; }
+}
+/* 목록 + 상세 두 칸 페이지의 상세 칸도 따로 잰다 (전수점검 눌러-중대-19·눌러-보통-35): 본문은 600 넘어도 상세 칸은 380쯤이라
+   이름 칸 200 옆 값 칸이 130 남아 사진 줄 글자가 한 글자씩 세로로 쌓이고 소속 칩이 한 줄에 하나씩 늘어섰다 → 상세 칸이 좁으면 줄 모양만 한 열로.
+   이름을 붙여 위 본문 규칙(목록→드롭다운, 머리 ▲▼)은 본문 폭으로만 켜진다: 이름 없는 규칙이면 상세 칸 폭으로 켜져 PC 두 칸에서도 머리에 ▲▼가 한 벌 더 생겼다 */
+.gw-detail { container: gwdetail / inline-size; }
+@container gwdetail (max-width: 600px) {
+  .gw .ps-row, .gw .dir-line, .gw .dir-in { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'label' 'ctl' 'hint'; }
+  .gw .ps-label > b, .gw .dir-line > span:first-child, .gw .dir-in > span:first-child { min-height: 0; }
+  .gw .ps-ctl > input, .gw .ps-ctl > select, .gw .dir-in > input, .gw .dir-in > select { width: 100%; }
+  .gw .dir-in:has(> .dir-photo) > span:first-child, .gw .dir-in > .dir-photo, .gw .dir-in:has(> .dir-photo) > small, .gw .dir-in:has(> .dir-photo) > .dir-ext { grid-column: 1; }
+  .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label' 'hint'; }
 }
 
 /* ── 좁은 화면 ── */
@@ -466,6 +485,7 @@
 .gw .gw-startpage .st-slot .gw-grip { flex: 0 0 auto; touch-action: none; }
 .gw .gw-startpage .st-slot .st-caret { display: inline-flex; width: 18px; color: var(--dim); }
 .gw .gw-startpage .st-slot .st-caret svg { width: 16px; height: 16px; }
+.gw .gw-startpage .st-slot .st-always { flex: none; font-size: 12px; color: var(--dim); }
 .gw .gw-startpage .st-slots .dir-row.dragging { opacity: .45; }
 .gw .gw-startpage .st-slots .dir-row.drop-before { box-shadow: 0 -3px 0 0 var(--signal); }
 .gw .gw-startpage .st-slots .dir-row.drop-after { box-shadow: 0 3px 0 0 var(--signal); }
@@ -473,8 +493,11 @@
 /* 폰: 이름 줄과 단추 줄을 나눈다 (한 줄에 다 넣으면 이름이 꺾이고 종류·코드가 잘린다, 2026-11-05 캡처) */
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw .gw-startpage .st-slot { flex-wrap: wrap; row-gap: 6px; }
-  .gw .gw-startpage .st-slot .dir-name { flex: 1 0 100%; }
-  .gw .gw-startpage .st-slot .gx-segs { margin-right: auto; }
+  /* 이름은 손잡이 옆 첫 줄에 (100%면 손잡이가 혼자 한 줄을 차지해 카드가 길어졌다, 전수점검 눌러2-사소-24). 고르기·화살표만 둘째 줄 */
+  .gw .gw-startpage .st-slot .dir-name { flex: 1 0 calc(100% - 40px); }
+  .gw .gw-startpage .st-slot .gx-segs, .gw .gw-startpage .st-slot .st-always { margin-right: auto; }
+  /* 고르기가 없는 줄(플레이 조직)도 펼침 화살표는 오른쪽 끝 (왼쪽 아래에 붙었다, 전수점검 눌러-보통-45) */
+  .gw .gw-startpage .st-slot .st-caret { margin-left: auto; }
 }
 .gw .gw-startpage .st-sel { display: flex; align-items: baseline; gap: 8px; margin: 16px 0 8px; font-size: 15px; }
 .gw .gw-startpage .st-sel small { color: var(--dim); font-weight: 400; }
@@ -509,11 +532,22 @@
 .gw-totop.show { opacity: 1; pointer-events: auto; transform: none; }
 .gw-totop:hover { background: var(--accent-bg); }
 .gw-totop svg { width: 20px; height: 20px; }
+/* 「맨 위로」가 뜨는 자리(오른쪽 22~64px)를 기능 설정 본문이 비워 둔다: 떠 있는 단추가 줄 끝의 지우기 ×·입력값·펼침 화살표를 덮어 잘못 눌렸다 (전수점검 눌러-보통-32).
+   호출 흐름 판(.fl-page)은 오른쪽 여백을 따로 두고 단추를 바깥으로 붙인다(아래 761 규칙) */
+.gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 44px; }
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  .gw-totop { width: 36px; height: 36px; margin: 0 8px 14px 0; }
+  .gw-body:has(~ .gw-totop) .gw-set > .gw-setbody:not(.fl-page) { margin-right: 34px; }
+}
 /* 조작 없이 설명만 있는 줄 (2026-11-08 사용자: 소지품 「넘기는 것·남는 것」 글 위 쓸데없는 여백) — 빈 조작 칸(높이 34)을 접고 설명을 이름 옆 첫 줄부터 */
 .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label hint'; }
 .gw .ps-row:has(> .ps-ctl:empty) > .ps-ctl { display: none; }
 .gw .ps-row:has(> .ps-ctl:empty) > .ps-label > b { min-height: 0; }
-@container (max-width: 600px) {
+@container gwbody (max-width: 600px) {
+  .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label' 'hint'; }
+}
+/* 폰 배치(한 열)에서도 같게: 위 「이름 | 설명」 두 칸이 한 열 격자에 덮여 설명이 폭을 다 가져가고 이름(「고유 상점」)이 한 글자씩 세로로 쌓였다 (전수점검 눌러2-중대-4) */
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw .ps-row:has(> .ps-ctl:empty) { grid-template-areas: 'label' 'hint'; }
 }
 /* 글 복사 단추 (2026-11-08 사용자): 머리 줄에서는 토큰 수와 ▲▼ 사이, 글 상자에서는 안쪽 오른쪽 위(스크롤 막대 왼쪽) */
@@ -810,7 +844,7 @@
 .gw .fl .ck-first { box-shadow: none; }
 .gw .fl-ph { display: none; }
 /* 떠 있는 「맨 위로」 단추(42px)가 「설정 →」 단추를 덮지 않게: 이 쪽에서는 단추를 오른쪽으로 10px 붙이고, 줄 오른쪽에 그 자리를 비운다 (2026-11-12 전수점검 A3). 폰은 폭이 모자라 그대로 */
-@media (min-width: 761px) { .gw .fl-page { padding-right: 22px; } .gw-body:has(.fl-page) ~ .gw-totop { margin-right: 12px; } }
+@media (min-width: 761px) { .gw .fl-page { padding-right: 22px; } .gw-body:has(.fl-page) ~ .gw-totop { margin-right: 2px; } }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw .fl-pc { display: none; }
   .gw .fl-ph { display: flex; }
@@ -846,7 +880,7 @@
 }
 /* 본문 칸이 한 줄(약 930px)보다 좁으면 (노트북 1280·1366, AI 상담을 연 창, 창 폭을 줄인 경우) PC 줄이 오른쪽에서 잘렸다 → 폰과 같은 카드로 (전수검사 11-13, 사용자 승인).
    1002 = 줄 932(테두리 포함) + .gw-page 좌우 48 + .fl-page 오른쪽 22. 둘 중 하나가 바뀌면 다시 셈. 위 폰 규칙을 그대로 옮긴 것 (@media 와 @container 는 규칙을 나눠 쓸 수 없다) */
-@container (max-width: 1001px) {
+@container gwbody (max-width: 1001px) {
   .gw .fl-pc { display: none; }
   .gw .fl-ph { display: flex; }
   /* 폰: 오른쪽 숫자 칸은 왼쪽 두 줄(메인 + 보조 = 합)에 이미 있어 숨긴다. 글이 한 줄씩 들어가게 */
@@ -895,7 +929,7 @@
 .gw-ai-top .ai-clear + .gx-x { margin-left: 0; }
 .gw-ai-top .ai-model:disabled { opacity: .45; cursor: default; }
 .gw-ai > .gw-confirm { z-index: 2; }
-.gw-ai > .gw-confirm .gw-confirm-box { margin: 0 16px; }
+/* 좌우 여백은 모든 확인 팝업 공통(.gw-confirm padding 16)으로 준다. 상자에 margin 을 또 주면 두 번 들어갔다 */
 .gw-ai-log { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; }
 .gw-ai .ai-sys { align-self: center; max-width: 92%; padding: 4px 10px; border-radius: 10px; background: var(--panel2); color: var(--dim); font-size: 12.5px; text-align: center; overflow-wrap: anywhere; }
 .gw-ai .ai-err { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 10px; color: var(--danger); }
@@ -920,7 +954,8 @@
 @media (max-width: 1280px) {
   .gw.ai-on { gap: 0; }
   .gw.ai-on .gw-win { width: min(var(--gw-width, 90%), 1340px); }
-  .gw-ai { position: fixed; right: 12px; top: 50%; transform: translateY(-50%); z-index: 5; width: min(380px, calc(100% - 24px)); }
+  /* 화면 끝이 아니라 설정 창 오른쪽 안쪽에 맞춘다: 화면 끝 기준이라 창 밖으로 40px쯤 나왔다 (전수점검 눌러-보통-34) */
+  .gw-ai { position: fixed; right: calc((100% - min(var(--gw-width, 90%), 1340px)) / 2 + 12px); top: 50%; transform: translateY(-50%); z-index: 5; width: min(380px, calc(min(var(--gw-width, 90%), 1340px) - 24px)); }
 }
 @media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
   .gw.ai-on { gap: 0; }
@@ -928,3 +963,99 @@
   .gw-ai { position: fixed; left: 0; right: 0; top: auto; bottom: 0; transform: none; z-index: 5; width: auto; height: 82%; border-radius: 14px 14px 0 0; border-bottom: 0; }
   .gw.ai-on::after { content: ''; position: fixed; inset: 0; z-index: 4; background: rgba(0, 0, 0, .45); }
 }
+
+/* ── 전수점검 고침 · 설정 (2026-11-21) ── */
+/* 체크 격자 (눌러-중대-16·17, 눌러-보통-48): 줄마다 따로 잡던 열 폭을 표 하나(subgrid)로 맞춘다 — 머리글 줄과 동그라미 줄의 폭이 달라 한 칸씩 밀렸다.
+   열은 머리 낱말보다 좁아지지 않고(낱말 중간에서 안 끊김), 판보다 넓으면 옆으로 밀어 본다. 옆에 더 있으면 그쪽 끝에 그림자, 가로 막대도 보이게 */
+.gw .ck > .ps-rows {
+  display: grid; grid-template-columns: var(--gname, 96px) var(--ck-cols, repeat(var(--ck-n), minmax(min-content, 1fr)));
+  overflow-x: auto; overflow-y: hidden;
+  scrollbar-color: color-mix(in srgb, var(--sub) 45%, transparent) transparent;
+  background:
+    linear-gradient(to right, var(--panel) 40%, transparent) left center / 28px 100% no-repeat local,
+    linear-gradient(to left, var(--panel) 40%, transparent) right center / 28px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, .45), transparent) left center / 14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, .45), transparent) right center / 14px 100% no-repeat scroll,
+    var(--panel);
+}
+.gw .ck > .ps-rows::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--sub) 45%, transparent); border: 2px solid transparent; background-clip: padding-box; }
+.gw .ck > .ps-rows > .ck-line { grid-column: 1 / -1; grid-template-columns: subgrid; min-width: 0; }
+.gw .ck .ck-name .mx-name > span { white-space: nowrap; }
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  .gw .ck > .ps-rows { grid-template-columns: minmax(var(--gname-ph, 74px), max-content) repeat(var(--ck-n), minmax(min-content, 1fr)); }
+  .gw .ck-h1 b { font-size: 12px; letter-spacing: -.2px; }
+  .gw .ck-h2 { font-size: 12px; letter-spacing: -.2px; }
+  .gw .ck-h2 > span { padding: 0 3px; }
+}
+/* 확인 팝업: 좁은 화면에서도 좌우 여백 (전수점검 눌러-보통-28) */
+.gw-confirm { padding: 16px; }
+/* 저장·불러오기 「가져오기」: 「파일 올리기」를 다른 줄 단추처럼 이름 옆에 (오른쪽 끝에 혼자 떨어져 있었다, 눌러-보통-39) */
+.gw .ps-row.gw-import-row { grid-template-columns: var(--label) minmax(0, 1fr); }
+.gw .ps-row.gw-import-row > .ps-ctl { justify-content: flex-start; }
+@container gwbody (max-width: 600px) { .gw .ps-row.gw-import-row { grid-template-columns: minmax(0, 1fr) auto; } }
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .gw .ps-row.gw-import-row { grid-template-columns: minmax(0, 1fr) auto; } }
+/* 꺼진 위험 단추: 어두운 바탕에 어두운 빨강이라 글자가 안 읽혔다 → 다른 꺼진 단추처럼 (눌러2-보통-28) */
+.gw .gx-mini.danger:disabled { color: var(--sub); }
+/* 폰 설정 목록 서랍 (눌러-보통-33): 열린 동안 아래 띠 손잡이가 서랍 글자 위에 떠 있었다 → 숨김. 서랍이 덮지 않은 본문 띠도 어둡게(눌러도 서랍만 닫힌다) */
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  /* 닫힌 평소에도 손잡이(높이 8 + 선 1)가 본문 맨 아래 줄(설명 끝·체크칸·스위치)에 걸쳤다 → 본문 칸을 그만큼 위에서 끝내 손잡이가 빈 띠에 앉게 */
+  .gw-win > .gw-body { margin-bottom: 9px; }
+  .gw-win.drawer .gw-cdr .gx-cgrip { visibility: hidden; }
+  .gw-win.drawer::after { content: ''; grid-area: body; z-index: 2; background: var(--scrim); pointer-events: none; }
+}
+/* 캐릭터 이미지 「요청 속 이미지 태그」「표시 범위」 (눌러-보통-36·눌러-사소-35): 고르기만 오른쪽 끝에 붙고 막대 시작·길이가 다른 줄과 달랐다 → 다른 줄처럼 왼쪽부터, 막대 폭도 같게 */
+.gw .st-recent { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 8px; width: var(--ctl); }
+.gw .st-recent > .st-range { width: 100%; }
+@container gwbody (max-width: 600px) { .gw .st-recent { width: 100%; } }
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) { .gw .st-recent { width: 100%; } }
+/* − 값 + 가운데 칸 (눌러-보통-38): .gw input:not(...)×5 공통 칸 규칙(특이도 0,6,1)이 .adv-step > input.adv-val(0,3,1)을 이겨
+   상자 안에 테두리 상자가 또 생기고 단위가 떨어져 보였다 → 가운데 칸은 테두리·바탕·높이를 상자에 맡긴다 */
+.gw .adv-step > input.adv-val { height: auto !important; min-height: 0 !important; max-height: none !important; border: 0 !important; border-radius: 0 !important; background: transparent !important; }
+/* 왼쪽 열 머리 (눌러-보통-41): 갈래 탭·찾기 칸은 목록을 내려도 위에 붙어 있다 */
+.gw-tree-top { position: sticky; top: -10px; z-index: 2; margin: -10px -10px 0; padding: 10px 10px 2px; background: var(--sunk); }
+/* 이미지 지침 글칸 (눌러-보통-50): 복사 단추를 글상자 안에 띄우면 첫 줄 끝을 덮었다 → 다른 지침처럼 글상자 위 줄에, 토큰 수와 함께 */
+.gw .ip-copyhead { justify-content: flex-end; min-height: 0; margin: 0 0 6px; }
+/* 지침 설명 (눌러-보통-51): 영어 낱말(FORMAT 등)이 글자 단위로 끊기지 않게 */
+.gw .gw-head > .gx-muted { word-break: keep-all; overflow-wrap: break-word; }
+/* 폰 켬/끔·표 고르기 (눌러2-보통-31): 스위치 36×20·동그라미 24 는 누르는 칸이 작았다 → 폰은 스위치 44×24, 표 고르기는 칸 둘레까지 눌린다 */
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  .gw .gx-switch { width: 44px; height: 24px; }
+  .gw .gx-switch i { left: 3px; top: 3px; width: 16px; height: 16px; }
+  .gw .gx-switch[aria-checked="true"] i { transform: translateX(20px); }
+  .gw .gx-switch::before { inset: -10px -8px; }
+  .gw .ck-m { position: relative; }
+  .gw .ck-m::before { content: ''; position: absolute; inset: -10px; }
+  .gw .pp-check input { width: 22px; height: 22px; }
+}
+/* 요원 목록: 소속이 바뀌는 줄 위에 금 (눌러-사소-16) */
+.gw .gw-rowbox.gw-grp { position: relative; margin-top: 13px; }
+.gw .gw-rowbox.gw-grp::before { content: ''; position: absolute; left: 0; right: 0; top: -8px; border-top: 1px solid var(--line); pointer-events: none; }
+/* 시작 화면 「묶음 추가」 (눌러-사소-19): 이름|조작 두 칸 줄에 넣어 가운데에 떠 있었다 → 위 카드들과 같은 왼쪽 줄에 */
+.gw .gw-startpage .st-addrow { display: flex; margin: 8px 0 4px; }
+/* 말로 적는 글칸(시작 화면 설명·위키 공용 지침·규칙 등)은 본문 글꼴 (고정폭이라 한국어 글자 사이가 벌어져 보였다, 눌러-사소-26·28). 지침 틀 같은 영어 틀은 그대로 고정폭 */
+.gw .dir-in > textarea, .gw textarea.gx-search:not(.ip-template) { font-family: inherit; }
+/* 이름|조작 줄의 고르기 상자는 글 폭만큼 (거점 「지도에 보이기」만 줄 끝까지 늘어났다, 눌러-사소-29) */
+.gw .dir-line > .gx-segs { justify-self: start; width: auto; }
+/* 지침 절 머리 (눌러-사소-31): 좁은 폭에서 복사 단추가 제목 칸 아래 줄로 떨어져 절마다 자리가 달랐다 → 제목 칸이 줄어들고 단추는 늘 같은 줄 끝 */
+.gw .gw-guide-secs .gw-field-head { flex-wrap: nowrap; }
+.gw .gw-guide-secs .gw-gtitle { flex-basis: 0; }
+.gw .gw-guide-secs .gw-field-head > b { flex: 1 1 0; min-width: 0; }
+/* 폰 쌓은 표의 글 칸 (눌러-사소-36): 칸 이름 길이에 따라 입력칸 시작점이 달랐다 → 글 칸이 든 줄은 이름 폭을 같게 */
+@media (max-width: 760px), (max-height: 499px) and (pointer: coarse) {
+  .gw .mx-grid .mx-cell:has(> input.gx-search) > .mx-site { flex: 0 0 6.5em; }
+  .gw .mx-grid .mx-cell:has(> input.gx-search) > input.gx-search { flex: 1 1 0; min-width: 0; }
+}
+/* 다음 요청 로어북의 종류 딱지 (눌러-사소-24): 조작 칸 폭으로 늘어나 입력칸처럼 보였다 → 글 폭 딱지로 줄 오른쪽에 */
+.gw .lc-row > .lc-kind { justify-self: end; align-self: center; width: auto; }
+/* 바꾼 값 표시 점 (눌러2-사소-29): 점이 제목 앞에 끼어 그 제목만 오른쪽으로 밀렸다 → 줄 왼쪽 여백에 띄운다 */
+.gw .adv-row.changed .ps-label b, .gw .ps-changed .ps-label b { position: relative; }
+.gw .adv-row.changed .ps-label b::before, .gw .ps-changed .ps-label b::before { position: absolute; left: -11px; top: .5em; margin: 0; }
+/* 상태 점검 받기 결과 (눌러2-보통-27): 그 줄 단추 옆 한 줄 */
+.gw .gw-getmsg { flex-basis: 100%; font-size: 12.5px; color: var(--sub); }
+.gw .gw-getmsg.err { color: var(--danger); }
+/* 넓은 줄 안의 안내 글 (눌러2-사소-30): ps-note 자체 여백 때문에 위 설명보다 들여 써지고 아래가 비었다 */
+.gw .ps-row.wide > .ps-ctl > .ps-note { margin: 0; padding: 0; }
+/* 괴이 공통 머리말 (눌러2-사소-25): 펼침 화살표가 없어 펼쳐지는 줄인지 몰랐다 → 다른 접는 칸과 같은 화살표 */
+.gw .gw-anote > summary::-webkit-details-marker { display: none; }
+.gw .gw-anote > summary::after { content: ''; flex: none; margin-left: auto; width: 8px; height: 8px; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: translateY(-2px) rotate(45deg); }
+.gw .gw-anote[open] > summary::after { transform: translateY(2px) rotate(-135deg); }
