@@ -5071,13 +5071,11 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
    화면 폭이 아니라 위키 스크롤 칸 폭 기준이라 1280 PC 는 두 칸 그대로. 폰 규칙(아래 @media)이 뒤에 와서 폰은 폰대로 */
 .wk .wsc { container: wkw / inline-size; }
 @container wkw (max-width: 700px) {
-  .wk .wrap { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px 16px; }
-  .wk .doc { padding: 20px 22px; }
+  /* PC 배치 그대로(본문 + 오른쪽 「최근 변경」, 정보 상자는 오른쪽에 띄움), 폭만 줄인다 (11-22 사용자: 폴드 펼침은 PC 배치) */
+  .wk .wrap { grid-template-columns: minmax(0, 1fr) 150px; gap: 12px; padding: 14px 16px; }
+  .wk .doc { padding: 18px 18px; }
   .wk .wst { padding: 12px 16px 0; }
-  /* 띄우지 않되 PC 와 같은 300px 로 가운데 — 폭 전체면 사진이 첫 화면을 다 채움 (11-21) */
-  .wk .nw-infobox { float: none; width: min(100%, 300px); margin: 0 auto 14px; }
-  /* 사진은 PC 와 같은 정사각 자르기 그대로, 크기만 170px — 펼친 폴드 첫 화면에 정보표 줄·본문이 보이게 */
-  .wk .nw-infobox td.nw-ibphoto img { width: 170px; max-width: 100%; margin: 0 auto; }
+  .wk .nw-infobox { width: 200px; margin: 0 0 12px 14px; }
 }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .wk .top { padding: 0 12px; }
@@ -5168,6 +5166,11 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs .gn-dmwin-bd > .ph-form { display: flex; flex-direction: column; }
 .bs .gn-dmwin-bd > .ph-form > .ph-form-body { flex: 1; min-height: 0; overflow-y: auto; align-content: start; }
 .bs .gn-dmwin-bd > .ph-form > .ph-form-foot { flex: none; }
+/* 쪽지 창: 내용 칸은 남는 높이만 쓰고 첨부 단추 줄이 「보내기」 줄에 가리지 않게 (11-22 사용자) */
+.bs .gn-dmwin-bd > .ph-form > .ph-form-body { display: flex; flex-direction: column; }
+.bs .gn-dmwin-bd > .ph-form > .ph-form-body > * { flex: none; }
+.bs .gn-dmwin-bd > .ph-form > .ph-form-body > textarea { flex: 1 1 56px; min-height: 56px; height: auto; resize: none; }
+.bs .gn-dmwin-bd > .ph-form > .ph-form-body { padding-bottom: 10px; }
 .bs .gn-dmwin-bd .ph-log { flex: 1; min-height: 0; overflow-y: auto; }
 .bs .gn-dmwin-bd .ph-list { overflow-y: auto; min-height: 0; }
 .bs .gn-dmwin-bd .bs-dmh { justify-content: flex-end; margin-bottom: 6px; }
@@ -5826,10 +5829,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .bs-gn:not(.bs-m) .side h6 { margin: 10px 8px 4px; }
   .bs-gn:not(.bs-m) .gmain { padding: 14px; }
   .bs-wpf:not(.bs-m) .cols { grid-template-columns: 130px minmax(0, 1fr); }
-  /* 괴이위키: 「최근 변경」 칸을 본문 아래로 (본문이 190~225px 라 낱말마다 꺾였다). 문서 정보 상자는 본문 폭 그대로 */
   .wk .top { gap: 12px; padding: 0 14px; }
-  .wk .wrap { grid-template-columns: minmax(0, 1fr); padding: 14px; }
-  .wk .nw-infobox { float: none; width: 100%; margin: 0 0 14px; }
   /* 괴담톡: 목록 또는 대화 한 칸 (대화 칸이 210px 라 머리 단추가 겹쳐 「방 삭제」 자리에서 전화 창이 뜨고 「초대」가 창 밖으로 나갔다).
      방 머리의 「목록으로」 단추로 돌아간다 */
   .gx-body.ph-app { grid-template-columns: minmax(0, 1fr); }
