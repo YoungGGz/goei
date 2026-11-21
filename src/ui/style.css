@@ -4253,7 +4253,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-sm .ph.want{background:#fffdf8;border:1.5px dashed #c9b9a6;box-shadow:none;place-items:start;align-content:start;padding:16px;gap:10px;text-align:left}
 .bs-sm .ph.want b{background:#3a322c;color:#fff;font-size:12px;padding:3px 8px;border-radius:4px;justify-self:start}
 .bs-sm .ph.want p{margin:0;font-size:13.5px;line-height:1.55;color:#5b524a}
-.bs-sm.bs-m .c .bs-sm .ph.want{padding:8px;gap:6px}.bs-sm.bs-m .c .bs-sm .ph.want p{font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.bs-sm.bs-m .c .ph.want{padding:8px;gap:6px}.bs-sm.bs-m .c .ph.want p{font-size:11px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .bs-sm .ph.dark{background:radial-gradient(circle at 50% 40%,#4b4640,#24211e)}
 .bs-sm .ph .tag{position:absolute;left:8px;top:8px;padding:2px 7px;border-radius:3px;background:rgba(43,38,34,.85);color:#fff;font-size:11px;font-weight:700}
 .bs-sm .ph .tag.g{background:#3d7a58}
@@ -4281,7 +4281,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .bs-sm.bs-m .bar2{flex-wrap:wrap;row-gap:8px}.bs-sm.bs-m .bar2 .loc{order:1}.bs-sm.bs-m .sort{order:2}.bs-sm.bs-m .cats{order:3;width:100%;overflow-x:auto;scrollbar-width:none}
 .bs-sm.bs-m .grid{grid-template-columns:minmax(0,1fr);gap:0}
 .bs-sm.bs-m .c{display:grid;grid-template-columns:104px minmax(0,1fr);gap:12px;padding:12px 0;border-bottom:1px solid #e4ddd3}
-.bs-sm.bs-m .c .bs-sm .ph{border-radius:6px}.bs-sm.bs-m .c .bs-sm .ph img{width:85px;height:85px}.bs-sm.bs-m .c .nm{margin-top:2px}
+.bs-sm.bs-m .c .ph{border-radius:6px}.bs-sm.bs-m .c .ph img{width:85px;height:85px}.bs-sm.bs-m .c .nm{margin-top:2px}
 
 /* 첨부 공통 */
 .bs .ax{margin:12px 0;max-width:min(100%,520px)}
@@ -5785,7 +5785,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
   .bs-sm:not(.bs-m) .detail .ph img { width: 180px; height: 180px; }
   .bs-gal .bs-x, .bs-sm .bs-x { padding: 10px 14px 0; }
   /* 괴담넷 본문: 왼쪽 글 목록 칸을 좁혀 글·새 글 칸에 폭을 준다 (글 칸이 170~200px 라 답글 안내가 세로로 쌓였다) */
-  .bs-gn:not(.bs-m) .wrap { grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 14px; }
+  .bs-gn:not(.bs-m) .wrap { grid-template-columns: minmax(150px, 32%) minmax(0, 1fr); gap: 12px; padding: 14px; } /* 752 폭에서 왼쪽 글 목록 제목이 4~5글자에서 잘리던 것: 폭의 1/3 까지 */
   .bs-gn:not(.bs-m) .side { padding: 6px; }
   .bs-gn:not(.bs-m) .side button { padding: 8px; }
   .bs-gn:not(.bs-m) .side h6 { margin: 10px 8px 4px; }
