@@ -933,7 +933,9 @@
   .gw { padding: 14px; box-sizing: border-box; }
   .gw-win, .gw.ai-on .gw-win { width: 90%; height: 90%; grid-template-columns: 184px minmax(0, 1fr); }
   .gw > .gw-ai { right: calc((100% - (100% - 28px) * .9) / 2 + 12px); width: min(380px, calc((100% - 28px) * .9 - 24px)); height: calc((100% - 28px) * .9 - 24px); }
-  .gw-tree { padding: 8px; }
+  .gw-tree { padding: 8px; scrollbar-gutter: auto; }
+  /* 「설정 찾기 (예: 테마, 새로고침)」 안내글이 141px 칸에서 잘렸다(11-22 검수) → 글은 그대로, 안쪽 여백·글자만 줄임. .gw input:not(…) 규칙보다 세게 */
+  .gw .gw-find:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]) { padding: 0 6px; font-size: 12px; letter-spacing: -.4px; }
   .gw-tabs { gap: 4px; }
   .gw-tab { padding: 0 4px; font-size: 13.5px; }
   .gw-tree-item, .gw-tree-label { gap: 8px; padding: 0 8px; font-size: 13.5px; }
@@ -1096,26 +1098,10 @@
 /* ── 눌러 보기 3차 고침 · 설정 (2026-11-21) ── */
 /* 본문 칸이 좁은 PC 배치(폴드 펼침 673: 왼쪽 목록 옆 본문 343): 표가 PC 모양 그대로라 머리글이 한 글자씩 꺾이고 오른쪽 칸이 잘렸다.
    → 본문 폭 600 이하면 표·수 묶음은 폰 모양. 아래는 위 폰 @media 규칙 가운데 표(.ck·.mx·.fam-set) 것을 그대로 옮긴 것 (@media 와 @container 는 규칙을 나눠 쓸 수 없다). 폰 규칙을 고치면 여기도 같이 고친다 */
+/* 11-22 검수(폴드 펼침 = PC 배치, 폭·간격만 줄이기. 줄 이름 올리기·표 쪼개기 금지): 표를 폰 모양(띠마다 나눔·상점마다 카드·사이트 탭)으로 바꾸던 줄은 뺐다.
+   표는 PC 모양 그대로 글자·칸만 줄이고, 그래도 넘치면 표 안 가로 스크롤(막대 보이게, 아래 .ck-pc 규칙) */
 @container gwbody (max-width: 600px) {
-  .gw .mx-head { display: flex; gap: 4px; top: 0; margin: 0 0 10px; padding: 4px; }
-  .gw .mx-head > span { display: none; }
-  .gw .mx-head label { flex: 1 1 0; flex-direction: column; justify-content: center; gap: 3px; min-height: 48px; padding: 4px 2px; border-radius: 8px; font-size: 12px; font-weight: 600; color: var(--dim); text-align: center; cursor: pointer; }
-  .gw .mx-head label > span { white-space: normal; line-height: 1.2; }
-  .gw .mx-r:nth-of-type(1):checked ~ .mx-head label:nth-of-type(1), .gw .mx-r:nth-of-type(2):checked ~ .mx-head label:nth-of-type(2),
-  .gw .mx-r:nth-of-type(3):checked ~ .mx-head label:nth-of-type(3), .gw .mx-r:nth-of-type(4):checked ~ .mx-head label:nth-of-type(4) { background: var(--accent-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--accent-line); }
-  .gw .mx-r:nth-of-type(1):checked ~ .ps-group .mx-cell:not(.mx-c0):not(.mx-all), .gw .mx-r:nth-of-type(2):checked ~ .ps-group .mx-cell:not(.mx-c1):not(.mx-all),
-  .gw .mx-r:nth-of-type(3):checked ~ .ps-group .mx-cell:not(.mx-c2):not(.mx-all), .gw .mx-r:nth-of-type(4):checked ~ .ps-group .mx-cell:not(.mx-c3):not(.mx-all) { display: none; }
-  .gw .mx-row { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; }
-  .gw .mx-label { grid-column: 1; white-space: nowrap; }
-  .gw .mx-cell { grid-column: 2; justify-content: flex-end; box-shadow: none; }
-  .gw .mx-cell + .mx-cell { box-shadow: none; }
-  .gw .mx-cell .gx-chips { justify-content: flex-end; }
-  .gw .mx-cell.wide, .gw .mx-cell.mx-all { grid-column: 1 / -1; justify-content: flex-start; }
-  .gw .mx-help { grid-column: 1 / -1; }
-  .gw .ck-pc { display: none; }
   .gw .hl-i { grid-template-columns: 1fr; padding: 4px 0; }
-  .gw .ck-ph { display: block; }
-  .gw .ck-line { grid-template-columns: var(--gname-ph, 74px) repeat(var(--ck-n), minmax(0, 1fr)); padding: 0 6px; }
   .gw .fn-wide { --gname-ph: 92px; }
   .gw .ck-name .mx-name svg, .gw .ck-name .mx-name img { width: 15px; height: 15px; }
   .gw .ck-name { font-size: 12.5px; letter-spacing: -.3px; }
@@ -1129,22 +1115,9 @@
   .gw .ck-s { width: 100%; height: 24px; }
   .gw .ck-h1 b { padding: 2px 1px; font-size: 11px; letter-spacing: -.3px; }
   .gw .ck-h2 > span { padding: 0 1px; }
-  .gw .mx-grid .mx-head { display: none; }
-  .gw .mx-grid .mx-row { display: block; padding: 12px var(--pad); }
-  .gw .mx-grid .mx-label { margin-bottom: 6px; font-size: 15px; }
-  .gw .mx-grid .mx-cell { display: flex; flex-wrap: nowrap; justify-content: space-between; gap: 10px; padding: 4px 0; }
-  .gw .mx-grid .mx-site { display: block; flex: 0 0 auto; white-space: nowrap; color: var(--dim); font-size: 13px; }
-  .gw .mx-help { margin-top: 6px; }
   .gw .ps-ctl > .fam-set, .gw .ps-ctl > .fam-set:has(.st-step.lg) { grid-template-columns: minmax(0, 1fr); width: 100%; gap: 8px; }
   .gw .ps-ctl > .fam-set > .fam-set1 { grid-template-columns: minmax(0, 1fr) max-content; }
   .gw .ps-ctl > .fam-set .fam-l { white-space: normal; word-break: keep-all; line-height: 1.3; }
-  .gw .mx-grid.ck-ph { display: block; }
-  .gw .mx-grid.ck-ph .mx-cell { flex-wrap: wrap; align-items: center; }
-  .gw .mx-grid.ck-ph .fam-set { display: flex; flex-wrap: nowrap; gap: 8px 12px; justify-content: flex-end; width: auto; }
-  .gw .mx-grid.ck-ph .fam-set1 { display: inline-flex; align-items: center; gap: 6px; }
-  .gw .mx-grid.ck-ph .fam-set1 > span { font-size: 13px; color: var(--text); white-space: nowrap; }
-  .gw .ck > .ps-rows { grid-template-columns: max-content repeat(var(--ck-n), minmax(min-content, 1fr)); padding-inline: 6px; }
-  .gw .ck > .ps-rows .ck-name { min-width: var(--gname-ph, 74px); }
   .gw .ck-h1 b { font-size: 12px; letter-spacing: -.2px; }
   .gw .ck-h2 { font-size: 12px; letter-spacing: -.2px; }
   .gw .ck-h2 > span { padding: 0 3px; }
@@ -1152,6 +1125,12 @@
   .gw .ck-m::before { content: ''; position: absolute; inset: -10px; }
   .gw .mx-grid .mx-cell:has(> input.gx-search) > .mx-site { flex: 0 0 6.5em; }
   .gw .mx-grid .mx-cell:has(> input.gx-search) > input.gx-search { flex: 1 1 0; min-width: 0; }
+  /* PC 표(.ck-pc)는 한 줄(이름 | 칸들) 그대로: 이름·머리 낱말은 안 꺾고, 판보다 넓으면 표 안에서 옆으로 민다(막대 보임). 이름과 첫 열 경계선 사이 여백 */
+  .gw .ck-pc > .ps-rows { grid-template-columns: max-content var(--ck-cols, repeat(var(--ck-n), minmax(min-content, 1fr))); }
+  .gw .ck-pc .ck-name { white-space: nowrap; padding-right: 8px; min-width: max-content; }
+  .gw .ck-pc .ck-name * { white-space: nowrap; overflow-wrap: normal; flex-shrink: 0; }
+  .gw .ck-pc .ck-h1 b, .gw .ck-pc .ck-h2 > span { white-space: nowrap; }
+  .gw .ck-pc .ck-cell { padding-inline: 3px; }
 }
 /* 표 머리 낱말이 중간에서 꺾였다(「컨텍/스트/포함」「이목집/중」「언급금/지」「창을/열/때」): 물려받은 overflow-wrap: anywhere 가 칸 최소 폭을 한 글자로 만들었다
    → 머리 낱말은 안 끊는다. 칸은 가장 긴 낱말만큼 넓어지고(min-content), 판보다 넓어지면 표를 옆으로 밀어 본다 */
