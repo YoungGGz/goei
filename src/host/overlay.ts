@@ -34,6 +34,12 @@ ${themeVars('[x-goei-fab]')}
   position: fixed; right: 16px; bottom: 96px; z-index: 45; /* 플러그인 창(49)·Risu 경고(50) 아래 */
   display: none;
 }
+/* 폰 배치(600 이하)에서 한 번도 옮기지 않은 버튼은 왼쪽 아래에 둔다 (11-21 사용자 「감도 안오네?」: 폴드 커버 344 에서 오른쪽 아래 버튼이
+   리스 채팅 마지막 메시지의 오른쪽 단추(가게 카드 「상점 열기」, 메시지 고치기·지우기)와 보내기 단추를 덮었다. 리스 채팅은 단추가 오른쪽에 모이고 왼쪽은 글뿐이다).
+   끌어서 옮기면 그 자리(인라인 right·bottom)를 쓴다. 모양은 그대로 */
+@media (max-width: 600px) {
+  [x-goei-fab][x-goei-defpos="true"] { right: auto !important; left: 16px; }
+}
 [x-goei-fab] button {
   position: relative; display: flex; align-items: center; justify-content: center;
   width: 48px; height: 48px; padding: 0; box-sizing: border-box;
@@ -161,10 +167,19 @@ interface DragState {
   y: number;
   start: FabPos;
   /** 누른 자리가 버튼 안이면 버튼 영역, 아니면 null (비동기로 확인) */
-  hit: Promise<{ rect: Rect; vw: number; vh: number } | null>;
+  hit: Promise<{ rect: Rect; vw: number; vh: number; start: FabPos } | null>;
 }
 
 type PointerEv = { clientX?: number; clientY?: number; button?: number; buttons?: number };
+
+/** 사용자가 버튼을 끌어 옮긴 적이 있나 (저장된 자리가 있나) */
+async function hasSavedPos(): Promise<boolean> {
+  try {
+    return !!(await risuai.safeLocalStorage.getItem(POS_KEY));
+  } catch {
+    return false;
+  }
+}
 
 async function loadPos(): Promise<FabPos> {
   try {
@@ -207,8 +222,10 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
   const button = await host.querySelector('button');
   if (!button) throw new Error('여는 버튼을 만들지 못했어요.');
 
+  let custom = await hasSavedPos();
   let pos = await loadPos();
   const applyPos = async () => {
+    await host.setAttribute('x-goei-defpos', custom ? 'false' : 'true');
     await host.setStyle('right', `${pos.right}px`);
     await host.setStyle('bottom', `${pos.bottom}px`);
   };
@@ -262,7 +279,8 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
           moved = true;
           await host.setAttribute('x-goei-drag', 'true');
         }
-        pos = dragTo(d.start, dx, dy, hit.vw, hit.vh);
+        custom = true;
+        pos = dragTo(hit.start, dx, dy, hit.vw, hit.vh);
         await applyPos();
       }
     } catch {
@@ -287,7 +305,9 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
       hit: (async () => {
         const r = await rect();
         if (!inside(r, x, y)) return null;
-        return { rect: r!, ...(await viewport()) };
+        const v = await viewport();
+        // 끌기 시작 자리는 지금 보이는 자리에서 잰다 (폰에서 안 옮긴 버튼은 CSS 로 왼쪽에 있어 저장값과 다르다)
+        return { rect: r!, ...v, start: { right: v.vw - r!.left - r!.width, bottom: v.vh - r!.top - r!.height } };
       })().catch(() => null),
     };
   };
@@ -371,7 +391,9 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
       if (next && intro) {
         // 버튼이 화면 왼쪽 절반에 있으면 표를 오른쪽으로 펼친다
         const { vw } = await viewport();
-        await host.setAttribute('x-goei-side', pos.right + FAB_SIZE / 2 > vw / 2 ? 'left' : 'right');
+        const r = await rect().catch(() => null);
+        const center = r ? r.left + r.width / 2 : vw - pos.right - FAB_SIZE / 2;
+        await host.setAttribute('x-goei-side', center < vw / 2 ? 'left' : 'right');
         await host.setAttribute('x-goei-intro', 'true');
         introTimer = setTimeout(endIntro, INTRO_MS + 400);
       }
