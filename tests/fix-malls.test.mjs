@@ -132,7 +132,7 @@ test('망상홈쇼핑 지침: 스티커 밑 글·맞교환 말을 편성에서 �
   assert.equal(g.BROADCAST_PEEK, undefined);
   assert.equal(g.BROADCAST_BARTER, undefined);
   assert.doesNotMatch(g.BROADCAST, /\{peek_|\{barter_/);
-  assert.match(g.OPERATOR, /You play a 괴이/);
+  assert.match(g.OPERATOR, /A 괴이 has picked up the phone/);
 });
 
 test('쇼핑몰 「매 턴」: 받아 둔 진열을 아직 안 열어 봤으면 새로 받지 않는다', () => {

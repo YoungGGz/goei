@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { homeshop } from '../dist-test/core.mjs';
+import { homeshop, hspeel } from '../dist-test/core.mjs';
 const { scheduleDues, openOrder, newOrder, ordersVars, liveOrders, paidOf, callNow, homeshopBlock, withHomeshop, boxOrder, HS_AUD_VAR, parseShow, applyShow, readShow, showVars, emptyShow, moodMap, hsSettings, HS_KEY, HS_NUM, parseClipGroups, clipsOf, idleState, nextIdle, moodClip, cueMs } = homeshop;
 
 const meta = JSON.parse(readFileSync(new URL('../그림/홈쇼핑/homeshop.json', import.meta.url), 'utf8'));
@@ -314,13 +314,13 @@ test('망상홈쇼핑 편성 요청문: 누가 무엇을 아는지(KNOWS)가 들
   const fill = { cue: '6 to 10', chat: '12 to 18', cuts: '와이드, 바스트', moods: '말하기', moods_b: '-', events: '가격 공개' };
   const sys = core1112.programPrompt(src, homeshop.hsSettings({}).shop, fill).find((m) => m.role === 'system').content;
   assert.match(sys, /Who knows what: /);
-  assert.match(sys, /<\/chat>\n<operator>\nhello\|[^\n]+\ndone\|[^\n]+\n<\/operator>\n<cue>:/);
+  // 상담원의 첫마디·주문 받는 말은 편성에서 미리 쓰지 않는다 (2026-11-22 사용자: 통화 때 상담원을 불러 받는다)
+  assert.doesNotMatch(sys, /<operator>|hello\|/);
   assert.doesNotMatch(sys, /<peek>|barter\||\{[a-z_]+\}|\n\n\n/);
   assert.match(sys, /이름\|값\|쓰임\|그림\|무게\|설명\|효과\|시연\|진실/);
   assert.match(sys, /시연: O if the channel sells/);
-  const raw = `<title>밤 편성</title>\n<shelf>\n무전기|-|-|기기/무전기/radio|0.3|받는다||4|\n</shelf>\n<cue>\n#1\nwide|talk|어서 오세요|-\n</cue>\n<chat>\n#1\nㅇㅇ|와\n</chat>\n<operator>\nhello|네 고객님\ndone|접수했습니다\n</operator>`;
+  const raw = `<title>밤 편성</title>\n<shelf>\n무전기|-|-|기기/무전기/radio|0.3|받는다||4|\n</shelf>\n<cue>\n#1\nwide|talk|어서 오세요|-\n</cue>\n<chat>\n#1\nㅇㅇ|와\n</chat>`;
   const r = homeshop.parseShow(raw, new Map());
-  assert.deepEqual(r.ops, { hello: '네 고객님', done: '접수했습니다' });
   assert.equal(r.items[0].price, 0, '값 「-」= 돈으로는 안 팖, 상품은 남는다');
   assert.deepEqual(r.insts, [1]);
 });
@@ -375,7 +375,7 @@ test('망상홈쇼핑 상담원 요청문: 상담원은 사람이 아니고 후�
   const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
   const msgs = core1112.operatorPrompt(src, core1112.shopSettings({}), 'barter', '[내민 물건]\n붕대|소모3|-|-', true, true);
   const sys = msgs.find((m) => m.role === 'system').content;
-  assert.match(sys, /You play a 괴이/);
+  assert.match(sys, /A 괴이 has picked up the phone/);
   assert.match(sys, /underpays/);
   assert.match(sys, /Who knows what: /);
   assert.match(sys, /cannot take money/);
@@ -412,11 +412,74 @@ test('약조(돈·물건·시연이 아닌 대가): 상자를 열 때 받으러 
   assert.equal(openOrder(c3, { ...newOrder(c2, ITEM, 'won', { money: 1000, items: [], appear: 0, other: '' }), boxId: 'b2' }, { call: [3, 3] }, 'c5', () => 0).owe, undefined);
 });
 
-test('스티커 모양: 같은 상품이면 늘 같고, 접는 선의 비가 상품마다 다르다', () => {
-  const { stickerLook } = homeshop;
+test('스티커 모양: 같은 상품이면 늘 같고, 눌러 젖히는 방향·떼지는 넓이가 상품마다 다르다 (넓이는 설정의 최소~최대 사이)', () => {
+  const { stickerLook, stickerLimit, hsSettings, HS_KEY } = homeshop;
   assert.deepEqual(stickerLook('ms1_0_ab'), stickerLook('ms1_0_ab'));
-  const ratios = new Set(Array.from({ length: 60 }, (_, i) => { const l = stickerLook(`p${i}`); return `${l.rx}:${l.ry}`; }));
-  assert.ok(ratios.size > 1, '늘 같은 각도로 접히지 않는다');
+  const ids = Array.from({ length: 60 }, (_, i) => `p${i}`);
+  assert.ok(new Set(ids.map((id) => stickerLook(id).dir.join(':'))).size > 1, '늘 같은 각도로 접히지 않는다');
+  assert.ok(new Set(ids.map((id) => stickerLook(id).corner)).size > 1);
+  const range = hsSettings({}).peel;
+  assert.deepEqual(range, [15, 35]);
+  const lims = ids.map((id) => stickerLimit(id, range));
+  assert.ok(lims.every((l) => l >= 0.15 && l <= 0.35), '한도는 설정 구간 안');
+  assert.ok(new Set(lims.map((l) => l.toFixed(3))).size > 10, '상품마다 다르다');
+  assert.equal(stickerLimit('p1', range), stickerLimit('p1', range));
+  // 설정을 바꾸면 그 구간을 따른다 (최소·최대를 거꾸로 적어도 같다)
+  const wide = hsSettings({ [HS_KEY.peelLo]: '40', [HS_KEY.peelHi]: '40' }).peel;
+  assert.deepEqual(wide, [40, 40]);
+  assert.ok(ids.every((id) => Math.abs(stickerLimit(id, wide) - 0.4) < 1e-9));
+  assert.equal(stickerLimit('p3', [35, 15]), stickerLimit('p3', [15, 35]));
+});
+
+test('스티커 접기 셈: 접는 선은 끈 방향에 수직이고, 들린 조각·접힌 뒷면·한도가 맞는다', () => {
+  const { foldAt, limitDrag, fullDrag, liftedAt, inward, unTilt, cornerPt } = hspeel;
+  const W = 300, H = 200;
+  const near = (a, b, e = 1e-6) => Math.abs(a - b) < e;
+  const area = (p) => Math.abs(p.reduce((s, [x, y], i) => { const [x2, y2] = p[(i + 1) % p.length]; return s + x * y2 - x2 * y; }, 0)) / 2;
+  // 안 끌었거나 바깥으로만 끌면 안 들린다
+  for (const d of [[0, 0], [30, 40]]) { const f = foldAt(W, H, 'br', ...d); assert.equal(f.frac, 0); assert.equal(f.line, null); assert.deepEqual(f.lifted, []); }
+  assert.deepEqual(inward('br', 30, -40), [0, -40]);
+  assert.deepEqual(inward('tl', 30, -40), [30, 0]);
+  // 옆으로 끌면 세로로 긴 띠가 들린다 (폭은 끈 만큼의 절반)
+  { const f = foldAt(W, H, 'br', -80, 0);
+    assert.ok(near(f.frac, (40 * H) / (W * H)));
+    assert.ok(f.lifted.every(([x]) => x >= 260 - 1e-6));
+    assert.ok(f.flap.every(([x]) => x <= 260 + 1e-6 && x >= 220 - 1e-6), '뒷면은 접는 선 안쪽으로 넘어온다'); }
+  // 위로 끌면 가로로 긴 띠
+  { const f = foldAt(W, H, 'br', 0, -60);
+    assert.ok(near(f.frac, (30 * W) / (W * H)));
+    assert.ok(f.lifted.every(([, y]) => y >= 170 - 1e-6)); }
+  // 비스듬히 끌면 세모: 모서리가 끌려간 자리가 뒷면의 꼭짓점, 넓이는 그대로
+  for (const c of ['br', 'bl', 'tr', 'tl']) {
+    const sx = c === 'br' || c === 'tr' ? -1 : 1, sy = c === 'br' || c === 'bl' ? -1 : 1;
+    const f = foldAt(W, H, c, sx * 60, sy * 40);
+    const [cx, cy] = cornerPt(c, W, H);
+    assert.equal(f.lifted.length, 3, c);
+    assert.ok(f.flap.some(([x, y]) => near(x, cx + sx * 60) && near(y, cy + sy * 40)), `${c}: 끌려간 모서리`);
+    assert.ok(near(area(f.flap), area(f.lifted)) && near(area(f.face) + area(f.lifted), W * H), c);
+    assert.ok(liftedAt(f, cx + sx * 2, cy + sy * 2) && !liftedAt(f, W / 2, H / 2), c);
+  }
+  // 한도: 넘지 않고, 방향은 그대로
+  { const [dx, dy] = limitDrag(W, H, 'br', -500, -250, 0.2);
+    const f = foldAt(W, H, 'br', dx, dy);
+    assert.ok(f.frac <= 0.2 && f.frac > 0.199, `한도까지: ${f.frac}`);
+    assert.ok(near(dx / dy, 2, 1e-6));
+    assert.deepEqual(limitDrag(W, H, 'br', -20, -10, 0.2), [-20, -10], '한도 안이면 그대로'); }
+  for (const c of ['br', 'bl', 'tr', 'tl']) for (const max of [0.15, 0.35]) {
+    const [dx, dy] = fullDrag(W, H, c, [0.7, 1.35], max);
+    const f = foldAt(W, H, c, dx, dy);
+    assert.ok(f.frac <= max && f.frac > max - 0.001, `${c} ${max}: ${f.frac}`);
+  }
+  // 눌러 젖힘: 한도까지 젖히되 접힌 뒷면이 스티커 밖으로 나가지 않는다
+  for (const c of ['br', 'bl', 'tr', 'tl']) for (const max of [0.15, 0.25, 0.35, 0.5]) for (const dir of [[1 * H, 1.3 * W], [1.3 * H, 1 * W], [H, W]]) {
+    const [dx, dy] = hspeel.pressDrag(W, H, c, dir, max);
+    const f = foldAt(W, H, c, dx, dy);
+    assert.ok(f.frac <= max + 1e-9 && f.frac > max - 0.001, `${c} ${max}: ${f.frac}`);
+    assert.ok(f.flap.every(([x, y]) => x >= -0.5 && x <= W + 0.5 && y >= -0.5 && y <= H + 0.5), `${c} ${max} ${dir}: 뒷면이 밖으로 나감 ${JSON.stringify(f.flap)}`);
+  }
+  // 기울여 붙인 스티커: 화면에서 끈 만큼을 제자리 좌표로
+  { const [x, y] = unTilt(10, 0, 90); assert.ok(near(x, 0) && near(y, -10)); }
+  assert.deepEqual(unTilt(7, -3, 0), [7, -3]);
 });
 
 test('망상홈쇼핑: 진실 칸(숨은 원래 용도)을 받아 상품에 둔다 · 화면용 기록에는 없다 (11-15 사용자: 쓸 때 숨은 효과가 하나도 안 들어감)', () => {
@@ -443,4 +506,39 @@ test('망상홈쇼핑 상담원: 지난 주문을 채널 기록 그대로 넘긴
   const owe = { ...base, id: 'o2', n: 0, how: '이름 한 글자', dues: [], openKey: 'c2', owe: 8, terms: { money: 0, items: [], appear: 0, other: '이름 한 글자' } };
   assert.match(orderFacts([owe], alive, 3, () => true), /약조 「이름 한 글자」 대기$/);
   assert.match(orderFacts([owe], alive, 8, () => true), /약조 「이름 한 글자」 받아 감$/);
+});
+
+test('망상홈쇼핑 상담원: 말로 받아들이면 주문 <deal/> — 조건이 있을 때만, 끊는 표식이 같이 와도 주문으로 (2026-11-22 사용자: 타결하자 끊어 버림)', () => {
+  const { parseOperator, parseOperatorLine } = homeshop;
+  const ok = parseOperator('<operator>그럼 그렇게 받지.</operator>\n<terms>\nother|왼손 새끼손가락의 감각\n</terms>\n<deal/>', [], true);
+  assert.deepEqual([ok.deal, ok.hangup, ok.terms.other], [true, false, '왼손 새끼손가락의 감각']);
+  const both = parseOperator('<operator>받았어. 끊는다.</operator>\n<terms>\nmoney|88000\n</terms>\n<deal/>\n<hangup/>', [], true);
+  assert.deepEqual([both.deal, both.hangup], [true, false], '주문을 받으며 끊는 표식까지 내도 주문은 들어간다');
+  assert.equal(parseOperator('<operator>받았어.</operator>\n<terms>none</terms>\n<deal/>', [], true).deal, false, '조건이 없으면 주문이 아니다');
+  assert.equal(parseOperator('<operator>말만 하면 <deal/> 이지.</operator>\n<terms>\nmoney|1000\n</terms>', [], true).deal, false, '말 가운데 글자는 표식이 아니다');
+  const tail = parseOperator('<operator>\n받았어.\n<deal/>\n</operator>\n<terms>\nmoney|1000\n</terms>', [], false);
+  assert.deepEqual([tail.line, tail.deal], ['받았어.', true]);
+  assert.equal(parseOperator('<operator>싫어.</operator>\n<terms>none</terms>\n<hangup/>', [], true).hangup, true, '거래 없이 끊는 것은 그대로');
+  assert.equal(parseOperatorLine('<operator>…누구야.</operator>'), '…누구야.');
+  assert.equal(parseOperatorLine('<thoughts>x</thoughts>\n…누구야.'), '…누구야.', '블록 없이 말만 와도 받는다');
+  assert.throws(() => parseOperatorLine('<operator></operator>'));
+});
+
+test('망상홈쇼핑 상담원 요청문: 첫마디·주문 받는 말은 말만 청하고, 흥정에는 주문 표식 절이 늘 들어간다', () => {
+  const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '' }, prev: [] };
+  const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
+  const sys = (mode, hang) => core1112.operatorPrompt(src, core1112.shopSettings({}), mode, '-', false, hang).find((m) => m.role === 'system').content;
+  const hello = sys('hello', true);
+  assert.match(hello, /A 괴이 has picked up the phone/);
+  assert.match(hello, /has just connected/);
+  assert.doesNotMatch(hello, /<terms>|<deal\/>|<hangup\/>|\{[a-z_]+\}/);
+  const order = sys('order', true);
+  assert.match(order, /has just placed the order/);
+  assert.doesNotMatch(order, /<terms>|<deal\/>|<hangup\/>/);
+  for (const hang of [true, false]) {
+    const talk = sys('talk', hang);
+    assert.match(talk, /<deal\/> after the blocks/);
+    assert.match(talk, /plainly accept the terms as they stand/);
+    assert.equal(/<hangup\/> after the blocks/.test(talk), hang);
+  }
 });

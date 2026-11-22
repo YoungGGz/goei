@@ -11,7 +11,7 @@ import { boot, chatOf, clickSel, goNode, launch, loadFixture, openEditor, openWi
 const fx = loadFixture(process.argv[2]);
 const browser = await launch();
 const MARK = 'ZZ메인본문표식';
-const started = () => ({ message: [{ role: 'user', data: 'hi' }, { role: 'char', data: `${MARK}\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|목표]` }], scriptstate: { $st_faction: 'A00', $st_lang: 'ko', $st_fixed_theme: 'dark', $st_anomaly_on: '1' } });
+const started = () => ({ message: [{ role: 'user', data: 'hi' }, { role: 'char', data: `${MARK}\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|목표]` }], scriptstate: { $st_faction: 'A00', $st_lang: 'ko', $st_fixed_theme: 'dark', $st_anomaly_on: '1' }, goeiPeopleV1: { people: { 유지영: { name: '유지영', slots: {} } } } });
 const fresh = () => ({ message: [], scriptstate: {} });
 const PC = { width: 1920, height: 1080, touch: false };
 const PHONE = { width: 390, height: 844, touch: true };

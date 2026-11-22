@@ -1070,9 +1070,12 @@ export interface ShopSource {
 // 지침 글은 플러그인 내장 지침 「Shop」(지침/상점.txt, 설정 → 지침 → 상점에서 고침). 여기는 절을 골라 자리만 채운다 (2026-11-07 사용자: 지침은 전부 지침 메뉴에서)
 const G = (name: GuideName = 'Shop') => guideSections(name);
 
+/** 「다시 내지 말 것」 목록: 지난 진열대에 남았던 것 + 여기서 산 것 (2026-11-22 사용자: 다 사고 새로고침하면 같은 물건이 다시 나옴) */
+const prevNames = (st: ShopState): string[] => [...new Set([...st.prev, ...st.items.filter((x) => x.sold).map((x) => x.name)])];
+
 const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, guide: GuideName = 'Shop', truthMode: TruthMode = 'mix', talk = false) => {
   const r = s.size;
-  const v = { size: r[0] === r[1] ? guideTxt(guide, 'SIZE_EXACT', { n: r[0] }) : guideTxt(guide, 'SIZE_RANGE', { min: r[0], max: r[1] }), line: lineOf(guide), price: s.price, prev: st.prev.join(', '), truth_rule: guideTxt(guide, `TRUTH_${truthMode.toUpperCase()}`) };
+  const v = { size: r[0] === r[1] ? guideTxt(guide, 'SIZE_EXACT', { n: r[0] }) : guideTxt(guide, 'SIZE_RANGE', { min: r[0], max: r[1] }), line: lineOf(guide), price: s.price, prev: prevNames(st).join(', '), truth_rule: guideTxt(guide, `TRUTH_${truthMode.toUpperCase()}`) };
   return [
     fillGuide(g.SHELF, v),
     guide === 'Cos' ? fillGuide(g.SHELF_SECRET, v) : '',
@@ -1082,7 +1085,7 @@ const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, 
     s.diverse ? fillGuide(g.VARIETY, v) : '',
     fillGuide(s.price ? g.PRICE_GUIDE : g.PRICE_DEFAULT, v),
     fillGuide(g.PRICING, v),
-    s.avoidPrev && st.prev.length ? fillGuide(g.AVOID_PREV, v) : '',
+    s.avoidPrev && prevNames(st).length ? fillGuide(g.AVOID_PREV, v) : '',
   ].filter(Boolean).join('\n');
 };
 
@@ -1223,11 +1226,17 @@ export function programPrompt(src: ShopSource, s: ShopSettings, fill: Record<str
 }
 /** 망상홈쇼핑 전화 주문 상담원 (물건 맞교환 감정·흥정, 11-15 사용자: 상담원은 사람이 아니고 채널 몫부터 챙겨 후려친다).
  *  system: 누가 무엇을 아는지(KNOWS) + 상담원 + 맞교환/흥정 + 출력 꼴. user: 참고 자료·맥락(편성과 같은 길) + 지금 상품 + 내민 물건 + 지금 조건 + 통화 */
-export function operatorPrompt(src: ShopSource, s: ShopSettings, mode: 'barter' | 'talk', body: string, noMoney: boolean, hangup: boolean): CraftMessage[] {
+export function operatorPrompt(src: ShopSource, s: ShopSettings, mode: 'barter' | 'talk' | 'hello' | 'order', body: string, noMoney: boolean, hangup: boolean): CraftMessage[] {
   const g = G('Hs');
+  const f = (k: string) => fillGuide(g[k] ?? '', {});
+  // 첫마디(hello)·단추로 주문한 뒤 마지막 말(order): 말만 받는다 — 조건·주문·끊기 표식 없음
+  const lineOnly = mode === 'hello' || mode === 'order';
+  const task = mode === 'barter' ? 'OPERATOR_BARTER' : mode === 'talk' ? 'OPERATOR_TALK' : mode === 'hello' ? 'OPERATOR_HELLO' : 'OPERATOR_ORDER';
   // 통화 끊음 (상점의 KICK_ON·KICK_OFF·TALK_OUTPUT_END 와 같은 꼴): 켜면 끊을 수 있다는 절 + 출력 꼴 끝 절, 끄면 끊지 않는다는 절
-  const system = [fillGuide(g.KNOWS ?? '', {}), [fillGuide(g.OPERATOR ?? '', {}), fillGuide(mode === 'barter' ? g.OPERATOR_BARTER ?? '' : g.OPERATOR_TALK ?? '', {}), noMoney ? fillGuide(g.OPERATOR_NO_MONEY ?? '', {}) : '', fillGuide((hangup ? g.OPERATOR_HANGUP_ON : g.OPERATOR_HANGUP_OFF) ?? '', {})].filter(Boolean).join(' '), [fillGuide(g.OPERATOR_OUTPUT ?? '', {}), hangup ? fillGuide(g.OPERATOR_OUTPUT_END ?? '', {}) : ''].filter(Boolean).join('\n'), src.language ?? ''].filter(Boolean).join('\n\n');
-  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${body}\n\n${guideTxt('Hs', 'TASK_OPERATOR')}` }], s, fillGuide(g.THOUGHTS_OPERATOR ?? '', {}));
+  const role = [f('OPERATOR'), f(task), !lineOnly && noMoney ? f('OPERATOR_NO_MONEY') : '', lineOnly ? '' : f(hangup ? 'OPERATOR_HANGUP_ON' : 'OPERATOR_HANGUP_OFF')].filter(Boolean).join(' ');
+  const out = lineOnly ? f('OPERATOR_OUTPUT_LINE') : [f('OPERATOR_OUTPUT'), f('OPERATOR_OUTPUT_DEAL'), hangup ? f('OPERATOR_OUTPUT_END') : ''].filter(Boolean).join('\n');
+  const system = [f('KNOWS'), role, out, src.language ?? ''].filter(Boolean).join('\n\n');
+  return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${body}\n\n${guideTxt('Hs', lineOnly ? 'TASK_OPERATOR_LINE' : 'TASK_OPERATOR')}` }], s, lineOnly ? '' : fillGuide(g.THOUGHTS_OPERATOR ?? '', {}));
 }
 /** 망상홈쇼핑 머리 (지침 「망상홈쇼핑」의 HEAD_CHANNEL · HEAD_CHANNEL_HOST 절) */
 const channelHead = (st: ShopState): string => (st.owner ? guideTxt('Hs', 'HEAD_CHANNEL_HOST', { shop: st.shop, owner: st.owner }) : guideTxt('Hs', 'HEAD_CHANNEL', { shop: st.shop }));
