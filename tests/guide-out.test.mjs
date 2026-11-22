@@ -69,6 +69,12 @@ const ANSWERED = [
   ["Each post is a listing whose tag is exactly one of 팝니다 (selling), 삽니다 (buying), 나눔 (giving away) or 정보 (occult information).", "Each post is a listing whose tag is exactly one of 팝니다 (selling), 삽니다 (buying), 나눔 (giving away) or 정보 (information for sale or wanted). A 정보 listing trades a piece of information the way other listings trade goods: the poster either sells what they know or offers to pay for what someone else knows. The post says only what the information is about and why it is worth paying for, names a price or asks for offers, and says how it is handed over once the deal is made; the information itself is never written in the post or given away in the comments. It is not a tip, a warning, a rumor thread or a discussion post."],
   ["Comments are questions, haggling, 예약 requests and warnings.", "Comments are questions, haggling, 예약 requests and warnings; under a 정보 listing they haggle, ask for proof that the information is real, or doubt the seller, and nobody leaks the information for free."],
   ["salvage, information and odd services. Sellers and buyers", "salvage, information and odd services. Information is a commodity here like any other: it is sold and bought, never posted for free. Sellers and buyers"],
+  // 사용자 11-22: 지침 첫 줄의 상투 문장을 빼고, 주인 첫마디의 문장 수를 박지 않는다
+  ["You run a shop inside an ongoing Korean urban-horror roleplay (서울, 괴이).", "You run a shop in the roleplay (서울, 괴이)."],
+  ["the web page of a hidden shop inside the ongoing Korean urban-horror roleplay (괴이):", "the web page of a hidden shop in the roleplay (괴이):"],
+  ["the in-house welfare point mall of 백일몽, inside an ongoing Korean urban-horror roleplay (괴이).", "the in-house welfare point mall of 백일몽, in the roleplay (괴이)."],
+  ["You run the live feed of 망상홈쇼핑 inside an ongoing Korean urban-horror roleplay (괴이).", "You run the live feed of 망상홈쇼핑 in the roleplay (괴이)."],
+  ["the owner's first line to the protagonist, in character, 1–3 sentences, Korean, no stage directions", "the owner's first line to the protagonist, in character, Korean, no stage directions"],
 ];
 const moved = Object.entries(OLD.sections).flatMap(([file, list]) => list.map(([name, body]) => ({ file, name, body })));
 
