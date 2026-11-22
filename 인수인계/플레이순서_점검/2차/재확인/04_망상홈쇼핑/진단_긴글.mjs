@@ -1,0 +1,40 @@
+import { boot, launch, loadFixture, openWin, closeEditor, closeWin } from '/home/user/goei-rel/tests/qc-settings-harness.mjs';
+import { distPack } from '/home/user/goei-rel/tests/data-init.mjs';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const fx = loadFixture('/home/user/goei-rel/.scratch/fixture/fixture.json');
+const vp = process.argv[2] || 'pc';
+const ST = `[▣|2025.03.14|11:20 PM|🌙|6°C|이정 책방 앞 골목|없음|없음|없음|관리국/신입|2000000]`;
+const truths = ['빛에 닿은 그림자를 떼어 내 주머니에 담는 등. 사람 그림자에 세 번 비추면 그 사람이 따라온다', '얼굴을 옮겨 붙이는 얇은 막. 30분이 지나면 떼어지지 않고 원래 얼굴은 막 쪽으로 간다', '죽은 이를 부르는 종. 자정에 네 번째 울음을 세면 부른 사람이 대신 따라간다'];
+const mk = (id, truth) => ({ loaded: true, key: 'c1', title: 't', at: 0, prev: [], tk: 't:c1', chat: [], parts: [{ item: { id, name: '붉은 리본 손전등', price: 300000, desc: '켜면 붉은 빛이 납니다.', effect: '어둠 속 길이 보인다', truth, icon: 'flashlight', weight: 0.2 }, cues: [{ cut: 'A', mood: 'talk', text: '첫 상품입니다', ev: '' }], inst: 1 }] });
+const b = await launch();
+const chat0 = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: 'b\n' + ST, chatId: 'c1' }], scriptstate: { $hs_net: '1', $st_faction: 'A00', $st_lang: 'ko', $pp_on: '0', $hs_show: JSON.stringify(mk('x0', truths[0])), $hs_show_at: 't:c1', $hs_turn: '0', $hs_sh_auto: 'manual' } };
+const { page } = await boot(b, fx, chat0, vp, { store: { 'p:goei:data-homeshop': distPack('goei-data-homeshop'), 'p:goei:data-items': distPack('goei-data-items'), 'p:goei:data-looks': distPack('goei-data-looks') } });
+const out = [];
+for (let i = 0; i < (Number(process.env.N) || 24); i++) {
+  const id = `ms${(1e6 + i * 7919).toString(36)}_${i}_c1`;
+  const truth = truths[i % 3];
+  await closeWin(page).catch(() => {});
+  await page.evaluate(([s]) => { window.__chat.scriptstate.$hs_show = s; window.__chat.scriptstate.$hs_log = ''; }, [JSON.stringify(mk(id, truth))]);
+  await openWin(page); await sleep(200);
+  if (await page.evaluate(() => document.querySelector('.gw')?.hidden === false)) await closeEditor(page, true);
+  if (!(await page.locator('.br').count())) await page.evaluate(() => document.querySelector('[data-action="nav-tab"][data-value="net"]')?.click());
+  await sleep(200);
+  await page.evaluate(() => document.querySelector('.br-bm[data-value="hs"]')?.click());
+  await page.waitForSelector('.hs', { timeout: 8000 }).catch(() => {});
+  await sleep(400);
+
+  await page.evaluate(() => document.querySelector('[data-action="hs-pop"][data-value="peek"]')?.click());
+  await sleep(400);
+  const info = await page.evaluate(() => { const st = document.querySelector('.hs-sticker'); return { corner: st?.dataset.corner, lim: st?.dataset.lim, W: st?.offsetWidth, H: st?.offsetHeight, font: document.querySelector('.hs-und .emb')?.style.fontSize, embH: document.querySelector('.hs-und .emb')?.scrollHeight }; });
+  await page.evaluate(() => document.querySelector('.hs-sticker .corner')?.click());
+  await sleep(1300);
+  if (i === 0 || i === 1) await page.screenshot({ path: process.env.SHOT_DIR + '/스티커_' + vp + '_' + i + '.png' });
+  await page.evaluate(() => document.querySelector('.hs-pop header [data-action="hs-pop"]')?.click());
+  await sleep(600);
+  const lg = await page.evaluate(() => { try { return JSON.parse(window.__chat.scriptstate.$hs_log || '{"entries":[]}').entries.filter((e) => e.who === '스티커').map((e) => e.text); } catch { return []; } });
+  out.push({ i, ...info, revealed: lg });
+}
+console.log(JSON.stringify(out, null, 1));
+const none = out.filter((o) => !o.revealed.length);
+console.log(`nothing revealed: ${none.length}/${out.length}`, none.map((o) => `${o.corner}/${(+o.lim).toFixed(2)}`).join(' '));
+await b.close();
