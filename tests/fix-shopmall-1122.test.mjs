@@ -187,3 +187,74 @@ test('9: 포인트몰 1:1 상담 줄은 상담·포인트몰이 꺼지면 다른
   if (M.mallSettings(ctxOf().chat.scriptstate, 'bm').on) assert.equal(on.calls, '보낼 때마다 1회 (상담사 연결 1회 더)');
   else assert.equal(on.calls, '호출 없음');
 });
+
+// ── 재검토(11-22): 새로고침 답이 모두 겹쳐 버려지면 바로 오류로 끝나지 않고 설정 「재시도」대로 다시 묻는다 ──
+
+test('1-재검토: 겹치는 줄만 온 새로고침은 generate 의 재시도로 다시 묻고, 두 번째 답으로 진열한다', async () => {
+  const outR = await build({
+    stdin: { contents: `export { generate } from './src/host/llm'; export { applyShelf, parseShelf, shopSettings, emptyShop } from './src/core/shop';`, resolveDir: process.cwd(), loader: 'ts' },
+    bundle: true, format: 'esm', write: false, platform: 'node', target: 'es2022', charset: 'utf8', loader: { '.txt': 'text' }, logLevel: 'silent',
+  });
+  const R = await import(`data:text/javascript;base64,${Buffer.from(outR.outputFiles[0].text).toString('base64')}`);
+  const ID = '<shop-identity>\nsells: 공구\nnever: 음식\nprices: 싸다\n</shop-identity>\n<owner>뭐 찾소.</owner>\n';
+  const replies = [`${ID}<shelf>\n신문|1000|사용|newspaper|0.5||\n</shelf>`, `${ID}<shelf>\n우산|2000|사용|umbrella|0.5||\n</shelf>`];
+  const sent = [];
+  const prev = globalThis.risuai;
+  globalThis.risuai = { runLLMModel: async (o) => { sent.push(o.messages); return { type: 'success', result: replies[sent.length - 1] ?? '' }; } };
+  try {
+    const st = shopState([{ ...item('신문'), id: 'a' }]);
+    const s = R.shopSettings({});
+    // 화면(ui/shop.ts·ui/malls.ts ask)과 같은 꼴: 진열대에 얹는 것까지 읽기 안에서
+    const { value } = await R.generate([{ role: 'user', content: 'shelf' }], 'aux', (raw) => R.applyShelf(st, R.parseShelf(raw, st.identity), s), { retries: 1, retryModel: 'same', transientRetries: 0 });
+    assert.equal(sent.length, 2, '한 번 더 물었다');
+    assert.deepEqual(value.items.filter((x) => !x.sold).map((x) => x.name), ['우산']);
+  } finally {
+    globalThis.risuai = prev;
+  }
+  // 화면 두 곳이 진열대 얹기를 읽기 안에서 한다
+  assert.match(readFileSync('src/ui/shop.ts', 'utf8'), /generate\(shelfPrompt\(src, s\), s\.model, \(raw\) => applyShelf\(st0, parseShelf\(/);
+  assert.match(readFileSync('src/ui/malls.ts', 'utf8'), /return \{ r, applied: applyShelf\(st0, r, s\) \};/);
+});
+
+// ── 사용자 22:22: 소지품 기록 화면·물건 출처 줄의 몰 구매는 한국어로. 사실만 한 번 저장하고 본편 영어는 지침 MALL.PAID.* 로 ──
+
+const outK = await build({
+  stdin: { contents: `export { mallPaidLabel } from './src/ui/items'; export { addItem, readItems, boughtLine, mallPaidText, bmOrderPaid, confirmBmPickups } from './src/core/items';`, resolveDir: process.cwd(), loader: 'ts' },
+  bundle: true, format: 'esm', write: false, platform: 'browser', target: 'es2022', charset: 'utf8', loader: { '.txt': 'text' }, logLevel: 'silent',
+});
+const K = await import(`data:text/javascript;base64,${Buffer.from(outK.outputFiles[0].text).toString('base64')}`);
+
+test('몰 구매 화면 글: 「₩ 1,500,000 · 우주 쇼핑몰 입금」「1,200 P · 백일몽 포인트몰」「₩ 3,000,000 · 우주 쇼핑몰 선납 완료」', () => {
+  assert.equal(K.mallPaidLabel({ mall: 'cos', by: 'bank', amount: 1500000 }), '₩ 1,500,000 · 우주 쇼핑몰 입금');
+  assert.equal(K.mallPaidLabel({ mall: 'bm', by: 'points', amount: 1200 }), '1,200 P · 백일몽 포인트몰');
+  assert.equal(K.mallPaidLabel({ mall: 'cos', by: 'order', amount: 3000000 }), '₩ 3,000,000 · 우주 쇼핑몰 선납 완료');
+  assert.equal(K.mallPaidLabel({ mall: 'cos', by: 'bank', amount: 1000, pay: '머리카락' }), '₩ 1,000 · 우주 쇼핑몰 입금 + 머리카락');
+});
+
+test('몰 구매: 물건·획득 기록에는 사실(mallPaid)만 — 영어 글(paidWith·note)은 저장하지 않고, 본편 글은 예전과 같다', () => {
+  const alive = new Set(['c1']);
+  let it = K.addItem(K.readItems({}), alive, { name: '우산', from: 'store', store: 'cos', anchor: 'c1', price: 1500000, mallPaid: { mall: 'cos', by: 'bank', amount: 1500000 } });
+  it = K.addItem(it, alive, { name: '손전등', from: 'store', store: 'cos-order', anchor: 'c1', price: 3000000, mallPaid: { mall: 'cos', by: 'order', amount: 3000000 } });
+  it = K.addItem(it, alive, { name: '복지 컵', from: 'store', store: 'bm', anchor: 'c1', mallPaid: { mall: 'bm', by: 'points', amount: 1200 } });
+  for (const e of it.list) assert.equal(e.paidWith, undefined, e.name);
+  for (const l of it.log) { assert.equal(l.note, undefined, l.name); assert.ok(l.mallPaid, l.name); }
+  const line = (n) => K.boughtLine(it.list.find((e) => e.name === n));
+  // 지침 MALL.PAID.* · INVENTORY.BOUGHT.* 로 만든 글 (살 때 적어 두던 글과 같다)
+  assert.equal(line('우산'), '우산 (paid with bank transfer to 우주 쇼핑몰 + 1,500,000 won)');
+  assert.equal(line('손전등'), '손전등 (paid with custom order from 우주 쇼핑몰, paid in advance + 3,000,000 won)');
+  assert.equal(line('복지 컵'), '복지 컵 (paid with 1,200 Baekilmong points at 백일몽 포인트몰)');
+  assert.equal(K.mallPaidText({ mall: 'cos', by: 'bank', amount: 5, pay: '피 200ml' }), M.guideTxt('Main', 'MALL.PAID.BANK', { mall: '우주 쇼핑몰', extra: ` ${M.guideTxt('Main', 'MALL.PAID.EXTRA', { pay: '피 200ml' })}` }));
+  // 몰 화면 코드는 영어 MALL.PAID 글을 저장하지 않는다
+  assert.doesNotMatch(readFileSync('src/ui/malls.ts', 'utf8'), /paidWith|'MALL\.PAID\./);
+});
+
+test('포인트몰 수령: 살 때의 사실이 받은 물건에 그대로, 없으면 그 값만큼 포인트', () => {
+  const o = { id: 'o1', anchor: 'c1', price: 900, item: { name: '복지 우산', desc: '', effect: '' }, mallPaid: { mall: 'bm', by: 'points', amount: 900 } };
+  assert.deepEqual(K.bmOrderPaid(o), o.mallPaid);
+  const { mallPaid: _m, ...bare } = o;
+  assert.deepEqual(K.bmOrderPaid(bare), { mall: 'bm', by: 'points', amount: 900 });
+  const r = K.confirmBmPickups(K.readItems({}), [o], [o], ['복지 우산'], new Set(['c1', 'c2']), 'c2', []);
+  const got = r.it.list.find((e) => e.name === '복지 우산');
+  assert.deepEqual(got.mallPaid, o.mallPaid);
+  assert.equal(K.mallPaidLabel(r.it.log.find((l) => l.item === got.id).mallPaid), '900 P · 백일몽 포인트몰');
+});

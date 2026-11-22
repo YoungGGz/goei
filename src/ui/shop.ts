@@ -437,8 +437,9 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
     let deal = '';
     let next: ShopState;
     if (kind === 'shelf') {
-      const { value } = await generate(shelfPrompt(src, s), s.model, (raw) => parseShelf(raw, st0.loaded ? st0.identity : null), opts);
-      next = applyShelf(st0, value, s);
+      // 진열대에 얹는 것(applyShelf)까지 읽기 안에서: 받은 줄이 지금 진열·산 것과 모두 겹쳐 버려지면 형식 오류처럼 다시 묻는다(설정 「재시도」) — 바로 오류로 끝나 옛 진열이 남지 않게 (11-22)
+      const { value } = await generate(shelfPrompt(src, s), s.model, (raw) => applyShelf(st0, parseShelf(raw, st0.loaded ? st0.identity : null), s), opts);
+      next = value;
     } else {
       const { value } = await generate(talkPrompt(src, s), s.model, parseTalk, opts);
       next = applyTalk(st0, value, s.kick, s.talkStock, s.shelf, s.keep);

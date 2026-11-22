@@ -14,7 +14,7 @@ import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { pointsMember, pointsVars, readPoints } from '../core/points';
-import { addItem, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
+import { addItem, bmOrderPaid, type MallPaid, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
 import { bmGoing, bmOrdersKeep, bmOrdersVars, cosOrdersKeep, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
@@ -176,8 +176,10 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
     let deal = '';
     let shut = false;
     if (kind === 'shelf') {
-      const { value } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => { const r = parseShelf(raw, st0.loaded ? st0.identity : null); return site === 'bm' ? pointShelf(r) : r; }, opts);
-      let applied = applyShelf(st0, value, s);
+      // 진열대에 얹는 것(applyShelf)까지 읽기 안에서: 받은 줄이 모두 겹쳐 버려지면 형식 오류처럼 다시 묻는다 (기본 상점 ask 와 같게, 11-22)
+      const { value: got } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => { const r0 = parseShelf(raw, st0.loaded ? st0.identity : null); const r = site === 'bm' ? pointShelf(r0) : r0; return { r, applied: applyShelf(st0, r, s) }; }, opts);
+      const value = got.r;
+      let applied = got.applied;
       // 우주몰: 새 진열에 진실 칸이 비었으면 「?」 (문의로 들어온 물건과 같게 — 광고 문구가 사실이 되지 않게, 11-15)
       if (site === 'cos') { const had = new Set(st0.items.map((x) => x.id)); applied = { ...applied, items: applied.items.map((x) => (!x.sold && !had.has(x.id) && !x.truth ? { ...x, truth: '?' } : x)) }; }
       if (site === 'cos') {
@@ -321,11 +323,11 @@ async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<Sho
       const walletId = it.price > 0 ? freshWalletId(w, `${site}_${it.id}`, anchor) : '';
       if (walletId) w = addWalletEntry(w, { id: walletId, anchor, amount: -it.price, memo: guideTxt('Main', 'MALL.MEMO.BUY', { item: it.name, mall: MALL_NAME[site] }), src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
       // 흥정으로 붙은 다른 대가(it.pay)도 기록에 남긴다 (일반 상점 ui/shop.ts 와 같게, 릴리스 점검 11-09)
-      // 기록 글은 지침 「메인 요청에 붙는 글」의 MALL.PAID.* 절 (본편에 「paid with …」로 간다)
-      const extra = it.pay ? ` ${guideTxt('Main', 'MALL.PAID.EXTRA', { pay: it.pay })}` : '';
-      const paid = p ? { paidWith: guideTxt('Main', 'MALL.PAID.POINTS', { price: it.price.toLocaleString('en-US'), mall: MALL_NAME[site], extra }) } : { price: it.price, ...(walletId ? { walletId } : {}), paidWith: guideTxt('Main', 'MALL.PAID.BANK', { mall: MALL_NAME[site], extra }) };
+      // 치른 사실만 적는다: 본편 글은 지침 「메인 요청에 붙는 글」의 MALL.PAID.* 절로 요청 때(core/items.ts mallPaidText), 화면 글은 한국어로(ui/items.ts) — 2026-11-22 사용자
+      const mallPaid: MallPaid = { mall: site, by: p ? 'points' : 'bank', amount: it.price, ...(it.pay ? { pay: it.pay } : {}) };
+      const paid = p ? { mallPaid } : { price: it.price, ...(walletId ? { walletId } : {}), mallPaid };
       // 포인트몰은 소지품이 아니라 수령 대기로 (2026-11-16 사용자: 받는 것은 회사에서). 「주문 조회」에서 받을 때 소지품에 들어간다
-      if (p) waiting.push({ id: walletId || `bm_${it.id}_${Date.now().toString(36)}${waiting.length}`, anchor, price: it.price, walletId: walletId || undefined, paidWith: paid.paidWith, item: { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight } });
+      if (p) waiting.push({ id: walletId || `bm_${it.id}_${Date.now().toString(36)}${waiting.length}`, anchor, price: it.price, walletId: walletId || undefined, mallPaid, item: { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight } });
       else items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...paid });
       st = markSold(st, it.id, anchor, storyStamp(chat));
     }
@@ -456,7 +458,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         const anchor = lastBot(chat)?.key ?? '';
         const walletId = freshWalletId(w, `${site}_note_${n.id}`, anchor);
         w = addWalletEntry(w, { id: walletId, anchor, amount: -n.price, memo: guideTxt('Main', 'MALL.MEMO.NOTE', { title: n.title, mall: MALL_NAME[site] }), src: 'store' }, alive); // 살아 있는 응답을 넘겨 장부가 400줄을 넘으면 줄인다 (전수검사 11-13)
-        const items = addItem(readItems(chat.scriptstate), alive, { name: guideTxt('Main', 'MALL.NOTE.NAME', { title: n.title }), desc: guideTxt('Main', 'MALL.NOTE.DESC', { mall: MALL_NAME[site] }), text: n.body, use: false, icon: 'note paper', weight: 0.01, from: 'store', store: site, anchor, price: n.price, walletId, paidWith: guideTxt('Main', 'MALL.PAID.BANK', { mall: MALL_NAME[site], extra: '' }) });
+        const items = addItem(readItems(chat.scriptstate), alive, { name: guideTxt('Main', 'MALL.NOTE.NAME', { title: n.title }), desc: guideTxt('Main', 'MALL.NOTE.DESC', { mall: MALL_NAME[site] }), text: n.body, use: false, icon: 'note paper', weight: 0.01, from: 'store', store: site, anchor, price: n.price, walletId, mallPaid: { mall: site, by: 'bank', amount: n.price } });
         ok = true;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...itemsVars(items), ...mallVarsOf(site, nextShop) } };
       });
@@ -502,7 +504,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (!cur || cur.taken) return null;
         const anchor = lastBot(chat)?.key ?? '';
         const it = cur.item;
-        const items = addItem(readItems(chat.scriptstate), aliveAnchors(chat), { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site === 'cos' ? 'cos-order' : site, anchor, price: cur.price, walletId: cur.walletId ?? `${site}_ord_${cur.id}`, paidWith: guideTxt('Main', 'MALL.PAID.ORDER', { mall: MALL_NAME[site] }) });
+        const items = addItem(readItems(chat.scriptstate), aliveAnchors(chat), { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site === 'cos' ? 'cos-order' : site, anchor, price: cur.price, walletId: cur.walletId ?? `${site}_ord_${cur.id}`, mallPaid: { mall: site, by: 'order', amount: cur.price } });
         ok = true;
         const next = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(items), ...ordersVars(list.map((x) => (x.id === o.id ? { ...x, taken: true, takenKey: anchor } : x)), cosOrdersKeep(chat.scriptstate)) } };
         // 받았으니 채팅의 완성 알림 카드(표식)를 지운다
@@ -540,7 +542,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         let items = readItems(chat.scriptstate);
         for (const o of got) {
           const it = o.item;
-          items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...(o.walletId ? { walletId: o.walletId } : {}), paidWith: o.paidWith ?? guideTxt('Main', 'MALL.PAID.POINTS', { price: o.price.toLocaleString('en-US'), mall: MALL_NAME[site], extra: '' }) });
+          items = addItem(items, alive, { name: it.name, desc: it.desc, effect: it.effect, truth: it.truth, use: it.use, uses: it.uses, equip: it.equip, icon: it.icon, weight: it.weight, from: 'store', store: site, anchor, ...(o.walletId ? { walletId: o.walletId } : {}), mallPaid: bmOrderPaid(o) });
         }
         n = got.length;
         first = got[0].item.name;

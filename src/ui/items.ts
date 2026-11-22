@@ -14,8 +14,9 @@ import { aliveAnchors } from '../core/wallet';
 import {
   addItem, addUse, canMerge, canUse, invOn, dropUse, EQUIP_LABEL, EQUIP_SLOTS, equipItem, equippedOf, gridItems, isEquipped, ITEM_SPENT_VAR, ITEM_USE_AT_VAR, ITEMS_VAR, itemCarry, itemEditOn, itemLeft, itemSlots, itemUseVars, itemWeight, itemsVars, lastBotKey, liveItems, mergeItems, mergeUse, queueUseVars, usesToSend, seatLost, useNeedsSeat,
   forgetAway, itemAutoOn, purgeItem, readItemUse, readItems, removeItem, searchItems, setItemLeft, slotKind, STATE_LABEL, lineWeight, totalWeight, unequipItem, updateItem, weightText,
-  type Item, type ItemEquip, type ItemLog, type Items, type ItemUse,
+  type Item, type ItemEquip, type ItemLog, type Items, type ItemUse, type MallPaid,
 } from '../core/items';
+import { MALL_NAME } from '../core/malls';
 import { findStatusTags } from '../core/world/status';
 import { splitIconWord } from '../core/iconmatch';
 import { messageKey } from '../core/people/store';
@@ -127,7 +128,14 @@ const realOf = (iso: string) => {
 /** 줄의 때: 기준 메시지의 RP 날짜·시각 → 없으면(직접 넣기·버리기) 마지막 RP 시각 → 상태창이 없으면 현실 시각 */
 const whenLabel = (w: When, anchor: string, iso: string) => (anchor ? w.at.get(anchor) : '') || w.last || realOf(iso);
 /** 값: 원으로 치른 값 · 원이 아닌 대가 (물건으로만 치른 것은 「₩ 0」 대신 그 대가, 전수점검 사소-27 — 획득 기록 paidNote 와 같은 셈) */
-const paidLine = (it: Item) => [Number.isSafeInteger(it.price) && (it.price! > 0 || !it.paidWith) ? `₩ ${it.price!.toLocaleString('en-US')}` : '', it.paidWith ?? ''].filter(Boolean).join(' + ');
+/** 쇼핑몰에서 치른 것 (화면 글, 2026-11-22 사용자): 「₩ 1,500,000 · 우주 쇼핑몰 입금」「1,200 P · 백일몽 포인트몰」「₩ 3,000,000 · 우주 쇼핑몰 선납 완료」. 흥정으로 붙은 다른 대가는 「+ 대가」.
+ *  본편에 가는 영어 글은 따로 지침 MALL.PAID.* 로 만든다 (core/items.ts mallPaidText) */
+const MALL_PAID_HOW: Record<MallPaid['by'], string> = { bank: '입금', points: '', order: '선납 완료' };
+export const mallPaidLabel = (p: MallPaid): string => {
+  const amount = p.by === 'points' ? `${p.amount.toLocaleString('en-US')} P` : `₩ ${p.amount.toLocaleString('en-US')}`;
+  return `${amount} · ${[MALL_NAME[p.mall], MALL_PAID_HOW[p.by]].filter(Boolean).join(' ')}${p.pay ? ` + ${p.pay}` : ''}`;
+};
+const paidLine = (it: Item) => it.mallPaid ? mallPaidLabel(it.mallPaid) : [Number.isSafeInteger(it.price) && (it.price! > 0 || !it.paidWith) ? `₩ ${it.price!.toLocaleString('en-US')}` : '', it.paidWith ?? ''].filter(Boolean).join(' + ');
 const sourceLine = (it: Item, w: When) => [FROM_NAME[it.from], whenLabel(w, it.anchor, it.at), paidLine(it)].filter(Boolean).join(' · ');
 
 /** 이 채팅의 「사용」 자리 (이미 보낸 턴의 것은 비어 보인다) */
@@ -342,7 +350,7 @@ function logList(ctx: ChatContext): string {
   const pic = (l: ItemLog) => itemPic(l);
   const row = (l: ItemLog) => {
     const when = whenLabel(w, l.anchor, l.at);
-    const sub = [BY[l.by] ?? l.by, l.what === 'use' && (l.n ?? 1) > 1 ? `×${l.n}` : '', l.note, l.quote ? `「${l.quote}」` : ''].filter(Boolean).join(' · ');
+    const sub = [BY[l.by] ?? l.by, l.what === 'use' && (l.n ?? 1) > 1 ? `×${l.n}` : '', l.mallPaid ? mallPaidLabel(l.mallPaid) : l.note, l.quote ? `「${l.quote}」` : ''].filter(Boolean).join(' · ');
     return `<li class="gx-wt-row"><div class="gx-wt-main"><span class="it-ic">${pic(l)}</span><span class="gx-wt-memo"><b>${esc(l.name)} <em class="it-what ${l.what === 'get' ? 'get' : 'out'}">${logWhatLabel(l)}</em></b><small>${esc(sub)}</small></span><span class="gx-wt-amt"><small>${esc(when.split(' ')[1] ?? when)}</small></span></div></li>`;
   };
   // RP 날짜별 묶음 (가계부처럼). 같은 날은 한 묶음, 묶음 머리에 획득·사용 수

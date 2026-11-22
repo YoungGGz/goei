@@ -11,7 +11,7 @@ import { messageKey } from './people/store';
 import type { PromptMessage } from './request';
 import type { ItemChange, ItemNow } from './people/updater';
 import { currentShop, shopEvents, shopOn, shopGuide } from './shop';
-import { mallEvents, soldPasses } from './malls';
+import { MALL_NAME, mallEvents, soldPasses, type MallSite } from './malls';
 import { boughtPasses } from './shopctx';
 import { bmGoing, bmWaiting, type BmOrder } from './orders';
 import { peopleSettings } from './people/settings';
@@ -93,6 +93,8 @@ export interface Item {
   walletId?: string;
   /** 상점: 원이 아닌 값으로 치른 것 (그 가게의 결제 수단·흥정으로 정한 대가, 2026-11-08 사용자) */
   paidWith?: string;
+  /** 쇼핑몰: 어느 몰에서 어떻게 얼마를 치렀나 (사실만. 본편 글·화면 글은 쓸 때 만든다 — MallPaid) */
+  mallPaid?: MallPaid;
   /** 본문: 근거 인용 */
   quote?: string;
   /** 상점에 판 응답 키: 그 응답이 살아 있는 동안 목록에서 안 보인다 (다시 굴리면 판 돈과 함께 돌아온다) */
@@ -131,6 +133,8 @@ export interface ItemLog {
   anchor: string;
   quote?: string;
   note?: string;
+  /** 쇼핑몰에서 산 획득 기록: 치른 사실 (note 대신. 화면 글은 ui/items.ts 가 한국어로) */
+  mallPaid?: MallPaid;
   /** 물건 id (사용 기록: 남은 횟수 셈) */
   item?: string;
   /** 사용 횟수 (사용 기록, 기본 1) */
@@ -357,6 +361,7 @@ export interface ItemInput {
   price?: number;
   walletId?: string;
   paidWith?: string;
+  mallPaid?: MallPaid;
   /** 상점: 산 곳 (core/shopctx.ts ItemStore) */
   store?: string;
   quote?: string;
@@ -400,6 +405,26 @@ function withTraits(cur: Item, p: { use?: boolean; uses?: unknown; equip?: unkno
   }
   return next;
 }
+
+/**
+ * 쇼핑몰에서 치른 것: 어느 몰(mall) · 어떻게(by: 송금·포인트·맞춤 주문 선납) · 얼마(amount: 송금·선납은 원, 포인트는 포인트) · 흥정으로 붙은 다른 대가(pay).
+ * 사실만 한 번 저장하고 글은 쓸 때 만든다 (2026-11-22 사용자: 글을 두 번 저장하지 않는다) — 본편 영어는 지침 「메인 요청에 붙는 글」 MALL.PAID.* (mallPaidText), 화면 한국어는 ui/items.ts
+ */
+export interface MallPaid { mall: MallSite; by: 'bank' | 'points' | 'order'; amount: number; pay?: string }
+
+const cleanMallPaid = (p: MallPaid): MallPaid => ({ mall: p.mall, by: p.by, amount: Number.isSafeInteger(p.amount) ? p.amount : 0, ...(p.pay ? { pay: clean(p.pay, 60) } : {}) });
+
+/** 본편에 넘기는 「무엇으로 치렀나」 글 (지침 MALL.PAID.*): 살 때 적어 두던 글과 같다 */
+export function mallPaidText(p: MallPaid): string {
+  const mall = MALL_NAME[p.mall];
+  const extra = p.pay ? ` ${guideTxt('Main', 'MALL.PAID.EXTRA', { pay: p.pay })}` : '';
+  if (p.by === 'points') return guideTxt('Main', 'MALL.PAID.POINTS', { price: p.amount.toLocaleString('en-US'), mall, extra });
+  if (p.by === 'order') return guideTxt('Main', 'MALL.PAID.ORDER', { mall });
+  return guideTxt('Main', 'MALL.PAID.BANK', { mall, extra });
+}
+
+/** 포인트몰 수령 대기 줄이 물건에 넘길 치른 사실 (살 때 적은 것, 없으면 그 값만큼 포인트) */
+export const bmOrderPaid = (o: BmOrder): MallPaid => o.mallPaid ?? { mall: 'bm', by: 'points', amount: o.price };
 
 /** 획득 기록의 값: 원 · 원이 아닌 대가 */
 const paidNote = (e: ItemInput): string =>
@@ -459,6 +484,7 @@ export function addItem(it: Items, alive: Set<string>, e: ItemInput): Items {
     ...(Number.isSafeInteger(e.price) ? { price: e.price } : {}),
     ...(e.walletId ? { walletId: e.walletId } : {}),
     ...(e.paidWith ? { paidWith: clean(e.paidWith, 60) } : {}),
+    ...(e.mallPaid ? { mallPaid: cleanMallPaid(e.mallPaid) } : {}),
     ...(e.store ? { store: clean(e.store, 16) } : {}),
     ...(truth ? { truth } : {}),
     ...(text ? { text } : {}),
@@ -466,7 +492,7 @@ export function addItem(it: Items, alive: Set<string>, e: ItemInput): Items {
     ...(kind ? { kind } : {}),
   }, { use: e.use, uses: e.uses, equip: e.equip, state: e.state, icon: e.icon, weight: e.weight });
   // 획득 기록 (2026-11-07 사용자: 기록에 사용만 있고 얻은 건 없음). 값은 note 에
-  const got = addItemLog(it, { name, item: id, ...(row.icon ? { icon: row.icon } : {}), what: 'get', by: e.from, anchor: e.anchor, ...(quote ? { quote } : {}), ...(paidNote(e) ? { note: paidNote(e) } : {}), at: row.at }, alive);
+  const got = addItemLog(it, { name, item: id, ...(row.icon ? { icon: row.icon } : {}), what: 'get', by: e.from, anchor: e.anchor, ...(quote ? { quote } : {}), ...(row.mallPaid ? { mallPaid: row.mallPaid } : paidNote(e) ? { note: paidNote(e) } : {}), at: row.at }, alive);
   const out = compactList({ ...got, list: [...got.list, row] }, withAnchor(alive, e.anchor));
   return e.wear && row.equip ? equipItem(out, alive, id) : out;
 }
@@ -939,8 +965,10 @@ const boughtShown = (e: Item): boolean => e.store !== 'bm';
 const boughtListed = (live: Item[], nowKey: string, vars?: Record<string, unknown>): Item[] => boughtPassing(live, nowKey, vars).filter(boughtShown);
 
 /** 본편에 넘기는 「새로 산 것」 이름: 원이 아닌 값으로 치렀으면 무엇으로 치렀는지 붙인다 (본편 모델이 몸·빚 같은 결과를 이야기로) */
-export const boughtLine = (e: Item): string =>
-  e.paidWith ? (e.price ? guideTxt('Main', 'INVENTORY.BOUGHT.PAID_WON', { name: e.name, paid: e.paidWith, price: e.price.toLocaleString('en-US') }) : guideTxt('Main', 'INVENTORY.BOUGHT.PAID', { name: e.name, paid: e.paidWith })) : e.name;
+export const boughtLine = (e: Item): string => {
+  const paid = e.mallPaid ? mallPaidText(e.mallPaid) : e.paidWith;
+  return paid ? (e.price ? guideTxt('Main', 'INVENTORY.BOUGHT.PAID_WON', { name: e.name, paid, price: e.price.toLocaleString('en-US') }) : guideTxt('Main', 'INVENTORY.BOUGHT.PAID', { name: e.name, paid })) : e.name;
+};
 
 /** 본편에 넘기는 물건 한 줄: 이름 — 설명 (효과) [장착] [남은 횟수] [상태] */
 export function itemLine(e: Item, left: number | undefined, equipped: boolean, detail: ItemDetail = 'full'): string {
@@ -1474,7 +1502,7 @@ export function settleBmPickups(it0: Items, orders: BmOrder[], alive: Set<string
       continue;
     }
     const g = o.item;
-    it = addItem(it, alive, { name: g.name, desc: g.desc, effect: g.effect, truth: g.truth, use: g.use, uses: g.uses, equip: g.equip, icon: g.icon, weight: g.weight, from: 'story', store: 'bm', anchor: c.anchor, quote: c.quote, fresh: true, ...(o.walletId ? { walletId: o.walletId } : {}), ...(o.paidWith ? { paidWith: o.paidWith } : {}) });
+    it = addItem(it, alive, { name: g.name, desc: g.desc, effect: g.effect, truth: g.truth, use: g.use, uses: g.uses, equip: g.equip, icon: g.icon, weight: g.weight, from: 'story', store: 'bm', anchor: c.anchor, quote: c.quote, fresh: true, ...(o.walletId ? { walletId: o.walletId } : {}), mallPaid: bmOrderPaid(o) });
     list = list.map((x) => (x.id === o.id ? { ...x, taken: true, takenKey: c.anchor } : x));
     settled++;
   }
@@ -1496,7 +1524,7 @@ export function confirmBmPickups(it0: Items, orders: BmOrder[], asked: BmOrder[]
     left.splice(i, 1);
     const g = o.item;
     // 같은 이름 물건을 이미 가졌어도 산 물건은 따로 한 줄 (전수점검 중대-7: 가진 물건에 합쳐져 숨긴 진실·설명이 옮겨 붙었다)
-    it = addItem(it, alive, { name: g.name, desc: g.desc, effect: g.effect, truth: g.truth, use: g.use, uses: g.uses, equip: g.equip, icon: g.icon, weight: g.weight, from: 'story', store: 'bm', anchor, fresh: true, ...(o.walletId ? { walletId: o.walletId } : {}), ...(o.paidWith ? { paidWith: o.paidWith } : {}) });
+    it = addItem(it, alive, { name: g.name, desc: g.desc, effect: g.effect, truth: g.truth, use: g.use, uses: g.uses, equip: g.equip, icon: g.icon, weight: g.weight, from: 'story', store: 'bm', anchor, fresh: true, ...(o.walletId ? { walletId: o.walletId } : {}), mallPaid: bmOrderPaid(o) });
     got.push(o);
   }
   const ids = new Set(got.map((o) => o.id));
