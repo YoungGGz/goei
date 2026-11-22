@@ -16,7 +16,8 @@ import { chatCardsAt, refreshStatusContext } from '../host/statusview';
 import { assetUrl } from '../host/assets';
 import { nudgeMessages, updateChat, type CharacterSnapshot, type ChatContext } from '../host/risu';
 import { noticeClass, sendNow } from '../host/send';
-import { markUnsent } from '../host/unsent';
+import { markUnsent, withdrawUnsentAt } from '../host/unsent';
+import { isWaiting } from '../host/waiting';
 import { ICONS } from './icons';
 import { aimFlash, elapsedText, endedCard, evCard, peopleChips, aimMark, } from './evcard';
 import { agentInner, stLabel } from './images';
@@ -710,6 +711,33 @@ export function sendMission(ctx: ChatContext, env: FieldEnv, opening: boolean): 
   });
 }
 
+/**
+ * 임무 창 「요청 취소」: 그 요청의 카드가 아직 안 보낸 채 채팅 끝에 있으면 채팅 속 카드의 「취소」와 같이 카드째 물린다 (host/unsent.ts withdrawUnsentAt).
+ * 카드가 이미 보내졌거나(응답을 기다리는 중 포함 — 요청 도중 채팅을 저장하면 응답이 사라질 수 있다) 없으면 상황판 대기만 지운다.
+ */
+async function cancelRequest(ctx: ChatContext, env: FieldEnv, kind: EventKind): Promise<void> {
+  const target = readWorld(ctx.chat).pending[kind];
+  if (target && !isWaiting()) {
+    env.setBusy(true);
+    env.setNotice('');
+    try {
+      const saved = await withdrawUnsentAt(ctx.charIndex, ctx.chatIndex, ctx.char.globalLore, target);
+      if (saved) {
+        env.setBusy(false);
+        await env.refresh();
+        return;
+      }
+    } catch (error) {
+      env.setBusy(false);
+      env.setNotice(error instanceof Error ? error.message : String(error));
+      env.render();
+      return;
+    }
+    env.setBusy(false);
+  }
+  await saveWorld(ctx, env, (w) => (cancelMission(w, kind), null));
+}
+
 /** 손 종료의 기준 메시지: 마지막 봇 응답 (상태창·위치·카드 열쇠를 거기서 읽는다). 응답이 없으면 마지막 메시지 */
 function closeIndexOf(chat: Chat): number {
   const list = chat.message ?? [];
@@ -905,7 +933,7 @@ export async function handleField(action: string, value: string | undefined, ctx
       return true;
     }
     case 'mission-cancel':
-      if (v === 'an' || v === 'ms' || v === 'in') await saveWorld(ctx, env, (w) => (cancelMission(w, v), null));
+      if (v === 'an' || v === 'ms' || v === 'in') await cancelRequest(ctx, env, v);
       return true;
     case 'mission-unpick':
       await aimFlash(v);

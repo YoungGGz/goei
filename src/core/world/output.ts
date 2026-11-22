@@ -10,6 +10,7 @@ import { applyOutput, bootstrap, cancelMission, parseWorld, reports, serializeWo
 import { cleanOutput, hasWorldTags } from './tags';
 import { splitThoughts } from '../thoughts';
 import { guideTxt } from '../guides';
+import { hasSceneCard, isUnsent, readScene } from '../dispatch';
 
 export const WORLD_KEY = '$goei_world';
 const LAST_KEY = '$goei_last';
@@ -71,9 +72,59 @@ export function dropPendingVars(chat: Chat, lore: LoreEntry[] | undefined): Scri
   }
 }
 
+/**
+ * 안 보낸 마지막 유저 메시지(자동 전송이 막힌 임무 요청 카드·직접 입력)를 물린 채팅. 임무 요청 카드면 걸어 둔 커스텀 임무도 거둔다 (dropPendingVars).
+ * 채팅 속 카드의 「취소」와 임무 창의 「요청 취소」가 같이 쓴다. target 을 주면 그 목표의 임무 요청 카드일 때만 물린다. 물릴 것이 없으면 null.
+ */
+export function withdrawUnsent(chat: Chat, lore: LoreEntry[] | undefined, target?: string): Chat | null {
+  const msgs = chat.message ?? [];
+  const last = msgs[msgs.length - 1];
+  if (!last || last.role !== 'user' || typeof last.data !== 'string' || !isUnsent(last.data)) return null;
+  const card = hasSceneCard(last.data);
+  if (target !== undefined && (!card || readScene(last.data)?.target !== target)) return null;
+  const next: Chat = { ...chat, message: msgs.slice(0, -1) };
+  // 임무 요청 카드를 물리면 걸어 둔 커스텀 임무도 거둔다 (안 그러면 다음 요청에 NEW 지시가 남았다) (전수검사 11-13)
+  const vars = card && worldOn(chat) ? dropPendingVars(chat, lore) : null;
+  if (vars) next.scriptstate = { ...(chat.scriptstate ?? {}), ...vars };
+  return next;
+}
+
 /** START 때 넣을 상황판 변수 (첫 발생 추첨 포함) */
 export function startWorldVars(c: Catalog, s: WorldSettings, faction: string, rng: Rng, player = ''): ScriptState {
   return worldVars(bootstrap(c, s, rng, player), c, s, faction);
+}
+
+/** index 자리 바로 앞 메시지의 열쇠 (리롤 판정용) */
+function prevKey(messages: Chat['message'], index: number): string {
+  const m = messages?.[index - 1];
+  return index > 0 && m ? messageKey(m, index - 1) : '';
+}
+
+/**
+ * index 자리에 오는 응답이 리롤(같은 자리의 이전 응답을 갈아 끼움)이면 그 이전 응답이 반영되기 전 상태, 아니면 null.
+ * 「같은 자리」 = 같은 번호 + 바로 앞 메시지가 같은 것(열쇠). 응답 처리(processOutput)와 다시 굴린 요청 조립(rerollRequestVars)이 같이 쓴다.
+ */
+function rerollBase(chat: Chat, index: number): PrevState | null {
+  const prev = readPrev(chat.scriptstate?.[PREV_KEY]);
+  if (prev?.i !== index) return null;
+  return prev.pk === undefined || prev.pk === prevKey(chat.message ?? [], index) ? prev : null;
+}
+
+/**
+ * 다시 굴린 요청: 버린 응답이 상황판·소속에 반영한 것을 되감은 채팅 변수 (요청 조립용, 저장하지 않는다).
+ * 버린 응답은 이미 채팅에서 빠졌고 새 응답은 채팅 끝 다음 자리에 온다. 그 자리가 리롤이 아니면 null.
+ * 새 응답이 붙으면 processOutput 이 같은 기준 상태에서 다시 반영한다.
+ */
+export function rerollRequestVars(chat: Chat, c: Catalog, s: WorldSettings): ScriptState | null {
+  if (!worldOn(chat)) return null;
+  const before = rerollBase(chat, (chat.message ?? []).length);
+  if (!before) return null;
+  return {
+    ...worldVars(parseWorld(before.world), c, s, before.faction),
+    $st_faction: before.faction,
+    $st_pick: before.pick,
+    $ib_affiliation: before.aff,
+  };
 }
 
 /** 짧은 지문: 같은 응답을 두 번 처리하지 않기 위해 */
@@ -114,10 +165,10 @@ export function processOutput(chat: Chat, messageIndex: number, raw: string, c: 
   // 리롤·다시 생성: 같은 자리의 이전 응답이 반영되기 전 상태로 돌아가서 이번 응답만 반영한다.
   // 「같은 자리」 = 같은 번호 + 바로 앞 메시지가 같은 것(열쇠). Risu 는 리롤 때 새 chatId 를 주므로 응답 자체는 비교할 수 없고,
   // 앞 메시지를 지운 뒤 새 턴이 같은 번호에 오면 앞 메시지(새 유저 메시지)의 열쇠가 다르다 — 그때 옛 상태로 돌아가거나 옛 일지를 되감으면 안 된다 (2026-10-29)
-  const prev = readPrev(state[PREV_KEY]);
-  const pk = index > 0 && messages[index - 1] ? messageKey(messages[index - 1], index - 1) : '';
-  const reroll = prev?.i === index && (prev.pk === undefined || prev.pk === pk);
-  const before: PrevState = reroll
+  const prev = rerollBase(chat, index);
+  const pk = prevKey(messages, index);
+  const reroll = prev !== null;
+  const before: PrevState = prev
     ? prev
     : {
         i: index,
