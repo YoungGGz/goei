@@ -127,7 +127,7 @@ This call cannot take money: the terms never include money.
 @@SECTION OPERATOR_OUTPUT
 Output, in this order:
 <operator>
-what the operator says now, on the phone, as short or as long as the moment calls for; only what the caller hears down the line
+what the operator says now, on the phone; only what the caller hears down the line. As on a real call, its length follows what the caller just said: a short remark, a probe or an acceptance gets a short answer; it runs longer only when there is something to put across, such as appraising what was put forward or setting new terms. Never a speech or a written explanation.
 </operator>
 <terms>
 the full terms on which the operator will ship the item now, one per line, only the kinds that apply:
@@ -140,8 +140,8 @@ Write <terms>none</terms> when the operator will not ship the item on anything o
 @@END
 
 @@SECTION THOUGHTS_OPERATOR
-1. What did the caller just offer, ask or object to, and what are the current terms?
-2. For each thing on the table: what is it really, what was it made for, its condition, its worth to the channel, and what does the caller seem not to know about it?
+1. What did the caller just offer, ask or object to, and what are the current terms? Does it call for a fresh appraisal or new terms, or only an answer in the flow of the call?
+2. Only if something new was put forward or the deal must be reweighed: for each thing on the table, what is it really, what was it made for, its condition, its worth to the channel, and what does the caller seem not to know about it?
 3. What is the item on air worth to the channel, and how far can this caller be pushed?
 4. What this operator, being what it is, wants out of this caller now; the terms that follow.
 5. The operator's line, in its own voice.
