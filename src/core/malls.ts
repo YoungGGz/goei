@@ -4,7 +4,7 @@
 import type { Chat } from './types';
 import { type TruthMode, emptyShop, readShop, reviveShop, shelfCap, SHOP_VAR, shopBlocked, shopLimits, shopSettings, type ShopSettings, type ShopState } from './shop';
 import { guideTxt, type GuideName } from './guides';
-import { lastBot, shelfMainText, SHOP_CTX_VAR, SHOP_SHARED_VARS, turnKey } from './shop';
+import { lastBot, shelfMainText, SHOP_CTX_VAR, SHOP_KICK_VAR, SHOP_SHARED_VARS, turnKey } from './shop';
 import { liveOrders, readyNotes } from './orders';
 import { readDesk } from './bmdesk';
 import { aliveAnchors } from './wallet';
@@ -55,8 +55,13 @@ export interface MallSettings extends ShopSettings {
 export function mallSettings(vars: Vars, site: MallSite): MallSettings {
   const s = shopSettings(mallVars(vars, site));
   const a = String(vars?.[mallAutoKey(site)] ?? '');
-  return { ...s, on: shopBlocked(vars) === '', kick: false, auto: a === 'manual' || a === 'turn' ? a : 'open' };
+  // 「문의 끊음」은 운영자가 있는 우주 쇼핑몰에만 ($cos_sh_kick, 기본 켬). 포인트몰은 운영자가 없다.
+  // 끊기면 상태의 closed 가 서고(문의 창만 막는다, 정가 구매는 그대로), 진열을 새로 받으면 풀린다 (core/shop.ts applyShelf)
+  return { ...s, on: shopBlocked(vars) === '', kick: site === 'cos' && s.kick, auto: a === 'manual' || a === 'turn' ? a : 'open' };
 }
+
+/** 우주 쇼핑몰 「문의 끊음」 설정 변수 ($cos_sh_kick, 기본 켬). 기본 상점의 「거래 끊음」($sh_kick)과 같은 이름 규칙 */
+export const cosKickKey = (): string => mallKey(SHOP_KICK_VAR, 'cos');
 
 /** 저장된 쇼핑몰 상태 (없으면 빈 상태) */
 export function readMall(vars: Vars, site: MallSite, alive?: Set<string>): ShopState {

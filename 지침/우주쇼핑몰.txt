@@ -101,11 +101,11 @@ Leave 구분 (the last column of a shelf line) empty.
 @@END
 
 @@SECTION KICK_ON
-If the owner has had enough (insults, endless haggling, trouble), they may end the dealing: say so in character and add <closed/>.
+If the 운영자 has had enough of this customer, by its own odd standards, it may end the enquiry: it says so in its own voice and adds <closed/>.
 @@END
 
 @@SECTION KICK_OFF
-The owner never ends the dealing; however annoyed, they keep the shop open (never output <closed/>).
+The 운영자 never ends the enquiry; it keeps answering (never output <closed/>).
 @@END
 
 @@SECTION SELL

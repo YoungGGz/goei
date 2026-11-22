@@ -22,8 +22,8 @@ import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, canc
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
-import { DESK_AVOID_RANGE, DESK_KEEP_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseSay, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
-import { COS_ACCOUNT, COS_FIXED_MAX, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallSeenKey, mallUnseen, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
+import { DESK_AVOID_RANGE, DESK_KEEP_RANGE, deskAxesDefault, DESK_KEY, deskRawSafe, deskSettings, deskTag, newDeskNo, deskVars, endDesk, makePrompt, parseAxes, parseCard, parseTalk as parseDeskTalk, pickAgain, readDesk, rollDice, talkPrompt as deskTalkPrompt, type DeskAgent, type DeskLine, type DeskSource, type DeskState } from '../core/bmdesk';
+import { COS_ACCOUNT, COS_FIXED_MAX, cosKickKey, COS_TRUTH_KEY, COS_READY_KEY, cosReadyMode, cosAssignment, cosDraw, cosFixed, cosFixedRoll, cosFixedVars, cosTruthMode, genresText, MALL_GUIDE, MALL_NAME, MALL_OWNER, mallAtKey, mallAutoKey, mallSeenKey, mallUnseen, mallKey, mallNote, mallNoteKey, mallRoll, mallSettings, mallVars, mallVarsOf, newCosFixed, parseGenres, parseTiers, readMall, rollChanged, rollDefaults, rollKeys, tiersText, type CosFixed, type CosTier, type MallSite } from '../core/malls';
 import { mergeLate, SHOP_SIZE_HI, SHOP_SIZE_LO, shopLimits } from '../core/shop';
 import { onOffSwitch } from './controls';
 import { shopSource } from './shop';
@@ -173,6 +173,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
     let next: ShopState;
     let note: string | null = null;
     let deal = '';
+    let shut = false;
     if (kind === 'shelf') {
       const { value } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => { const r = parseShelf(raw, st0.loaded ? st0.identity : null); return site === 'bm' ? { ...r, items: r.items.map(pointPrice) } : r; }, opts);
       let applied = applyShelf(st0, value, s);
@@ -189,7 +190,9 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       next = { ...applied, talk: st0.talk };
     } else {
       const { value } = await generate(talkPrompt(src, s, MALL_GUIDE[site]), s.model, parseTalk, opts);
-      next = stampLastLine(applyTalk(st0, value, false, s.talkStock, s.shelf, s.keep), lastBot(ctx.chat)?.key ?? '');
+      // 운영자가 문의를 끊으면(설정 「문의 끊음」) 상태의 closed 가 선다. 쇼핑몰에서는 문의 창만 막는다 (카탈로그 구매는 그대로). 진열을 새로 받으면 풀린다
+      next = stampLastLine(applyTalk(st0, value, s.kick, s.talkStock, s.shelf, s.keep), lastBot(ctx.chat)?.key ?? '');
+      shut = next.closed && !st0.closed;
       // 우주몰: 문의로 새로 들어온 물건에 진실 칸이 비었으면 「?」 (시그니처 상품 fixedItem 과 같게 — 광고 문구가 사실이 되지 않게, 전수검사 11-13)
       if (site === 'cos') { const had = new Set(st0.items.map((x) => x.id)); next = { ...next, items: next.items.map((x) => (!x.sold && !had.has(x.id) && !x.truth ? { ...x, truth: '?' } : x)) }; }
       // 말로 판 것: 운영자가 <deal/> 을 냈고 부른 값이 있으면 「판매」 단추와 같이 처리
@@ -214,6 +217,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       return done ?? saved;
     });
     if (sold && sale) { v.info = `「${sale.name}」${pp(sale.name, '을', '를')} ${won(sale.price as number)}에 팔았다. 입금 완료, 너에게.`; void refreshUseBox(cur.charIndex, cur.chatIndex); }
+    if (shut) { v.picking = false; v.selling = false; v.chip = ''; }
     // 장바구니에서 진열대에 없는 물건은 뺀다
     v.cart = v.cart.filter((id) => shelfItems(merged).some((x) => x.id === id));
   } catch (error) {
@@ -407,17 +411,18 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       v.picking = false;
       break;
     case 'mall-pick':
+      if (st.closed) return true;
       v.picking = !v.picking;
       v.selling = false;
       break;
     case 'mall-sell-open':
       // 상담원: 내 물건 팔기 — 소지품을 골라 운영자에게 내민다 (값은 운영자가 헐값으로 부른다)
-      if (site !== 'cos') return true;
+      if (site !== 'cos' || st.closed) return true;
       v.selling = !v.selling;
       v.picking = false;
       break;
     case 'mall-sell-pick': {
-      if (site !== 'cos' || v.loading || !st.loaded) return true;
+      if (site !== 'cos' || v.loading || !st.loaded || st.closed) return true;
       const mine = liveItemsOf(readItems(ctx.chat.scriptstate), ctx.chat).find((x) => x.id === value);
       if (!mine) return true;
       const left = itemLeft(readItems(ctx.chat.scriptstate), mine, aliveAnchors(ctx.chat));
@@ -592,7 +597,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       const said = (value ?? v.input).trim();
       if (site === 'bm') {
         const d = readDesk(ctx.chat.scriptstate);
-        if (!said || v.dl || !d.agent) return true;
+        if (!said || v.dl || !d.agent || d.ended) return true;
         // 줄마다 그때의 마지막 응답 키를 적는다: 창을 열어 둔 채 다음 턴에 이어 말해도 메인 요청에 넘어가게 (전수검사 11-13)
         const me: DeskLineK = { who: 'me', text: said.slice(0, 600), k: lastBot(ctx.chat)?.key ?? '' };
         // 상담 대화도 「보관하는 양」의 문의 대화 줄 수까지만 둔다: 한 턴 안에서 길게 이어 가도 모델에 끝없이 쌓여 가지 않게 (전수점검 사소-34)
@@ -602,7 +607,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (saved) await deskRun({ ...ctx, chat: saved }, env, 'talk', next);
         return true;
       }
-      if (site !== 'cos' || !said || v.loading || !st.loaded) return true;
+      if (site !== 'cos' || !said || v.loading || !st.loaded || st.closed) return true;
       const chip = st.items.find((x) => x.id === v.chip && !x.sold);
       const next = stampLastLine(sayToOwner(st, chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said, shopLimits(ctx.chat.scriptstate)), lastBot(ctx.chat)?.key ?? '');
       v.input = '';
@@ -637,6 +642,7 @@ async function saveDesk(ctx: ChatContext, st: DeskState) {
 }
 
 // 11-09 사용자: 상담원 신분(실명·직급·부서)은 손님에게 드러나지 않는다 — 화면엔 번호 호칭만
+const DESK_ENDED = '상담원이 상담을 종료했습니다.';
 const deskHello = (a: DeskAgent, again = false) => `${deskTag(a)} 님이 상담에 ${again ? '다시 ' : ''}연결되었습니다.`;
 
 /** 상담사 만들기(make) 또는 답 받기(talk). 같은 채팅을 보고 있을 때만 저장 */
@@ -667,9 +673,10 @@ async function deskRun(ctx: ChatContext, env: MallEnv, kind: 'make' | 'talk', st
       const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, (raw) => parseCard(raw, dice, no), opts);
       next = { ...st0, agent: value.agent, anchor: key, talk: [{ who: 'sys', text: deskHello(value.agent) }, ...value.say.map((t): DeskLineK => ({ who: 'op', text: t, k: key }))] };
     } else {
-      const p = deskTalkPrompt(src, st0);
-      const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, parseSay, opts);
-      next = { ...st0, talk: [...st0.talk, ...value.map((t): DeskLineK => ({ who: 'op', text: t, k: key }))].slice(-shopLimits(vars).talk) };
+      const p = deskTalkPrompt(src, st0, ds.end);
+      const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, (raw) => parseDeskTalk(raw, ds.end), opts);
+      // 상담원이 끝냈으면 마지막 말 아래에 안내 줄을 남기고 더 말할 수 없게 한다 (다시 열면 새 상담)
+      next = { ...st0, talk: [...st0.talk, ...value.say.map((t): DeskLineK => ({ who: 'op', text: t, k: key })), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
     }
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
@@ -705,7 +712,8 @@ async function deskOpen(ctx: ChatContext, env: MallEnv): Promise<boolean> {
   if (v.dl) return env.render(), true;
   let st = readDesk(ctx.chat.scriptstate);
   const key = lastBot(ctx.chat)?.key ?? '';
-  if (st.agent && st.anchor === key) return env.render(), true;
+  // 상담원이 끝낸 상담은 이어 가지 않는다: 끝내고 새로
+  if (st.agent && st.anchor === key && !st.ended) return env.render(), true;
   if (st.agent) st = endDesk(st, ds.keep);
   const again = pickAgain(st, ds);
   if (again) {
@@ -831,6 +839,9 @@ function cosAsk(ctx: ChatContext, st: ShopState, v: View, mobile: boolean): stri
     ? st.talk.map((l) => (l.who === 'me' ? `<div class="q-m q-me"><b>나</b><p>${esc(l.text)}</p></div>` : `<div class="q-m q-op"><b>${esc(MALL_OWNER.cos)}</b><p>${opText(l.text, st)}</p>${noteCard(st, l.note, v)}${quoteCard(st, l.quote, v)}</div>`)).join('')
     : `<div class="q-m q-op"><b>${esc(MALL_OWNER.cos)}</b><p>안녕하신가! 무엇을 도울까, 만일 상품을 물어보면 붙여라 그것을 여기에.</p></div>`;
   const wait = v.loading === 'talk' ? `<div class="q-m q-op q-wait"><b>${esc(MALL_OWNER.cos)}</b><p>운영자가 입력하는 중…</p></div>` : '';
+  // 운영자가 문의를 끊었으면 마지막 말 아래에 알림 한 줄, 입력 칸은 꺼진다 (카탈로그 구매는 그대로)
+  const shut = st.closed;
+  const shutLine = shut && !v.loading ? '<div class="q-m q-wait"><p>운영자가 문의를 끊었어요.</p></div>' : '';
   const pickList = v.picking ? `<div class="q-pick">${onShelf(st).map((x) => `<button data-action="mall-chip" data-value="${esc(x.id)}">${esc(x.name)} <b>${won(x.price)}</b></button>`).join('') || '<p>없다 붙일 상품.</p>'}</div>` : '';
   // 상담원: 내 물건 팔기 — 소지품 목록(장착한 것 포함)에서 고른다
   const mine: Item[] = v.selling ? liveItemsOf(readItems(ctx.chat.scriptstate), ctx.chat) : [];
@@ -840,8 +851,8 @@ function cosAsk(ctx: ChatContext, st: ShopState, v: View, mobile: boolean): stri
   const sellCard = o ? `<div class="q-card q-sell"><i class="q-th">${itemPic({ name: o.name, icon: o.icon })}</i><span>파는 물건</span><b>${esc(o.name)}</b>${o.paid !== undefined ? `<small>산 값 ${won(o.paid)}</small>` : ''}<em>${offered ? `우리의 값 ${o.first !== undefined ? `<s>${won(o.first)}</s> ` : ''}${won(o.price as number)}` : o.price === null ? '우리는 사지 않는다' : '값을 아직 말하지 않았다'}</em>${offered ? `<button class="cs-btn" data-action="mall-sell"${v.loading ? ' disabled' : ''}>판매</button>` : ''}<button class="q-x" data-action="mall-sell-cancel" aria-label="그만">×</button></div>` : '';
   return `<div class="cs-win cs-askwin" role="dialog" aria-label="운영자에게 질문"${at}><div class="cs-wt"><b>★ 운영자에게 질문 ★ - Netscape</b><button data-action="mall-ask-close" aria-label="닫기">×</button></div>
     <div class="q-hd">${ufo}<div><b>${esc(MALL_OWNER.cos)}</b><small>● 운영자 여기에 있음, 지금</small></div></div>
-    <div class="q-lg" data-chatlog="cos">${log}${wait}</div>${failBox(v, 'q-fail')}${pickList}${sellList}${sellCard}${chip ? `<div class="q-card"><i class="q-th">${pic(chip)}</i><span>붙인 상품</span><button class="cs-ln" data-action="mall-show" data-value="${esc(chip.id)}">${esc(chip.name)} <b>${won(chip.price)}</b></button><button class="q-x" data-action="mall-chip" data-value="" aria-label="상품 떼기">×</button></div>` : ''}
-    <div class="q-in"><button class="cs-btn" data-action="mall-pick" aria-pressed="${v.picking}">상품 붙이기</button><button class="cs-btn" data-action="mall-sell-open" aria-pressed="${v.selling}">내 물건 팔기</button><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${o ? (offered ? '값을 다시 불러 보거나 그냥 팔아라' : '값을 부르거나 그냥 보내라') : '넣어라 질문, 여기에'}" aria-label="질문"${v.loading ? ' disabled' : ''}><button class="cs-btn" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, !!v.loading || !st.loaded)}>전송</button></div><i class="cs-rs" aria-hidden="true"></i></div>`;
+    <div class="q-lg" data-chatlog="cos">${log}${wait}${shutLine}</div>${failBox(v, 'q-fail')}${pickList}${sellList}${sellCard}${chip ? `<div class="q-card"><i class="q-th">${pic(chip)}</i><span>붙인 상품</span><button class="cs-ln" data-action="mall-show" data-value="${esc(chip.id)}">${esc(chip.name)} <b>${won(chip.price)}</b></button><button class="q-x" data-action="mall-chip" data-value="" aria-label="상품 떼기">×</button></div>` : ''}
+    <div class="q-in"><button class="cs-btn" data-action="mall-pick" aria-pressed="${v.picking}"${shut ? ' disabled' : ''}>상품 붙이기</button><button class="cs-btn" data-action="mall-sell-open" aria-pressed="${v.selling}"${shut ? ' disabled' : ''}>내 물건 팔기</button><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${shut ? '문의가 끊겼어요' : o ? (offered ? '값을 다시 불러 보거나 그냥 팔아라' : '값을 부르거나 그냥 보내라') : '넣어라 질문, 여기에'}" aria-label="질문"${v.loading || shut ? ' disabled' : ''}><button class="cs-btn" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, !!v.loading || !st.loaded || shut)}>전송</button></div><i class="cs-rs" aria-hidden="true"></i></div>`;
 }
 
 function cosHtml(ctx: ChatContext, mobile: boolean): string {
@@ -962,7 +973,7 @@ function bmDesk(ctx: ChatContext, v: View, mobile: boolean): string {
   return `<div class="bd-win" role="dialog" aria-label="1:1 상담"${at}><div class="bd-wt"><b>1:1 상담</b><span>${esc(MALL_NAME.bm)}</span><button data-action="mall-ask-close" aria-label="닫기">×</button></div>
     <div class="bd-hd">${badge}${tools}</div>
     <div class="bd-lg"><div>${log}</div></div>${failBox(v, 'bp-fail bd-fail')}
-    <div class="bd-in"><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${a ? '메시지를 입력하세요' : '상담사가 연결되면 입력할 수 있습니다'}" aria-label="메시지"${busy || !a ? ' disabled' : ''}><button class="bp-buy" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, busy || !a)}>전송</button></div>${mobile ? '' : '<i class="bd-rs" aria-hidden="true"></i>'}</div>`;
+    <div class="bd-in"><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${d.ended ? '상담이 종료되었습니다' : a ? '메시지를 입력하세요' : '상담사가 연결되면 입력할 수 있습니다'}" aria-label="메시지"${busy || !a || d.ended ? ' disabled' : ''}><button class="bp-buy" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, busy || !a || !!d.ended)}>전송</button></div>${mobile ? '' : '<i class="bd-rs" aria-hidden="true"></i>'}</div>`;
 }
 
 /** 브라우저 탭 화면 */
@@ -1050,7 +1061,7 @@ export function mallSettingsPane(ctx: ChatContext, site: MallSite): string {
   const name = MALL_NAME[site];
   const blocked = s.on ? '' : `<p class="gx-hint">소지품이나 가계부가 꺼져 있어 ${name}을 쓸 수 없어요. 산 물건은 소지품에, 돈은 가계부로 오가서 둘 다 켜져 있어야 해요.</p>`;
   // 자동 호출·모델·상품 수·구획·값 기준과 상점 넷이 같이 쓰는 값은 설정 → 상점에 있다 (ui/famtable.ts shopTable)
-  const rows = `${blocked}${cosRollGroup(ctx, site)}${site === 'cos' ? cosReadyGroup(ctx) + cosTruthGroup(ctx) + cosFixedGroup(ctx) : deskGroup(ctx)}`;
+  const rows = `${blocked}${cosRollGroup(ctx, site)}${site === 'cos' ? cosKickGroup(ctx) + cosReadyGroup(ctx) + cosTruthGroup(ctx) + cosFixedGroup(ctx) : deskGroup(ctx)}`;
   return `<div class="ph-form"><header class="ph-room-head"><div class="ph-room-title"><b>${name} 설정</b></div></header><div class="ph-form-body ps">${rows}</div></div>`;
 }
 
@@ -1097,9 +1108,15 @@ function deskGroup(ctx: ChatContext): string {
     row('사용', mseg('bm', 'desk_on', d.on ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '끄면 왼쪽 메뉴에 「1:1 상담」이 안 보여요.'),
     row('상담사 주사위 칸', axisTable(ctx.chat.scriptstate), '칸마다 값을 하나씩 뽑아요. 값은 쉼표로 나눠요. 같은 값을 여러 번 적으면 그만큼 잘 뽑혀요. 다 지우면 기본 칸으로 돌아가요.', `ms-wide ${aSet || String(ctx.chat.scriptstate?.[DESK_KEY.axes] ?? '').trim() ? 'ps-changed' : ''}`),
     row('지난 상담사 다시 만나기', mseg('bm', 'desk_again', d.again ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '켜면 가끔(4번에 1번꼴) 전에 만났던 상담사가 다시 연결돼요.'),
+    row('상담 끊음', mseg('bm', 'desk_end', d.end ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '켜면 상담원이 먼저 상담을 끝낼 수 있어요.'),
     row('겹치지 않게 넘길 수', stepIn('ms-desk-step', '', d.avoid, DESK_AVOID_RANGE[0], DESK_AVOID_RANGE[1], '명', '겹치지 않게 넘길 수'), '새 상담사를 만들 때 최근 상담사 몇 명의 요약을 같이 넘겨 「이들과 겹치지 마라」고 해요(0~12).'),
     row('지난 상담사 보관 수', stepIn('ms-desk-keep', '', d.keep, DESK_KEEP_RANGE[0], DESK_KEEP_RANGE[1], '명', '지난 상담사 보관 수'), `지난 상담사를 몇 명까지 남겨 둘지예요(${DESK_KEEP_RANGE[0]}~${DESK_KEEP_RANGE[1]}). 넘으면 오래된 상담사부터 지워요. 「다시 만나기」는 남아 있는 상담사 가운데서 골라요.`),
   ].join('') + reset);
+}
+
+/** 운영자 문의: 문의 끊음 (기본 상점의 「거래 끊음」과 같은 장치, 우주 쇼핑몰 값은 따로) */
+function cosKickGroup(ctx: ChatContext): string {
+  return group('운영자 문의', row('문의 끊음', mseg('cos', 'kick', mallSettings(ctx.chat.scriptstate, 'cos').kick ? '1' : '0', [['1', 'ON'], ['0', 'OFF']]), '켜면 운영자가 먼저 문의를 끊을 수 있어요. 끊겨도 상품은 그대로 살 수 있고, 쇼핑몰을 새로고침하면 다시 문의할 수 있어요.'));
 }
 
 /** 맞춤 주문 완성 알림 (11-11 사용자) */
@@ -1179,7 +1196,7 @@ export async function mallSettingsAction(action: string, value: string | undefin
   return true;
 }
 
-/** 1:1 상담 설정: ms-cfg 「bm:desk_on=1」·「bm:desk_again=1」 · ms-desk 「axes=글」 · ms-desk-step ± · ms-desk-reset */
+/** 1:1 상담 설정: ms-cfg 「bm:desk_on=1」·「bm:desk_again=1」·「bm:desk_end=1」 · ms-desk 「axes=글」 · ms-desk-step ± · ms-desk-reset */
 async function deskSettingsAction(action: string, value: string | undefined, ctx: ChatContext, env: MallEnv): Promise<boolean> {
   const set = async (vars: Record<string, string>) => {
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
@@ -1187,8 +1204,9 @@ async function deskSettingsAction(action: string, value: string | undefined, ctx
     return true;
   };
   if (action === 'ms-cfg') {
-    const m = /^bm:(desk_on|desk_again)=([01])$/.exec(value ?? '');
+    const m = /^bm:(desk_on|desk_again|desk_end)=([01])$/.exec(value ?? '');
     if (!m) return false;
+    if (m[1] === 'desk_end') return set({ [DESK_KEY.end]: m[2] === '0' ? '0' : '' });
     return m[1] === 'desk_on' ? set({ [DESK_KEY.on]: m[2] === '0' ? '0' : '' }) : set({ [DESK_KEY.again]: m[2] === '1' ? '1' : '' });
   }
   {
@@ -1277,6 +1295,8 @@ async function cosExtraAction(action: string, value: string | undefined, ctx: Ch
   };
   const list = () => cosFixed(ctx.chat.scriptstate);
   if (action === 'ms-cfg') {
+    // 운영자 문의 「문의 끊음」 (우주몰 전용)
+    if (value === 'cos:kick=1' || value === 'cos:kick=0') return set({ [cosKickKey()]: value.endsWith('0') ? '0' : '' });
     const m = /^(cos|bm):(roll_on|roll_useful|roll_gmode|roll_tmode|truth|ready|fx_on:\w+)=([\s\S]*)$/.exec(value ?? '');
     if (!m) return false;
     const K = rollKeys(m[1] as MallSite);
