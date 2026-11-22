@@ -263,7 +263,7 @@ test('망상홈쇼핑 전화 주문·맞교환: 그 턴에는 「새로 산 것�
   it = M.addItem(it, alive, { name: '낡은 우산', desc: '', effect: '', use: false, from: 'story', anchor: 'c0' });
   it = M.sellItem(it, it.list.find((e) => e.name === '낡은 우산').id, 'c1', '망상홈쇼핑 맞교환');
   it = M.addItem(it, alive, { name: '택배 상자 A', desc: '', effect: '', use: false, from: 'store', store: 'hs', anchor: 'c1' });
-  // 다른 가게에서 산 것은 건드리지 않는다
+  // 다른 가게에서 이번 턴에 산 것도 같다 (2026-11-22 사용자: 「새로 산 것」에만, 최근 기록에 되풀이하지 않는다)
   it = M.addItem(it, alive, { name: '철물 손전등', desc: '', effect: '', use: false, from: 'store', store: 'shop', anchor: 'c1' });
   const vars = { ...M.itemsVars(it), $it_push: '1' };
   const now = inventoryText({ message, scriptstate: vars });
@@ -271,7 +271,8 @@ test('망상홈쇼핑 전화 주문·맞교환: 그 턴에는 「새로 산 것�
   assert.match(now, /just sold 낡은 우산/);
   const recent = (text) => (/Recently: ([^\n]*)/.exec(text)?.[1] ?? '');
   assert.doesNotMatch(recent(now), /got 택배 상자 A|sold 낡은 우산/, now);
-  assert.match(recent(now), /got 철물 손전등/, '다른 가게 것은 그대로');
+  assert.doesNotMatch(recent(now), /got 철물 손전등/, '다른 가게 것도 그 턴에는 최근 기록에 없다');
+  assert.match(now, /just bought[^\n]*철물 손전등/);
   const next = inventoryText({ message: [...message, { role: 'user', data: 'c', chatId: 'u3' }, { role: 'char', data: '다음', chatId: 'c2' }], scriptstate: vars });
   assert.match(recent(next), /sold 낡은 우산/);
   assert.match(recent(next), /got 택배 상자 A/);

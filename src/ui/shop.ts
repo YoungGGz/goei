@@ -17,7 +17,7 @@ import { collectRefs, limitRefs, recentTurns, refText, storyText, type RefRow, t
 import { buildRegistry } from '../core/world/registry';
 import { matchedBooks, shopGive, type ShopGive } from '../core/shopfn';
 import { readDirectory } from '../core/world';
-import { findStatusTags } from '../core/world/status';
+import { findStatusTags, stripStatusTags } from '../core/world/status';
 import { rebuildStatusLine } from '../core/statusctx';
 import { colConfig, usedCols } from '../core/world/statuscols';
 import { findDoc, innerBody } from '../core/wiki';
@@ -343,13 +343,15 @@ const chatKey = (ctx: ChatContext) => `${ctx.charIndex}:${ctx.chatIndex}`;
 
 /** 상점·쇼핑몰 요청 자료. sh: 쓸 설정 (쇼핑몰은 사이트 설정).
  *  give: 가게 표·기능 표·양 표로 정한 「넘길 것」 (core/shopfn.ts shopGive, 기본 상점·쇼핑몰 둘). 안 주면 예전 고정 값 그대로 (망상홈쇼핑) */
-export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ctx.chat.scriptstate), give?: ShopGive): ShopSource {
+/** keepStatus: [최근 본문]의 상태창 줄을 그대로 둔다 (포인트몰 1:1 상담만 — 상담은 지침 CUSTOMER 로 포인트를 일부러 받는다). 그 밖(상점·쇼핑몰·망상홈쇼핑)은 상태창 줄을 빼서 잔고가 가지 않게 (2026-11-22 사용자) */
+export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ctx.chat.scriptstate), give?: ShopGive, keepStatus = false): ShopSource {
   const src = playerSource({ char: ctx.char as RefSource['char'], chat: ctx.chat, persona: personaText() } as RefSource);
   const vars = ctx.chat.scriptstate ?? {};
   // 위키 문서·사건 보고를 몇 자까지 넘길지 (설정 → 상점, 상점 넷이 같이 쓰는 값)
   const limits = shopLimits(vars);
   // 최근 챗로그는 맥락 반영이 꺼져 있어도 관련 로어북을 고를 때는 읽는다
-  const story = storyText(recentTurns(ctx.chat, give ? give.turns : sh.turns, genSettings(vars).userMessages));
+  const turns = recentTurns(ctx.chat, give ? give.turns : sh.turns, genSettings(vars).userMessages);
+  const story = storyText(turns);
   const doc = findDoc(ctx.chat, st.shop, ctx.char.globalLore);
   const extra = doc ? [{ source: guideTxt('Shop', 'REFS_WIKI_SOURCE', { shop: st.shop }), content: innerBody(doc.body).slice(0, limits.wiki) }] : [];
   const text = `${st.shop}\n${st.owner}\n${story}`;
@@ -379,7 +381,9 @@ export function shopSource(ctx: ChatContext, st: ShopState, sh = shopSettings(ct
   // 양 표 「지난 대화」: 진열·문의 요청에 같이 넘기는 지난 문의 대화의 줄 수 (give 가 없으면 전부)
   const talkMax = give ? { talkMax: give.talk } : {};
   if (give && !give.context) return { st, refs: refText(rows), story: '', status: '', situation: '', identity: '', language: genSettings(vars).language, ...talkMax };
-  return { st, refs: refText(rows), story, status, situation, identity, language: genSettings(vars).language, ...talkMax };
+  // 로어북 고르기(text)는 위에서 본문 그대로 읽었다. 모델에 넘기는 본문만 상태창 줄을 뺀다
+  const sent = keepStatus ? story : storyText(turns.map((t) => ({ ...t, user: stripStatusTags(t.user), char: t.char.map(stripStatusTags).filter(Boolean) })));
+  return { st, refs: refText(rows), story: sent, status, situation, identity, language: genSettings(vars).language, ...talkMax };
 }
 
 /** 팔기 확정 (「판매」 단추와 주인의 <deal/> 가 같이 쓴다): 가계부 수입(src store) + 소지품에서 뺌(기록 sell) + 판 것 목록. 팔 수 없으면 null */
@@ -433,8 +437,9 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
     let deal = '';
     let next: ShopState;
     if (kind === 'shelf') {
-      const { value } = await generate(shelfPrompt(src, s), s.model, (raw) => parseShelf(raw, st0.loaded ? st0.identity : null), opts);
-      next = applyShelf(st0, value, s);
+      // 진열대에 얹는 것(applyShelf)까지 읽기 안에서: 받은 줄이 지금 진열·산 것과 모두 겹쳐 버려지면 형식 오류처럼 다시 묻는다(설정 「재시도」) — 바로 오류로 끝나 옛 진열이 남지 않게 (11-22)
+      const { value } = await generate(shelfPrompt(src, s), s.model, (raw) => applyShelf(st0, parseShelf(raw, st0.loaded ? st0.identity : null), s), opts);
+      next = value;
     } else {
       const { value } = await generate(talkPrompt(src, s), s.model, parseTalk, opts);
       next = applyTalk(st0, value, s.kick, s.talkStock, s.shelf, s.keep);

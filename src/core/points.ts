@@ -46,9 +46,14 @@ export function pointsFlagFor(chat: Chat, fallback = false): '1' | '0' | null {
   return chat.scriptstate?.[POINTS_ON_VAR] === want ? null : want;
 }
 
+/** 지금 백일몽 소속인가: 포인트 칸이 사용 중이면(자동이면 신분이 백일몽). pointsOn 과 달리 지난 거래는 세지 않는다 — 포인트몰(즐겨찾기·새 탭·서랍·구매·매 턴 진열)은 백일몽 소속일 때만 (2026-11-08 사용자) */
+export function pointsMember(chat: Chat): boolean {
+  return colConfig(chat.scriptstate).points !== 'off';
+}
+
 /** 포인트 장부를 쓰나: 포인트 칸이 사용 중이거나(자동이면 신분이 백일몽), 이미 포인트 거래가 있으면 (백일몽을 나와도 지난 기록은 보인다) */
 export function pointsOn(chat: Chat): boolean {
-  return colConfig(chat.scriptstate).points !== 'off' || readPoints(chat.scriptstate).log.length > 0;
+  return pointsMember(chat) || readPoints(chat.scriptstate).log.length > 0;
 }
 
 /** 최근 포인트 거래 n줄 (영어 한 줄: 「-100 p 탈모약」, 지침 「메인 요청에 붙는 글」의 STATUS.RECENT_POINT_LINE 절). 상태창 맞춤 줄은 뺀다 */

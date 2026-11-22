@@ -97,7 +97,8 @@ test('1:1 상담: 참고 자료는 예전과 같고, 본편 맥락은 상점 문
   const ctx = ctxOf({ $sh_refs: '12' });
   const d = M.deskSource(ctx);
   const s = M.mallSettings(ctx.chat.scriptstate, 'bm');
-  const old = M.shopSource(mallCtx(ctx, 'bm'), { ...M.readMall(ctx.chat.scriptstate, 'bm'), shop: '백일몽', owner: '' }, s);
+  // 1:1 상담은 [최근 본문]의 상태창 줄을 그대로 받는다 (keepStatus, 2026-11-22: 상점·쇼핑몰·망상홈쇼핑만 뺀다)
+  const old = M.shopSource(mallCtx(ctx, 'bm'), { ...M.readMall(ctx.chat.scriptstate, 'bm'), shop: '백일몽', owner: '' }, s, undefined, true);
   assert.equal(d.refs, old.refs);
   assert.equal(d.language, old.language);
   assert.deepEqual(Object.keys(d).sort(), ['identity', 'language', 'nick', 'points', 'refs', 'shelf', 'situation', 'status', 'story']);

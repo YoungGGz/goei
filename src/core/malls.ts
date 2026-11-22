@@ -10,7 +10,7 @@ import { readDesk } from './bmdesk';
 import { aliveAnchors } from './wallet';
 import { capLines, shopMain, shopMainLines } from './shopctx';
 import { hsBuyPasses } from './hslog';
-import { pointsOn } from './points';
+import { pointsMember } from './points';
 
 export type MallSite = 'cos' | 'bm';
 export const MALL_SITES: MallSite[] = ['cos', 'bm'];
@@ -301,8 +301,8 @@ export function soldPasses(vars: Vars, place: string, plain: boolean): boolean {
   return shopMain(vars, 'shop').has('sell');
 }
 
-/** 이 쇼핑몰을 턴마다 부르나: 켜짐 · 「매 턴」 · 포인트몰은 백일몽 로그인과 포인트 칸이 있을 때만 (화면에 안 보이는 포인트몰을 부르지 않게, 전수검사 11-13) */
+/** 이 쇼핑몰을 턴마다 부르나: 켜짐 · 「매 턴」 · 포인트몰은 백일몽 로그인과 포인트 칸이 있을 때만 (화면에 안 보이는 포인트몰을 부르지 않게, 전수검사 11-13. 지난 포인트 거래만 남은 백일몽 밖 채팅은 부르지 않는다, 11-22) */
 export const mallAutoTurn = (chat: Chat, site: MallSite): boolean => {
   const m = mallSettings(chat.scriptstate, site);
-  return m.on && m.auto === 'turn' && (site !== 'bm' || (String(chat.scriptstate?.['$br_login'] ?? '') === '1' && pointsOn(chat)));
+  return m.on && m.auto === 'turn' && (site !== 'bm' || (String(chat.scriptstate?.['$br_login'] ?? '') === '1' && pointsMember(chat)));
 };
