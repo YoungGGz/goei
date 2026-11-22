@@ -325,7 +325,7 @@ if (PART.includes('misc')) {
   const tiers = cos.rows.find((r) => r.id === 'ms-tier.cos:0:name');
   const genres = cos.rows.find((r) => r.id === 'ms-roll.cos:genres');
   ok(tiers?.kind === 'text' && !tiers.multi && genres?.kind === 'text' && genres.multi, '기본값이 든 칸(값 등급 칸·장르 목록)이 글 칸으로 목록에 있다');
-  ok(['lo', 'hi'].every((f) => cos.rows.find((r) => r.id === `ms-tier.cos:0:${f}`)?.kind === 'num') && cos.rows.find((r) => r.id === 'ms-tier-w.cos:0')?.kind === 'step', '값 등급 칸: 하한·상한은 수 칸, 가중치는 − + 수');
+  ok(['lo', 'hi'].every((f) => cos.rows.find((r) => r.id === `ms-tier.cos:0:${f}`)?.kind === 'num') && cos.rows.find((r) => r.id === 'ms-tier-w.cos:0')?.kind === 'num', '값 등급 칸: 하한·상한·가중치 모두 수 칸 (가중치는 f928137 부터 직접 입력 칸 달린 − +)');
   const sCos = await snap(page);
   await send(page, '장르에 horror 추가', [`${SAY('장르 목록과 값 등급을 바꿀까요?')}\n<set>\nms-roll.cos:genres=${genres.cur}, horror\nms-tier.cos:0:name=시험가\n</set>`]);
   await send(page, '응', [`${SAY('바꿨어요.')}\n<apply>yes</apply>`]);
