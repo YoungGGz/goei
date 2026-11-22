@@ -5,6 +5,7 @@ import type { ChatContext } from '../../host/risu';
 import { basicSettings, getPrefs } from '../../core/settings';
 import { featureModel } from '../../core/craft';
 import { peopleSettings, type Stage } from '../../core/people/settings';
+import { peopleStore } from '../../core/people/store';
 import { phoneSettings } from '../../core/phone';
 import { viewSettings, VIEW_PRESETS } from '../../core/phoneView';
 import { gnetSettings } from '../../core/gnet';
@@ -141,10 +142,14 @@ export function flowNodes(ctx: ChatContext): { pre: Node[]; main: Node; post: No
   const directorOn = pp.on && (pp.director === 'scene' || pp.director === 'facts');
   const updateOn = pp.on && pp.when === 'turn';
   const tidyOn = pp.on && pp.tidy === 'separate';
+  // 기록된 인물이 없으면 Router·Director 를 부르지 않는다 (body.ts withPeople, core/progplan.ts turnPlan 과 같은 조건). 켜져 있어도 이 화면에 「1회」로 적지 않는다
+  let hasPeople = false;
+  try { hasPeople = Object.keys(peopleStore(ctx.chat).people).length > 0; } catch { hasPeople = false; }
+  const NO_PEOPLE = '호출 없음 (이 채팅에 기록된 인물 없음)';
   const pre: Node[] = [
     { name: '로어북 고름', sub: '다음 요청에 넣을 로어북 선택', kind: 'plain', on: true, calls: '호출 없음 (플러그인 코드 또는 Risu)', page: 'set:lore', to: 'r:로어북 보내기', sure: 0, maybe: 0 },
-    { name: '인물 Router', sub: '장면 인물 고르기', kind: 'aux', on: routerOn, model: routerOn ? ppModel('router') : undefined, calls: routerOn ? '보조 1회' : pp.on ? '호출 없음 (코드가 고름)' : '호출 없음 (인물 기록 끔)', page: 'set:people', to: 'r:Router', sure: routerOn ? 1 : 0, maybe: 0 },
-    { name: '인물 Director', sub: '이번 턴 연기 지시', kind: 'aux', on: directorOn, model: directorOn ? ppModel('director') : undefined, calls: directorOn ? (pp.directorSearch ? '1회 (자료 부족 땐 2회)' : '1회') : pp.director === 'note' ? '호출 없음 (갱신에 얹음)' : '호출 없음', page: 'set:people', to: 'r:Director', sure: directorOn ? 1 : 0, maybe: directorOn && pp.directorSearch ? 1 : 0 },
+    { name: '인물 Router', sub: '장면 인물 고르기', kind: 'aux', on: routerOn, model: routerOn ? ppModel('router') : undefined, calls: routerOn ? (hasPeople ? '보조 1회' : NO_PEOPLE) : pp.on ? '호출 없음 (코드가 고름)' : '호출 없음 (인물 기록 끔)', page: 'set:people', to: 'r:Router', sure: routerOn && hasPeople ? 1 : 0, maybe: 0 },
+    { name: '인물 Director', sub: '이번 턴 연기 지시', kind: 'aux', on: directorOn, model: directorOn ? ppModel('director') : undefined, calls: directorOn ? (!hasPeople ? NO_PEOPLE : pp.directorSearch ? '1회 (자료 부족 땐 2회)' : '1회') : pp.director === 'note' ? '호출 없음 (갱신에 얹음)' : '호출 없음', page: 'set:people', to: 'r:Director', sure: directorOn && hasPeople ? 1 : 0, maybe: directorOn && hasPeople && pp.directorSearch ? 1 : 0 },
   ];
   const main: Node = { name: '메인 응답', sub: 'Risu 가 응답 생성', kind: 'main', on: true, model: '메인', calls: '메인 1회', sure: 0, maybe: 0 };
   const assetOn = basic.assetOn && basic.assetModel === 'aux';

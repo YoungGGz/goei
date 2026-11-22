@@ -164,7 +164,9 @@ export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[],
   const list = Array.isArray(chat.message) ? chat.message : [];
   const exclude = new Set(o.exclude ?? []);
   // 사용자가 무시한 이름은 다시 올리지 않는다 (전수점검 보통-17)
-  const match = nameMatcher(allNames(o.roster).filter((n) => !store.people[n.name] && !exclude.has(n.name) && !store.ignored.includes(n.name)));
+  // 호칭(주인·의사·반장…)만으로는 기록을 만들지 않는다: 이름·별칭이 글에 나와야 등장이다
+  // (2026-11-22 사용자: 사망단길 본문의 「정육점 주인」「의사를 밝혀」에서 마덕희·고연지 기록이 생겼다). 이미 기록된 사람을 호칭으로 장면에 넣는 것은 그대로다
+  const match = nameMatcher(allNames(o.roster).filter((n) => !store.people[n.name] && !exclude.has(n.name) && !store.ignored.includes(n.name)).map((n) => ({ ...n, titles: [] })));
   const found = new Map<string, string>();
   for (const i of indexes) {
     const anchor = list[i] ? messageKey(list[i], i) : '';

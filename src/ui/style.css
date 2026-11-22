@@ -5627,14 +5627,11 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs .hs-ok { margin: 0; text-align: center; font-weight: 700; color: var(--y); }
 .hs .hs-no { margin: 0; text-align: center; color: var(--sub); }
 .hs .hs-no b { display: block; font: 900 30px ui-monospace, monospace; color: #fff; letter-spacing: 3px; }
-/* 상품 스티커 (11-20 사용자): 노란 앞면 밑 바닥에 숨은 효과 글 전체가 찍혀 있고, 모서리가 조금 들린 자리만큼만 보인다. --peel 0~1 = 젖힌 정도, --rx·--ry = 접는 선의 가로·세로 비(상품마다 다름) */
-@property --peel { syntax: '<number>'; inherits: true; initial-value: 0.12; }
-.hs .hs-sticker { position: relative; --peel: .12; --pmax: 96px; --p: calc(var(--peel) * var(--pmax) * var(--lim, 1)); --px: calc(var(--p) * var(--rx, 1)); --py: calc(var(--p) * var(--ry, 1)); transform: rotate(var(--tilt, -1.2deg)); filter: drop-shadow(0 4px 0 #b99a00) drop-shadow(0 10px 20px #0006); }
-.hs.hs-m .hs-sticker { --pmax: 88px; }
-.hs .hs-sticker.lifted { --peel: 1; }
-.hs .hs-sticker.anim { animation: hs-peel .45s cubic-bezier(.2,.8,.25,1.15); }
-@keyframes hs-peel { from { --peel: var(--from, .12); } to { --peel: 1; } }
-.hs .hs-sticker .face { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 16px 22px; border-radius: 4px; background: #ffe45c; color: #2a1a00; text-align: center; clip-path: polygon(0 0, 100% 0, 100% calc(100% - var(--py)), calc(100% - var(--px)) 100%, 0 100%); }
+/* 상품 스티커 (11-20 사용자 · 11-22 다시 짬): 노란 앞면 밑 바닥에 숨은 효과 글이 보통 글로 왼쪽 위부터 적혀 있고, 스티커가 그 위를 덮는다.
+   모서리 넷 어디든 잡아 끄는 방향대로 접힌다: 앞면이 잘리는 모양(.face clip-path)과 접힌 뒷면(.flapw·.flap)은 ui/homeshop.ts drawFold 가 px 로 넣는다.
+   --tilt = 붙인 기울기(상품마다), --rest = 가만히 있을 때 정해진 모서리가 들려 있는 만큼 */
+.hs .hs-sticker { position: relative; --rest: 20px; transform: rotate(var(--tilt, -1.2deg)); filter: drop-shadow(0 4px 0 #b99a00) drop-shadow(0 10px 20px #0006); }
+.hs .hs-sticker .face { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 16px 22px; border-radius: 4px; background: #ffe45c; color: #2a1a00; text-align: center; }
 .hs .hs-sticker .pic { width: 72px; height: 72px; background: #fff7c2; }
 .hs .hs-sticker .pic img { max-width: 64px; max-height: 64px; }
 .hs .hs-sticker .face b { font-size: 17px; font-weight: 900; }
@@ -5642,30 +5639,21 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .hs .hs-sticker .face .ef { font-weight: 800; color: #b00020; }
 .hs .hs-und { position: absolute; inset: 0; border-radius: 4px; overflow: hidden; background: radial-gradient(120% 90% at 100% 100%, #3b1219 0, #24090e 60%, #1a0609 100%); user-select: none; }
 .hs .hs-und::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(135deg, #ffffff06 0 2px, transparent 2px 5px); }
-/* 바닥에 찍힌 원래 글 전체: 스티커 넓이에 꽉 차게 (글자 크기는 ui/homeshop.ts fitUnder 가 맞춘다). 스티커가 덮고 있어 젖힌 자리만 보인다 */
-.hs .hs-und .emb { position: absolute; inset: 6px 8px; margin: 0; overflow: hidden; font-size: 20px; line-height: 1.4; font-weight: 800; letter-spacing: .4px; word-break: break-all; text-align: justify; color: #e3b96b; text-shadow: 0 1px 0 #000, 0 -1px 0 #fff3, 0 0 6px #e3b96b33; }
-.hs .hs-und .emb i { font-style: normal; white-space: pre; }
-.hs .hs-sticker.c-br .hs-und .emb, .hs .hs-sticker.c-bl .hs-und .emb { display: flex; flex-wrap: wrap; align-content: flex-end; }
-.hs .hs-sticker.c-br .hs-und .emb { justify-content: flex-end; }
-.hs .hs-sticker.c-tr .hs-und .emb { text-align: right; }
-.hs .hs-sticker .flapw { position: absolute; width: calc(var(--px) * 2); height: calc(var(--py) * 2); pointer-events: none; }
+/* 바닥에 적힌 원래 글 전체: 보통 문단, 왼쪽 위부터. 글자 크기는 글이 스티커 넓이를 채울 만큼 --min~--max 사이에서 ui/homeshop.ts fitUnder 가 맞춘다 */
+.hs .hs-und .emb { position: absolute; inset: 10px 12px; margin: 0; overflow: hidden; --min: 11px; --max: 30px; --lh: 1.5; font-size: 16px; line-height: var(--lh); font-weight: 800; text-align: left; color: #e3b96b; text-shadow: 0 1px 0 #000, 0 -1px 0 #fff3, 0 0 6px #e3b96b33; }
+.hs .hs-und .emb .w { display: inline-block; }
+.hs .hs-und .emb i { font-style: normal; }
+.hs .hs-sticker .flapw { position: absolute; display: none; pointer-events: none; }
 .hs .hs-sticker .flap { position: absolute; inset: 0; }
-.hs .hs-sticker .corner { position: absolute; width: 48px; height: 48px; cursor: grab; touch-action: none; }
-/* 들리는 모서리마다: 앞면이 잘리는 자리 · 접힌 종이 · 잡는 자리 */
-.hs .hs-sticker.c-br .flapw, .hs .hs-sticker.c-br .corner { right: 0; bottom: 0; }
-.hs .hs-sticker.c-bl .flapw, .hs .hs-sticker.c-bl .corner { left: 0; bottom: 0; }
-.hs .hs-sticker.c-tr .flapw, .hs .hs-sticker.c-tr .corner { right: 0; top: 0; }
-.hs .hs-sticker.c-tl .flapw, .hs .hs-sticker.c-tl .corner { left: 0; top: 0; }
-.hs .hs-sticker.c-br .flapw { filter: drop-shadow(-3px -3px 3px #0008); }
-.hs .hs-sticker.c-bl .flapw { filter: drop-shadow(3px -3px 3px #0008); }
-.hs .hs-sticker.c-tr .flapw { filter: drop-shadow(-3px 3px 3px #0008); }
-.hs .hs-sticker.c-tl .flapw { filter: drop-shadow(3px 3px 3px #0008); }
-.hs .hs-sticker.c-bl .face { clip-path: polygon(0 0, 100% 0, 100% 100%, var(--px) 100%, 0 calc(100% - var(--py))); }
-.hs .hs-sticker.c-tr .face { clip-path: polygon(0 0, calc(100% - var(--px)) 0, 100% var(--py), 100% 100%, 0 100%); }
-.hs .hs-sticker.c-tl .face { clip-path: polygon(var(--px) 0, 100% 0, 100% 100%, 0 100%, 0 var(--py)); }
+/* 잡는 자리: 모서리 넷 */
+.hs .hs-sticker .corner { position: absolute; width: 48px; height: 48px; padding: 0; border: 0; background: none; cursor: grab; touch-action: none; }
+.hs .hs-sticker .corner.c-br { right: 0; bottom: 0; }
+.hs .hs-sticker .corner.c-bl { left: 0; bottom: 0; }
+.hs .hs-sticker .corner.c-tr { right: 0; top: 0; }
+.hs .hs-sticker .corner.c-tl { left: 0; top: 0; }
 .hs .hs-sticker.drag .corner { cursor: grabbing; }
-.hs .hs-sticker .corner:disabled { cursor: default; }
 .hs.hs-m .hs-sticker .corner { width: 64px; height: 64px; }
+.hs .hs-sticker.lifted + .hs-peelhint { visibility: hidden; }
 .hs .hs-peelhint { margin: 2px 0 0; text-align: center; font-size: 12px; color: var(--sub); }
 .hs .hs-peelhint i { font-style: normal; color: var(--y); }
 .hs .hs-f { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: var(--sub); }

@@ -217,3 +217,13 @@ test('인터넷 쇼핑몰에 판 것은 본편에 「이번 턴」 사건으로 
   const next = { ...c, message: [...c.message, { role: 'user', data: '간다', chatId: 'u3' }, { role: 'char', data: '다음', chatId: 'c2' }], scriptstate: { ...itemsVars(it), $it_push: '1' } };
   assert.doesNotMatch(inventoryText(next), /just sold/);
 });
+
+test('새로고침 요청: 여기서 산 물건도 「다시 내지 말 것」 목록에 든다 (다 사고 새로고침하면 같은 물건이 다시 나오던 것)', () => {
+  let st = applyShelf(readShop(settleShop(chat('x\n[shop: 철물점|주인]'), 3).vars), parseShelf(SHELF, null), shopSettings({}));
+  const names = shelfItems(st).map((x) => x.name);
+  for (const x of shelfItems(st)) st = markSold(st, x.id, 'c1');
+  assert.equal(shelfItems(st).length, 0);
+  const sys = shelfPrompt({ st, refs: '', story: '', status: '', situation: '', identity: '', language: null }, shopSettings({})).map((m) => m.content).join('\n');
+  assert.match(sys, /Previously shown here \(do not repeat\): /);
+  for (const n of names) assert.ok(sys.split('Previously shown here')[1].includes(n), n);
+});

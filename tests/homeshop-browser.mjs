@@ -61,15 +61,33 @@ for (const [vp, size] of VPS) {
   { const lines = await page.evaluate(() => [...document.querySelectorAll('.hs-chlog p')].map((p) => p.textContent));
     assert.ok(!lines.some((t) => t.includes('이부전용') || t.includes('삼부전용')), `다른 부 채팅이 섞임: ${lines.join(' / ')}`);
     assert.equal(new Set(lines).size, lines.length, `채팅 되풀이: ${lines.join(' / ')}`); }
-  // 스티커 들추기: 모서리를 젖히면 바닥 글 가운데 그 자리 글자만 보인다
+  // 스티커 들추기 (11-22 사용자): 바닥 글은 보통 글로 반듯하게 적혀 있고, 모서리 넷 어디든 잡아 끄는 방향대로 접힌다. 그냥 누르면 정해진 모서리가 이 상품의 한도까지 젖혀진다
   await click('[data-action="hs-pop"][data-value="peek"]'); await page.waitForTimeout(300); await shot('peek');
-  assert.equal(await page.locator('.hs-sticker .corner').count(), 1, '들출 모서리');
-  await click('[data-action="hs-lift"]'); await page.waitForTimeout(900); await shot('peek-lifted');
-  assert.equal(await page.locator('.hs-sticker.lifted').count(), 1, '젖혀짐');
-  // 바닥에는 숨은 효과 글 전체가 찍혀 있고(11-20 사용자), 젖힌 세모 밖의 글자는 앞면에 덮여 안 보인다
-  { const st = await page.evaluate(() => { document.querySelector('.hs-sticker .corner').style.pointerEvents = 'none'; const e = document.querySelector('.hs-und .emb'); const cs = [...e.querySelectorAll('i')]; const hit = cs.filter((c) => { const r = c.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return top === c || top === e || top?.classList.contains('hs-und'); }); return { all: e.textContent, n: cs.length, seen: hit.length }; });
+  assert.equal(await page.locator('.hs-sticker .corner').count(), 4, '잡는 모서리 넷');
+  const seen = () => page.evaluate(() => { const st = document.querySelector('.hs-sticker'); st.querySelectorAll('.corner').forEach((c) => { c.style.pointerEvents = 'none'; }); const e = st.querySelector('.hs-und .emb'); const cs = [...e.querySelectorAll('i')]; const hit = cs.filter((c) => { const r = c.getBoundingClientRect(); const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return top === c || top === e || top?.classList.contains('w') || top?.classList.contains('hs-und'); }); st.querySelectorAll('.corner').forEach((c) => { c.style.pointerEvents = ''; }); const lines = new Set(cs.map((c) => c.offsetTop)); return { all: e.textContent, n: cs.length, seen: hit.length, left: Math.min(...cs.map((c) => c.offsetLeft)), firstTop: cs[0].offsetTop, lines: lines.size, align: getComputedStyle(e).textAlign, lim: Number(st.dataset.lim), clip: st.querySelector('.face').style.clipPath }; });
+  { const st = await seen();
     assert.equal(st.all, TRUTH, '바닥 글은 전체 문장');
-    assert.ok(st.seen > 0 && st.seen < st.n / 2, `드러난 글자 ${st.seen}/${st.n}`); }
+    assert.ok(st.align === 'left' || st.align === 'start', `왼쪽 정렬: ${st.align}`);
+    assert.ok(st.left <= 1 && st.firstTop <= 6, `왼쪽 위부터 적힘: ${st.left}, ${st.firstTop}`);
+    assert.ok(st.lim >= 0.15 && st.lim <= 0.35, `떼지는 넓이 한도(기본 15~35%): ${st.lim}`); }
+  await click('.hs-sticker .corner'); await page.waitForTimeout(900); await shot('peek-lifted');
+  assert.equal(await page.locator('.hs-sticker.lifted').count(), 1, '젖혀짐');
+  // 젖힌 조각 밖의 글자는 앞면에 덮여 안 보인다
+  { const st = await seen();
+    assert.ok(st.clip.startsWith('polygon('), '앞면이 접는 선대로 잘림');
+    assert.ok(st.seen > 0 && st.seen < st.n * 0.6, `드러난 글자 ${st.seen}/${st.n}`); }
+  // 끌기: 왼쪽 위 모서리를 옆으로 끌면 세로로 긴 띠가 접힌다 (접는 선이 끄는 방향을 따른다)
+  if (vp !== 'phone') {
+    const box = await page.locator('.hs-sticker').boundingBox();
+    await page.mouse.move(box.x + 12, box.y + 12); await page.mouse.down();
+    await page.mouse.move(box.x + 60, box.y + 13, { steps: 4 }); await page.mouse.move(box.x + 150, box.y + 14, { steps: 6 });
+    await shot('peek-drag-side'); await page.mouse.up(); await page.waitForTimeout(200);
+    const side = await page.evaluate(() => { const st = document.querySelector('.hs-sticker'); const pts = st.querySelector('.face').style.clipPath.replace(/^polygon\(|\)$/g, '').split(',').map((p) => p.trim().split(/\s+/).map(parseFloat)); return { pts, h: st.offsetHeight, lifted: st.classList.contains('lifted') }; });
+    assert.ok(side.lifted, '끌어 놓은 모양으로 남음');
+    const xs = side.pts.map((p) => p[0]);
+    assert.equal(side.pts.length, 4, `옆으로 끌면 앞면이 네모로 남음(세로 띠가 접힘): ${JSON.stringify(side.pts)}`);
+    assert.ok(Math.min(...xs) > 20, `왼쪽 띠가 들림: ${Math.min(...xs)}`);
+  }
   await click('.hs-pop header [data-action="hs-pop"]');
   // 채팅 보내기: 한 번 더 호출 → 진행자 반응이 끼어든다
   await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<cue>\n바스트|웃음|은하제 고객님, 좋은 질문이십니다!|-\n</cue>\n<chat>\n민지맘|ㅋㅋㅋ 읽어줬다\n???|읽지 마세요\n</chat>' }]; });
@@ -81,11 +99,14 @@ for (const [vp, size] of VPS) {
   await shot('say');
   // 전화 주문: 결제 네 가지 → 흥정 → 맞교환 감정 → 그 조건으로 주문 (원 몫은 가계부, 내민 물건은 소지품에서 빠짐)
   const wallet0 = JSON.parse((await ss()).$st_wallet);
-  await click('[data-action="hs-pop"][data-value="call"]'); await page.waitForTimeout(300); await shot('call');
+  // 전화가 연결되면 상담원을 불러 첫 말을 받는다 (편성이 미리 써 두지 않는다)
+  await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<operator>받았다. 무전기 말이지.</operator>' }]; });
+  await click('[data-action="hs-pop"][data-value="call"]');
+  await page.waitForFunction(() => (document.querySelector('.hs-op')?.textContent ?? '').includes('받았다'), null, { timeout: 15000 }); await shot('call');
   assert.equal(await page.locator('[data-action="hs-pay"]').count(), 4, '결제 네 가지');
   assert.ok((await page.textContent('.hs-pop')).includes('380,000원'), '원 값');
   assert.ok((await page.textContent('.hs-pop')).includes('시연 참여'), '시연');
-  assert.ok((await page.textContent('.hs-op')).includes('주문 도와드리겠습니다'), '상담원 인사');
+  assert.ok((await page.textContent('.hs-op')).includes('받았다. 무전기 말이지.'), '상담원 첫 말');
   // 통화 중에는 대본이 멈춘다 (11-20 사용자: 상담하는 사이 방송이 흘러 매진이 뜬다): 지금 대사만 마치고 큐가 더 넘어가지 않는다
   { const cue = () => page.evaluate(() => Number((document.querySelector('.hs-scr')?.dataset.clip ?? '').split(':')[2]));
     await page.waitForTimeout(4000); const a = await cue(); await page.waitForTimeout(7000); const b = await cue();
@@ -97,7 +118,7 @@ for (const [vp, size] of VPS) {
   await click('[data-action="hs-op"]');
   await page.waitForFunction(() => !!document.querySelector('.hs-terms') && document.querySelector('.hs-terms').textContent.includes('머리카락'), null, { timeout: 15000 });
   { const req = await page.evaluate(() => window.__calls.llm.at(-1).messages.map((m) => m.content).join('\n'));
-    assert.ok(req.includes('not a human') && req.includes('돈 대신 시연으로 안 될까요'), '흥정 요청: 상담원 지침 + 내 말'); }
+    assert.ok(req.includes('has picked up the phone') && req.includes('돈 대신 시연으로 안 될까요'), '흥정 요청: 상담원 지침 + 내 말'); }
   await page.waitForTimeout(200); await shot('call-talk');
   // 맞교환: 물건 고르기 → 감정 받기
   await click('[data-action="hs-pay"][data-value="barter"]'); await page.waitForTimeout(200);
@@ -109,8 +130,12 @@ for (const [vp, size] of VPS) {
   { const req = await page.evaluate(() => window.__calls.llm.at(-1).messages.map((m) => m.content).join('\n'));
     assert.ok(req.includes('빛이 닿은 그림자를 붙잡아 둔다'), '내민 물건의 숨은 효과가 상담원에게 감'); }
   await page.waitForTimeout(200); await shot('call-barter');
+  // 단추로 주문하면 상담원을 불러 통화를 맺는 말을 받는다
+  await page.evaluate(() => { window.__llm = [{ type: 'success', result: '<operator>됐다. 상자는 곧 간다.</operator>' }]; });
   await click('[data-action="hs-order"]');
   await page.waitForFunction(() => (window.__chat.scriptstate.$hs_orders || '').includes('무전기'), null, { timeout: 8000 });
+  await page.waitForFunction(() => (document.querySelector('.hs-pop')?.textContent ?? '').includes('상자는 곧 간다'), null, { timeout: 15000 }).catch(() => {});
+  assert.ok((await page.textContent('.hs-pop')).includes('상자는 곧 간다'), '주문 뒤 상담원 말');
   await page.waitForTimeout(300); await shot('call-done');
   let st = await ss();
   const o1 = JSON.parse(st.$hs_orders)[0];
