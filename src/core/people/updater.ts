@@ -533,7 +533,7 @@ export interface UpdateResult {
   transactions?: { amount: number | string; memo?: string | null; m: string; quote: string }[];
   point_transactions?: { amount: number | string; memo?: string | null; m: string; quote: string }[];
   /** 소지품: 본문에 분명히 적힌 얻음(new)·상태 바뀜(update)·없어짐(gone)만. update·gone 은 목록의 이름 그대로 */
-  items?: { name: string; action: string; desc?: string | null; effect?: string | null; usable?: boolean | null; uses?: number | string | null; equip?: string | null; condition?: string | null; icon?: string | null; weight?: number | string | null; place?: string | null; m: string; quote: string }[];
+  items?: { name: string; action: string; desc?: string | null; effect?: string | null; usable?: boolean | null; uses?: number | string | null; equip?: string | null; equipped?: boolean | string | null; condition?: string | null; icon?: string | null; weight?: number | string | null; place?: string | null; m: string; quote: string }[];
   /** 성격 관찰 (기능 axes): 축을 바꾸지 않고 「이 장면에서 이런 모습」만. 코드가 모아 검토로 띄운다 */
   observations?: { who: string; axis: string; direction: string; pattern: string; reason?: string; strength?: number; confidence?: number; m: string; quote: string }[];
   /** 성격 6축 시작값 (axes_init_needed 인 인물만, 한 번) */
@@ -592,8 +592,8 @@ export interface ApplyReport {
 export interface ItemChange {
   anchor: string;
   name: string;
-  /** unequip = 벗음·내려놓음(아직 지님), left = 두고 옴·맡김(place), gone = 버림·잃음·줌, destroyed = 파괴 */
-  action: 'new' | 'update' | 'unequip' | 'left' | 'gone' | 'destroyed';
+  /** equip = 지닌 것을 입음·손에 듦, unequip = 벗음·내려놓음(아직 지님), left = 두고 옴·맡김(place), gone = 버림·잃음·줌, destroyed = 파괴 */
+  action: 'new' | 'update' | 'equip' | 'unequip' | 'left' | 'gone' | 'destroyed';
   desc: string;
   effect: string;
   quote: string;
@@ -610,6 +610,8 @@ export interface ItemChange {
   weight?: number;
   /** left: 두고 온 자리 (≤30) */
   place?: string;
+  /** new: 본문에서 얻자마자 입었거나 손에 들고 있음 → 장착 칸에 놓는다 (사용자 2026-11-22: 장착은 본문을 따른다) */
+  worn?: boolean;
 }
 
 export interface ApplyCtx {
@@ -1566,12 +1568,12 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         drop('items', t, '이름 없음');
         continue;
       }
-      if (action !== 'new' && action !== 'update' && action !== 'unequip' && action !== 'left' && action !== 'gone' && action !== 'destroyed') {
+      if (action !== 'new' && action !== 'update' && action !== 'equip' && action !== 'unequip' && action !== 'left' && action !== 'gone' && action !== 'destroyed') {
         drop('items', t, '모르는 action', name);
         continue;
       }
-      // 「사용」한 물건(used_now)은 인용이 없어도 그 응답을 기준으로 받는다 (프로그램이 이미 아는 사실). 벗음·두고 옴은 늘 인용이 있어야 한다
-      const usedAt = action === 'unequip' || action === 'left' ? undefined : (input.used ?? []).find((u) => sameItemName(u.name, name));
+      // 「사용」한 물건(used_now)은 인용이 없어도 그 응답을 기준으로 받는다 (프로그램이 이미 아는 사실). 입음·벗음·두고 옴은 늘 인용이 있어야 한다
+      const usedAt = action === 'equip' || action === 'unequip' || action === 'left' ? undefined : (input.used ?? []).find((u) => sameItemName(u.name, name));
       const ev0 = evidence(str(t.m), str(t.quote));
       const ev = typeof ev0 === 'string' && usedAt ? { anchor: usedAt.anchor, index: -1 } : ev0;
       if (typeof ev === 'string') {
@@ -1585,6 +1587,10 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       }
       if (action === 'unequip' && !(input.itemsWorn ?? []).some((x) => sameItemName(x, name))) {
         drop('items', t, '장착하지 않은 물건', name);
+        continue;
+      }
+      if (action === 'equip' && (input.itemsWorn ?? []).some((x) => sameItemName(x, name))) {
+        drop('items', t, '이미 장착한 물건', name);
         continue;
       }
       if (seen.has(norm(listed ?? name))) {
@@ -1624,6 +1630,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
         ...(icon ? { icon } : {}),
         ...(weight !== undefined ? { weight } : {}),
         ...(act === 'left' && place ? { place } : {}),
+        ...(act === 'new' && (t.equipped === true || /^true$/i.test(str(t.equipped).trim())) ? { worn: true } : {}),
       });
       report.applied.items++;
     }

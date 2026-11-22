@@ -314,3 +314,22 @@ test('C-10·C-11 손 칸에서 넣기: 본편 말 「put X away」, 기록 탭 �
   const recent = recentItemLog(chat, r, 1);
   assert.deepEqual(recent, ['put 망치 away', 'put 손전등 away', 'took off 방독면']);
 });
+
+test('equip: 본문에서 입거나 든 것만 장착 칸에. 얻자마자 입었으면(worn) 장착된 채로, 말이 없으면 얻기만', () => {
+  setItemRules(undefined);
+  const s = suit();
+  const off = applyItemChanges(s, alive, [ch({ anchor: 'c2', name: '사내용 정장 세트', action: 'unequip' })], { order });
+  const on = applyItemChanges(off, alive, [ch({ anchor: 'c3', name: '사내용 정장 세트', action: 'equip', quote: '재킷을 다시 걸쳤다' })], { order });
+  assert.equal(isEquipped(row(on, '사내용 정장 세트'), liveItems(on, alive)), true, '본문에서 다시 입음');
+  assert.equal(applyItemChanges(on, alive, [ch({ anchor: 'c3', name: '사내용 정장 세트', action: 'equip' })], { order }), on, '이미 장착한 것은 그대로');
+  const got = applyItemChanges(on, alive, [
+    ch({ anchor: 'c3', name: '방독면', action: 'new', equip: 'gear', icon: '옷/방독면/gas mask', worn: true }),
+    ch({ anchor: 'c3', name: '우비', action: 'new', equip: 'gear', icon: '옷/우비/raincoat' }),
+    ch({ anchor: 'c3', name: '쪽지', action: 'new', equip: null, icon: '서류/쪽지/note', worn: true }),
+  ], { order });
+  const live = liveItems(got, alive);
+  assert.equal(isEquipped(row(got, '방독면'), live), true, '얻자마자 쓴 것');
+  assert.equal(isEquipped(row(got, '우비'), live), false, '말이 없으면 얻기만');
+  assert.equal(isEquipped(row(got, '쪽지'), live), true, '갈래가 없어도 손에 들었으면 손 칸');
+  assert.equal(row(got, '쪽지').held, true);
+});
