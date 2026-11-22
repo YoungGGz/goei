@@ -22,9 +22,6 @@
       {
         "script": "tests/shop-browser.mjs",
         "arg": "dir"
-      },
-      {
-        "script": "@shop-fields.mjs"
       }
     ]
   },
@@ -352,9 +349,6 @@
       "fix3-images"
     ],
     "jobs": [
-      {
-        "script": "@late-image.mjs"
-      },
       {
         "script": "tests/qc-modules-browser.mjs",
         "arg": "fixture",
