@@ -537,7 +537,10 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
         if (placed) { meCall.ref = placed; opCall.ref = placed; }
       }
     }
-    if (!placed) saveLog(ctx.charIndex, ctx.chatIndex, talked, show);
+    // 수락했는데 주문이 들어가지 않았다 (잔고 모자람 · 가계부 꺼짐 · 내민 물건 없어짐 · 쓸 조건 없음): 그 수락하는 말과 상담원의 「주문 받았다」 말은
+    // 시청 기록(본편)에도, 통화(화면과 다음 상담원 요청)에도 남기지 않는다. 막힌 까닭은 창의 안내 그대로 (2026-11-22 사용자)
+    if (!placed && value.took) call.lines = call.lines.filter((l) => l !== meCall && l !== opCall);
+    else if (!placed) saveLog(ctx.charIndex, ctx.chatIndex, talked, show);
   } catch (error) {
     // 실패하면 내 말과 내민 물건을 되돌린다 (다시 보낼 수 있게)
     if (ui.call === call) {

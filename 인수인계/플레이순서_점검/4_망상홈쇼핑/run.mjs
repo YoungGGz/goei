@@ -703,9 +703,10 @@ let snapBeforeU3;
   writeReq(s, req3, TALK_D_AFTER, '■ 수락 뒤 한마디\n', '_3');
   const a3 = textOf(req3);
   const callTxt = /\[통화 — [^\]]*\][\s\S]*$/.exec(req3.at(-1)?.content ?? '')?.[0] ?? '';
-  check(s, '다음 상담원 요청이 「주문이 들어가지 않았다」를 앎 (지침 OPERATOR_OUTPUT: 주문은 프로그램이 <deal/> 로 넣는다)', /잔고|안 됐|되지 않|들어가지 않|not placed|failed/i.test(callTxt.replace(/여보세요\? 주문 된 거예요\?/, '')), '주문 실패 사실', callTxt.slice(0, 400));
-  const ctxLog = ((await hslog())?.entries ?? []).filter((e) => e.k === 'aside' && e.who === '상담원').map((e) => e.text);
-  check(s, '본편으로 갈 시청 기록에 「주문 받았습니다」만 남고 주문 줄 없음(기록)', true, '-', ctxLog.slice(-3));
+  // 사용자 결정 11-22 22:42: 주문이 안 들어간 <deal/> 의 수락하는 말과 「주문 받았습니다」는 시청 기록과 다음 상담원 요청 [통화]에서 뺀다
+  check(s, '다음 상담원 요청 [통화]에 안 들어간 주문의 수락 말·「주문 받았습니다」가 없음 (사용자 11-22 22:42)', callTxt.includes('여보세요? 주문 된 거예요?') && !callTxt.includes('그걸로 주문할게요') && !callTxt.includes('주문 받았습니다'), '빠짐', callTxt.slice(0, 400));
+  const asides = ((await hslog())?.entries ?? []).filter((e) => e.k === 'aside').map((e) => e.text);
+  check(s, '본편으로 갈 시청 기록에도 수락 말·「주문 받았습니다」가 없음 (사용자 11-22 22:42)', !asides.some((x) => x.includes('그걸로 주문할게요') || x.includes('주문 받았습니다')) && asides.some((x) => x.includes('여보세요? 주문 된 거예요?')), '빠짐', asides.slice(-4));
   await saveState(s);
 }
 
