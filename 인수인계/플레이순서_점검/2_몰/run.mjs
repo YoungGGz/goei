@@ -157,6 +157,12 @@ const mainRequest = async (userText, uid) => page.evaluate(async ([t, id]) => {
   const out = await window.__calls.replacers[0]([{ role: 'system', content: 'SYSTEM PROMPT' }, ...hist], 'model');
   return out.map((m) => ({ role: m.role, content: String(m.content) }));
 }, [userText, uid]);
+/** 다시 굴리기: 리수가 마지막 응답을 지운 채(채팅 끝이 유저 메시지) 다시 요청한다 */
+const rerollRequest = async () => page.evaluate(async () => {
+  const hist = window.__chat.message.map((m) => ({ role: m.role === 'char' ? 'assistant' : 'user', content: m.data }));
+  const out = await window.__calls.replacers[0]([{ role: 'system', content: 'SYSTEM PROMPT' }, ...hist], 'model');
+  return out.map((m) => ({ role: m.role, content: String(m.content) }));
+});
 /** 본편 요청을 미리 보기만 (채팅·상태는 원래대로 되돌린다) */
 const peekMain = async (userText) => { const c = await snap(); const out = await mainRequest(userText, 'peek'); await page.evaluate((c) => { window.__chat = c; }, c); return out; };
 /** 본편 응답이 붙음 → output 리스너 */
@@ -316,6 +322,7 @@ const ids = {};
 
 // 07 장바구니 → 주문하기 → 입금
 let snapAfterBuy;
+let snapAfterU2;
 {
   const s = step('장바구니_입금');
   await act('mall-cart', ids['반짝 걸음 구두약']);
@@ -344,6 +351,7 @@ let snapAfterBuy;
   const s = step('다음턴_본편요청');
   await closeWin(page);
   const out = await mainRequest('상자를 열어 본다.', 'u2');
+  snapAfterU2 = await snap();
   writeReq(s, out);
   const inv = inventoryOf(out);
   const tt = thisTurn(inv);
@@ -506,7 +514,8 @@ let snapAfterBuy;
 // A. 문의 응답 실패 (owner 블록 없음): 내 말이 되돌아가고 상태가 반쯤 저장되지 않음
 {
   const s = step('갈래_문의응답실패');
-  await act('mall-ask', '');
+  const clock = J(await vars(), '$cos_shop').items.find((x) => x.name === '거꾸로 시계' && !x.sold);
+  await act('mall-ask', clock.id);
   const talk0 = J(await vars(), '$cos_shop').talk.length;
   await queue('그냥 아무 말', '그냥 아무 말', '그냥 아무 말', '그냥 아무 말');
   const n0 = await llmCount();
@@ -518,7 +527,9 @@ let snapAfterBuy;
   check(s, '실패 안내가 보임', /owner|주인|대사|받은 글/.test(await page.evaluate(() => document.querySelector('.q-fail')?.innerText ?? '')), '실패 안내', await page.evaluate(() => document.querySelector('.q-fail')?.innerText ?? ''));
   check(s, '내 말이 대화에서 빠짐(되돌림)', st.talk.length === talk0, talk0, st.talk.length);
   const inp = await page.evaluate(() => document.querySelector('[data-input="mall-say"]')?.value ?? '');
-  note(s, '실패 뒤 입력칸 글 (포인트몰 상담은 돌려줌 ui/malls.ts:693, 우주몰 문의는 코드상 안 돌려줌 ui/malls.ts:226-236)', inp);
+  const chipShown = await page.evaluate(() => !!document.querySelector('.cs-askwin .q-card:not(.q-sell)'));
+  check(s, '보낸 말이 화면 어딘가에 남아 다시 보낼 수 있음(입력칸 또는 대화 칸)', inp.includes('시계는 몇 번') || (await screen()).includes('시계는 몇 번 돌릴 수 있어?'), '시계는 몇 번 돌릴 수 있어?', { input: inp }, '기본 상점은 failSay 로 남김(ui/shop.ts:478-479), 포인트몰 상담은 입력칸에 돌려줌(ui/malls.ts:693)');
+  check(s, '붙인 물건(거꾸로 시계)이 되돌아옴', chipShown, '붙인 상품 카드', chipShown, '기본 상점은 실패 때 칩을 되돌림(ui/shop.ts:480, 눌러3)');
   void txt;
   await act('mall-ask-close');
   await saveState(s);
@@ -560,6 +571,23 @@ let snapAfterBuy;
   await saveState(s);
 }
 
+// B2. 산 뒤 보낸 턴의 응답(c2)을 다시 굴림 → 다시 받는 요청에도 구매 사건·받는 법이 한 번 (응답이 새로 쓰이니까)
+{
+  const s = step('갈래_구매턴응답_다시굴리기');
+  await closeWin(page);
+  const c = JSON.parse(JSON.stringify(snapAfterU2));
+  await page.evaluate((c) => { window.__chat = c; }, c);
+  const out = await rerollRequest();
+  writeReq(s, out);
+  const inv = inventoryOf(out);
+  const tt = thisTurn(inv);
+  check(s, '다시 받는 요청에도 구매 사건(구두약·우산) 한 번', (tt.match(/반짝 걸음 구두약 \(paid/g) ?? []).length === 1 && /말 듣는 우산/.test(tt), 'just bought …', tt);
+  check(s, '받는 법(ARRIVE) 한 번', (inv.match(/website purchase arrives this turn/g) ?? []).length === 1, 1, (inv.match(/website purchase arrives this turn/g) ?? []).length);
+  check(s, '문의·주문 사건 한 번', (inv.match(/chatted by text with the operator/g) ?? []).length === 1 && (inv.match(/placed a custom order/g) ?? []).length === 1, '각 1', { ask: (inv.match(/chatted by text with the operator/g) ?? []).length, order: (inv.match(/placed a custom order/g) ?? []).length });
+  check(s, '잔고는 그대로(구매가 살아 있음)', (await bal()) === 2800000, 2800000, await bal());
+  await saveState(s);
+}
+
 // C. 설정 끔 (소지품·가계부 끔 → 몰 닫힘, 본편에도 몰 일 없음)
 {
   const s = step('갈래_소지품가계부끔');
@@ -586,6 +614,7 @@ let snapAfterBuy;
   await botReply(C2.replace('2800000', '10000000'), 'c2d');
   await sleep(1500);
   note(s, '응답 처리 중 나간 보조 호출 수(이 갈래 앞)', (await llmCount()) - nb);
+  await queue(COS_SHELF2);
   const n0 = await llmCount();
   await openSite('cos');
   await waitLlm(n0);
