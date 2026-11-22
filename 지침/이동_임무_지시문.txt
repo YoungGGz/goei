@@ -1,17 +1,17 @@
 ===COMMON===
-The user chose a subject and companions from a menu outside the story; no one in the story knows a choice was made. Where the subject also appears as a NEW entry among the world tags, that entry records where it is and what state it is in; it is not a report that someone delivers in the scene. Write the scene in which the protagonist's own path runs into the subject.
+The user picked a subject and companions in a menu outside the story. The characters do not know about the menu. If the subject is listed as a NEW entry in the world tags, that entry only records its place and state; nobody in the scene reports it.
 
-Build that scene from the entries you were given. The subject's entry says what it is, where it sits, how people come to meet it, and what happens to them; that decides what kind of encounter this is. The protagonist's organization, rank, and duties, and each companion's entry, decide why these particular people are within its reach and what each of them already knows. A different subject or a different cast leads to a different kind of encounter.
+Use the lore entries you were given. Read the subject's entry for what it is, where it is, how people run into it, and what it does to them, and write an encounter that fits that. Read the protagonist's organization, rank, and duties, and each companion's entry, for why these people would be there and what each of them knows. A different subject or different companions should give a different encounter.
 
-The subject shows itself as it would to someone standing there: through a detail that is off, through what it does, through what it has left behind. What a character knows comes out as that character's speech, in their own voice and for their own reasons. A companion's entry is a portrait drawn over a long time. In this scene they are busy with what this place and moment hand them, and they talk to each other as well as to the protagonist; who they are shows in how they go about it.
+Show the subject the way a person on the spot would notice it: something that looks wrong, something it does, something it left. Information comes from characters saying it, each in their own way. Give each companion something to do that comes from this place and this moment, and let them talk to each other too.
 
-A Situation, when given, decides the scene ahead of your own choice. The protagonist's words, decisions, feelings, and condition belong to the user; other characters can only guess at them.
+If a Situation is given, follow it first. The user decides what the protagonist says, does, and feels, and what state they are in; other characters can only guess.
 
 ===OPENING===
-No story exists yet; this scene is its opening message. It starts in the protagonist's own day, before the subject has touched it: where they are, what they are doing there, and how this world feels. From there the scene moves, one thing happening after another, to the first contact with the subject, and it takes the room that needs; a scene with several people needs more room than one person meeting one thing. Companions can already be there or come into the scene on their own business. End on the line or the object that asks something of the protagonist right now, with nothing after it.
+This is the first message of a new story. Start with the protagonist's ordinary day, before the subject is involved: where they are, what they are doing, what this world is like. Then move step by step, one event after another, until the protagonist first meets the subject. Write it long enough to cover all of that; more people in the scene need more space. Companions may already be there or may arrive for their own reasons. End on a line of dialogue or an object that requires the protagonist to respond, and write nothing after it.
 
 ===CONTINUATION===
-The story is already running, and continuing it comes before everything above. The place, the hour, the people present, and what was being said and done all stay, and the writing carries on from the last moment without a break. Within that flow, the matter of the subject reaches the protagonist in a way the current situation allows. Going there, or letting time pass, waits for the user to say so.
+The story is already in progress. Continue the current scene from where it stopped: same place, same time, same people, same conversation. The selected subject comes up within that scene. Do not move the protagonist elsewhere or skip time unless the user asks.
 
 ===CONTEXT===
 Subject: [[DEST]]
