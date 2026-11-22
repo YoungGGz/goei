@@ -4,7 +4,8 @@
 import { isFoldPc, isPhone, zoomK } from './media';
 
 // 지금 위키 목록 서랍(.wdr·.wgrab·.wscrim)도 비킨다 (전수검사 11-13)
-export const SWIPE_SKIP = 'input, textarea, select, [contenteditable], .gx-canvas, .gx-mbar, .gx-nav, .nw-rail, .nw-panel, .nw-scrim, .nw-edge, .wk .wdr, .wk .wgrab, .wk .wscrim, .ph-drawer, .gx-agpop';
+// PC 왼쪽 메뉴(.gx-nav) 위에서도 뒤로·앞으로 쓸기를 받는다 (11-22 사용자). 폰의 아래 바는 .gx-mbar 로 비킨다
+export const SWIPE_SKIP = 'input, textarea, select, [contenteditable], .gx-canvas, .gx-mbar, .nw-rail, .nw-panel, .nw-scrim, .nw-edge, .wk .wdr, .wk .wgrab, .wk .wscrim, .ph-drawer, .gx-agpop';
 const SKIP = SWIPE_SKIP;
 const FIRE = 72;
 const bound = new WeakSet<HTMLElement>();
