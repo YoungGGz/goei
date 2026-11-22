@@ -702,7 +702,8 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
   const nameInSpan = (given: string, name: string): boolean => {
     if (rosterSent.has(name)) return true;
     const row = input.names.find((e) => e.name === name);
-    return [given, name, ...(row?.aliases ?? [])].map(norm).some((k) => !!k && spanTexts.some((t) => t.includes(k)));
+    // 등록을 기다리는 줄(2턴 규칙)에 적힌 별명도 받는다: 그 별명으로만 다시 나온 사람을 놓치지 않게
+    return [given, name, ...(row?.aliases ?? []), ...(store.pending[name]?.aliases ?? [])].map(norm).some((k) => !!k && spanTexts.some((t) => t.includes(k)));
   };
   /** 인용 없이 기준 메시지만 (문서용) */
   const evidenceLoose = (m: unknown): { anchor: string; index: number } | string => {

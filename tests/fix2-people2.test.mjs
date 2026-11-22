@@ -27,12 +27,12 @@ const R = await mod('itemrules');
 const person = (name) => ({ name, faction: 'A00', seeded: { from: 'none', at: '' }, slots: {}, affinity: { base: 0 }, address: { toUser: '요원', register: '반말' }, express: 1, aliases: [] });
 
 test('정리: 어느 from 에도 없는 원본은 접혀서 살아 있지 않다', () => {
-  const chat = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '쟈알디가 왔다.', chatId: 'c1' }] };
+  const chat = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '쟈알디가 왔다.', chatId: 'c1' }, { role: 'user', data: 'b', chatId: 'u2' }, { role: 'char', data: '다음 응답', chatId: 'c2' }] }; // 항목은 마지막 응답(c2)이 아닌 c1 에 묶인다 (마지막 응답의 항목은 정리에서 빠짐)
   const e = (id, text) => ({ id, text, src: 'story', anchor: 'c1', seq: 1, quote: '왔다' });
   const store = T.emptyStore();
   store.people.쟈알디 = person('쟈알디');
   store.people.쟈알디.slots.state = [e('s1', 'a'), e('s2', 'b'), e('s3', 'c')];
-  const settings = { ...St.peopleSettings({}), keepMsgs: 0 }; // 최근 응답 창 없음 (합치기 동작만 본다)
+  const settings = St.peopleSettings({});
   const input = C.buildConsolidate(store, chat, '쟈알디', settings);
   const live = S.liveness(chat);
   const rep = C.applyConsolidate(store, '쟈알디', input, { slots: { state: [{ text: 'merged', from: ['s1'] }] } }, live, settings);

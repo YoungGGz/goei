@@ -80,6 +80,19 @@ test('처음 등장: 같은 글에 소속이나 초상 태그가 같이 있으�
   assert.deepEqual(H.seedAppearing(store, c5, [1], () => null), ['백사헌']);
 });
 
+test('처음 등장: 상태창 신분 칸(유저 자신의 소속)은 소속 근거가 아니다 — 백일몽·가짜 관리국·관리국 플레이어', () => {
+  const ST = (org) => `[▣|2025.03.14|09:10 PM|🌙|6°C|사무실|없음|없음|없음|${org}|1000]`;
+  for (const org of ['백일몽/사원', '가짜 관리국/사원', '관리국/신입']) {
+    const store = T.emptyStore();
+    const c = chat(['user', '둘러본다', 'u1'], ['char', `"사장님이 부르신대." 책상 위에는 독사 표본과 산양 뿔이 있었다.\n${ST(org)}`, 'c1']);
+    assert.deepEqual(H.seedAppearing(store, c, [1], () => null), [], org);
+  }
+  // 이야기 글에 소속이 나오면 상태창이 있어도 예전처럼 기록한다
+  const store = T.emptyStore();
+  const c = chat(['user', '복도', 'u1'], ['char', `백일몽 사원 하나가 웃었다. 다들 그를 독사라고 불렀다.\n${ST('관리국/신입')}`, 'c1']);
+  assert.deepEqual(H.seedAppearing(store, c, [1], () => null), ['백사헌']);
+});
+
 test('기록된 사람은 별명만으로도 장면 인물로 잡힌다 (예전 그대로)', () => {
   const store = T.emptyStore();
   const base = B.seedBaseFor('백사헌', 'A00', undefined);
@@ -110,6 +123,22 @@ test('갱신기 새 인물: 인용은 원문에 있어도 이름이 글에 없�
   rep = U.applyUpdate(x.store, x.c, x.input, { new_people: [{ name: '도준', m: x.m, quote: '노점 앞에서 도준이라는 청년이' }] }, x.ctx);
   assert.deepEqual(rep.applied.newPeople, ['도준']);
   assert.equal(x.store.people.도준.origin, 'c1', '처음 만든 응답을 적는다');
+});
+
+test('갱신기 새 인물: 등록 대기 줄(2턴 규칙)에 적힌 별명으로만 다시 나와도 받는다', () => {
+  const msgs = [['user', '시장', 'u1'], ['char', '박준호라는 형사가 "준호라고 불러"라며 인사했다.', 'c1']];
+  for (let i = 0; i < 10; i++) msgs.push(['user', `걷는다 ${i}`, `uu${i}`], ['char', `길을 걸었다 ${i}`, `cc${i}`]);
+  msgs.push(['user', '다시 시장', 'u9'], ['char', '준호가 다시 손을 흔들었다.', 'c9']);
+  const c = chat(...msgs);
+  const store = T.emptyStore();
+  store.pending.박준호 = { anchor: 'c1', aliases: ['준호'] };
+  const s = settings({ twoTurn: true });
+  const idx = c.message.length - 1;
+  const input = U.buildUpdate(c, store, [idx], { settings: s, system: '', values: {}, names: B.allNames([]) });
+  const m = [...input.tags].find(([, i]) => i === idx)[0];
+  const rep = U.applyUpdate(store, c, input, { new_people: [{ name: '박준호', aliases: ['준호'], m, quote: '준호가 다시 손을 흔들었다' }] }, { settings: s, sheetOf: () => null });
+  assert.deepEqual(rep.dropped.map((d) => [d.who, d.reason]), []);
+  assert.deepEqual(rep.applied.newPeople, ['박준호']);
 });
 
 test('갱신기 새 인물: 이름 없는 인물(호칭 기록)과 명부 대조로 올린 명부 줄은 이름 검사를 하지 않는다', () => {
@@ -193,30 +222,67 @@ test('Director 재사용 열쇠: 방식·언어·길이·덧붙인 지침이 바
   assert.notEqual(key({ $pp_director_rules: '짧게 써라' }), k0);
 });
 
-// ── 문제 6: 정리는 최근 응답의 항목을 합치지 않는다 ──
+// ── 문제 6: 정리는 마지막 응답(다시 굴릴 수 있는 응답)의 항목만 빼고 합친다 ──
 
-test('정리: 채팅 뒤쪽 keepMsgs 메시지 안 응답의 항목은 입력에서 빠지고, 다시 굴리면 그 항목은 사라진다', () => {
-  const msgs = [];
-  for (let i = 1; i <= 30; i++) msgs.push([i % 2 ? 'user' : 'char', `글 ${i}`, `m${i}`]);
-  const c = chat(...msgs);
+const hist = (store, who, id, anchor, text = id) => S.putEntry(store, who, 'history', { id, text, src: 'field', anchor, seq: 1 });
+
+test('정리: 짧은 채팅에서도 마지막 응답보다 앞의 항목은 합친다', () => {
+  const c = chat(['user', 'a', 'u1'], ['char', 'b', 'c1'], ['user', 'c', 'u2'], ['char', 'd', 'c2'], ['user', 'e', 'u3'], ['char', 'f', 'c3']);
   const store = T.emptyStore();
   store.people.큐라스 = person('큐라스');
-  S.putEntry(store, '큐라스', 'history', { id: 'old1', text: '손전등을 켬', src: 'field', anchor: 'm2', seq: 1 });
-  S.putEntry(store, '큐라스', 'history', { id: 'old2', text: '앞장섬', src: 'field', anchor: 'm4', seq: 1 });
-  S.putEntry(store, '큐라스', 'history', { id: 'new1', text: '전단지를 챙김', src: 'field', anchor: 'm30', seq: 1 });
-  const s = settings({ keepMsgs: 20 });
+  hist(store, '큐라스', 'a', 'c1', '손전등을 켬');
+  hist(store, '큐라스', 'b', 'c2', '앞장섬');
+  hist(store, '큐라스', 'n', 'c3', '전단지를 챙김');
+  const s = settings();
   const input = C.buildConsolidate(store, c, '큐라스', s);
-  assert.deepEqual(input.data.slots.history.map((e) => e.id), ['old1', 'old2']);
-  C.applyConsolidate(store, '큐라스', input, { slots: { history: [{ text: '손전등을 켜고 앞장섬', from: ['old1', 'old2'] }] } }, S.liveness(c), s);
-  // m30 을 다시 굴림
-  const rerolled = { message: c.message.map((m) => (m.chatId === 'm30' ? { ...m, chatId: 'm30b', data: '다른 글' } : m)) };
-  const texts = S.liveEntries(store.people.큐라스.slots.history, S.liveness(rerolled)).map((e) => e.text);
-  assert.deepEqual(texts, ['손전등을 켜고 앞장섬']);
-  // 최근 응답만 있는 짧은 채팅: 합칠 것이 없다 (호감 계기 접기와 같다)
-  const short = chat(['user', 'a', 'u1'], ['char', 'b', 'c1'], ['user', 'c', 'u2'], ['char', 'd', 'c2']);
+  assert.deepEqual(input.data.slots.history.map((e) => e.id), ['a', 'b'], '마지막 응답(c3) 항목만 빠진다');
+  const rep = C.applyConsolidate(store, '큐라스', input, { slots: { history: [{ text: '손전등을 켜고 앞장섬', from: ['a', 'b'] }] } }, S.liveness(c), s);
+  assert.equal(rep.after, 1);
+  const live = S.liveEntries(store.people.큐라스.slots.history, S.liveness(c)).map((e) => e.text);
+  assert.deepEqual([...live].sort(), ['손전등을 켜고 앞장섬', '전단지를 챙김'].sort());
+});
+
+test('정리: 마지막 응답 뒤에 유저 글이 와 있어도 마지막 응답의 항목은 빠진다', () => {
+  const c = chat(['user', 'a', 'u1'], ['char', 'b', 'c1'], ['user', 'c', 'u2'], ['char', 'd', 'c2'], ['user', '다음', 'u3']);
+  const store = T.emptyStore();
+  store.people.큐라스 = person('큐라스');
+  hist(store, '큐라스', 'a', 'c1');
+  hist(store, '큐라스', 'a2', 'c1');
+  hist(store, '큐라스', 'n', 'c2');
+  assert.deepEqual(C.buildConsolidate(store, c, '큐라스', settings()).data.slots.history.map((e) => e.id), ['a', 'a2']);
+  // 마지막 응답의 항목뿐이면 합칠 것이 없다
   const st2 = T.emptyStore();
   st2.people.큐라스 = person('큐라스');
-  S.putEntry(st2, '큐라스', 'history', { id: 'a', text: 'x', src: 'field', anchor: 'c1', seq: 1 });
-  S.putEntry(st2, '큐라스', 'history', { id: 'b', text: 'y', src: 'field', anchor: 'c2', seq: 1 });
-  assert.equal(C.buildConsolidate(st2, short, '큐라스', settings()), null);
+  hist(st2, '큐라스', 'n1', 'c2');
+  hist(st2, '큐라스', 'n2', 'c2');
+  assert.equal(C.buildConsolidate(st2, c, '큐라스', settings()), null);
+});
+
+test('정리 뒤 마지막 응답을 다시 굴리면 그 응답의 내용은 남지 않는다', () => {
+  const c = chat(['user', 'a', 'u1'], ['char', 'b', 'c1'], ['user', 'c', 'u2'], ['char', 'd', 'c2'], ['user', 'e', 'u3'], ['char', 'f', 'c3']);
+  const store = T.emptyStore();
+  store.people.큐라스 = person('큐라스');
+  hist(store, '큐라스', 'old1', 'c1', '손전등을 켬');
+  hist(store, '큐라스', 'old2', 'c2', '앞장섬');
+  hist(store, '큐라스', 'new1', 'c3', '전단지를 챙김');
+  const s = settings();
+  const input = C.buildConsolidate(store, c, '큐라스', s);
+  C.applyConsolidate(store, '큐라스', input, { slots: { history: [{ text: '손전등을 켜고 앞장섬', from: ['old1', 'old2'] }] } }, S.liveness(c), s);
+  const rerolled = { message: c.message.map((m) => (m.chatId === 'c3' ? { ...m, chatId: 'c3b', data: '다른 글' } : m)) };
+  const texts = S.liveEntries(store.people.큐라스.slots.history, S.liveness(rerolled)).map((e) => e.text);
+  assert.deepEqual(texts, ['손전등을 켜고 앞장섬']);
+  assert.ok(!JSON.stringify(texts).includes('전단지'));
+});
+
+test('별도 정리: 짧은 채팅에서도 인물 기록 상한을 넘긴 사람은 정리를 부른다', async () => {
+  const c = chat(['user', 'a', 'u1'], ['char', 'b', 'c1'], ['user', 'c', 'u2'], ['char', 'd', 'c2']);
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  for (let i = 0; i < 10; i++) hist(store, '쟈알디', `h${i}`, 'c1', `h${i} ` + '가'.repeat(280));
+  const s = { ...St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' }) };
+  assert.deepEqual(C.tidyDue(store, c, s, new Map()).map((d) => d.name), ['쟈알디']);
+  const calls = [];
+  const failed = await C.runTidy(store, c, s, new Map(), async (n) => (calls.push(n), { ok: true, message: '' }));
+  assert.deepEqual(calls, ['쟈알디']);
+  assert.deepEqual(failed, []);
 });

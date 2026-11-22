@@ -28,13 +28,12 @@ export function buildConsolidate(store: PeopleStore, chat: Parameters<typeof liv
   const slots: ConsolidateInput['data']['slots'] = {};
   const ids = new Map<string, { slot: SlotId; entry: Entry }>();
   const enabled = slotsFor(settings.features, settings.qualitative);
-  // 채팅 뒤쪽 keepMsgs 메시지 안의 응답에 근거한 항목은 합치지 않는다: 합친 줄은 응답에 묶이지 않아('#0') 그 응답을 다시 굴리거나 지워도 남는다.
-  // 호감 계기 접기(store.ts foldLog, FOLD_KEEP_MSGS)와 같은 규칙 — 이 안의 응답은 다시 굴리면 기록이 정확히 되돌아간다 (점검 11-22 문제 6)
-  const cut = (Array.isArray(chat.message) ? chat.message.length : 0) - settings.keepMsgs;
-  const recent = (e: Entry) => {
-    const at = live.at.get(e.anchor);
-    return at !== undefined && at >= 0 && at >= cut;
-  };
+  // 마지막 응답에 근거한 항목만 합치지 않는다: 합친 줄은 응답에 묶이지 않아('#0') 그 응답을 다시 굴리거나 지워도 남는다.
+  // 다시 굴릴 수 있는 것은 마지막 응답뿐이라 그 줄만 빼고, 그보다 앞의 항목은 전처럼 합친다 (점검 11-22 문제 6, 사용자 11-22 22:22)
+  const list = Array.isArray(chat.message) ? chat.message : [];
+  let lastBot = -1;
+  for (let i = list.length - 1; i >= 0; i--) if (list[i]?.role === 'char') { lastBot = i; break; }
+  const recent = (e: Entry) => lastBot >= 0 && live.at.get(e.anchor) === lastBot;
   for (const slot of enabled) {
     // 수치 모드 의심 칸은 정리하지 않는다: 항목마다 종류(kind)와 맨 앞 표식 하나로 점수를 세므로 합치면 깨진다 (갱신기 merge 도 막음)
     if (SLOT_META[slot].once || slot === 'suspicion') continue;
@@ -69,7 +68,7 @@ export function parseConsolidate(raw: string): ConsolidateResult {
 
 export interface ConsolidateReport { slots: number; before: number; after: number; dropped: { slot: string; reason: string; item: unknown }[] }
 
-/** 반영: 칸마다 결과 항목을 '#0' 기준(늘 살아 있음)으로 넣고 (입력에는 최근 응답의 항목이 없다, buildConsolidate), 원본은 접거나 대체한다. 결과가 입력보다 많거나 깨졌으면 그 칸은 그대로 */
+/** 반영: 칸마다 결과 항목을 '#0' 기준(늘 살아 있음)으로 넣고 (입력에는 마지막 응답의 항목이 없다, buildConsolidate), 원본은 접거나 대체한다. 결과가 입력보다 많거나 깨졌으면 그 칸은 그대로 */
 export function applyConsolidate(store: PeopleStore, who: string, input: ConsolidateInput, r: ConsolidateResult, live: Liveness, settings: PeopleSettings): ConsolidateReport {
   const report: ConsolidateReport = { slots: 0, before: 0, after: 0, dropped: [] };
   const p = store.people[who];

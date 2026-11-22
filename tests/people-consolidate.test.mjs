@@ -17,10 +17,9 @@ const C = await mod('consolidate');
 const S = await mod('store');
 const T = await mod('types');
 const St = await mod('settings');
-// keepMsgs: 0 = 채팅 뒤쪽 「최근 응답」 창 없음. 이 파일은 합치기 동작을 본다 (최근 응답 항목은 정리에서 빠진다: fix-people-1122 시험)
 const U = await mod('updater');
 
-const chat = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '쟈알디가 왔다. 명단을 봤다. 팔을 다쳤다.', chatId: 'c1' }] };
+const chat = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '쟈알디가 왔다. 명단을 봤다. 팔을 다쳤다.', chatId: 'c1' }, { role: 'user', data: 'b', chatId: 'u2' }, { role: 'char', data: '다음 응답', chatId: 'c2' }] }; // 항목은 마지막 응답(c2)이 아닌 c1 에 묶인다 (마지막 응답의 항목은 정리에서 빠짐)
 const person = (name) => ({ name, faction: 'A00', seeded: { from: 'none', at: '' }, slots: {}, affinity: { base: 0 }, address: { toUser: '요원', register: '반말' }, express: 1, aliases: [] });
 const e = (id, text, extra = {}) => ({ id, text, src: 'story', anchor: 'c1', seq: 1, quote: '왔다', ...extra });
 
@@ -29,7 +28,7 @@ test('정리: 입력은 살아 있는 비고정 항목만, 칸 상한 포함; �
   store.people.쟈알디 = person('쟈알디');
   store.people.쟈알디.slots.state = [e('s1', '본부에 있음'), e('s2', '왼팔 부상'), e('s3', '피곤함'), e('s4', '고정', { pin: true }), e('s5', '취소', { void: true })];
   store.people.쟈알디.slots.history = [e('h1', '명단 사건'), e('h2', '부상')];
-  const settings = { ...St.peopleSettings({}), keepMsgs: 0 };
+  const settings = { ...St.peopleSettings({}) };
   const input = C.buildConsolidate(store, chat, '쟈알디', settings);
   assert.deepEqual(input.data.slots.state.map((x) => x.id), ['s1', 's2', 's3'], '고정·취소는 안 넣음');
   assert.equal(input.data.target, Math.round(settings.personCap * 0.8));
@@ -74,7 +73,7 @@ test('정리: 수치 모드 의심 칸은 정리 자료에 넣지 않고, 모델
     e('q1', '[시작] 명단을 몰래 봄', { target: '@user', kind: '배신' }),
     e('q2', '[단서·중] 밤에 자료실 출입', { target: '@user', kind: '배신', seq: 2 }),
   ];
-  const settings = { ...St.peopleSettings({}), features: new Set(['suspicion']), qualitative: new Set(), keepMsgs: 0 };
+  const settings = { ...St.peopleSettings({}), features: new Set(['suspicion']), qualitative: new Set() };
   assert.ok(T.slotsFor(settings.features, settings.qualitative).includes('suspicion'), '수치 모드에서 의심 칸이 켜져 있음');
   const live = S.liveness(chat);
   const before = JSON.stringify(U.suspicionCases(store.people.쟈알디, live));
@@ -98,7 +97,7 @@ test('정리 지침: 자료에 없는 칸(빈 칸·첫인상·수치 의심)의 
   store.people.쟈알디.slots.state = [e('s1', '본부에 있음'), e('s2', '왼팔 부상')];
   store.people.쟈알디.slots['affinity.appraisal'] = [e('a1', '첫인상', { target: '@user' })];
   store.people.쟈알디.slots.suspicion = [e('u1', '[+1] 단서', { target: '@user', kind: '거짓말' })];
-  const settings = { ...St.peopleSettings({ $pp_num_suspicion: '1' }), keepMsgs: 0 };
+  const settings = St.peopleSettings({ $pp_num_suspicion: '1' });
   const input = C.buildConsolidate(store, chat, '쟈알디', settings);
   assert.deepEqual(Object.keys(input.data.slots), ['state']);
   assert.equal(input.system, C.CONSOLIDATE_PROMPT(settings.lang, ['state']));
@@ -117,7 +116,7 @@ test('별도 정리: 상한을 넘긴 인물만, 부른 뒤에는 정리 자료�
   // 정리할 수 없는 항목(고정)만으로 상한을 넘긴 인물: 정리 자료가 없어 부르지 않는다
   store.people.도윤 = person('도윤');
   store.people.도윤.slots.history = Array.from({ length: 10 }, (_, i) => ({ ...long(`p${i}`), pin: true }));
-  const settings = { ...St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' }), keepMsgs: 0 };
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
   const tried = new Map();
   const due = C.tidyDue(store, chat, settings, tried);
   assert.deepEqual(due.map((d) => d.name), ['쟈알디']);
@@ -140,7 +139,7 @@ test('별도 정리: 고정 항목이 상한을 넘긴 인물에게 매 턴 새 
   const store = T.emptyStore();
   store.people.도윤 = person('도윤');
   store.people.도윤.slots.history = Array.from({ length: 10 }, (_, i) => ({ ...e(`p${i}`, `p${i} ` + '가'.repeat(280)), pin: true }));
-  const settings = { ...St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' }), keepMsgs: 0 };
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
   const tried = new Map();
   const calls = [];
   // 턴마다 40자쯤의 상태 항목 하나. 모델 결과는 줄지 않아 버려진다고 본다 (기록은 그대로)
@@ -178,7 +177,7 @@ test('별도 정리(runTidy): 호출이 실패한 인물은 다음 턴에 다시
   const store = T.emptyStore();
   store.people.쟈알디 = person('쟈알디');
   store.people.쟈알디.slots.history = Array.from({ length: 10 }, (_, i) => e(`h${i}`, `h${i} ` + '가'.repeat(280)));
-  const settings = { ...St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' }), keepMsgs: 0 };
+  const settings = St.peopleSettings({ $pp_person_cap: '2000', $pp_tidy: 'separate' });
   const tried = new Map();
   const calls = [];
   const fail = async (n) => (calls.push(n), { ok: false, message: '모델 요청에 실패' });

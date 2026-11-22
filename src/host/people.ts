@@ -158,6 +158,13 @@ function userFaction(chat: Chat): string {
   return typeof v === 'string' ? v : '';
 }
 
+/** 글에서 상태창 줄만 지운다 (본문은 그대로) */
+function withoutStatusTags(t: string): string {
+  let out = t;
+  for (const tag of findStatusTags(t)) out = out.replace(tag.raw, '');
+  return out;
+}
+
 /** 처음 등장 판정: 응답(indexes)마다 그 응답과 바로 앞 메시지의 글에서 이름이 나온 사람 → 처음 나온 응답 열쇠.
  *  열쇠는 이름·별명만 (호칭은 넣지 않는다). 흔한 낱말·별명이라 다른 근거가 있어야 하는 열쇠(aliases.json corroborate)만 나왔으면,
  *  같은 글에 그 사람의 초상 태그(<img=이름·영문 표기_표정>)나 소속이 같이 있을 때만 등장으로 본다 (2026-11-22 사용자: 「사장님」「독사」만으로 기록이 생겼다).
@@ -183,7 +190,8 @@ export function appearingIn(chat: Chat, indexes: number[], entries: { name: stri
     const anchor = list[i] ? messageKey(list[i], i) : '';
     const win = [list[i - 1], list[i]].filter((m): m is NonNullable<typeof m> => !!m);
     const raw = win.map((m) => String(m.data ?? '')).join('\n');
-    const text = win.map((m) => messageText(String(m.data ?? ''))).join('\n');
+    // 소속 근거는 이야기 글에서만: 상태창 줄([▣|…|조직/직급|…])의 신분 칸은 늘 유저 자신의 소속이라 빼고 본다
+    const text = win.map((m) => withoutStatusTags(messageText(String(m.data ?? '')))).join('\n');
     const strong = new Set<string>();
     const weak = new Set<string>();
     for (const m of win) {
