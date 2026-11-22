@@ -1416,9 +1416,6 @@ async function handle(action: string, value?: string): Promise<void> {
       walletTabUi.edit = false;
       return refresh();
     }
-    case 'menu-fold':
-      await savePrefs((p) => ({ ...p, navFold: getPrefs().navFold === true ? undefined : true }));
-      return render();
     case 'id-fold':
       await savePrefs((p) => ({ ...p, idFold: getPrefs().idFold === true ? undefined : true }));
       return render();
@@ -2101,11 +2098,10 @@ function tabs(): string {
   const item = (id: Tab, label: string, icon: string, cls = '', badge = '') =>
     `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" title="${label}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
   const ctx = view.kind === 'started' ? view.ctx : null;
-  // 메뉴 접기 (11-22 사용자): 메뉴와 본문 사이 경계선의 ‹ › 를 누르거나 메뉴 위에서 옆으로 쓴다 (ui/navswipe.ts).
+  // 메뉴 접기 (11-22 사용자): 표시 없이 메뉴 위에서 옆으로 쓸어서만 접고 편다 (ui/navswipe.ts).
   // 접은 아이콘 묶음은 위아래로 끌어 옮긴다: 남는 높이를 위 빈칸(.gx-nav-top)과 아래 빈칸(.gx-nav-gap)이 navAt : 100 - navAt 로 나눈다
   const folded = !!ctx && getPrefs().navFold === true;
   const at = folded ? getPrefs().navAt ?? 0 : 0;
-  const grip = ctx ? `<button class="gx-navgrip" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}">${ICONS.back}</button>` : '';
   return `<nav class="gx-nav${folded ? ' folded' : ''}" aria-label="주요 화면">
     <span class="gx-nav-top"${at ? ` style="flex-grow:${at}"` : ''}></span>
     ${ctx ? brand(ctx) : ''}
@@ -2120,7 +2116,7 @@ function tabs(): string {
     <span class="gx-nav-gap"${at ? ` style="flex-grow:${100 - at}"` : ''}></span>
     ${ctx ? navHistBar() : ''}
     ${mobileBar(item, unreadPhone, ctx)}
-  </nav>${grip}`;
+  </nav>`;
 }
 
 /** 소지품 메뉴(가계부 | 소지품)는 가계부나 소지품 중 하나라도 켜져 있을 때만 (2026-11-07 사용자: 켜고 끄기) */

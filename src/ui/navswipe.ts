@@ -26,9 +26,7 @@ export function bindNavSwipe(root: HTMLElement, acts: NavSwipeActs): void {
   root.addEventListener('touchstart', (e) => {
     mode = 'off';
     if (e.touches.length !== 1 || isPhone()) return;
-    nav = (e.target as Element).closest<HTMLElement>('.gx-nav, .gx-navgrip');
-    if (!nav) return;
-    if (nav.classList.contains('gx-navgrip')) nav = root.querySelector<HTMLElement>('.gx-nav');
+    nav = (e.target as Element).closest<HTMLElement>('.gx-nav');
     if (!nav) return;
     x0 = e.touches[0].clientX;
     y0 = e.touches[0].clientY;
