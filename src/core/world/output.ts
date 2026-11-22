@@ -27,6 +27,8 @@ interface PrevState {
   made?: string[];
   /** 그 응답 바로 앞 메시지의 열쇠(messageKey). 같은 번호라도 앞 메시지가 다르면(앞 메시지를 지운 뒤 새 턴) 리롤이 아니다 */
   pk?: string;
+  /** 반영한 그 응답의 열쇠(messageKey). 이 응답이 채팅에서 지워졌으면 다음 응답은 이 응답 전 상태에서 반영한다 (지운 응답이 만든 것은 되돌아간다) */
+  k?: string;
 }
 
 function readPrev(raw: unknown): PrevState | null {
@@ -104,13 +106,19 @@ function prevKey(messages: Chat['message'], index: number): string {
 }
 
 /**
- * index 자리에 오는 응답이 리롤(같은 자리의 이전 응답을 갈아 끼움)이면 그 이전 응답이 반영되기 전 상태, 아니면 null.
- * 「같은 자리」 = 같은 번호 + 바로 앞 메시지가 같은 것(열쇠). 응답 처리(processOutput)와 다시 굴린 요청 조립(rerollRequestVars)이 같이 쓴다.
+ * index 자리에 오는 응답이 마지막으로 반영한 응답을 되돌려야 하는 자리면 그 응답이 반영되기 전 상태, 아니면 null.
+ * - 리롤: 같은 자리의 이전 응답을 갈아 끼움. 「같은 자리」 = 같은 번호 + 바로 앞 메시지가 같은 것(열쇠).
+ * - 지움: 마지막으로 반영한 응답이 채팅에 없다 (지우고 새로 보냄). 소지품·가계부·인물 기록처럼 지운 응답이 만든 것도 되돌아간다.
+ *   앞 메시지만 지우고 그 응답은 남았으면 되돌리지 않는다.
+ * 응답 처리(processOutput)와 다시 굴린 요청 조립(rerollRequestVars)이 같이 쓴다.
  */
 function rerollBase(chat: Chat, index: number): PrevState | null {
   const prev = readPrev(chat.scriptstate?.[PREV_KEY]);
-  if (prev?.i !== index) return null;
-  return prev.pk === undefined || prev.pk === prevKey(chat.message ?? [], index) ? prev : null;
+  if (!prev) return null;
+  const messages = chat.message ?? [];
+  if (prev.i === index && (prev.pk === undefined || prev.pk === prevKey(messages, index))) return prev;
+  if (prev.k && !messages.some((m, i) => i !== index && messageKey(m, i) === prev.k)) return prev;
+  return null;
 }
 
 /**
@@ -128,6 +136,16 @@ export function rerollRequestVars(chat: Chat, c: Catalog, s: WorldSettings): Scr
     $st_pick: before.pick,
     $ib_affiliation: before.aff,
   };
+}
+
+/**
+ * 본편 요청을 만들 때 쓸 상황판·소속 변수 (요청 조립용, 저장하지 않는다). 다시 굴린 요청이면 rerollRequestVars, 아니면 지금 상태에서 다시 만든다.
+ * 브리핑($ag_report·$an_report 등)을 늘 지금 카드 로어북·설정으로 만들어, 명부·세계 설정을 고친 직후의 요청에도 바로 맞게 간다
+ * (저장된 브리핑은 다음 응답이 붙어야 새로 만들어졌다). 상황판이 꺼져 있으면 null.
+ */
+export function requestWorldVars(chat: Chat, c: Catalog, s: WorldSettings): ScriptState | null {
+  if (!worldOn(chat)) return null;
+  return rerollRequestVars(chat, c, s) ?? worldVars(readWorld(chat), c, s, String(chat.scriptstate?.['$st_faction'] ?? ''));
 }
 
 /** 짧은 지문: 같은 응답을 두 번 처리하지 않기 위해 */
@@ -228,8 +246,8 @@ export function processOutput(chat: Chat, messageIndex: number, raw: string, c: 
     }
     if (changed) Object.assign(next.scriptstate!, recordVars(journal, rec));
   }
-  // 리롤 기준 상태에 이번 응답이 만든 일지 줄 id 를 적는다 (다음 리롤이 바로 이 줄들만 되감게)
-  next.scriptstate![PREV_KEY] = JSON.stringify({ ...before, made });
+  // 리롤 기준 상태에 이번 응답이 만든 일지 줄 id 를 적는다 (다음 리롤이 바로 이 줄들만 되감게). 자리·앞 메시지·응답 열쇠는 이번 응답의 것
+  next.scriptstate![PREV_KEY] = JSON.stringify({ ...before, i: index, pk, k: messageKey(msg, index), made });
   return next;
 }
 
@@ -251,15 +269,19 @@ function markStart(before: WorldState, after: WorldState, key: string) {
 /**
  * 상황판에서 손으로 바꾼 것(사건 종료 등)을 리롤 기준 상태에도 똑같이 반영한다.
  * 안 그러면 그 응답을 리롤할 때 손으로 바꾼 것이 사라진다. 바꿀 기준 상태가 없으면 빈 값.
+ * change 가 기준 상태에서 안 됐다고 하면(참 값을 돌려주거나 던짐) 그 대상은 마지막 응답이 만든 것이다 — 손으로 바꾸며 생긴 일지 줄(made)을
+ * 그 응답이 만든 줄로 적어, 그 응답을 다시 굴리거나 지우면 대상과 함께 되돌아가게 한다 (상황판과 일지가 서로 다른 말을 하지 않게).
  */
-export function prevWorldVars(state: ScriptState | undefined, change: (w: WorldState) => unknown): ScriptState {
+export function prevWorldVars(state: ScriptState | undefined, change: (w: WorldState) => unknown, made: string[] = []): ScriptState {
   const prev = readPrev(state?.[PREV_KEY]);
   if (!prev) return {};
   const w = parseWorld(prev.world);
+  let missed = false;
   try {
-    change(w);
+    missed = !!change(w);
   } catch {
-    return {};
+    missed = true;
   }
+  if (missed) return made.length ? { [PREV_KEY]: JSON.stringify({ ...prev, made: [...(prev.made ?? []), ...made] }) } : {};
   return { [PREV_KEY]: JSON.stringify({ ...prev, world: serializeWorld(w) }) };
 }

@@ -113,20 +113,19 @@ export function pinReport(r: ReportStore, id: string, on: boolean): ReportStore 
 }
 
 /**
- * 리롤 되감기: 같은 자리의 응답이 다시 반영될 때, **바로 그 응답이 만들었던** 일지 줄·보고서를 지운다.
+ * 리롤·지운 응답 되감기: 그 응답을 다시 굴리거나 지우고 다음 응답이 반영될 때, **바로 그 응답이 만들었던** 일지 줄·보고서를 지운다 (고정한 보고서도).
  * 대상은 `$goei_prev` 가 적어 둔 그 응답의 일지 줄 id 목록(`made`)이다 — 메시지 번호(idx)로 지우면 앞 메시지를 지운 뒤 같은 번호에 온 무관한
- * 리롤이 옛 기록을 지운다(일지는 영구 보관). id 목록이 없는 옛 `$goei_prev`(2026-10-29 이전 저장)만 번호로 지운다.
- * 수동(manual)·필드(field) 종료는 리롤 기준 상태에도 이미 반영돼 있어(prevWorldVars) 되살아나지 않으므로 두고, 고정한 보고서도 둔다.
+ * 리롤이 옛 기록을 지운다(일지는 영구 보관). 목록에는 그 응답이 만든 대상을 손으로 끝낸 줄도 들어 있다 (world/output.ts prevWorldVars).
+ * 그 밖의 수동 종료는 리롤 기준 상태에도 반영돼 있어 되살아나지 않으므로 목록에 없다. id 목록이 없는 옛 `$goei_prev` 만 번호로 자동 종료를 지운다.
  */
 export function rewindClosures(j: JournalStore, r: ReportStore, target: number | string[]): { journal: JournalStore; reports: ReportStore; changed: boolean } {
   const auto = (cause: string) => cause === 'model' || cause === 'ttl';
-  const pinned = new Set(r.items.filter((x) => x.pin).map((x) => x.id));
   // 보고서 id 는 일지 줄 id 와 같은 해시 (`r…` ↔ `j…`)
   const made = Array.isArray(target) ? new Set(target.map((id) => id.slice(1))) : null;
-  const hitRow = (row: JournalRow) => (made ? made.has(row.id.slice(1)) : row.idx === target);
-  const hitRpt = (x: Report) => (made ? made.has(x.id.slice(1)) : x.idx === target);
-  const items = r.items.filter((x) => !(hitRpt(x) && auto(x.cause) && !x.pin));
-  const rows = j.rows.filter((row) => !(hitRow(row) && auto(row.cause) && !(row.rpt && pinned.has(row.rpt))));
+  const hitRow = (row: JournalRow) => (made ? made.has(row.id.slice(1)) : row.idx === target && auto(row.cause));
+  const hitRpt = (x: Report) => (made ? made.has(x.id.slice(1)) : x.idx === target && auto(x.cause));
+  const items = r.items.filter((x) => !hitRpt(x));
+  const rows = j.rows.filter((row) => !hitRow(row));
   const changed = items.length !== r.items.length || rows.length !== j.rows.length;
   return { journal: changed ? { v: 1, rows } : j, reports: changed ? { v: 1, items } : r, changed };
 }

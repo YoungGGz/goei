@@ -566,6 +566,8 @@ function applyAnomalies(w: WorldState, c: Catalog, s: WorldSettings, faction: st
       e = matchAn(w, t.region, canon ?? t.name);
       const key = canon ?? t.name;
       if (e && named.has(e) && key !== e.name && key !== e.presetName) continue; // 지역만 맞은 다른 이름 태그는 버린다 (전수검사 11-13)
+      // 방금 끝난 괴이(이름 막기)는 모델이 다시 적어도 새로 받지 않고, 같은 지역의 다른 항목에 그 이름을 붙이지도 않는다 (사건과 같게. 지침 「do not revive closed entries」)
+      if ((blocked(w, 'an', t.name) || (!!canon && blocked(w, 'an', canon))) && (!e || (key !== e.name && key !== e.presetName))) continue;
       if (!e && t.state === '활성' && validName(t.name) && !w.an.some((x) => x.name === t.name)) {
         // 모델이 스스로 낸 괴이는 추가 여유분 안에서만 받는다 (요청 대기 중인 커스텀 임무 몫은 남김)
         const extra = w.an.filter((x) => x.origin !== 'auto').length + (pending ? 1 : 0);
@@ -658,6 +660,8 @@ function applyMysticSites(w: WorldState, c: Catalog, s: WorldSettings, faction: 
     } else {
       if (t.state !== '출현' || !c.mysticSites.some((m) => m.name === t.name)) continue;
       const pending = w.pending.ms;
+      // 방금 끝난 특수(이름 막기)는 모델이 다시 적어도 새로 받지 않는다. 커스텀 임무로 다시 요청한 것은 받는다
+      if (pending !== t.name && blocked(w, 'ms', t.name)) continue;
       const reserved = pending && pending !== t.name && !w.ms.some((x) => x.name === pending) ? 1 : 0;
       const extra = w.ms.filter((x) => x.origin !== 'auto').length + reserved;
       const loc = uniqueRegion(t.region);

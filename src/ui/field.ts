@@ -764,17 +764,20 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
       const w = structuredClone(x.world);
       const err = change(w, x);
       if (err) throw new Error(err);
-      const prev = prevWorldVars(latest.scriptstate, (p) => change(p, x));
-      const next: Chat = { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...worldVars(w, x.catalog, x.settings, x.faction), ...prev } };
+      const next: Chat = { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...worldVars(w, x.catalog, x.settings, x.faction) } };
       // 손으로 끝낸 상황도 일지·보고서에 (core/journal). 기준은 마지막 봇 응답 (마지막이 유저 메시지면 상태창이 없어 카드 열쇠·위치가 비었다)
+      let made: string[] = [];
       if (w.closed?.length) {
         const index = closeIndexOf(latest);
         const built = buildClosures({ chat: next, index, world: w, closed: w.closed, catalog: x.catalog, faction: x.faction, settings: journalSettings(latest.scriptstate) });
         if (built.rows.length) {
           next.scriptstate = { ...next.scriptstate, ...recordVars(built.journal, built.reports) };
+          made = built.rows.map((r) => r.id);
           closedAt = index;
         }
       }
+      // 리롤 기준 상태에도 같은 손 변경을. 기준 상태에 없는 대상(마지막 응답이 만든 것)이면 이 일지 줄을 그 응답 몫으로 (core/world/output.ts prevWorldVars)
+      next.scriptstate = { ...next.scriptstate, ...prevWorldVars(latest.scriptstate, (p) => change(p, x), made) };
       return next;
     });
     // 손 종료로 보고서가 생겼으면 채팅 카드 열쇠 표를 다시 모으고, 카드가 붙을 응답이 있으면 채팅을 그대로 한 번 저장해 다시 그리게 한다
