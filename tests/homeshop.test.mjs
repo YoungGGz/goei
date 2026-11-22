@@ -375,7 +375,7 @@ test('망상홈쇼핑 상담원 요청문: 상담원은 사람이 아니고 후�
   const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
   const msgs = core1112.operatorPrompt(src, core1112.shopSettings({}), 'barter', '[내민 물건]\n붕대|소모3|-|-', true, true);
   const sys = msgs.find((m) => m.role === 'system').content;
-  assert.match(sys, /not a human/);
+  assert.match(sys, /You play a 괴이/);
   assert.match(sys, /underpays/);
   assert.match(sys, /Who knows what: /);
   assert.match(sys, /cannot take money/);
