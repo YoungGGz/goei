@@ -1,0 +1,35 @@
+// 탐색: 모든 메뉴를 펼친 상담 요청 전문을 뽑는다 (줄 id·이름·잠긴 줄·빈 수 칸 확인용)
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { boot, launch, loadFixture, openWin, openEditor, clickSel, sleep } from '../../../../tests/qc-settings-harness.mjs';
+const ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
+const OUT = fileURLToPath(new URL('./out/', import.meta.url));
+const fx = loadFixture(`${ROOT}.scratch/fixture/fixture.json`);
+const b = await launch();
+const chat = { id: 'chatA', message: [{ role: 'user', data: 'hi' }, { role: 'char', data: 'ZZ본문\n[▣|2025.01.01|02:47 AM|☀️|4°C|관리국 본부|목표]' }], scriptstate: { $st_faction: 'A00', $st_lang: 'ko', $st_fixed_theme: 'dark', $st_anomaly_on: '1' } };
+const { page, errors } = await boot(b, fx, chat, { width: 1920, height: 1080, touch: false });
+await openWin(page);
+await openEditor(page, 'set:people');
+await sleep(500);
+await clickSel(page, '.gw [data-action="ai-toggle"]');
+await page.waitForSelector('.gw-ai');
+await sleep(400);
+const req0 = await page.evaluate(() => 0);
+// 첫 답: 메뉴 이름을 뽑으려면 먼저 요청을 하나 보낸다
+await page.evaluate(() => { window.__llm = ['<say>네</say>']; });
+await page.evaluate(() => { const i = document.querySelector('.gw-ai [name="ai-q"]'); i.value = '안녕'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+await clickSel(page, '.gw-ai [data-action="ai-send"]');
+await page.waitForFunction(() => document.querySelector('.gw-ai [name="ai-q"]')?.disabled === false && (window.__calls.llm || []).length >= 1, null, { timeout: 15000 });
+await sleep(300);
+const first = await page.evaluate(() => window.__calls.llm[0].messages);
+const menus = [...first[1].content.matchAll(/^- ([^:|\n]+?)(?::|\s\|)/gm)].map((m) => m[1].trim());
+writeFileSync(`${OUT}탐색_첫요청.txt`, first.map((m) => `── ${m.role}\n${m.content}`).join('\n\n'));
+await page.evaluate((ms) => { window.__llm = [`<open>${ms.join(', ')}</open>`, '<say>네</say>']; }, menus);
+await page.evaluate(() => { const i = document.querySelector('.gw-ai [name="ai-q"]'); i.value = '전부 보여줘'; i.dispatchEvent(new Event('input', { bubbles: true })); });
+await clickSel(page, '.gw-ai [data-action="ai-send"]');
+await sleep(500);
+await page.waitForFunction(() => document.querySelector('.gw-ai [name="ai-q"]')?.disabled === false && (window.__calls.llm || []).length >= 3, null, { timeout: 15000 });
+const all = await page.evaluate(() => window.__calls.llm[2].messages);
+writeFileSync(`${OUT}탐색_전부.txt`, all.map((m) => `── ${m.role}\n${m.content}`).join('\n\n'));
+console.log('menus', menus.length, menus.join(','), 'errors', errors);
+await b.close();
