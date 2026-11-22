@@ -30,7 +30,7 @@ import { itemPic } from './items';
 import { isPhone, zpx } from './media';
 import { foldAt, liftedAt, limitDrag, pressDrag, unTilt, type Fold, type Pt } from '../core/hspeel';
 import { playerFlush } from './hsplayer';
-import { appendLog, hsLogOperator, hsLogSticker, sameProgram, type HsLogEntry } from '../core/hslog';
+import { appendLog, dropRefVars, hsLogOperator, hsLogSticker, sameProgram, type HsLogEntry } from '../core/hslog';
 import { isWaiting, onWaiting } from '../host/waiting';
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -605,10 +605,12 @@ async function order(ctx: ChatContext, env: HsEnv, said?: HsLogEntry[]): Promise
     ok = true;
     placed = o.id;
     // 시청 기록의 주문 줄 (본편 참고 기록, core/hslog.ts). 주문 id 를 달아 두어 주문이 없던 일이 되면 본편에도 안 간다. 말로 받은 주문은 그 말이 주문 줄 앞에 (같은 주문 id)
-    const bought = appendLog(chat.scriptstate, show, [...(said ?? []).map((e) => ({ ...e, ref: o.id })), { k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how: o.how }), ref: o.id }], turnKey(chat));
+    const bought = appendLog(dropRefVars(chat.scriptstate, o.id), show, [...(said ?? []).map((e) => ({ ...e, ref: o.id })), { k: 'buy', p: show.at, who: buyer, text: guideTxt('Hs', 'ORDER_LOG', { item: part.item.name, how: o.how }), ref: o.id }], turnKey(chat));
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...wallet, ...itemsVars(items), ...ordersVars(pruneOrders([...readOrders(chat.scriptstate).filter((x) => x.id !== o.id), o], hsSettings(chat.scriptstate).keep.orders, { alive, turn: userTurns(chat), last: anchor, boxHeld: boxHeldIn(items, chat, anchor) })), ...bought } };
   });
   if (ok) {
+    // 같은 주문 id 의 앞 주문(없던 일이 됨)에 묶인 통화 말도 뺀다 (시청 기록과 같이)
+    if (ui.call?.pid === pre.part.item.id) ui.call.lines = ui.call.lines.filter((l) => l.ref !== placed);
     ui.done = '1';
     ui.donePid = pre.part.item.id;
     ui.offer = [];

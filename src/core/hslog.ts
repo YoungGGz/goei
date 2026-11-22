@@ -78,6 +78,12 @@ export function readLog(vars: Vars): HsLog {
     return emptyLog();
   }
 }
+/** 같은 주문 id 로 주문을 다시 넣을 때: 없던 일이 된 앞 주문(주문한 응답을 다시 굴림)에 묶인 줄을 기록에서 뺀 채팅 변수. 주문 기록에서도 앞 주문은 새 주문으로 갈린다 */
+export function dropRefVars(vars: Vars, ref: string): Vars {
+  const log = readLog(vars);
+  if (!log.entries.some((e) => e.ref === ref)) return vars;
+  return { ...(vars ?? {}), ...logVars({ ...log, entries: log.entries.filter((e) => e.ref !== ref) }) };
+}
 export const logVars = (log: HsLog): Record<string, string> => ({ [HS_LOG_VAR]: log.entries.length ? JSON.stringify(log) : '' });
 
 /** 이 편성의 것인가 (열쇠와 첫 상품 id) */

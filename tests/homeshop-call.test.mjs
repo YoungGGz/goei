@@ -146,3 +146,32 @@ test('단추 주문 조건은 다시 굴린 뒤 흥정·맞교환 조건 칸으�
   await settle();
   assert.equal(M.liveOrders(R.chat.scriptstate, M.aliveAnchors(R.chat)).length, 0, '상담원이 낸 적 없는 조건으로 주문되면 안 된다');
 });
+
+test('다시 굴린 주문 뒤 같은 상품을 다시 주문해도: 없던 일이 된 주문의 통화 말·주문 줄이 되살아나지 않는다', async () => {
+  const M = await fresh();
+  M.resetHomeshop();
+  const R = setup(M, { $st_wallet: JSON.stringify({ start: 2000000, list: [] }) }, [
+    `<operator>\n첫 판, 주문 받았습니다.\n</operator>\n${TERMS}\n<deal/>`,
+    `<operator>\n둘째 판, 주문 받았습니다.\n</operator>\n${TERMS}\n<deal/>`,
+  ]);
+  await R.act('hs-pop', 'call');
+  await R.act('hs-pay', 'talk');
+  await R.say('첫 판 주문할게요.');
+  await settle();
+  assert.equal(M.readOrders(R.chat.scriptstate).length, 1);
+  R.chat = reroll(R.chat);
+  await R.act('hs-pop', '');
+  await R.act('hs-pop', 'call');
+  await R.act('hs-pay', 'talk');
+  await R.say('둘째 판 주문할게요.');
+  await settle();
+  assert.equal(M.liveOrders(R.chat.scriptstate, M.aliveAnchors(R.chat)).length, 1, '다시 넣은 주문');
+  const lines = types(M, R.chat).map((l) => `${l.type}:${l.text}`);
+  assert.ok(!lines.some((l) => l.includes('첫 판')), lines.join('\n'));
+  assert.equal(lines.filter((l) => l.startsWith('user_order:')).length, 1, lines.join('\n'));
+  assert.ok(lines.some((l) => l.includes('둘째 판, 주문 받았습니다.')));
+  const env = { render() {}, refresh: async () => {}, current: () => R.ctx() };
+  globalThis.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const html = M.homeshopTab(R.ctx(), env);
+  assert.ok(!html.includes('첫 판'), '통화 칸에도 없던 일이 된 말이 되살아나지 않는다');
+});
