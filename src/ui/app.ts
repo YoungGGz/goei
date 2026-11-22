@@ -1877,8 +1877,11 @@ function navState(): NavState {
 
 /** PC 메뉴 맨 아래: ‹ 뒤로 · 앞으로 › (모바일 쓸기와 같은 기록) */
 function navHistBar(): string {
+  // 접는 단추는 ‹ 와 › 사이에 같은 색으로, 접으면 한 줄에 안 들어가 ‹ › 윗줄로 (11-22 사용자)
+  const folded = getPrefs().navFold === true;
   return `<div class="gx-navhist">
     <button class="gx-nh" data-action="nav-back" aria-label="뒤로" title="뒤로">${ICONS.back}</button>
+    <button class="gx-nh gx-navfold" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}">${ICONS.side}</button>
     <button class="gx-nh fwd" data-action="nav-fwd" aria-label="앞으로" title="앞으로">${ICONS.back}</button></div>`;
 }
 
@@ -2098,7 +2101,7 @@ function tabs(): string {
   const item = (id: Tab, label: string, icon: string, cls = '', badge = '') =>
     `<button class="gx-nb${cls ? ` ${cls}` : ''}${cur === id ? ' on' : ''}" data-action="${cls === 'mob' ? 'tab' : 'nav-tab'}" data-value="${id}" title="${label}" aria-current="${tab === id ? 'page' : 'false'}">${icon}<span>${label}</span>${badge}</button>`;
   const ctx = view.kind === 'started' ? view.ctx : null;
-  // 메뉴 접기 (11-22 사용자): ‹ › 구분선 바로 위의 「접기」 줄로 접고 편다 (닫기와 같은 메뉴 줄 모양. 쓸어 접기는 실기에서 뒤로가기와 부딪혀 폐기).
+  // 메뉴 접기 (11-22 사용자): ‹ 와 › 사이의 단추로 접고 편다 (쓸어 접기는 실기에서 뒤로가기와 부딪혀 폐기).
   // 접은 아이콘 묶음은 위아래로 끌어 옮긴다: 남는 높이를 위 빈칸(.gx-nav-top)과 아래 빈칸(.gx-nav-gap)이 navAt : 100 - navAt 로 나눈다
   const folded = !!ctx && getPrefs().navFold === true;
   const at = folded ? getPrefs().navAt ?? 0 : 0;
@@ -2115,7 +2118,6 @@ function tabs(): string {
     <button class="gx-nb desk" data-action="ed-open" data-value="set:screen" title="설정">${ICONS.settings}<span>설정</span>${ctx && hasUpdate(ctx) ? '<span class="gx-nbadge dot" aria-label="새 버전"></span>' : ''}</button>
     ${ctx ? `<button class="gx-nb desk" data-action="close" title="닫기">${ICONS.close}<span>닫기</span></button>` : ''}
     <span class="gx-nav-gap"${at ? ` style="flex-grow:${100 - at}"` : ''}></span>
-    ${ctx ? `<button class="gx-nb desk gx-navfold" data-action="menu-fold" aria-expanded="${!folded}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}">${ICONS.side}<span>${folded ? '펼치기' : '접기'}</span></button>` : ''}
     ${ctx ? navHistBar() : ''}
     ${mobileBar(item, unreadPhone, ctx)}
   </nav>`;
