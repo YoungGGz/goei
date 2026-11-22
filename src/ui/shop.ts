@@ -26,7 +26,7 @@ import { peopleSettings } from '../core/people/settings';
 import { identityText } from '../core/people/identity';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT, type Wallet } from '../core/wallet';
 import { pointsVars, readPoints } from '../core/points';
-import { addItem, dropUse, EQUIP_LABEL, gridItems, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
+import { addItem, dropUse, EQUIP_LABEL, gridItems, useSentAt, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { getPrefs } from '../core/settings';
 import { guideTxt } from '../core/guides';
 import {
@@ -402,7 +402,7 @@ function saleDone<C extends ChatContext['chat']>(chat: C, shop: string, itemId: 
   const nextShop = closeSale(now, now.key, shopLimits(chat.scriptstate));
   if (!nextShop) return null;
   // 답을 기다리는 중·정리 중에는 「사용」 자리를 건드리지 않는다 (요청에 실린 사용이 기록 없이 빠지지 않게, host/usebox.ts useLocked)
-  const q = chat.scriptstate?.[ITEM_USE_AT_VAR] || useLocked() ? null : readItemUse(chat.scriptstate);
+  const q = useSentAt(chat) || useLocked() ? null : readItemUse(chat.scriptstate);
   const use = q && q.some((u) => u.id === itemId) ? itemUseVars(dropUse(q, itemId)) : {};
   return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...ledgerVars(w, p), ...itemsVars(items), ...shopVars(nextShop), ...use } };
 }

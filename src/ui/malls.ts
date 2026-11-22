@@ -14,7 +14,7 @@ import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { pointsMember, pointsVars, readPoints } from '../core/points';
-import { addItem, bmOrderPaid, type MallPaid, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
+import { addItem, bmOrderPaid, type MallPaid, bmPickupConfirm, dropUse, useSentAt, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
 import { bmGoing, bmOrdersKeep, bmOrdersVars, cosOrdersKeep, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
@@ -134,7 +134,7 @@ function saleDone<C extends ChatContext['chat']>(chat: C, site: MallSite, itemId
   const nextShop = closeSale(now, anchor, shopLimits(chat.scriptstate)); // 판 응답 키 — 다시 굴리면 판 것 목록에서도 빠진다 (전수검사 11-13)
   if (!nextShop) return null;
   // 답을 기다리는 중·정리 중에는 「사용」 자리를 건드리지 않는다 (요청에 실린 사용이 기록 없이 빠지지 않게, host/usebox.ts useLocked)
-  const q = chat.scriptstate?.[ITEM_USE_AT_VAR] || useLocked() ? null : readItemUse(chat.scriptstate);
+  const q = useSentAt(chat) || useLocked() ? null : readItemUse(chat.scriptstate);
   const use = q && q.some((u) => u.id === itemId) ? itemUseVars(dropUse(q, itemId)) : {};
   return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(w), ...itemsVars(items), ...mallVarsOf(site, nextShop), ...use } };
 }
