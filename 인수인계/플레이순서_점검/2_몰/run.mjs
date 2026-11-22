@@ -233,7 +233,8 @@ const ids = {};
   check(s, '로어북 「우주 쇼핑몰」이 참고 자료로', all.includes('[관련 로어북: 우주 쇼핑몰]'), '[관련 로어북: 우주 쇼핑몰]', all.includes('[관련 로어북: 우주 쇼핑몰]'));
   check(s, '상태창 칸에서 잔고를 뺌', /\[상태창 — 지금 시각·장소\]\n\[▣[^\n]*관리국\/신입\]/.test(all), '…|관리국/신입]', /\[상태창 — 지금 시각·장소\]\n[^\n]*/.exec(all)?.[0]);
   check(s, '잔고(10000000)를 요청 어디에도 넘기지 않음 (상점 문제 2와 같은 길: [최근 본문])', !all.includes('10000000'), '잔고 없음', (/[^\n]*10000000[^\n]*/.exec(all)?.[0] ?? ''), '지침 COMMON 「Never mention the player\'s money」·ui/shop.ts:374');
-  check(s, '진행 중 괴이·사건 칸에 자리표(<등급> 등)가 없음 (상점 문제 3과 같은 길)', !/<[^<>\n]{1,8}>/.test(sit(all)), '자리표 없음', sit(all));
+  // 기대 바꿈: NEW 줄은 그대로 둔다 (사용자 11-22 21:51 「상관없음」, 재검토 몰 문제4 intended)
+  check(s, '진행 중 괴이·사건 칸이 상황판 브리핑을 받음(NEW 줄은 사용자 결정으로 그대로 둠)', sit(all).length > 0, '칸 있음', sit(all));
   const st = J(await vars(), '$cos_shop');
   for (const x of st?.items ?? []) ids[x.name] = x.id;
   check(s, '진열 3개, 진실 칸 저장(구두약=글, 우산=?)', st?.items?.length === 3 && st.items.find((x) => x.name === '반짝 걸음 구두약')?.truth?.includes('밑창이 녹는다') && st.items.find((x) => x.name === '말 듣는 우산')?.truth === '?', '3개·truth', st?.items?.map((x) => `${x.name}:${x.price}:${x.truth}`));
@@ -684,7 +685,8 @@ const bids = {};
   check(s, '상태창 칸에서 잔고·포인트를 뺌', /\[상태창 — 지금 시각·장소\]\n\[▣[^\n]*백일몽\/사원\]/.test(all), '…|백일몽/사원]', /\[상태창 — 지금 시각·장소\]\n[^\n]*/.exec(all)?.[0]);
   check(s, '포인트(5000)를 요청 어디에도 넘기지 않음 (지침 COMMON 「Never mention the player\'s points」)', !/\|5000\]/.test(all), '없음', /[^\n]*\|5000\][^\n]*/.exec(all)?.[0] ?? '');
   check(s, '로어북 「백일몽」이 참고 자료로', all.includes('Baekilmong corporation'), 'Baekilmong corporation', all.includes('Baekilmong corporation'));
-  check(s, '진행 중 괴이·사건 칸에 자리표 없음', !/<[^<>\n]{1,8}>/.test(sit(all)), '없음', sit(all));
+  // 기대 바꿈: NEW 줄은 그대로 둔다 (사용자 11-22 21:51 「상관없음」, 재검토 몰 문제4 intended)
+  check(s, '진행 중 괴이·사건 칸이 상황판 브리핑을 받음(NEW 줄은 사용자 결정으로 그대로 둠)', sit(all).length > 0, '칸 있음', sit(all));
   const st = J(await vars(), '$bm_shop');
   for (const x of st?.items ?? []) bids[x.name] = x.id;
   check(s, '진열 3개(1200·800·9000p), 포인트 가게', st?.items?.length === 3 && st.identity.points === true && st.items.find((x) => x.name === 'B등급 꿈결용액 앰플')?.price === 9000, '3개', st?.items?.map((x) => `${x.name}:${x.price}`));
@@ -796,7 +798,8 @@ const bids = {};
   let all = allText(msgs);
   check(s, '연결 요청: MAKE·MANUAL·주사위·손님(계정·남은 포인트 3,000p)', all.includes('Create the counselor') && /사내 계정: 토끼\n남은 포인트: 3,000p/.test(all), 'CUSTOMER 토끼 · 3,000p', /\[손님\][^\n]*\n[^\n]*\n[^\n]*/.exec(all)?.[0]);
   check(s, '지금 진열 상품 목록(이름|값p|설명)', /\[지금 진열된 상품\]\n[^\n]*\|\d+p\|/.test(all), 'SHELF_LINE', /\[지금 진열된 상품\]\n[^\n]*/.exec(all)?.[0]);
-  check(s, '진행 중 괴이·사건 칸에 자리표 없음', !/<[^<>\n]{1,8}>/.test(sit(all)), '없음', sit(all));
+  // 기대 바꿈: NEW 줄은 그대로 둔다 (사용자 11-22 21:51 「상관없음」, 재검토 몰 문제4 intended)
+  check(s, '진행 중 괴이·사건 칸이 상황판 브리핑을 받음(NEW 줄은 사용자 결정으로 그대로 둠)', sit(all).length > 0, '칸 있음', sit(all));
   const d0 = J(await vars(), '$bm_desk');
   const txt0 = await screen();
   check(s, '상담원 저장, 화면엔 번호 호칭만(실명·부서 안 보임)', d0?.agent?.name === '김하영' && /상담원 \d{4}/.test(txt0) && !txt0.includes('김하영') && !txt0.includes('인사팀'), '상담원 NNNN', txt0.slice(-300));

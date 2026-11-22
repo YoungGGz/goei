@@ -459,7 +459,8 @@ let snapAfterC5;
 // ── 12 정리(consolidate): 인물 화면 「정리」 → 정리 호출 → 항목 수 줄어듦 ──
 {
   const s = step('정리');
-  await queue('tidy', JSON.stringify({ slots: { history: [{ text: '지하상가에서 손전등을 켜고 앞장서 전단지를 챙김', from: '@FROM:history' }] } }));
+  // 고친 뒤(5b47f11, 리드 결정·사용자 11-22 22:22): 정리는 다시 굴릴 수 있는 마지막 응답(c7)의 줄만 빼고 앞의 줄을 합친다 → 가짜 답도 c6 줄만 다룬다
+  await queue('tidy', JSON.stringify({ slots: { history: [{ text: '지하상가에서 손전등을 켜고 앞장섬', from: '@FROM:history' }] } }));
   const n0 = await llmN();
   await openWin(page); await sleep(200);
   await page.evaluate(() => { const el = document.createElement('button'); el.dataset.action = 'rec-person'; el.dataset.value = '큐라스'; el.style.display = 'none'; document.querySelector('.gx-panel').appendChild(el); el.click(); el.remove(); });
@@ -470,10 +471,11 @@ let snapAfterC5;
   const calls = (await llmFrom(n0)).filter((c) => c.kind === 'tidy');
   writeCalls(s, calls);
   const d = dataOf(calls[0]);
-  check(s, '정리 호출 1회, history 2항목을 보냄', calls.length === 1 && (d?.slots?.history ?? []).length === 2, 2, calls.length && (d?.slots?.history ?? []).map((e) => e.text));
+  const sent = (d?.slots?.history ?? []).map((e) => e.text);
+  check(s, '정리 호출 1회, history 는 마지막 응답(c7 전단지) 줄을 빼고 보냄', calls.length === 1 && sent.length === 1 && !sent.some((t) => t.includes('전단지')), ['손전등을 켜고 앞장섬'], calls.length && sent);
   const p = await st();
   const live = (p.people['큐라스'].slots.history ?? []).filter((e) => !e.folded && !e.void);
-  check(s, '정리 뒤 살아 있는 history 는 합친 1줄 + 원본은 접힘', live.some((e) => e.anchor === '#0' && e.text.includes('전단지')), '#0 합친 줄', live.map((e) => `${e.anchor}:${e.text}`));
+  check(s, '정리 뒤 마지막 응답(c7)의 줄은 c7 에 묶인 채 남고, 합친 줄(#0)에 전단지가 안 들어감', live.some((e) => e.anchor === 'c7' && e.text.includes('전단지')) && !live.some((e) => e.anchor === '#0' && e.text.includes('전단지')), 'c7:전단지 그대로', live.map((e) => `${e.anchor}:${e.text}`));
   await saveState(s);
 }
 const snapAfterTidy = await snap();

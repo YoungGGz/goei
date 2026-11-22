@@ -173,7 +173,8 @@ const ids = {};
   check(s, '요청에 최근 본문이 들어감', all.includes('구슬발'), '구슬발', all.includes('구슬발'));
   check(s, '잔고(1000)를 상점 모델에 넘기지 않음 (11-08 설정 「넘기는 것·남는 것」)', !/\|1000\]/.test(all), '잔고 칸 없음', /\|1000\]/.test(all));
   const sit = /\[진행 중 괴이·사건\]\n([\s\S]*?)\n\n/.exec(all)?.[1] ?? '';
-  check(s, '진행 중 괴이·사건 칸에 안 채운 자리표(<등급> 등)가 없음', !/<[^<>\n]{1,8}>/.test(sit), '자리표 없음', sit);
+  // 기대 바꿈: 진행 중 괴이·사건 칸의 NEW 줄(자리표째)은 그대로 둔다 (사용자 11-22 21:51 「상관없음」, 재검토 상점 문제3) → 칸이 상황판 브리핑을 받는지만 본다
+  check(s, '진행 중 괴이·사건 칸이 상황판 브리핑을 받음(NEW 줄은 사용자 결정으로 그대로 둠)', sit.length > 0, '칸 있음', sit);
   check(s, '첫 방문 지시(FIRST) 와 정체 블록 요구가 있음', all.includes('<shop-identity>') && all.includes('First visit'), 'FIRST 절', all.includes('First visit'));
   const st = await shopSt();
   for (const x of st?.items ?? []) ids[x.name] = x.id;
@@ -394,17 +395,20 @@ let snapAfterBuy;
   await act('shop-close');
   await page.evaluate((c) => { window.__chat = c; }, snapShelf1);
   await openCard(CHAR1);
-  await queue(SHELF1.replace(/<shop-identity>[\s\S]*?<\/shop-identity>\n/, ''));
+  // 고친 뒤(26edc4a, 사용자 11-22 「새로고침해도 같은 물건」): 지금 진열과 모두 겹친 답은 버리고 설정 「재시도」대로 다시 묻는다 → 둘째 답(겹치지 않는 진열)을 줄에 세워 둔다
+  await queue(SHELF1.replace(/<shop-identity>[\s\S]*?<\/shop-identity>\n/, ''), SHELF2);
   const n0 = await llmCount();
   await act('shop-refresh');
   await waitIdle(); await sleep(300);
-  const msgs = (await llmCount()) > n0 ? await llmAt(n0) : [];
-  writeReq(s, msgs, '(같은 물건 A·B 를 다시 낸 답)');
+  const nCalls = (await llmCount()) - n0;
+  const msgs = nCalls > 0 ? await llmAt(n0) : [];
+  writeReq(s, msgs, '(같은 물건 A·B 를 다시 낸 답 → 다시 물어 둘째 답: 낡은 필사본)');
   const all = msgs.map((m) => m.content).join('\n');
   const avoid = /Previously shown here \(do not repeat\): ([^\n]*)/.exec(all)?.[1] ?? '';
   check(s, '피할 목록(또는 지금 진열대)에 지금 걸린 A·B 가 들어감', avoid.includes('누런 부적지 묶음') && avoid.includes('송연먹') || /\[지금 진열대\][\s\S]*누런 부적지 묶음/.test(all), ['누런 부적지 묶음', '송연먹'], avoid || '(피할 목록 절이 아예 없음)');
   const st = await shopSt();
-  check(s, '모델이 같은 물건을 또 내면 화면에 같은 물건이 다시 뜨지 않음', !(st.items.filter((x) => !x.sold).map((x) => x.name).join() === '누런 부적지 묶음,송연먹'), '같은 진열 아님', st.items.map((x) => x.name));
+  check(s, '모델이 같은 물건을 또 내면 버리고 다시 물음(호출 2회)', nCalls === 2, 2, nCalls);
+  check(s, '다시 물은 둘째 진열(낡은 필사본)이 화면 진열대에 뜸', st.items.filter((x) => !x.sold).map((x) => x.name).join() === '낡은 필사본', '낡은 필사본', st.items.map((x) => x.name));
   await saveState(s);
 }
 
