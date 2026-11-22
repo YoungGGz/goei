@@ -1404,6 +1404,10 @@ export function itemsAwayOf(chat: Chat, asOf?: string): { name: string; place?: 
     .map((e) => ({ name: e.name, ...(e.place ? { place: e.place } : {}) }));
 }
 
+/** 그림 말이 「빈」을 뗀 물건 이름(base)에 다른 말을 더 붙였나 (「꿈결 수집기 a등급」). 물건 이름만(「괴이/꿈결 수집기/dream collector」의 물건말)이면 어느 상태 그림인지 말하지 않은 것이다
+ *  — 시작 소지품 「빈 꿈결 수집기」가 첫 턴 갱신기의 이름만 적은 그림 말에 「빈」이 떼여 찬 그림으로 나오던 것 (사용자 2026-11-22) */
+const iconSaysMore = (word: string, base: string): boolean => !word.trim().startsWith(`${FORM_EMPTY} `) && normName(word).includes(normName(base)) && normName(word) !== normName(base);
+
 /** 그림 말이 바뀌어 더는 「빈」 그림이 아닌데 이름이 「빈 …」이면 「빈」을 뗀다 (찬 수집기가 「빈 꿈결 수집기」로 남지 않게).
  *  새 그림 말이 그 물건의 것일 때만(물건 이름이 그림 말에 들어 있음), 같은 이름의 다른 물건이 없을 때만 */
 function unEmptyName(it: Items, alive: Set<string>, id: string, icon: string | undefined): Items {
@@ -1411,7 +1415,7 @@ function unEmptyName(it: Items, alive: Set<string>, id: string, icon: string | u
   if (!cur || !icon) return it;
   const name = nameFilled(cur.name);
   const word = splitIconWord(icon).word;
-  if (name === cur.name || word.trim().startsWith(`${FORM_EMPTY} `) || !normName(word).includes(normName(name))) return it;
+  if (name === cur.name || !iconSaysMore(word, name)) return it;
   if (liveItems(it, alive).some((e) => e.id !== id && sameItemName(e.name, name))) return it;
   return updateItem(it, id, { name });
 }
@@ -1468,6 +1472,11 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
       if (!back && !cur && opts.skipKinds?.length && opts.skipKinds.includes(kindOfIcon(c.icon))) continue;
       // 「빈 X」를 지닌 채 「… X」를 새로 얻었다고 오면(찬 수집기) 같은 물건이 찬 것 — 줄을 둘로 두지 않고 그 줄을 바꾼다
       const empty = !back && !cur ? live.find((e) => e.name.startsWith(`${FORM_EMPTY} `) && nameFilled(e.name) !== e.name && normName(c.name).endsWith(normName(nameFilled(e.name))) && !c.name.trim().startsWith(`${FORM_EMPTY} `)) : undefined;
+      // 「빈」만 뗀 같은 이름에 그림 말도 물건 이름뿐이면 이미 지닌 그 물건을 다시 적은 것 (찬 것이라는 말이 없다): 이름·그림은 두고 설명·효과·상태만
+      if (empty && !live.some((e) => sameItemName(e.name, c.name)) && sameItemName(c.name, nameFilled(empty.name)) && !iconSaysMore(splitIconWord(c.icon).word, nameFilled(empty.name))) {
+        it = updateItem(it, empty.id, { desc: c.desc || empty.desc, effect: c.effect || empty.effect, ...(c.state ? { state: c.state } : {}) });
+        continue;
+      }
       if (empty && !live.some((e) => sameItemName(e.name, c.name))) {
         it = updateItem(it, empty.id, { name: c.name, desc: c.desc || empty.desc, effect: c.effect || empty.effect, ...(c.state ? { state: c.state } : {}), ...(c.icon ? { icon: c.icon } : {}) });
         it = { ...it, list: it.list.map((x) => (x.id === empty.id && c.quote ? { ...x, quote: clean(c.quote, 120) } : x)) };
