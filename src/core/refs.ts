@@ -249,7 +249,11 @@ export function messageText(data: string): string {
   let t = stripThoughts(stripStartCard(stripUnsentMark(String(data ?? ''))));
   if (t.includes('%%SCENE_CARD:')) {
     const s = readScene(t);
-    t = s ? guideTxt('Common', 'REFS.MOVE', { target: s.target, party: s.party }) : stripSceneCard(t);
+    // 카드 뒤에 붙은 글은 창의 상황 칸에 적은 것: 같이 남긴다 (거기 적은 사람·장소의 로어북도 찾게. 2026-11-22)
+    const END = '%%/SCENE_CARD%%';
+    const end = t.lastIndexOf(END);
+    const note = end >= 0 ? t.slice(end + END.length).trim() : '';
+    t = s ? [guideTxt('Common', 'REFS.MOVE', { target: s.target, party: s.party }), note].filter(Boolean).join('\n') : stripSceneCard(t);
   }
   if (hasCall(t)) t = stripCall(t).replace(/\{\{user\}\}/gi, () => userName());
   if (hasWorldTags(t)) t = cleanOutput(t);

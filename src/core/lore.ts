@@ -8,6 +8,7 @@ import { evaluate, type CbsEnv } from './cbs';
 import { guideTxt } from './guides';
 import { tokens } from './gnet';
 import { messageText } from './refs';
+import { hasSceneCard, readScene } from './dispatch';
 import type { Chat, LoreEntry } from './types';
 import { hasVirtual, isVirtual } from './world/virtual';
 import { readDirectory, type AppendixWhen } from './world/directory';
@@ -341,6 +342,8 @@ export interface LoreMessage {
 export interface LoreState {
   /** 상태창 괴이 칸 (마지막 응답) */
   target: string;
+  /** 이동·커스텀 임무 창에서 직접 고른 대상·동행 (최근 지시문 카드). 직접 고른 것은 확증 규칙을 거치지 않고 켠다 */
+  chosen?: string[];
   /** 상황판에 발생해 있는 괴이·특수 이름 */
   board: string[];
   /** 작전투입·외근 중인 요원 이름 */
@@ -405,6 +408,26 @@ export const DEFAULT_DEPTH = 10;
 /** 카드에 토큰 예산이 없을 때 (깡통봇 등) 기본값 (사용자 2026-10-27: 깊이 10 · 예산 99999) */
 export const DEFAULT_BUDGET = 99999;
 
+/** 최근 지시문 카드(이동·커스텀 임무)에서 직접 고른 대상·동행 이름. 거점을 골랐으면 명부가 그 거점에 이어 둔 로어북 이름도 */
+export function sceneChoices(chat: Chat, depth: number, lore?: LoreEntry[]): string[] {
+  const out = new Set<string>();
+  const bases = lore ? readDirectory(lore).bases : [];
+  for (const m of (chat.message ?? []).slice(-Math.max(1, depth))) {
+    const data = str(m.data);
+    if (m.role !== 'user' || !hasSceneCard(data)) continue;
+    const s = readScene(data);
+    if (!s) continue;
+    if (s.target.trim()) {
+      out.add(s.target.trim());
+      const base = bases.find((b) => b.name === s.target.trim());
+      if (base?.lore) out.add(base.lore);
+    }
+    // 투입 칸은 「나, 이름, …, 지원 ×N」: 이름이 아닌 것은 어떤 항목과도 안 맞아 그대로 버려진다
+    for (const n of s.party.split(',')) if (n.trim()) out.add(n.trim());
+  }
+  return [...out];
+}
+
 /** 채팅에서 상태 신호를 읽는다 */
 export function loreState(chat: Chat): LoreState {
   const msgs = chat.message ?? [];
@@ -448,6 +471,10 @@ export function pickLore(entries: ManagedEntry[], messages: LoreMessage[], state
   };
   entries.forEach((e, i) => {
     if (state.target && !e.appendix && names(e, state.target)) add(i, 'status', state.target, state.target, 100);
+  });
+  // 창에서 직접 고른 대상·동행: 흔한 낱말 이름(교회·강변·사장 …)도 그대로 켠다 (2026-11-22 사용자: 고른 괴이 로어북이 안 가던 버그)
+  for (const n of state.chosen ?? []) entries.forEach((e, i) => {
+    if (!e.appendix && names(e, n)) add(i, 'confirmed', n, n, 50);
   });
   const pending: { hit: KeyHit; why: LoreReason; score: number }[] = [];
   window.forEach((m, wi) => {
@@ -596,7 +623,7 @@ export function computeLore(lore: LoreEntry[] | undefined, chat: Chat, o: LoreOp
   const entries = managedEntries(lore).filter((e) => !o.exclude?.includes(e.name));
   if (!entries.length) return null;
   const msgs = loreMessages(chat, o.input, o.mode === 'risu');
-  const picks = o.mode === 'risu' ? pickLoreRisu(entries, msgs, o.depth, readUnlocked(chat.scriptstate)) : pickLore(entries, msgs, loreState(chat), o, msgs.at(-1)?.role === 'user');
+  const picks = o.mode === 'risu' ? pickLoreRisu(entries, msgs, o.depth, readUnlocked(chat.scriptstate)) : pickLore(entries, msgs, { ...loreState(chat), chosen: sceneChoices(chat, o.depth, lore) }, o, msgs.at(-1)?.role === 'user');
   // Risu가 직접 켤 때는 자리를 비운다 (picks는 확인 화면에 보일 Risu 방식 추정).
   // 자리 항목이 없는 카드의 가상 항목(플러그인 세계 데이터)은 Risu가 볼 수 없으니, Risu 방식으로 고른 것을 플러그인이 끼운다 (QC 2026-10-28)
   const books = lore ?? [];
