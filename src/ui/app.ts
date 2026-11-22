@@ -1876,12 +1876,15 @@ function navState(): NavState {
 }
 
 /** PC 메뉴 맨 아래: ‹ 뒤로 · 앞으로 › (모바일 쓸기와 같은 기록) */
-function navHistBar(): string {
-  // 접는 단추는 ‹ 와 › 사이에 같은 색으로, 접으면 한 줄에 안 들어가 ‹ › 윗줄로 (11-22 사용자)
-  const folded = getPrefs().navFold === true;
-  return `<div class="gx-navhist">
+/** 접는 단추: ‹ › 와 같은 색. 펼쳤을 때는 ‹ 와 › 사이, 접었을 때는 한 줄에 안 들어가 구분선 위로 올린다 (11-22 사용자) */
+function navFoldBtn(folded: boolean): string {
+  return `<button class="gx-nh gx-navfold" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}">${ICONS.side}</button>`;
+}
+
+function navHistBar(folded: boolean): string {
+  return `${folded ? navFoldBtn(true) : ''}<div class="gx-navhist">
     <button class="gx-nh" data-action="nav-back" aria-label="뒤로" title="뒤로">${ICONS.back}</button>
-    <button class="gx-nh gx-navfold" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}">${ICONS.side}</button>
+    ${folded ? '' : navFoldBtn(false)}
     <button class="gx-nh fwd" data-action="nav-fwd" aria-label="앞으로" title="앞으로">${ICONS.back}</button></div>`;
 }
 
@@ -2118,7 +2121,7 @@ function tabs(): string {
     <button class="gx-nb desk" data-action="ed-open" data-value="set:screen" title="설정">${ICONS.settings}<span>설정</span>${ctx && hasUpdate(ctx) ? '<span class="gx-nbadge dot" aria-label="새 버전"></span>' : ''}</button>
     ${ctx ? `<button class="gx-nb desk" data-action="close" title="닫기">${ICONS.close}<span>닫기</span></button>` : ''}
     <span class="gx-nav-gap"${at ? ` style="flex-grow:${100 - at}"` : ''}></span>
-    ${ctx ? navHistBar() : ''}
+    ${ctx ? navHistBar(folded) : ''}
     ${mobileBar(item, unreadPhone, ctx)}
   </nav>`;
 }

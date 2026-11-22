@@ -2037,10 +2037,11 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-nav.folded > .gx-nb .gx-nbadge { position: absolute; top: 6px; right: 6px; margin: 0; }
   .gx-nav.folded { touch-action: pan-x; }
   .gx-nav.folded > .gx-nav-top, .gx-nav.folded > .gx-nav-gap { flex-basis: 0; min-height: 0; }
-  .gx-nav.folded > .gx-navhist { width: 100%; gap: 0; flex-direction: row; flex-wrap: wrap; padding-left: 0; padding-right: 0; bottom: -12px; margin-bottom: -12px; padding-bottom: 12px; }
-  .gx-nav.folded > .gx-navhist .gx-nh { height: 36px; padding: 0; min-width: 0; flex: 1 1 40%; width: auto; }
+  .gx-nav.folded > .gx-navhist { width: 100%; gap: 0; flex-direction: row; padding-left: 0; padding-right: 0; bottom: -12px; margin-bottom: -12px; padding-bottom: 12px; }
+  .gx-nav.folded > .gx-navhist .gx-nh { height: 36px; padding: 0; min-width: 0; flex: 1 1 0; width: auto; }
   .gx-nav.folded > .gx-navhist .gx-nh svg { width: 18px; height: 18px; }
-  .gx-nav.folded > .gx-navhist .gx-navfold { order: -1; flex: 0 0 100%; }
+  .gx-nav.folded > .gx-navfold { flex: none; width: 48px; height: 36px; margin-bottom: 2px; }
+  .gx-nav.folded > .gx-navfold svg { width: 18px; height: 18px; }
 }
 /* 괴담톡 연락처: 대화가 있는 사람 이름 옆 말풍선 (글자 없이) */
 .ph-talk { flex: none; display: inline-grid; place-items: center; color: var(--dim); }
