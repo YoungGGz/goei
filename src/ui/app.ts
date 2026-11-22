@@ -2105,7 +2105,7 @@ function tabs(): string {
   // 접은 아이콘 묶음은 위아래로 끌어 옮긴다: 남는 높이를 위 빈칸(.gx-nav-top)과 아래 빈칸(.gx-nav-gap)이 navAt : 100 - navAt 로 나눈다
   const folded = !!ctx && getPrefs().navFold === true;
   const at = folded ? getPrefs().navAt ?? 0 : 0;
-  const grip = ctx ? `<button class="gx-navgrip" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}"></button>` : '';
+  const grip = ctx ? `<button class="gx-navgrip" data-action="menu-fold" aria-expanded="${!folded}" aria-label="${folded ? '메뉴 펼치기' : '메뉴 접기'}" title="${folded ? '메뉴 펼치기' : '메뉴 접기'}"><i></i></button>` : '';
   return `<nav class="gx-nav${folded ? ' folded' : ''}" aria-label="주요 화면">
     <span class="gx-nav-top"${at ? ` style="flex-grow:${at}"` : ''}></span>
     ${ctx ? brand(ctx) : ''}
