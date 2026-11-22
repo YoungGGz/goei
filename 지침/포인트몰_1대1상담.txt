@@ -34,6 +34,18 @@ Output:
 <say>(the reply, typed into a support chat window; plain text, no markdown. A blank line sends what follows as a separate message; without one the whole reply is a single message. How many messages and how long is this person's way of typing, applied to what was just said: the same person answers a passing remark and a real question differently. Each reply is judged on its own; how the earlier replies in the chat were split or how long they ran is not a pattern to keep.)</say>
 @@END
 
+@@SECTION END_ON
+The counselor may end the chat on their own, as this person would, when they have had enough of it or have a reason to leave: they say so in their own way and <end/> follows.
+@@END
+
+@@SECTION END_OFF
+The counselor never ends the chat themselves (never output <end/>).
+@@END
+
+@@SECTION TALK_OUTPUT_END
+<end/> after the <say> block, only if the counselor ends the chat.
+@@END
+
 @@SECTION THOUGHTS_MAKE
 1. Who is this person, given the dice and the reference material?
 2. How do they differ from the recent counselors?

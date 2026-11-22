@@ -8,7 +8,7 @@ import type { CraftMessage } from './craft';
 type Vars = Record<string, unknown> | undefined;
 
 export const DESK_VAR = '$bm_desk';
-export const DESK_KEY = { on: '$bm_desk_on', axes: '$bm_desk_axes', again: '$bm_desk_again', avoid: '$bm_desk_avoid', keep: '$bm_desk_keep' } as const;
+export const DESK_KEY = { on: '$bm_desk_on', axes: '$bm_desk_axes', again: '$bm_desk_again', end: '$bm_desk_end', avoid: '$bm_desk_avoid', keep: '$bm_desk_keep' } as const;
 export const DESK_AVOID_RANGE: [number, number] = [0, 12];
 export const DESK_AVOID_DEFAULT = 6;
 /** 저장해 두는 지난 상담사 수 (다시 만나기·겹치지 않기용). 겹치지 않게 넘길 수(최대 12)보다 적으면 그만큼 못 넘기니 12부터 */
@@ -39,6 +39,8 @@ export interface DeskSettings {
   axes: DeskAxis[];
   /** 지난 상담사가 다시 걸릴 수 있음 (기본 꺼짐 — 11-09 사용자: 매번 다른 페르소나가 재미) */
   again: boolean;
+  /** 상담원이 먼저 상담을 끝낼 수 있음 (끄면 응답의 <end/> 를 무시) */
+  end: boolean;
   /** 겹치지 말라고 넘길 최근 상담사 수 */
   avoid: number;
   /** 기억해 둘 지난 상담사 수 */
@@ -54,6 +56,7 @@ export function deskSettings(vars: Vars): DeskSettings {
     axesText,
     axes: parsed.length ? parsed : parseAxes(deskAxesDefault()),
     again: String(vars?.[DESK_KEY.again] ?? '') === '1',
+    end: String(vars?.[DESK_KEY.end] ?? '') !== '0',
     avoid: String(vars?.[DESK_KEY.avoid] ?? '') !== '' && Number.isFinite(n) ? Math.max(DESK_AVOID_RANGE[0], Math.min(DESK_AVOID_RANGE[1], n)) : DESK_AVOID_DEFAULT,
     keep: String(vars?.[DESK_KEY.keep] ?? '') !== '' && Number.isFinite(k) ? Math.max(DESK_KEEP_RANGE[0], Math.min(DESK_KEEP_RANGE[1], k)) : DESK_KEEP_DEFAULT,
   };
@@ -81,13 +84,15 @@ export interface DeskState {
   /** 이 상담이 시작된 본편 응답 (본편이 넘어가면 다음에 열 때 새 상담) */
   anchor: string;
   past: DeskAgent[];
+  /** 상담원이 이 상담을 끝냄 (더 말할 수 없다. 다시 열면 새 상담) */
+  ended?: boolean;
 }
 export const emptyDesk = (): DeskState => ({ agent: null, talk: [], anchor: '', past: [] });
 export function readDesk(vars: Vars): DeskState {
   try {
     const o = JSON.parse(String(vars?.[DESK_VAR] ?? ''));
     if (!o || typeof o !== 'object') return emptyDesk();
-    return { agent: o.agent && typeof o.agent.name === 'string' ? o.agent : null, talk: Array.isArray(o.talk) ? o.talk : [], anchor: String(o.anchor ?? ''), past: Array.isArray(o.past) ? o.past : [] };
+    return { agent: o.agent && typeof o.agent.name === 'string' ? o.agent : null, talk: Array.isArray(o.talk) ? o.talk : [], anchor: String(o.anchor ?? ''), past: Array.isArray(o.past) ? o.past : [], ...(o.ended === true ? { ended: true } : {}) };
   } catch {
     return emptyDesk();
   }
@@ -145,6 +150,12 @@ export function parseSay(raw: string): string[] {
   if (!say.length) throw fail(guideTxt('BmDesk', 'ERR_NO_SAY'), raw);
   return say;
 }
+/** 대화 응답: 말풍선 + 상담원이 상담을 끝냈나. <end/> 는 <say> 블록 밖에서, 줄 머리나 다른 블록 바로 뒤에 놓인 것만 (core/shop.ts parseTalk 의 <closed/> 와 같은 규칙). end = 설정 「상담 끊음」: 꺼져 있으면 표식을 무시한다 */
+export function parseTalk(raw: string, end = true): { say: string[]; ended: boolean } {
+  const say = parseSay(raw);
+  const rest = raw.replace(/<say\b[^>]*>[\s\S]*?<\/say\s*>/gi, '');
+  return { say, ended: end && /(?:^|<\/\w[\w-]*\s*>|\/>)[ \t]*<end\s*\/?>/im.test(rest) };
+}
 
 export interface DeskSource {
   /** 참고 자료 (백일몽 로어북·위키 문서 등) */
@@ -186,11 +197,11 @@ export function makePrompt(src: DeskSource, dice: DeskDice, recent: DeskAgent[],
   return { messages: [{ role: 'system', content: system }, { role: 'user', content: user }], thoughts: fillGuide(g.THOUGHTS_MAKE, {}) };
 }
 
-/** 대화: 카드 + 이번 상담 대화 전부 */
-export function talkPrompt(src: DeskSource, st: DeskState): { messages: CraftMessage[]; thoughts: string } {
+/** 대화: 카드 + 이번 상담 대화 전부. end = 설정 「상담 끊음」 */
+export function talkPrompt(src: DeskSource, st: DeskState, end = true): { messages: CraftMessage[]; thoughts: string } {
   const g = G();
   const a = st.agent!;
-  const system = [fillGuide(g.COMMON, {}), fillGuide(g.MANUAL, {}), fillGuide(g.TALK, {}), fillGuide(g.TALK_OUTPUT, {}), src.language ?? ''].filter(Boolean).join('\n\n');
+  const system = [fillGuide(g.COMMON, {}), fillGuide(g.MANUAL, {}), fillGuide(g.TALK, {}), fillGuide(end ? g.END_ON : g.END_OFF, {}), [fillGuide(g.TALK_OUTPUT, {}), end ? fillGuide(g.TALK_OUTPUT_END, {}) : ''].filter(Boolean).join('\n'), src.language ?? ''].filter(Boolean).join('\n\n');
   const talk = st.talk.filter((l) => l.who !== 'sys').map((l) => guideTxt('BmDesk', l.who === 'me' ? 'TALK_ME' : 'TALK_OP', { text: l.text })).join('\n');
   return { messages: [{ role: 'system', content: system }, { role: 'user', content: guideTxt('BmDesk', 'TALK_USER', { material: material(src), card: cardText(a), talk }) }], thoughts: fillGuide(g.THOUGHTS_TALK, {}) };
 }

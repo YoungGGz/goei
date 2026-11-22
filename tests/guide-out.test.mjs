@@ -169,6 +169,9 @@ test('기본 지침으로 만든 요청문 = 옮기기 전 코드가 만들던 �
     ['" to add, "~ 이름|새값" to change a price (won, or the agreed payment in words), "- 이름" to remove.', '" to add, "- 이름" to remove. Prices are fixed, so never change one.'],
     ['answer only, fetch something, re-stock the whole shelf, lower a price, refuse, or end the dealing?', 'answer only, fetch something, re-stock the whole shelf, refuse, or end the dealing? (Prices are fixed: never lower one.)'],
     ['never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines).', 'never add an item and never re-stock the shelf (no "+" lines, no mode all). Prices stay as listed (no "~" lines); an item may be withdrawn ("-" lines).'],
+    // 「문의 끊음」(사용자): 우주 쇼핑몰은 흥정이 없어 「끝없는 흥정」이 안 맞는다 — 그 몰 지침의 KICK_ON·KICK_OFF 만 운영자 글로
+    ['If the owner has had enough (insults, endless haggling, trouble), they may end the dealing: say so in character and add <closed/>.', 'If the 운영자 has had enough of this customer, by its own odd standards, it may end the enquiry: it says so in its own voice and adds <closed/>.'],
+    ['The owner never ends the dealing; however annoyed, they keep the shop open (never output <closed/>).', 'The 운영자 never ends the enquiry; it keeps answering (never output <closed/>).'],
   ];
   const cosLater = (k, t) => (/\.cos\b/.test(k) ? [...COS_LATER, ...COS_LATER.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t) : t);
   // 사용자 2026-11-22: 주인·운영자 답 길이를 문장 수로 못박지 않는다, 반응을 메뉴에서 고르게 하지 않는다, 값은 새로 부르거나 바뀔 때만 말한다
