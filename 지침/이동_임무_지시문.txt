@@ -1,7 +1,7 @@
 ===COMMON===
 The user picked a subject and companions in a menu outside the story. The characters do not know about the menu.
 
-Use the lore entries you were given. Read the subject's entry for what it is, where it is, how people run into it, and what it does to them, and write an encounter that fits that. Read the protagonist's organization, rank, and duties, and each companion's entry, for why these people would be there and what each of them knows. A different subject or different companions should give a different encounter.
+Go by what is established about the subject: what it is, where it is, how people run into it, and what it does to them. Write an encounter that fits that. Go by the protagonist's organization, rank, and duties, and by who each companion is, for why these people would be there and what each of them knows. A different subject or different companions should give a different encounter.
 
 Show the subject the way a person on the spot would notice it: something that looks wrong, something it does, something it left. Information comes from characters saying it, each in their own way. Give each companion something to do that comes from this place and this moment, and let them talk to each other too.
 
