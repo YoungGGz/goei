@@ -1,7 +1,7 @@
 // 폰 화면(아래 바·서랍) 기준 하나. 폭 600px 이하 (11-21 사용자: 폴드 펼친 화면은 PC 배치), 또는 손가락 화면에서 짧은 쪽(가로로 든 폰의 높이)이 500px 미만이면 폰 화면.
 // 2026-11-06 사용자: 폰을 가로로 들면(844×390) PC 화면으로 나와 줄이 잘리던 것 → 가로도 폰 화면으로. CSS 의 @media 도 같은 글을 쓴다.
 // 11-22 사용자: 펼친 폴드 같은 중간 폭(601~860)은 설정 「펼친 폴드 화면 배치」로 PC·모바일을 고른다. 모바일이면 기준 폭을 860 으로 올린다.
-import { FOLD_ZOOM_DEFAULT, getPrefs } from '../core/settings';
+import { FOLD_FILL_DEFAULT, FOLD_ZOOM_DEFAULT, getPrefs } from '../core/settings';
 
 /** 중간 폭의 위 끝 */
 export const FOLD_MAX = 860;
@@ -25,8 +25,10 @@ export const phoneMq = (): string => (mode() === 'zoom' ? 'not all' : `(max-widt
 export const isPhone = (): boolean => matchMedia(phoneMq()).matches;
 /** 기준이 바뀌는 경계를 다 지켜본다 (설정을 바꿔도 다시 걸 필요가 없게) */
 export const PHONE_WATCH = [`(max-width: ${BASE}px)`, `(max-width: ${FOLD_MAX}px)`, LAND];
-/** 펼친 폴드에서 창이 차지하는 화면 몫(%) */
-const FOLD_FILL = 95;
+/** 펼친 폴드에서 창이 차지하는 화면 몫(%): 설정 「펼친 폴드 창 가로·세로」(prefs.foldW·foldH) */
+const foldFill = (): [number, number] => [getPrefs().foldW ?? FOLD_FILL_DEFAULT, getPrefs().foldH ?? FOLD_FILL_DEFAULT];
+/** 펼친 폴드를 PC 배치로 줄여 보는 중인지 (손가락 화면이라 쓸기는 폰처럼 받는다) */
+export const isFoldPc = (): boolean => mode() === 'zoom';
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 /** CSS 글을 지금 방식에 맞춘다.
  *  phone: @media 머리의 폰 기준 폭 600→860, 601→861.
@@ -44,11 +46,11 @@ export function foldCss(css: string): string {
     + `\nhtml { zoom: ${k}; }\n`
     // 펼친 폴드에서는 상황판 창과 설정 창을 화면 가로·세로 95% 로 (사용자 11-22: 설정 창이 상황판보다 좁아 다 잘린다 → 둘 다 95%). 「설정 창 폭」 값과 상한(1280·950·1340)은 이 화면에서 쓰지 않는다.
     // 따로 뜨는 상점 창(.solo)과 AI 상담을 연 설정 창은 원래 규칙 그대로
-    + `.gx .gx-panel:not(.solo), .gw:not(.ai-on) .gw-win { width: ${r2(FOLD_FILL / k)}vw; height: ${r2(FOLD_FILL / k)}vh; }\n`;
+    + `.gx .gx-panel:not(.solo), .gw:not(.ai-on) .gw-win { width: ${r2(foldFill()[0] / k)}vw; height: ${r2(foldFill()[1] / k)}vh; }\n`;
 }
 
 /** 넣은 방식의 표: 배율이 바뀌어도 다시 넣게 배율까지 적는다 */
-const modeKey = (): string => { const m = mode(); return m === 'zoom' ? `zoom:${foldZoom()}` : m; };
+const modeKey = (): string => { const m = mode(); return m === 'zoom' ? `zoom:${foldZoom()}:${foldFill().join('x')}` : m; };
 const styles: { el: HTMLStyleElement; css: string; mode: string }[] = [];
 /** <style> 에 CSS 를 넣고 기억해 둔다: 방식이 바뀌면 syncFoldStyles 가 같은 글을 다시 맞춰 넣는다 */
 export function foldStyle(el: HTMLStyleElement, css: string): void {

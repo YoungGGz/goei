@@ -108,10 +108,15 @@ export interface Prefs {
   fold?: 'phone';
   /** 중간 폭 화면을 PC 배치로 볼 때 화면을 줄이는 배율 % (이 기기 공통, 11-22 사용자). 없으면 FOLD_ZOOM_DEFAULT */
   foldZoom?: number;
+  /** 중간 폭 화면을 PC 배치로 볼 때 창이 화면에서 차지하는 가로·세로 몫 % (이 기기 공통, 11-22 사용자). 없으면 FOLD_FILL_DEFAULT */
+  foldW?: number;
+  foldH?: number;
   /** PC 왼쪽 칸 카드의 사진·이름·소속을 접어 둠 (이 기기 공통, 11-22 사용자). 없으면 펼침 */
   idFold?: true;
   /** PC 왼쪽 메뉴를 아이콘 줄로 접어 둠 (이 기기 공통, 11-22 사용자). 없으면 펼침 */
   navFold?: true;
+  /** 접은 메뉴의 아이콘 묶음 자리 (0 = 맨 위 ~ 100 = 맨 아래, 이 기기 공통, 11-22 사용자). 없으면 맨 위 */
+  navAt?: number;
   /** 상황판 요원 칸 모양 (이 기기 공통): 모니터 벽(기본) 또는 목록 */
   agents?: 'wall' | 'list';
   dim?: number;
@@ -181,6 +186,8 @@ export const DIM_DEFAULT = 50;
 /** 펼친 폴드 PC 배치의 화면 배율 % */
 export const FOLD_ZOOM_DEFAULT = 70;
 export const FOLD_ZOOM_RANGE: readonly [number, number] = [50, 100];
+export const FOLD_FILL_DEFAULT = 95;
+export const FOLD_FILL_RANGE: readonly [number, number] = [50, 100];
 export const DIM_STEPS = [0, 25, 50, 75, 100];
 
 let prefs: Prefs = { basic: {}, world: {} };
@@ -234,6 +241,8 @@ export function setPrefs(raw: unknown): Prefs {
   const agents = o.agents === 'list' ? 'list' : undefined;
   const midLayout = o.fold === 'phone' ? ('phone' as const) : undefined;
   const foldZoom = int(o.foldZoom, ...FOLD_ZOOM_RANGE);
+  const foldW = int(o.foldW, ...FOLD_FILL_RANGE);
+  const foldH = int(o.foldH, ...FOLD_FILL_RANGE);
   const dim = int(o.dim, 0, 100);
   const status = o.status === 'off' || o.status === 'light' || o.status === 'dark' || o.status === 'paper' ? o.status : undefined;
   const size = imgSize(o.imgSize);
@@ -275,7 +284,7 @@ export function setPrefs(raw: unknown): Prefs {
   const times = setTimes(o.times);
   // 띄운 보고서 알림 기억도 남긴다. 최근 50개 (전수검사 11-13)
   const noticedReports = Array.isArray(o.noticedReports) ? [...new Set(o.noticedReports.filter((x): x is string => typeof x === 'string' && !!x.trim()).map((x) => x.slice(0, 80)))].slice(-50) : [];
-  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(diagOk !== null ? { diagKeep: diagOk } : {}), ...(diagFail !== null ? { diagFailKeep: diagFail } : {}), ...(traceKeep !== null ? { traceKeep } : {}), ...(consultLines !== null ? { consultLines } : {}), ...(consultChats !== null ? { consultChats } : {}), ...(Object.keys(times).length ? { times } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(midLayout ? { fold: midLayout } : {}), ...(foldZoom !== null && foldZoom !== FOLD_ZOOM_DEFAULT ? { foldZoom } : {}), ...(o.idFold === true ? { idFold: true as const } : {}), ...(o.navFold === true ? { navFold: true as const } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
+  prefs = { basic, world, ...(walletStart !== null ? { walletStart } : {}), ...(diagOk !== null ? { diagKeep: diagOk } : {}), ...(diagFail !== null ? { diagFailKeep: diagFail } : {}), ...(traceKeep !== null ? { traceKeep } : {}), ...(consultLines !== null ? { consultLines } : {}), ...(consultChats !== null ? { consultChats } : {}), ...(Object.keys(times).length ? { times } : {}), ...(frame ? { frame } : {}), ...(editorWidth !== null ? { editorWidth } : {}), ...(Object.keys(guides).length ? { guides } : {}), ...(rules.length ? { rules } : {}), ...(relationsSym === false ? { relationsSym } : {}), ...(theme ? { theme } : {}), ...(imgPrompt ? { imgPrompt } : {}), ...(imgNamesOff.length ? { imgNamesOff } : {}), ...(imgNamesExtra.length ? { imgNamesExtra } : {}), ...(imgKeywords.length ? { imgKeywords } : {}), ...(Object.keys(vars).length ? { vars } : {}), ...(nav ? { nav } : {}), ...(midLayout ? { fold: midLayout } : {}), ...(foldZoom !== null && foldZoom !== FOLD_ZOOM_DEFAULT ? { foldZoom } : {}), ...(foldW !== null && foldW !== FOLD_FILL_DEFAULT ? { foldW } : {}), ...(foldH !== null && foldH !== FOLD_FILL_DEFAULT ? { foldH } : {}), ...(o.idFold === true ? { idFold: true as const } : {}), ...(o.navFold === true ? { navFold: true as const } : {}), ...((int(o.navAt, 0, 100) ?? 0) > 0 ? { navAt: int(o.navAt, 0, 100)! } : {}), ...(look ? { look } : {}), ...(o.progress === false ? { progress: false } : {}), ...(o.consultModel === 'main' ? { consultModel: 'main' as const } : {}), ...(wikiSide ? { wikiSide } : {}), ...(agents ? { agents } : {}), ...(dim !== null ? { dim } : {}), ...(status ? { status } : {}), ...(size !== null ? { imgSize: size } : {}), ...(fold !== null ? { imgFold: fold } : {}), ...(imgFoldOn === false ? { imgFoldOn } : {}), ...(imgFoldLock ? { imgFoldLock } : {}), ...(imgNamesScene ? { imgNamesScene } : {}), ...(show !== null ? { imgShow: show } : {}), ...(send !== null ? { imgSend: send } : {}), ...(noticedReports.length ? { noticedReports } : {}) };
   return prefs;
 }
 
