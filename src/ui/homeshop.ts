@@ -22,7 +22,7 @@ import { userTurns } from '../core/request';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, pruneOrders, parseCue, parseOperator, parseShow, stickerLook, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
+import { applyShow, boxOrder, orderFacts, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, pruneOrders, parseCue, parseOperator, parseShow, stickerLook, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
 import { mountPlayer, playerCut, playerHold, playerPhone, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
@@ -56,7 +56,7 @@ interface View {
   calling: boolean;
   done: string;
   /** 상담원과의 통화 (지금 부 상품에만. 부가 바뀌면 새로): 주고받은 말 · 상담원이 마지막으로 내놓은 조건 · 마지막으로 감정받은 물건 */
-  call: { pid: string; lines: { who: 'me' | 'op'; text: string }[]; terms: HsTerms | null; offered: string[]; hung?: string } | null;
+  call: { pid: string; lines: { who: 'me' | 'op'; text: string; hello?: boolean }[]; terms: HsTerms | null; offered: string[]; hung?: string } | null;
   /** 스티커를 들췄나 · 끌다 놓은 자리(그 자리부터 마저 젖힌다) · 방청 규칙 동의 · 방금 접수한 번호 */
   lifted: boolean;
   /** 들춘 스티커의 상품 (그사이 다음 부로 넘어가면 새 상품 스티커는 덮인 채로, 전수점검 보통-41) */
@@ -250,7 +250,7 @@ export async function homeshopAction(action: string, value: string | undefined, 
         if (!payOk(ctx, part, s, ui.pay)) ui.pay = firstPay(ctx, part, s);
         // 전화를 걸면 상담원의 첫 말이 화면에 나온다: 시청 기록에 적는다 (설정 「스티커·상담원」을 켠 때만 메인 요청에 간다)
         if (!ui.call && !part.hung) {
-          ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello }] : [], terms: null, offered: [] };
+          ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello, hello: true }] : [], terms: null, offered: [] };
           if (!ordered && show.ops?.hello) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogOperator(), text: show.ops.hello }], show);
         }
       }
@@ -444,7 +444,7 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
   if (!part || ordered || ui.calling || soldNow(show) || hungLine(part)) return;
   if (mode === 'talk' && (!s.talk || !said)) return;
   if (mode === 'barter' && (!s.barter || !ui.offer.length)) return;
-  if (!ui.call || ui.call.pid !== part.item.id) ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello }] : [], terms: null, offered: [] };
+  if (!ui.call || ui.call.pid !== part.item.id) ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello, hello: true }] : [], terms: null, offered: [] };
   const call = ui.call;
   ui.info = '';
   const mine = barterItems(ctx);
@@ -469,9 +469,12 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
       return `${g('OFFERED_LINE', { name: x.name, traits: traitsText(x) + (left !== undefined ? ` (${left})` : ''), state, desc: x.desc || '-', effect: x.effect || '-' })}${truth}`;
     }).join('\n');
     const src = showSource(ctx, show, s, 'talk');
-    const keep = src.talkMax === undefined ? call.lines : call.lines.slice(-Math.max(1, src.talkMax));
+    // 첫 인사는 편성이 미리 써 둔 채널 멘트라 통화 기록으로 넘기지 않는다 (모델이 그 말투를 그대로 따라 한다)
+    const said0 = call.lines.filter((l) => !l.hello);
+    const keep = src.talkMax === undefined ? said0 : said0.slice(-Math.max(1, src.talkMax));
     const body = [
       g('HEAD_ON_AIR', { name: part.item.name, pay: hsPayText(part) || '-', desc: part.item.desc || '-', effect: part.item.effect || '-' }),
+      orderFacts(liveOrders(ctx.chat.scriptstate, alive), alive, userTurns(ctx.chat), boxHeldIn(items, ctx.chat, lastBot(ctx.chat)?.key ?? '')),
       `${g('HEAD_OFFERED')}\n${offerText || '-'}`,
       `${g('HEAD_TERMS')}\n${call.terms ? termsText(call.terms) : g('TERMS_NONE')}`,
       `${g('HEAD_CALL')}\n${keep.map((l) => g(l.who === 'me' ? 'CALL_LINE_ME' : 'CALL_LINE_OP', { text: l.text })).join('\n')}`,
