@@ -6,7 +6,7 @@
 - `카드/` 카드 재료 (원본 카드 그림, 위키 기본 문서, 시작 소지품 등). `tools/build_lite_card.py` 가 읽는다.
 - `그림/` 플러그인이 받는 그림의 원본만: 초상·요원·지도·위키(카드 사진), 물건(소지품 아이콘), 모습(아바타), 홈쇼핑(방송 그림). `scripts/data-pack.mjs`·카드 빌드가 읽는다.
 - `src/` 플러그인 코드. `scripts/` 빌드와 자료 도구(위키 기본 문서 넣기 `wiki-import.mjs`, 명부 별칭 정리 목록 `alias-drop.mjs`). `tests/` 플러그인 시험. `tools/` 카드 빌드, 소지품 그림 윗말 채우기·검사(`icon_upper.py`·`icon_same_check.mjs`, 표는 `그림/물건/upper/`, 규칙은 `그림/물건/윗말_규칙.md`), PixelLab 승인 문.
-- 받기용 파일(시작기·본체 조각·자료 팩·카드 업데이트·사진)은 main 에 두지 않는다. `npm run release:prep` 이 `release/`(git 에 안 올림)에 만들고, main 의 `package.json` 판이 새 판이면 GitHub Actions 가 같은 순서로 빌드하고 형 검사·단위 시험을 통과하면 `release` 브랜치를 새로 덮어쓰고 Releases 에 올린다. 플러그인이 받는 주소: `https://raw.githubusercontent.com/leepc25/goei/release`.
+- 받기용 파일(시작기·본체 조각·자료 팩·카드 업데이트·사진)은 main 에 두지 않는다. `npm run release:prep` 이 `release/`(git 에 안 올림)에 만들고, main 의 `package.json` 판이 새 판이면 GitHub Actions 가 같은 순서로 빌드하고 형 검사·단위 시험을 통과하면 `release` 브랜치를 새로 덮어쓰고 Releases 에 올린다. 플러그인이 받는 주소: `https://raw.githubusercontent.com/ygberserk/goei/release`.
 - 보관용 사본(_old, 백업 묶음, 옛 문서)을 만들지 않는다. 지우라고 하면 지운다 (사용자 2026-11-14).
 
 ## 규칙

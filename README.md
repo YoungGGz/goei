@@ -4,7 +4,7 @@ RisuAI용 괴담 시뮬레이션 「괴이 ː ANOMALY」의 전용 플러그인�
 
 ## 설치
 
-1. [Releases](https://github.com/leepc25/goei/releases)에서 「플러그인」(`goei-plugin.js`)과 「봇 카드」(`goei-anomaly.charx`)를 받습니다.
+1. [Releases](https://github.com/ygberserk/goei/releases)에서 「플러그인」(`goei-plugin.js`)과 「봇 카드」(`goei-anomaly.charx`)를 받습니다.
 2. Risu 설정 → 플러그인 → 가져오기에서 `goei-plugin.js`를 추가하고, 뜨는 권한 확인 창(요청 처리·본 화면·채팅 보내기)을 모두 허용합니다.
 3. `goei-anomaly.charx`를 캐릭터로 가져옵니다.
 4. 괴이 카드를 처음 열면 플러그인 본체를 한 번 받습니다.

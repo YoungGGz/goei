@@ -47,7 +47,7 @@ await ctx.route((u) => !u.href.startsWith('http://127.0.0.1'), async (r) => {
   const req = r.request();
   let url = req.url();
   if (url.includes('/proxy2')) url = decodeURIComponent(req.headers()['risu-url'] || '');
-  if (url.includes('raw.githubusercontent.com/leepc25/goei/release/')) {
+  if (url.includes('raw.githubusercontent.com/ygberserk/goei/release/')) {
     const f = decodeURIComponent(url.split('/release/')[1].split('?')[0]);
     try { const body = readFileSync(REL + f); served++; return r.fulfill({ status: 200, body, headers: { 'access-control-allow-origin': '*' } }); }
     catch { log('MISS', f); return r.fulfill({ status: 404, body: '' }); }
