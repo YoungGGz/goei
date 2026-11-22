@@ -925,3 +925,12 @@ test('첫 장면은 첫 응답과 같이 읽는다: 「지난 응답 1개 안 �
   const noScene = { message: [m('user', '1', 'u1'), m('char', 'a', 'c1'), m('user', '2', 'u2'), m('char', 'b', 'c2')] };
   assert.deepEqual(S.splitUnread(noScene, T.emptyStore()), { newer: [3], older: [1] });
 });
+
+test('처음 등장: 호칭(주인·의사)만 나온 글로는 기록을 만들지 않고, 이름이 나오면 만든다 (2026-11-22 사용자: 사망단길 본문에서 마덕희·고연지가 생김)', () => {
+  const c = chat(['user', '걸었다', 'u1'], ['char', '정육점 주인은 사람 키를 훌쩍 넘었다. 조용히 의사만 밝히자 손이 거두어졌다. 주인 없는 장갑이 떠다녔다.', 'c1']);
+  const store = T.emptyStore();
+  assert.deepEqual(H.seedAppearing(store, c, [1], () => null, {}), []);
+  assert.deepEqual(Object.keys(store.people), []);
+  const named = chat(['user', '걸었다', 'u1'], ['char', '마덕희가 금팔찌를 만지작거렸다.', 'c1']);
+  assert.deepEqual(H.seedAppearing(store, named, [1], () => null, {}), ['마덕희']);
+});
