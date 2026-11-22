@@ -141,6 +141,18 @@ Write <terms>none</terms> when the operator will not ship the item on anything o
 How much the operator says is one turn of talk on a phone: as much as it has to say to that at this point, a few words when that answers it, more when it has more to say. Each turn is judged on its own; how long the earlier turns under [통화] ran is not a pattern to keep.
 @@END
 
+@@SECTION OPERATOR_HANGUP_ON
+The operator may end the call on its own, for reasons of its own, when it has had enough of this call or this caller: it says so in its own way and adds <hangup/>. After that this caller cannot reach it again about this item.
+@@END
+
+@@SECTION OPERATOR_HANGUP_OFF
+The operator never ends the call itself (never output <hangup/>).
+@@END
+
+@@SECTION OPERATOR_OUTPUT_END
+<hangup/> after the blocks, only if the operator ends the call.
+@@END
+
 @@SECTION THOUGHTS_OPERATOR
 1. What did the caller just say, and what is it: talk, a question, an offer, pushback, an acceptance?
 2. What does this operator, being what it is, make of that and of this caller, and what does it want at this point? It need not be about the deal.
@@ -439,6 +451,10 @@ watched by the user on the broadcast
 
 @@SECTION LOG_OPERATOR_NICK
 상담원
+@@END
+
+@@SECTION LOG_HANGUP
+(상담원이 먼저 전화를 끊었다. 「{item}」 전화 주문은 더 받지 않는다.)
 @@END
 
 @@SECTION ARRIVE
