@@ -302,7 +302,8 @@ def add_directory_fix(entries):
         if not isinstance(have, dict):
             raise SystemExit(f'directory-fix.json: 명부에 {group} 묶음이 없음')
         for k, v in rows.items():
-            if k not in have:
+            # 시작 로어북은 목록째 덮는 표라, 원본에 없던 시작 조합(직접 입력·커스텀 임무)의 줄도 새로 더할 수 있다
+            if k not in have and group != '시작 로어북':
                 raise SystemExit(f'directory-fix.json: 명부 {group}에 {k} 없음')
             if isinstance(v, dict):
                 have[k].update(v)

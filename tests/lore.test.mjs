@@ -155,3 +155,19 @@ test('trimRoster: 전체 로어북이 들어간 인물은 Roster 한 줄 소개�
   const same = [{ role: 'system', content: roster }];
   assert.equal(trimRoster(same), same);
 });
+
+test('이동·커스텀 임무 창에서 직접 고른 대상·동행은 흔한 낱말 이름이어도 켠다', async () => {
+  const { sceneRecord, messageText } = await import('../dist-test/core.mjs');
+  const card = sceneRecord({ target: '어두운 정원', party: '나, 차여진, 지원 ×1' }, 'BODY');
+  // 글에 이름만 나오면 확증이 없어 안 켠다 (그대로)
+  assert.deepEqual(pick(['어두운 정원 쪽으로 걸었다']), []);
+  const chat = { message: [{ role: 'user', data: card }], scriptstate: {} };
+  assert.deepEqual(lore.sceneChoices(chat, 10), ['어두운 정원', '나', '차여진', '지원 ×1']);
+  const got = lore.computeLore(BOOKS, chat, { mode: 'plugin', depth: 10, budget: 0, env: { vars: {} } });
+  assert.deepEqual(got.picks.map((p) => p.entry.name).sort(), ['어두운 정원', '차여진']);
+  // 창의 상황 칸에 적은 글(카드 뒤)도 훑는다
+  const noted = `${card}\n\n이도형이 먼저 와 있다`;
+  assert.ok(messageText(noted).includes('이도형이 먼저 와 있다'));
+  const got2 = lore.computeLore(BOOKS, { message: [{ role: 'user', data: noted }], scriptstate: {} }, { mode: 'plugin', depth: 10, budget: 0, env: { vars: {} } });
+  assert.deepEqual(got2.picks.map((p) => p.entry.name).sort(), ['어두운 정원', '이도형', '차여진']);
+});
