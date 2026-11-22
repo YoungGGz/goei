@@ -32,7 +32,7 @@ test('정리: 어느 from 에도 없는 원본은 접혀서 살아 있지 않다
   const store = T.emptyStore();
   store.people.쟈알디 = person('쟈알디');
   store.people.쟈알디.slots.state = [e('s1', 'a'), e('s2', 'b'), e('s3', 'c')];
-  const settings = St.peopleSettings({});
+  const settings = { ...St.peopleSettings({}), keepMsgs: 0 }; // 최근 응답 창 없음 (합치기 동작만 본다)
   const input = C.buildConsolidate(store, chat, '쟈알디', settings);
   const live = S.liveness(chat);
   const rep = C.applyConsolidate(store, '쟈알디', input, { slots: { state: [{ text: 'merged', from: ['s1'] }] } }, live, settings);

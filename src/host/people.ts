@@ -6,7 +6,7 @@ import { generate, runModel, LlmError, type LlmMessage } from './llm';
 import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, repairDirector, runSearches, type DirectorInput, type DirectorNote } from '../core/people/director';
 import { loadContext, updateChat, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
-import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, pruneScene } from '../core/people/store';
+import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, dropGonePeople, pruneScene } from '../core/people/store';
 import { foldCues, foldOpenness, pruneEntries, pruneNotes } from '../core/people/prune';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
@@ -18,7 +18,7 @@ import { nameMatcher, namesWith } from '../core/people/select';
 import { buildRouter, parseRouter, type RouterHint } from '../core/people/router';
 import { speechVarietyBlock } from '../core/people/speech';
 import { sexualWriterSection } from '../core/people/sexual';
-import { allNames, extraNames, seedBaseFor, temperOf, valuesOf, type RosterRow } from '../core/people/base';
+import { allNames, corroborateKeys, extraNames, seedBaseFor, temperOf, valuesOf, type RosterRow } from '../core/people/base';
 import { playerAgent } from '../core/player';
 import { peopleBlockFor } from '../core/people/request';
 import { userInfo } from './user';
@@ -38,9 +38,10 @@ import { guideSections, guideTxt } from '../core/guides';
 /** Director 기본 지침(지침 탭 「Director」의 FACTS·SCENE 절)은 buildDirector 가 읽는다 */
 /** Router 기본 지침: 지침 탭 「Router」의 ROLE·RULES 절 */
 const routerBase = () => { const g = guideSections('Router'); return [g.ROLE, g.RULES].filter((x) => x?.trim()).join('\n'); };
-import { parseIdentity, rankLevel } from '../core/people/identity';
+import { factionCodesIn, parseIdentity, rankLevel } from '../core/people/identity';
 import type { Identity, PeopleStore, Person } from '../core/people/types';
 import { factionList } from '../core/factions';
+import { imgTagNames } from '../core/imgtag';
 import type { LoreEntry } from '../core/types';
 import { readDirectory } from '../core/world/directory';
 
@@ -157,22 +158,56 @@ function userFaction(chat: Chat): string {
   return typeof v === 'string' ? v : '';
 }
 
-/** 처음 등장한 인물의 기록을 만든다 (시트 → 시작값). 확정 구간 글에 이름이 나온, 아직 기록이 없는 사람.
- *  이름 표는 미리 만든 표 ∪ 명부(roster)라, 명부 인물은 초상 태그(<img=영문_표정>)만 떠도 등장으로 본다.
- *  유저가 연기하는 요원(exclude)은 기록하지 않는다 (있던 기록은 지운다). 호칭 시작값은 유저 신분(identity)으로 고른다 */
-export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[], sheet: (name: string) => string | null, o: { exclude?: string[]; identity?: Identity; roster?: RosterRow[]; confirm?: boolean; held?: string[] } = {}): string[] {
+/** 처음 등장 판정: 응답(indexes)마다 그 응답과 바로 앞 메시지의 글에서 이름이 나온 사람 → 처음 나온 응답 열쇠.
+ *  열쇠는 이름·별명만 (호칭은 넣지 않는다). 흔한 낱말·별명이라 다른 근거가 있어야 하는 열쇠(aliases.json corroborate)만 나왔으면,
+ *  같은 글에 그 사람의 초상 태그(<img=이름·영문 표기_표정>)나 소속이 같이 있을 때만 등장으로 본다 (2026-11-22 사용자: 「사장님」「독사」만으로 기록이 생겼다).
+ *  factionOf: 그 사람의 소속 (A00 같은 코드 또는 조직 이름, 모르면 ''). factions: 명부의 세력 코드 → 이름 */
+export function appearingIn(chat: Chat, indexes: number[], entries: { name: string; aliases: string[] }[], factionOf: (name: string) => string, factions: Record<string, string> = {}): Map<string, string> {
   const list = Array.isArray(chat.message) ? chat.message : [];
-  const exclude = new Set(o.exclude ?? []);
-  // 사용자가 무시한 이름은 다시 올리지 않는다 (전수점검 보통-17)
-  // 호칭(주인·의사·반장…)만으로는 기록을 만들지 않는다: 이름·별칭이 글에 나와야 등장이다
-  // (2026-11-22 사용자: 사망단길 본문의 「정육점 주인」「의사를 밝혀」에서 마덕희·고연지 기록이 생겼다). 이미 기록된 사람을 호칭으로 장면에 넣는 것은 그대로다
-  const match = nameMatcher(allNames(o.roster).filter((n) => !store.people[n.name] && !exclude.has(n.name) && !store.ignored.includes(n.name)).map((n) => ({ ...n, titles: [] })));
+  const keys = entries.flatMap((e) => {
+    const weak = new Set(corroborateKeys(e.name));
+    return [...new Set([e.name, ...e.aliases])].map((k) => ({ who: e.name, weak: weak.has(k), hit: nameMatcher([{ name: k, aliases: [], titles: [] }]) }));
+  });
+  const strongKeys = new Map(entries.map((e) => [e.name, new Set([e.name, ...e.aliases].filter((k) => !corroborateKeys(e.name).includes(k)).map((k) => k.toLowerCase()))]));
+  const backed = (who: string, raw: string, text: string): boolean => {
+    // 초상 태그: 태그의 이름 부분이 그 사람의 이름·영문 표기 (다른 근거가 필요한 열쇠는 빼고)
+    const mine = strongKeys.get(who);
+    if (imgTagNames(raw).some((t) => mine?.has(t.toLowerCase()))) return true;
+    // 소속: 코드면 글에 그 세력 이름이 나왔나 (identity.ts factionCodesIn), 조직 이름이면 그 이름이 글에 있나
+    const f = factionOf(who);
+    if (!f) return false;
+    return /^[A-Z]00$/.test(f) ? factionCodesIn(text, factions).includes(f) : text.includes(f);
+  };
   const found = new Map<string, string>();
   for (const i of indexes) {
     const anchor = list[i] ? messageKey(list[i], i) : '';
-    for (const m of [list[i - 1], list[i]]) if (m) for (const n of match(messageText(String(m.data ?? '')))) if (!found.has(n)) found.set(n, anchor);
+    const win = [list[i - 1], list[i]].filter((m): m is NonNullable<typeof m> => !!m);
+    const raw = win.map((m) => String(m.data ?? '')).join('\n');
+    const text = win.map((m) => messageText(String(m.data ?? ''))).join('\n');
+    const strong = new Set<string>();
+    const weak = new Set<string>();
+    for (const m of win) {
+      const t = messageText(String(m.data ?? ''));
+      for (const k of keys) if (!found.has(k.who) && k.hit(t).length) (k.weak ? weak : strong).add(k.who);
+    }
+    for (const who of strong) if (!found.has(who)) found.set(who, anchor);
+    for (const who of weak) if (!found.has(who) && backed(who, raw, text)) found.set(who, anchor);
   }
+  return found;
+}
+
+/** 처음 등장한 인물의 기록을 만든다 (시트 → 시작값). 확정 구간 글에 이름이 나온, 아직 기록이 없는 사람.
+ *  이름 표는 미리 만든 표 ∪ 명부(roster)라, 명부 인물은 초상 태그(<img=영문_표정>)만 떠도 등장으로 본다.
+ *  유저가 연기하는 요원(exclude)은 기록하지 않는다 (있던 기록은 지운다). 호칭 시작값은 유저 신분(identity)으로 고른다.
+ *  만든 기록에는 처음 나온 응답(origin)을 적는다: 그 응답이 다시 굴려져 사라지면 기록도 같이 없앤다 (dropGonePeople) */
+export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[], sheet: (name: string) => string | null, o: { exclude?: string[]; identity?: Identity; roster?: RosterRow[]; confirm?: boolean; held?: string[]; factions?: Record<string, string> } = {}): string[] {
+  const exclude = new Set(o.exclude ?? []);
+  // 사용자가 무시한 이름은 다시 올리지 않는다 (전수점검 보통-17)
+  // 호칭(주인·의사·반장…)만으로는 기록을 만들지 않는다: 이름·별명이 글에 나와야 등장이다
+  // (2026-11-22 사용자: 사망단길 본문의 「정육점 주인」「의사를 밝혀」에서 마덕희·고연지 기록이 생겼다). 이미 기록된 사람을 호칭으로 장면에 넣는 것은 그대로다
   const faction = userFaction(chat);
+  const rowOf = (name: string) => o.roster?.find((r) => r.name === name);
+  const found = appearingIn(chat, indexes, allNames(o.roster).filter((n) => !store.people[n.name] && !exclude.has(n.name) && !store.ignored.includes(n.name)), (name) => seedBaseFor(name, faction, undefined, rowOf(name)).faction ?? '', o.factions);
   const made: string[] = [];
   for (const [name, anchor] of found) {
     // 설정 「새 인물」이 확인 뒤 등록이면 기록을 만들지 않고 등록 대기에 올린다 (인물 화면에서 고를 때까지)
@@ -185,12 +220,21 @@ export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[],
     }
     // 같은 이름으로 등록을 기다리던 줄(2턴 규칙·확인 뒤 등록)은 기록이 생기니 없앤다 (별명은 받는다). 남겨 두면 그 줄을 지울 길이 없다
     const pend = store.pending[name];
-    const base = seedBaseFor(name, faction, o.identity ?? store.identity, o.roster?.find((r) => r.name === name));
+    const base = seedBaseFor(name, faction, o.identity ?? store.identity, rowOf(name));
     store.people[name] = seedPerson(name, sheet(name), { ...base, aliases: [...new Set([...(base.aliases ?? []), ...(pend?.aliases ?? [])])] });
+    if (anchor) store.people[name].origin = anchor;
     delete store.pending[name];
     made.push(name);
   }
   return made;
+}
+
+/** 다시 굴리기 정리용: names 가운데 지금 채팅의 메시지 어디에든 나오는 사람 (처음 등장 판정과 같은 규칙, 기록의 별명도 열쇠) */
+export function liveAppearing(store: PeopleStore, chat: Chat, names: string[], factions: Record<string, string> = {}): Set<string> {
+  const table = new Map(allNames().map((e) => [e.name, e.aliases]));
+  const entries = names.filter((n) => store.people[n]).map((n) => ({ name: n, aliases: [...new Set([...store.people[n].aliases, ...(table.get(n) ?? [])])] }));
+  const all = (Array.isArray(chat.message) ? chat.message : []).map((_, i) => i);
+  return new Set(appearingIn(chat, all, entries, (n) => store.people[n]?.faction ?? '', factions).keys());
 }
 
 /** 유저가 연기하는 요원의 기록을 지운다 (자기 자신은 기록 대상이 아니다). 지운 이름을 돌려준다 */
@@ -293,7 +337,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   const dropped = dropExcluded(store, exclude);
   const roster = rosterOf(ctx.char.globalLore);
   const held: string[] = [];
-  const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity, roster, confirm: settings.newPeople === 'confirm', held });
+  const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity, roster, confirm: settings.newPeople === 'confirm', held, factions: factionNamesOf(ctx.char.globalLore) });
   if (seeded.length || held.length || idChanged || dropped.length) {
     await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
       const s = peopleStore(cur);
@@ -438,6 +482,8 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         if (!o.scope?.only) recordRun(s, before, new Date().toISOString(), report.applied.renamed);
         // 다시 굴려(지워서) 채팅에서 사라진 응답이 만든 변경 줄만 버린다 (사용자 2026-11-14 F-1 (나)). 장면 인물 목록도 같이
         dropGoneChanges(s, cur);
+        // 그 응답이 처음 만든 인물 기록도 같이 없앤다. 살아 있는 메시지에도 나오는 사람·사용자가 고친 사람·항상 포함할 인물은 남긴다
+        dropGonePeople(s, cur, (gone) => liveAppearing(s, cur, gone, factionNamesOf(fresh.char.globalLore)), settings.always);
         pruneScene(s, cur);
         // 인물 기록·문서의 죽은 줄도 같은 때 치운다 (2026-11-17 사용자: 원본처럼 지난 이력 60개만)
         pruneEntries(s, cur, settings.keepMsgs);
@@ -767,7 +813,9 @@ export async function directorNoteText(chat: Chat, store: PeopleStore, people: s
   if (settings.director !== 'scene' && settings.director !== 'facts') return '';
   const built = buildDirector(chat, store, people, input, settings, Object.fromEntries(people.map((n) => [n, valuesOf(n)])), await hypaMemory(chat, char, [input, ...(Array.isArray(chat.message) ? chat.message.slice(-Math.max(1, settings.recentMsgs)).map((m) => messageText(String(m.data ?? ''))) : []), ...people].join('\n'), settings, Math.min(settings.hypaCap, 6000)));
   if (!built) return '';
-  if (settings.directorReuse && directorCache?.key === built.key) return directorBlock(directorCache.notes, user);
+  // 재사용 열쇠: 자료·지침(built.key) + 부르는 모델 (모델을 바꿔도 다시 묻는다)
+  const cacheKey = `${built.key}|${settings.stageModel.director}|${settings.stageModelId.director}`;
+  if (settings.directorReuse && directorCache?.key === cacheKey) return directorBlock(directorCache.notes, user);
   // 1차: 메모 또는 검색 요청. 검색 요청이면 코드가 찾아서 2차 (리수폿 B). 각 호출에 시간 제한
   // 출력 검증(JSON·notes)에 실패하면 원본처럼 「고침 요청」을 붙여 1회 더 묻는다 (repairDirectorPrompt 상당)
   const call = async (b: DirectorInput, reason: string, allowSearch: boolean, repaired = false): Promise<ReturnType<typeof parseDirectorAny> | null> => {
@@ -800,7 +848,7 @@ export async function directorNoteText(chat: Chat, store: PeopleStore, people: s
     r = await call(buildDirectorPass2(built, found), 'director2', false);
   }
   if (!r || !('notes' in r)) return '';
-  directorCache = { key: built.key, notes: r.notes };
+  directorCache = { key: cacheKey, notes: r.notes };
   return directorBlock(r.notes, user);
 }
 

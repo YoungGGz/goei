@@ -695,6 +695,15 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     if (!norm(messageText(str(list[idx].data))).includes(q) && !norm(sentText(str(list[idx].data))).includes(q)) return '인용이 원문에 없음';
     return { anchor: messageKey(list[idx], idx), index: idx };
   };
+  /** 갱신기에 보낸 글(확정·맥락 메시지 전부)에 이 이름이 나오나. 지우기 전 글이나 보낸(지운) 글 중 하나에 있으면 된다 */
+  const spanTexts = [...input.tags.values()].flatMap((i) => (list[i] ? [norm(messageText(str(list[i].data))), norm(sentText(str(list[i].data)))] : []));
+  // 자료 roster 로 보낸 명부 줄의 이름은 글에 없어도 된다: 이름 없이 나온 사람을 명부 대조로 그 줄의 이름으로 올리는 것은 지침 4절이 허용한다
+  const rosterSent = new Set((Array.isArray(input.data.roster) ? (input.data.roster as { name?: unknown }[]) : []).map((r) => str(r?.name)).filter(Boolean));
+  const nameInSpan = (given: string, name: string): boolean => {
+    if (rosterSent.has(name)) return true;
+    const row = input.names.find((e) => e.name === name);
+    return [given, name, ...(row?.aliases ?? [])].map(norm).some((k) => !!k && spanTexts.some((t) => t.includes(k)));
+  };
   /** 인용 없이 기준 메시지만 (문서용) */
   const evidenceLoose = (m: unknown): { anchor: string; index: number } | string => {
     const idx = input.tags.get(str(m));
@@ -748,6 +757,8 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     const base = ctx.baseOf?.(name) ?? {};
     const p = seedPerson(name, sheet, { ...base, aliases: [...new Set([...(base.aliases ?? []), ...(pend?.aliases ?? []), ...aliases])] }, ctx.now);
     if (provisional) p.provisional = true;
+    // 이 기록을 처음 만든 응답: 그 응답이 다시 굴려져 사라지면 기록도 없앤다 (store.ts dropGonePeople)
+    p.origin = ev.anchor;
     store.people[name] = p;
     delete store.pending[name];
     return true;
@@ -787,6 +798,12 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     const ev = evidence(n.m, n.quote);
     if (typeof ev === 'string') {
       drop('new_people', n, ev, name);
+      continue;
+    }
+    // 이름 있는 새 인물은 그 이름이 갱신기에 보낸 글(span)에 나와야 한다: 인용만 원문에 있고 이름은 지어낸 것이면 버린다 (지침 「Never coin a name」).
+    // 이름 표의 인물은 표의 이름·별명·영문 표기 가운데 하나가 나오면 된다. 자료 roster 로 보낸 명부 줄(명부 대조)과 이름 없는 인물(호칭 기록)은 여기서 보지 않는다
+    if (!provisional && !nameInSpan(given, name)) {
+      drop('new_people', n, '이름이 원문에 없음', name);
       continue;
     }
     if (newCount >= 2) {

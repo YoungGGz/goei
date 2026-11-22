@@ -194,6 +194,9 @@ export interface Person {
   sexual?: SexualProfile;
   /** 이름이 아직 밝혀지지 않아 글에 쓰인 호칭으로 적어 둔 기록 (설정 「이름 없는 인물 기록」). 이름이 밝혀져 기록을 옮기면(store.ts renamePerson) 없어진다 */
   provisional?: true;
+  /** 이 기록을 처음 만든 응답의 열쇠 (messageKey). 코드의 처음 등장 판정·갱신기 새 인물 등록이 적는다. 사용자가 만든 기록에는 없다.
+   *  그 응답이 다시 굴리기·지우기로 사라지면 기록도 없앤다 (store.ts dropGonePeople, 사용자 2026-11-14 F-1 (나)) */
+  origin?: string;
 }
 
 // ── 성적 욕망·이상성욕 (리수폿 원본 People profile 의 sexualDesire·paraphilia) ──

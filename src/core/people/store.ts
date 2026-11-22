@@ -56,6 +56,7 @@ export function peopleStore(chat: Chat): PeopleStore {
       ...(Number.isInteger(p.reviewTurn) ? { reviewTurn: p.reviewTurn as number } : {}),
       ...(p.sexual && typeof p.sexual === 'object' ? { sexual: readSexual(p.sexual as unknown as Record<string, unknown>) } : {}),
       ...(p.provisional === true ? { provisional: true as const } : {}),
+      ...(typeof p.origin === 'string' && p.origin ? { origin: p.origin } : {}),
     };
     const me = out.people[name];
     // 축: 저장된 것이 있으면 읽고, 없으면 express 에서 (감정 표출성만). express 는 늘 축에서 다시 계산
@@ -467,6 +468,43 @@ export function dropGoneChanges(store: PeopleStore, chat: Chat): number {
   const before = store.log.length;
   store.log = store.log.filter((c) => c.src === 'manual' || c.src === 'seed' || c.anchor.startsWith('#') || at.has(c.anchor));
   return before - store.log.length;
+}
+
+/** 사용자가 이 인물 기록을 직접 고쳤거나 고정했나: 수동 항목·고정 항목, 수동 변경(호감 고정·호칭 직접 수정), 호칭 고정,
+ *  축 승인·수정, 승인된 장기 변화, 성적 글 직접 씀·켬끔·덮어쓰기 */
+export function userTouched(store: PeopleStore, name: string): boolean {
+  const p = store.people[name];
+  if (!p) return false;
+  if (SLOTS.some((s) => (p.slots[s] ?? []).some((e) => e.src === 'manual' || e.pin))) return true;
+  if (store.log.some((c) => c.who === name && c.src === 'manual')) return true;
+  if (p.address.pin || p.axesFrom === 'manual' || p.patterns.length) return true;
+  const x = p.sexual;
+  return !!x && (!!x.desire?.manual || !!x.paraphilia?.manual || x.desireOn === false || x.paraphiliaOn === false || (x.explicit !== null && x.explicit !== undefined));
+}
+
+/** 다시 굴리거나 지워서 채팅에서 사라진 응답이 처음 만든 인물 기록을 없앤다 (사용자 2026-11-14 F-1 (나) — 등록 대기 줄의 prunePending, 변경 줄의 dropGoneChanges 와 같은 규칙). 없앤 이름.
+ *  남기는 것: appears(이름들) 가 돌려준 사람(살아 있는 메시지에도 나옴), 살아 있는 다른 응답에 근거한 항목·변경이 있는 사람,
+ *  사용자가 고치거나 고정한 사람(userTouched), keep(설정 「항상 포함할 인물」). 처음 만든 응답(origin)이 없는 기록(사용자가 만든 것·옛 저장)과
+ *  '#N' 기준(chatId 가 없는 메시지라 사라졌는지 가릴 수 없음)은 남긴다 */
+export function dropGonePeople(store: PeopleStore, chat: Chat, appears: (names: string[]) => Set<string>, keep: string[] = []): string[] {
+  const at = anchorPositions(chat);
+  const liveOther = (anchor: string, origin: string) => anchor !== origin && anchor !== '#0' && at.has(anchor);
+  const gone = Object.values(store.people)
+    .filter((p) => !!p.origin && !p.origin.startsWith('#') && !at.has(p.origin) && !keep.includes(p.name))
+    .filter((p) => !SLOTS.some((s) => (p.slots[s] ?? []).some((e) => e.src !== 'seed' && liveOther(e.anchor, p.origin!))))
+    .filter((p) => !store.log.some((c) => c.who === p.name && c.src !== 'seed' && liveOther(c.anchor, p.origin!)))
+    .filter((p) => !userTouched(store, p.name))
+    .map((p) => p.name);
+  if (!gone.length) return [];
+  const seen = appears(gone);
+  const out = gone.filter((n) => !seen.has(n));
+  for (const n of out) {
+    delete store.people[n];
+    store.log = store.log.filter((c) => c.who !== n);
+    delete store.folded[n];
+    for (const [k, list] of Object.entries(store.scene ?? {})) if (list.includes(n)) store.scene![k] = list.filter((x) => x !== n);
+  }
+  return out;
 }
 
 // ── 접기 ──
