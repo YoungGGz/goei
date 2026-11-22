@@ -243,7 +243,13 @@ const SIT = '아침, 집에서 시작한다.';
   await B.saveState(s);
   // 첫 요청(단계 B_첫요청)과 견줌: 다시 굴린 요청의 상황판 칸이 같은가
   writeFileSync(`${OUT}단계${s.n}_${s.name}_첫요청과비교.txt`, `첫 요청의 교회 줄: ${firstAn}\n다시 굴린 요청의 교회 줄: ${/[^\n]*\[AN[^\n]*교회[^\n]*/.exec(all)?.[0] ?? '(없음)'}\n`);
-  check(step('B_보조호출_없음'), '이 기능 흐름에서 보조 호출(runLLMModel) 0회', (await B.llmCount()) === 0, 0, await B.llmCount());
+  {
+    const s2 = step('B_보조호출');
+    const calls = await B.page.evaluate(() => (window.__calls.llm || []).map((o) => (o.messages || []).map((m) => `[${m.role}] ${String(m.content)}`).join('\n\n')));
+    writeFileSync(`${OUT}단계${s2.n}_${s2.name}.txt`, calls.map((t, i) => `════ 보조 호출 ${i + 1} ════\n${t}`).join('\n\n') + '\n');
+    // 지시문 흐름 자체는 보조 호출을 하지 않는다. 생기면 무엇인지 적어 둔다 (인물 기록 Router 등, 다른 기능)
+    check(s2, '[참고] 보조 호출 수와 첫 줄', true, '기록만', calls.map((t) => t.slice(0, 80)), 'info');
+  }
   if (B.errors.length) console.log('B 페이지 오류', B.errors.slice(0, 3));
   await B.page.close();
 }

@@ -533,10 +533,12 @@ let snapAfterBuy;
   await openSite('cos');
   const st = J(await vars(), '$cos_shop');
   const txt = await screen();
-  // 화면 잔고: 장바구니 화면으로
+  // 화면 잔고: 장바구니 화면으로 (물건이 하나 있어야 잔고 줄이 보인다)
+  await act('mall-cart', st.items.find((x) => x.name === '내일 신문 한 장').id);
   await act('mall-page', 'cart');
   const cart = await screen();
   check(s, '화면 잔고 10,000,000 으로 돌아옴(쪽지·선납·구매 거래가 죽음)', /10,000,000/.test(cart), '10,000,000', /당신의 잔고[^\n]*/.exec(cart)?.[0]);
+  await act('mall-cart', st.items.find((x) => x.name === '내일 신문 한 장').id);
   await act('mall-page', '');
   check(s, '진열대에 구두약·우산이 다시 보임', txt.includes('반짝 걸음 구두약') && txt.includes('말 듣는 우산'), '보임', txt.slice(0, 300));
   await act('mall-page', 'orders');
@@ -583,14 +585,19 @@ let snapAfterBuy;
   await openSite('cos');
   await waitLlm(n0);
   const n1 = await llmCount();
-  check(s, '열자 진열 호출 1회', n1 - n0 === 1, 1, n1 - n0);
+  const heads = async (a, z) => { const o = []; for (let i = a; i < z; i++) { const m = await llmAt(i); o.push(String(m[0]?.content ?? '').slice(0, 70)); } return o; };
+  note(s, '열 때 나간 보조 호출 머리', await heads(n0, n1));
+  const cosCalls = (await heads(n0, n1)).filter((h) => h.includes('우주 쇼핑몰')).length;
+  check(s, '열자 우주몰 진열 호출 1회', cosCalls === 1, 1, cosCalls);
   const msgs = n1 > n0 ? await llmAt(n0) : [];
   writeReq(s, msgs, COS_SHELF2);
   const all = allText(msgs);
   check(s, '설정 「진실 미리 정하기: 전부」→ TRUTH_ALL 절', all.includes('Give EVERY item a concrete') && !all.includes('MIX the two'), 'TRUTH_ALL', all.includes('Give EVERY item'));
   await openSite('cos');
   await sleep(800);
-  check(s, '같은 턴에 다시 열면 안 부름', (await llmCount()) === n1, 0, (await llmCount()) - n1);
+  const again = (await heads(n1, await llmCount())).filter((h) => h.includes('우주 쇼핑몰')).length;
+  note(s, '다시 열 때 나간 보조 호출 머리', await heads(n1, await llmCount()));
+  check(s, '같은 턴에 다시 열면 우주몰은 안 부름', again === 0, 0, again);
   await saveState(s);
 }
 
