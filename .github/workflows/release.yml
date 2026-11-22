@@ -98,6 +98,9 @@ jobs:
             gh release edit "$TAG" --notes-file out/notes.md
           else
             gh release create "$TAG" --target "$GITHUB_SHA" "${files[@]}" \
-              --title "괴이 ː ANOMALY ${TAG}" --prerelease \
+              --title "괴이 ː ANOMALY ${TAG}" \
               --notes-file out/notes.md
           fi
+          # Pre-release 딱지를 붙이지 않는다. 지난 판에 붙은 딱지도 뗀다 (2026-11-22 사용자)
+          for t in $(gh release list --limit 200 --json tagName,isPrerelease -q '.[] | select(.isPrerelease) | .tagName'); do gh release edit "$t" --prerelease=false; done
+          gh release edit "$TAG" --prerelease=false --latest
