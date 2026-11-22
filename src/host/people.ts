@@ -20,7 +20,7 @@ import { speechVarietyBlock } from '../core/people/speech';
 import { sexualWriterSection } from '../core/people/sexual';
 import { allNames, extraNames, seedBaseFor, temperOf, valuesOf, type RosterRow } from '../core/people/base';
 import { playerAgent } from '../core/player';
-import { peopleBlockFor, sceneFullByCode } from '../core/people/request';
+import { peopleBlockFor } from '../core/people/request';
 import { userInfo } from './user';
 import { promptFor, UPDATER_COMPACT, UPDATER_DETAILED } from '../core/people/prompt';
 import { messageText } from '../core/refs';
@@ -722,8 +722,7 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
   // 힌트는 이번 턴의 Router 가 본 것만 간다: 부르지 않거나 실패한 턴에 지난 턴 힌트가 갱신기로 가지 않게 먼저 비운다 (같은 입력의 재사용은 그때 힌트를 다시 쓴다)
   routerHints = [];
   if (settings.router !== 'model' || !Object.keys(store.people).length) return null;
-  // 항상 포함·글에 나온 사람·동행·장면 유지만으로 장면 인물 자리가 찼으면 모델이 고른 인물은 들어갈 자리가 없다: 부르지 않는다
-  if (sceneFullByCode(chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) return null;
+  // 켜져 있으면 매 턴 부른다 (2026-11-22 사용자: 코드가 고른 인물로 자리가 찼다고 건너뛰던 조건을 뺐다. 켰는데 한 번도 안 불렸다)
   const names = allNames(roster);
   const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, max: settings.sceneMax, prompt: routerBase(), rules: settings.routerRules, identityOf });
   if (routerCache?.key === built.key) {
@@ -823,7 +822,7 @@ export async function previewPeopleCalls(ctx: ChatContext): Promise<{ router: Ll
   const input = messageText(String(lastUser?.data ?? ''));
   const roster = rosterOf(ctx.char.globalLore);
   const names = allNames(roster);
-  if (settings.router === 'model' && Object.keys(store.people).length && !sceneFullByCode(ctx.chat, { settings, store, sheetOf: () => null, extraNames: extraNames(roster), input })) {
+  if (settings.router === 'model' && Object.keys(store.people).length) {
     const b = buildRouter(ctx.chat, store, names, input, { exclude, recent: settings.recentMsgs, max: settings.sceneMax, prompt: routerBase(), rules: settings.routerRules, identityOf: sheetOf(ctx) });
     out.router = [{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }];
   }

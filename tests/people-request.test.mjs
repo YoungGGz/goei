@@ -8,7 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const dir = await mkdtemp(join(tmpdir(), 'goei-people-req-'));
 await buildWithData({
-  entryPoints: ['src/core/people/request.ts', 'src/core/people/types.ts', 'src/core/people/settings.ts', 'src/core/people/seed.ts', 'src/core/people/base.ts'],
+  entryPoints: ['src/core/people/request.ts', 'src/core/people/types.ts', 'src/core/people/settings.ts', 'src/core/people/seed.ts', 'src/core/people/base.ts', 'src/core/people/store.ts'],
   outdir: dir, outbase: 'src', bundle: true, platform: 'node', format: 'esm', outExtension: { '.js': '.mjs' }, logLevel: 'silent',
 });
 const mod = async (n) => import(pathToFileURL(join(dir, `core/people/${n}.mjs`)));
@@ -17,6 +17,7 @@ const T = await mod('types');
 const St = await mod('settings');
 const Seed = await mod('seed');
 const Base = await mod('base');
+const Store = await mod('store');
 
 const SHEET = ['### Character - Jyaldi', '#### Identity', '- Role: Chief', '#### Voice', '- Short orders.'].join('\n');
 
@@ -200,18 +201,21 @@ test('시트 전체+기록: 시트에서 옮긴 시작값 항목은 다시 넣�
   assert.match(block('record'), /Personality:\n- \[Flaws\] Stubborn/);
 });
 
-test('모델 Router: 코드가 고른 인물로 자리가 차 있으면 부를 필요가 없다 (sceneFullByCode)', () => {
+test('모델 Router: 고른 사람은 글에 나온 사람 뒤, 장면에 남아 있는 사람 앞 (남아 있는 사람이 Router 몫을 밀어내지 않는다)', () => {
   const names = ['가람', '나루', '다온', '라온', '마루', '바다', '사랑'];
   const store = twStore(names);
   const o = (vars = {}) => ({ settings: St.peopleSettings({ $pp_router: 'model', ...vars }), store, sheetOf: () => null });
   const six = twChat(`${names.slice(0, 6).join(', ')}가 모였다.`);
-  assert.equal(R.sceneFullByCode(six, o()), true, '글에 나온 사람만으로 6명');
-  assert.deepEqual(R.peopleBlockFor(six, { ...o(), people: ['사랑'] }).people, names.slice(0, 6), '모델이 고른 사람은 들어갈 자리가 없다');
+  assert.deepEqual(R.peopleBlockFor(six, { ...o(), people: ['사랑'] }).people, names.slice(0, 6), '글에 이름이 나온 사람만으로 찼으면 그대로');
   const five = twChat(`${names.slice(0, 5).join(', ')}가 모였다.`);
-  assert.equal(R.sceneFullByCode(five, o()), false, '자리가 남으면 부른다');
   assert.deepEqual(R.peopleBlockFor(five, { ...o(), people: ['사랑'] }).people, [...names.slice(0, 5), '사랑']);
-  assert.equal(R.sceneFullByCode(five, o({ $pp_always: '사랑' })), true, '항상 포함 1 + 글에 나온 5');
-  assert.equal(R.sceneFullByCode(twChat('아무도 없다.'), o()), false);
+  // 장면에 남아 있는 사람(갱신기가 적어 둔 목록)이 자리를 다 채워도 Router 가 고른 사람이 먼저 든다
+  const one = twChat('가람이 문을 열었다.');
+  const last = one.message.length - 1;
+  const key = Store.messageKey(one.message[last], last);
+  const kept = { ...store, read: { [key]: Store.messageHash(one.message[last]) }, scene: { [key]: ['나루', '다온', '라온', '마루', '바다'] } };
+  assert.deepEqual(R.peopleBlockFor(one, { ...o(), store: kept }).people, ['가람', '나루', '다온', '라온', '마루', '바다'], 'Router 가 없으면 남아 있는 사람으로 채운다');
+  assert.deepEqual(R.peopleBlockFor(one, { ...o(), store: kept, people: ['사랑'] }).people, ['가람', '사랑', '나루', '다온', '라온', '마루'], '글에 나온 사람 → Router → 남아 있는 사람');
 });
 
 test('시트 전체+기록: 넘침 줄이기도 블록에서 뺀 시작값 항목을 세지 않아, 줄일 지난 일이 남아 있는 동안 뒤 인물을 통째로 빼지 않는다', () => {
