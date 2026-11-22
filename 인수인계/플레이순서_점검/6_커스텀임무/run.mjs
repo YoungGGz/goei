@@ -34,6 +34,8 @@ const MARKERS = ['%%SCENE_CARD', '%%/SCENE_CARD%%', '%%GOEI_START%%', '%%/GOEI_S
 const st = (time, place, aff, target = '없음') => `[▣|2025.03.14|${time}|☀️|8°C|${place}|${target}|없음|없음|${aff}|1000]`;
 const FAKE = (n, status, extra = '') => `【가짜 응답 ${n}】${extra ? `\n${extra}` : ''}\n${status}`;
 
+/** 시험 페이지 Math.random 씨앗 (무작위 발생 고정) */
+const SEED = 20261122;
 const results = [];
 let stepNo = 0;
 const step = (name) => { stepNo += 1; return { n: String(stepNo).padStart(2, '0'), name }; };
@@ -52,6 +54,8 @@ const b = await launch();
 /** 페이지 하나에 쓰는 도구 묶음 */
 async function session(chat0, vp = 'pc') {
   const { page, errors } = await boot(b, fx, chat0, vp, { store: STORE });
+  // 무작위 발생(첫 발생 추첨 등)을 고정한다: 판마다 상황판에 깔리는 괴이가 달라 커스텀 임무 목표(교회·소라 랜드 등)와 겹치면 「이미 발생 중인 괴이예요」로 거절돼 점검이 흔들렸다 (제품 코드는 그대로, 시험 페이지의 Math.random 만)
+  await page.evaluate((seed) => { let a = seed >>> 0; Math.random = () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }, SEED);
   const chat = () => page.evaluate(() => JSON.parse(JSON.stringify(window.__chat)));
   const vars = async () => (await chat()).scriptstate ?? {};
   const world = async () => { try { return JSON.parse((await vars()).$goei_world || 'null'); } catch { return null; } };
@@ -74,6 +78,10 @@ async function session(chat0, vp = 'pc') {
   };
   const isOpen = () => page.evaluate(() => { const g = document.querySelector('.gx'); return !!g && g.style.display !== 'none'; });
   const winText = () => page.evaluate(() => document.querySelector('.gx')?.innerText ?? '');
+  /** 임무 창(괴이 목록)에 있는 괴이 중 상황판에 이미 있거나 요청 대기가 아닌 것. prefer 를 먼저, avoid 는 뺀다 (무작위 발생과 겹치지 않게) */
+  const boardAn = async () => { const w = await world(); return new Set([...(w?.an ?? []).flatMap((a) => [a.name, a.presetName]), w?.pending?.an].filter(Boolean)); };
+  const listedAn = () => page.evaluate(() => [...document.querySelectorAll('.gx [data-action="mission-open"], .gx [data-action="mission-pick"]')].map((e) => e.dataset.value ?? '').filter((v) => v.startsWith('an:')).map((v) => v.slice(3)));
+  const freeAn = async (prefer, avoid = []) => { const taken = await boardAn(); return [...prefer, ...(await listedAn())].find((n) => !taken.has(n) && !avoid.includes(n)); };
   /** 본편 요청: 지금 채팅(window.__chat)을 그대로 요청 배열로 (Risu 처럼 마지막 유저 메시지가 끝) */
   const sendExisting = () => page.evaluate(async () => {
     const hist = window.__chat.message.map((m) => ({ role: m.role === 'char' ? 'assistant' : 'user', content: m.data }));
@@ -105,7 +113,7 @@ async function session(chat0, vp = 'pc') {
     await sleep(1600);
     return { disabled };
   };
-  return { page, errors, chat, vars, world, sends, llmCount, act, isOpen, winText, sendExisting, mainSend, botReply, saveState, pick };
+  return { page, errors, chat, vars, world, sends, boardAn, listedAn, freeAn, llmCount, act, isOpen, winText, sendExisting, mainSend, botReply, saveState, pick };
 }
 
 // ════════ 갈래 A: 프리랜서 · 직접 입력 ════════
@@ -333,21 +341,35 @@ const SIT = '아침, 집에서 시작한다.';
   const n1 = (await C.chat()).message.length;
   await openWin(C.page); await sleep(400);
   await C.act('tab', 'mission');
-  await C.act('mission-pick', 'an:명일 아파트');
+  // 상황판에 이미 있는 괴이를 고르면 전처럼 거절 (카드·대기 없음)
+  const taken = await C.boardAn();
+  const busyAn = (await C.listedAn()).find((n) => taken.has(n));
+  if (busyAn) {
+    await C.act('mission-pick', `an:${busyAn}`);
+    await C.act('mission-send');
+    await sleep(800);
+    const cb = await C.chat();
+    check(s, `상황판에 이미 있는 괴이(${busyAn})는 거절: 「이미 발생 중인 괴이예요」, 카드·대기 없음`, cb.message.length === n1 && (await C.winText()).includes('이미 발생 중인 괴이예요') && !(await C.world())?.pending?.an, '거절', { n: cb.message.length, pending: (await C.world())?.pending });
+    await openWin(C.page); await sleep(400);
+    await C.act('tab', 'mission');
+  } else console.log(`   (참고) [${s.n}] 상황판에 임무 창 목록의 괴이가 없어 거절 검사를 건너뜀`);
+  const T1 = await C.freeAn(['명일 아파트']);
+  await C.act('mission-pick', `an:${T1}`);
   await C.act('mission-send');
   await sleep(1200);
   let cc = await C.chat();
-  check(s, '첫 요청: 카드가 「안 보냄」으로 남음', cc.message.length === n1 + 1 && cc.message.at(-1).data.includes('%%SCENE_CARD:'), `${n1 + 1}개`, cc.message.length);
+  check(s, `첫 요청(${T1}): 카드가 「안 보냄」으로 남음`, cc.message.length === n1 + 1 && cc.message.at(-1).data.includes('%%SCENE_CARD:'), `${n1 + 1}개`, cc.message.length);
   await openWin(C.page); await sleep(400);
   await C.act('tab', 'mission');
-  await C.act('mission-pick', 'an:금지된 비디오');
+  const T2 = await C.freeAn(['금지된 비디오'], [T1]);
+  await C.act('mission-pick', `an:${T2}`);
   await C.act('mission-send');
   await sleep(1200);
   cc = await C.chat();
   const w2 = await C.world();
-  const cards = cc.message.filter((m) => m.role === 'user' && m.data.includes('%%SCENE_CARD:'));
-  check(s, '바꿔 끼움: 새 카드 하나만(명일 아파트 카드 사라짐)', cc.message.length === n1 + 1 && cc.message.at(-1).data.includes('CONTINUATION') === false && /Subject: [^\n]*금지된 비디오/.test(cc.message.at(-1).data) && !cc.message.some((m) => /Subject: [^\n]*명일 아파트/.test(m.data)), `${n1 + 1}개 · 금지된 비디오`, cc.message.slice(n1).map((m) => /Subject:[^\n]*/.exec(m.data)?.[0]));
-  check(s, '상황판 요청 대기도 금지된 비디오로 바뀜', w2?.pending?.an === '금지된 비디오', '금지된 비디오', w2?.pending);
+  const subj = (n) => new RegExp(`Subject: [^\\n]*${n}`);
+  check(s, `바꿔 끼움: 새 카드 하나만(${T1} 카드 사라짐 → ${T2})`, cc.message.length === n1 + 1 && cc.message.at(-1).data.includes('CONTINUATION') === false && subj(T2).test(cc.message.at(-1).data) && !cc.message.some((m) => subj(T1).test(m.data)), `${n1 + 1}개 · ${T2}`, cc.message.slice(n1).map((m) => /Subject:[^\n]*/.exec(m.data)?.[0]));
+  check(s, `상황판 요청 대기도 ${T2}로 바뀜`, w2?.pending?.an === T2, T2, w2?.pending);
   await C.saveState(s);
 
   // ── 임무 끄기: 임무 창의 「요청 취소」 ──
@@ -360,16 +382,16 @@ const SIT = '아침, 집에서 시작한다.';
   const w3 = await C.world();
   cc = await C.chat();
   check(s, '요청 취소 → 상황판 대기 비움', !w3?.pending?.an, '대기 없음', w3?.pending, pendBar.includes('요청 대기') ? '' : '(창에 요청 대기 줄이 안 보였음)');
-  check(s, '요청 취소 → 안 보낸 지시문 카드도 채팅에서 빠짐 (카드의 「취소」와 같게)', !cc.message.some((m) => /Subject: [^\n]*금지된 비디오/.test(m.data)), '카드 없음', cc.message.slice(n1).map((m) => `${m.role}:${/Subject:[^\n]*/.exec(m.data)?.[0] ?? m.data.slice(0, 30)}`));
+  check(s, '요청 취소 → 안 보낸 지시문 카드도 채팅에서 빠짐 (카드의 「취소」와 같게)', !cc.message.some((m) => subj(T2).test(m.data)), '카드 없음', cc.message.slice(n1).map((m) => `${m.role}:${/Subject:[^\n]*/.exec(m.data)?.[0] ?? m.data.slice(0, 30)}`));
   const left = cc.message.at(-1)?.data ?? '';
   const shown = (await C.page.evaluate((t) => window.__calls.handlers.display(t), left)).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   writeFileSync(`${OUT}단계${s.n}_${s.name}_화면.txt`, `■ 요청 취소 뒤 임무 창 글\n${await C.winText()}\n\n■ 채팅 속 마지막 메시지 화면 글\n${shown}\n`);
-  check(s, '요청 취소 뒤 채팅 화면에 「전송 대기」 카드가 남지 않음 (창은 대기 없음이라 말함)', !/금지된 비디오/.test(shown), '카드 없음', shown.slice(0, 160));
+  check(s, '요청 취소 뒤 채팅 화면에 「전송 대기」 카드가 남지 않음 (창은 대기 없음이라 말함)', !shown.includes(T2), '카드 없음', shown.slice(0, 160));
   await closeWin(C.page);
   out = await C.sendExisting();
   writeReq(s, out, undefined, '■ 요청 취소 뒤 플레이어가 채팅창 전송을 누름\n');
   all = allText(out);
-  check(s, '취소한 임무 지시문이 모델에 안 감', !/Subject: [^\n]*금지된 비디오/.test(all), '없음', /Subject:[^\n]*금지된 비디오[^\n]*/.exec(all)?.[0] ?? '(없음)');
+  check(s, '취소한 임무 지시문이 모델에 안 감', !subj(T2).test(all), '없음', new RegExp(`Subject:[^\\n]*${T2}[^\\n]*`).exec(all)?.[0] ?? '(없음)');
   await C.saveState(s);
   if (C.errors.length) console.log('C 페이지 오류', C.errors.slice(0, 3));
   await C.page.close();

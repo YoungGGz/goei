@@ -119,3 +119,41 @@ test('안 보낸 임무 카드 물리기: 카드를 빼고 걸어 둔 임무를 
   assert.equal(d.scriptstate.$goei_world, direct.scriptstate.$goei_world);
   assert.equal(m.withdrawUnsent(direct, lore, '명일 아파트'), null);
 });
+
+test('채팅 중 커스텀 임무 턴·보통 턴의 다시 굴리기, 상황판이 안 바뀐 턴, 응답을 지우고 새로 보낸 턴', () => {
+  const S0 = { ...S };
+  const u0 = { role: 'user', data: '시작', chatId: 'u0' };
+  let chat = { message: [u0], scriptstate: { $st_faction: 'A00', $st_pick: 'A00', $ib_affiliation: '관리국', ...m.startWorldVars(catalog, S0, 'A00', never) } };
+  const start = chat.scriptstate;
+  const r1 = '본문 1';
+  chat = m.processOutput({ ...chat, message: [u0, { role: 'char', data: r1, chatId: 'c1' }] }, 1, r1, catalog, S0, never);
+  // 태그 없는 턴을 다시 굴림: 상황판 칸은 지금과 같고, 상태는 그 응답 전(첫 요청 때) 그대로
+  const same = m.rerollRequestVars({ ...chat, message: [u0] }, catalog, S0);
+  assert.equal(same.$an_report, chat.scriptstate.$an_report);
+  assert.equal(same.$goei_world, start.$goei_world);
+  // 채팅 중 커스텀 임무: 창에서 걸고 카드를 보냄 (sendMission 과 같게 지금 상태에만)
+  const w = m.readWorld(chat);
+  assert.equal(m.requestMission(w, catalog, S0, 'an', '명일 아파트'), null);
+  chat = { ...chat, scriptstate: { ...chat.scriptstate, ...m.worldVars(w, catalog, S0, 'A00') } };
+  const pendingAn = chat.scriptstate.$an_report;
+  const card = { role: 'user', data: m.sceneRecord({ target: '명일 아파트', party: '나' }, '지시문'), chatId: 'u2' };
+  const c1 = chat.message[1];
+  const r3 = '본문 3\n[AN|경기도 용인시|명일 아파트|활성|B|없음|버린 상황 글]';
+  const after3 = m.processOutput({ ...chat, message: [u0, c1, card, { role: 'char', data: r3, chatId: 'c3' }] }, 3, r3, catalog, S0, never);
+  assert.ok(after3.scriptstate.$an_report.includes('버린 상황 글'));
+  const v3 = m.rerollRequestVars({ ...after3, message: [u0, c1, card] }, catalog, S0);
+  assert.equal(v3.$an_report, pendingAn, '카드 턴을 다시 굴리면 NEW 줄이 다시 간다');
+  assert.match(v3.$an_report, /NEW \[AN\|[^\n]*명일 아파트/);
+  assert.ok(!v3.$an_report.includes('버린 상황 글'));
+  // 보통 턴(카드 없음)에서 상황판이 바뀐 응답을 다시 굴림
+  const u4 = { role: 'user', data: '살핀다', chatId: 'u4' };
+  const c3 = after3.message[3];
+  const r5 = '본문 5\n[AN|경기도 용인시|명일 아파트|활성|A|없음|두 번째 버린 글]';
+  const after5 = m.processOutput({ ...after3, message: [u0, c1, card, c3, u4, { role: 'char', data: r5, chatId: 'c5' }] }, 5, r5, catalog, S0, never);
+  assert.ok(after5.scriptstate.$an_report.includes('두 번째 버린 글'));
+  const v5 = m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, u4] }, catalog, S0);
+  assert.equal(v5.$an_report, after3.scriptstate.$an_report, '앞 턴이 반영한 상태로 되감는다');
+  // 응답을 지우고 새 메시지를 보냄: 다시 굴리기가 아니라 되감지 않는다
+  assert.equal(m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, u4, { role: 'user', data: '다른 말', chatId: 'u6' }] }, catalog, S0), null);
+  assert.equal(m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, { role: 'user', data: '바꾼 말', chatId: 'u7' }] }, catalog, S0), null);
+});
