@@ -428,3 +428,19 @@ test('망상홈쇼핑: 진실 칸(숨은 원래 용도)을 받아 상품에 둔�
   assert.match(g.LINE, /\|진실$/);
   assert.match(g.BROADCAST, /진실/);
 });
+
+test('망상홈쇼핑 상담원: 지난 주문을 채널 기록 그대로 넘긴다 (이름·치른 것·지금 상태)', () => {
+  const { orderFacts } = homeshop;
+  const base = { item: { name: '달팽이 배꼽 소금', desc: '', effect: '', price: 0, traits: '', icon: '', weight: 0.2 }, pay: 'appear', anchor: 'c1', turn: 1, boxId: 'box1' };
+  const alive = new Set(['c1', 'c2']);
+  const sealed = { ...base, id: 'o1', n: 1, how: '다음 방송 시연 참여', dues: [] };
+  assert.equal(orderFacts([], alive, 3, () => true), '[이 손님의 지난 주문 — 채널 기록에 남은 그대로. 이름|치른 것|지금 상태]\n-');
+  assert.match(orderFacts([sealed], alive, 3, () => true), /\n달팽이 배꼽 소금\|다음 방송 시연 참여\|배송 완료, 상자 미개봉$/);
+  assert.match(orderFacts([sealed], alive, 3, () => false), /열지 않은 상자가 손님에게 없음$/);
+  const opened = { ...sealed, openKey: 'c2', dues: [9] };
+  assert.match(orderFacts([opened], alive, 3, () => true), /\|상자를 열어 받음, ?시연 참여 대기$/);
+  assert.match(orderFacts([opened], alive, 9, () => true), /시연 다녀옴$/);
+  const owe = { ...base, id: 'o2', n: 0, how: '이름 한 글자', dues: [], openKey: 'c2', owe: 8, terms: { money: 0, items: [], appear: 0, other: '이름 한 글자' } };
+  assert.match(orderFacts([owe], alive, 3, () => true), /약조 「이름 한 글자」 대기$/);
+  assert.match(orderFacts([owe], alive, 8, () => true), /약조 「이름 한 글자」 받아 감$/);
+});

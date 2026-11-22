@@ -22,7 +22,7 @@ import { userTurns } from '../core/request';
 import { userInfo } from '../host/user';
 import { fillGuide, guideSections, guideTxt } from '../core/guides';
 import { defStored } from '../core/deftext';
-import { applyShow, boxOrder, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, pruneOrders, parseCue, parseOperator, parseShow, stickerLook, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
+import { applyShow, boxOrder, orderFacts, CLIP_GROUP_LABEL, CUE_CUT_WORD, CUE_EVENT_WORD, HS_AT_VAR, HS_AUD_VAR, HS_BOX, HS_TEL_DEFAULT, hsHost, HS_KEY, hsName, HS_NUM, hsNumVars, hsPayText, hsReach, hsSettings, hsVars, liveOrders, moodMap, newOrder, openOrder, orderOpened, orderPaid, ordersVars, paidOf, pruneOrders, parseCue, parseOperator, parseShow, stickerLook, readAudience, readOrders, readShow, showVars, termsText, turnStep, type HsCue, type HsOrder, type HsPay, type HsPart, type HsScale, type HsSettings, type HsShow, type HsTerms } from '../core/homeshop';
 import { ensureHomeshop, homeshopArt, homeshopStatus, onHomeshopReady } from '../host/homeshop';
 import { mountPlayer, playerCut, playerHold, playerPhone, playerRecentChat, playerSay, playerState, playerTake, setPlayerFeed, stopPlayer } from './hsplayer';
 import { shopSource } from './shop';
@@ -472,6 +472,7 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
     const keep = src.talkMax === undefined ? call.lines : call.lines.slice(-Math.max(1, src.talkMax));
     const body = [
       g('HEAD_ON_AIR', { name: part.item.name, pay: hsPayText(part) || '-', desc: part.item.desc || '-', effect: part.item.effect || '-' }),
+      orderFacts(liveOrders(ctx.chat.scriptstate, alive), alive, userTurns(ctx.chat), boxHeldIn(items, ctx.chat, lastBot(ctx.chat)?.key ?? '')),
       `${g('HEAD_OFFERED')}\n${offerText || '-'}`,
       `${g('HEAD_TERMS')}\n${call.terms ? termsText(call.terms) : g('TERMS_NONE')}`,
       `${g('HEAD_CALL')}\n${keep.map((l) => g(l.who === 'me' ? 'CALL_LINE_ME' : 'CALL_LINE_OP', { text: l.text })).join('\n')}`,

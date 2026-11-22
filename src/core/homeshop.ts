@@ -722,6 +722,19 @@ export const boxLanded = (vars: Vars, lastKey: string, alive: Set<string>): bool
 export const paidOf = (o: HsOrder, turnNow: number): number => o.dues.filter((d) => d <= turnNow).length;
 /** 상자를 열었나 (연 응답이 살아 있을 때만) */
 export const orderOpened = (o: HsOrder, alive: Set<string>): boolean => o.openKey !== undefined && (!o.openKey || alive.has(o.openKey));
+/** 상담원에게 넘기는 지난 주문 (사용자 2026-11-22: 상담원이 지난 주문의 이름을 지어냈다): 주문 조회 화면과 같은 사실을 줄마다. 글은 지침 「망상홈쇼핑」의 ORDERS_* 절.
+ *  held = 열지 않은 상자를 아직 지니고 있는지 */
+export function orderFacts(list: HsOrder[], alive: Set<string>, turnNow: number, held: (boxId: string) => boolean): string {
+  const g = (k: string, v: Record<string, string | number> = {}) => guideTxt('Hs', k, v);
+  const rows = list.map((o) => {
+    const opened = orderOpened(o, alive);
+    const st = [opened ? g('ORDERS_OPENED') : o.boxId && !held(o.boxId) ? g('ORDERS_BOX_GONE') : g('ORDERS_SEALED')];
+    if (opened && o.n > 0) st.push(g(paidOf(o, turnNow) < 1 ? 'ORDERS_DEMO_WAIT' : 'ORDERS_DEMO_DONE'));
+    if (opened && o.terms?.other) st.push(g((o.owe ?? 0) > turnNow ? 'ORDERS_OWE_WAIT' : 'ORDERS_OWE_DONE', { other: o.terms.other }));
+    return g('ORDERS_LINE', { name: o.item.name, how: o.how || '-', state: st.reduce((a, b) => g('ORDERS_AND', { a, b })) });
+  });
+  return `${g('HEAD_ORDERS')}\n${rows.length ? rows.join('\n') : g('ORDERS_NONE')}`;
+}
 /** 호출 턴 뽑기: 지금 턴에서 간격(최소~최대)씩. 다른 주문의 호출 턴과 겹치면 한 턴 미룬다 (한 턴에 하나) */
 export function scheduleDues(taken: number[], turn: number, n: number, gap: [number, number], rnd: () => number = Math.random): number[] {
   const used = new Set(taken);
