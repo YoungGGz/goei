@@ -1,0 +1,401 @@
+[
+  {
+    "unit": [
+      "shop",
+      "shop-judge",
+      "shopctx",
+      "shopfn",
+      "shop-limits",
+      "fix2-shop",
+      "fix2-shop2",
+      "fix3-shop",
+      "audit-shop1121"
+    ],
+    "jobs": [
+      {
+        "script": "@claude-shop.mjs"
+      },
+      {
+        "script": "인수인계/플레이순서_점검/01_상점/run.mjs",
+        "arg": "dir"
+      },
+      {
+        "script": "tests/shop-browser.mjs",
+        "arg": "dir"
+      },
+      {
+        "script": "@shop-fields.mjs"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "orders",
+      "malls-roll",
+      "fix-malls",
+      "items-truth"
+    ],
+    "jobs": [
+      {
+        "script": "@malls.mjs"
+      },
+      {
+        "script": "tests/mall-say-browser.mjs",
+        "arg": "dir"
+      },
+      {
+        "script": "tests/order-ready-browser.mjs",
+        "arg": "dir"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "bmorders",
+      "points-first",
+      "kick-end"
+    ],
+    "jobs": [
+      {
+        "script": "@malls.mjs"
+      },
+      {
+        "script": "@bm-invalid.mjs"
+      },
+      {
+        "script": "@bm-retry.mjs"
+      },
+      {
+        "script": "@bm-pending.mjs"
+      },
+      {
+        "script": "@points-safe.mjs",
+        "arg": "dir"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "homeshop",
+      "homeshop-ask",
+      "hsbox",
+      "hslog",
+      "hsreach",
+      "hsset"
+    ],
+    "jobs": [
+      {
+        "script": "인수인계/플레이순서_점검/04_망상홈쇼핑/run.mjs"
+      },
+      {
+        "script": "tests/homeshop-edge-browser.mjs"
+      },
+      {
+        "script": "tests/homeshop-browser.mjs",
+        "arg": "dir"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "people",
+      "people-*",
+      "fix-people",
+      "fix2-people",
+      "fix2-people2",
+      "fix3-people"
+    ],
+    "jobs": [
+      {
+        "script": "tests/qc-people-live-browser.mjs",
+        "arg": "fixture"
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "PP1"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "PP2"
+        }
+      }
+    ]
+  },
+  {
+    "unit": [
+      "main-single-start",
+      "startitems",
+      "world",
+      "world-draft",
+      "lore",
+      "player",
+      "factions"
+    ],
+    "jobs": [
+      {
+        "script": "tests/qc-settings-start-browser.mjs",
+        "arg": "fixture"
+      },
+      {
+        "script": "@mission.mjs",
+        "arg": "fixture"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "qc-pipeline",
+      "fix-pipeline",
+      "fix2-pipe",
+      "fix2-pipe2",
+      "fix3-pipe",
+      "stale-plugin-msg",
+      "status-context",
+      "status-cols"
+    ],
+    "jobs": [
+      {
+        "script": "@pipeline.mjs",
+        "arg": "fixture"
+      },
+      {
+        "script": "@trace-local.mjs",
+        "arg": "fixture"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "items",
+      "itemstate",
+      "items-away",
+      "fix-items-1121",
+      "fix14-items",
+      "fix2-items",
+      "fix2-items2",
+      "fix3-usebox",
+      "wallet",
+      "ledger-caps",
+      "ledger-caps-chat"
+    ],
+    "jobs": [
+      {
+        "script": "tests/items-browser.mjs",
+        "arg": "dir"
+      },
+      {
+        "script": "tests/usebar-browser.mjs"
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "WL1"
+        }
+      },
+      {
+        "script": "@ledger-mobile.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "WL2"
+        }
+      }
+    ]
+  },
+  {
+    "unit": [
+      "gnet",
+      "gnet-style",
+      "gnet-lb",
+      "boards",
+      "fix-gnet",
+      "fix-gnet-1121",
+      "fix2-gnetwiki"
+    ],
+    "jobs": [
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "G1"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "G3"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "G4"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "G5"
+        }
+      },
+      {
+        "script": "@09-social.mjs",
+        "arg": "fixture"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "phone",
+      "phone-lb",
+      "phonepic",
+      "fix2-phone",
+      "b11-agent-order-phone"
+    ],
+    "jobs": [
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "P1"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "P3"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "P4"
+        }
+      },
+      {
+        "script": "@10-social.mjs",
+        "arg": "fixture"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "wiki",
+      "wiki-lb",
+      "lore-calls",
+      "focus",
+      "reffn"
+    ],
+    "jobs": [
+      {
+        "script": "@wiki-functional.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "W1"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "W2"
+        }
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "W3"
+        }
+      },
+      {
+        "script": "@wiki-refs.mjs"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "consult",
+      "settings",
+      "gen-limits"
+    ],
+    "jobs": [
+      {
+        "script": "tests/consult-all-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "PART": "fresh,misc"
+        }
+      },
+      {
+        "script": "@consult-numeric.mjs",
+        "arg": "fixture"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "assetcopy",
+      "imgprompt",
+      "imgtag",
+      "fix2-img",
+      "fix3-images"
+    ],
+    "jobs": [
+      {
+        "script": "@late-image.mjs"
+      },
+      {
+        "script": "tests/qc-modules-browser.mjs",
+        "arg": "fixture",
+        "env": {
+          "ONLY": "PP3"
+        }
+      },
+      {
+        "script": "@pipeline.mjs",
+        "arg": "fixture"
+      }
+    ]
+  },
+  {
+    "unit": [
+      "trace-phase",
+      "trace-added",
+      "trace-orphan",
+      "joint",
+      "fix4-retry",
+      "llm-craft"
+    ],
+    "jobs": [
+      {
+        "script": "tests/flow-consult-browser.mjs",
+        "arg": "fixture"
+      },
+      {
+        "script": "tests/progwin-browser.mjs",
+        "arg": "dir"
+      },
+      {
+        "script": "@desk-flow.mjs"
+      },
+      {
+        "script": "@trace-local.mjs",
+        "arg": "fixture"
+      },
+      {
+        "script": "@preview-match.mjs"
+      }
+    ]
+  }
+]
