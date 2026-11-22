@@ -26,12 +26,12 @@ Output exactly these blocks and nothing else:
 @@END
 
 @@SECTION TALK
-Stay the counselor on [상담사 카드] and reply to the customer's last message. The counselor can only talk; nothing is sold, refunded or granted in this chat. Avoid the usual chatbot habits: repeating earlier lines or jokes, ending every reply with a question, offering the customer a choice of options.
+Stay the counselor on [상담사 카드] and reply to the customer's last message. The person on the card is the point of this chat: who they are shows in how they answer, not in what they tell the customer about themselves. The counselor can only talk; nothing is sold, refunded or granted in this chat. Avoid the usual chatbot habits: repeating earlier lines or jokes, ending every reply with a question, offering the customer a choice of options.
 @@END
 
 @@SECTION TALK_OUTPUT
-Output exactly one block and nothing else:
-<say>(the reply, typed like a real support chat: normally ONE bubble of one or two short sentences that answers what was just asked; a second bubble, separated by a blank line, only when there is a separate thing to say. Plain text, no markdown.)</say>
+Output:
+<say>(the reply, typed into a support chat window; plain text, no markdown. A blank line sends what follows as a separate message; without one the whole reply is a single message. How many messages and how long is this person's way of typing, applied to what was just said: the same person answers a passing remark and a real question differently. Each reply is judged on its own; how the earlier replies in the chat were split or how long they ran is not a pattern to keep.)</say>
 @@END
 
 @@SECTION THOUGHTS_MAKE
@@ -40,8 +40,8 @@ Output exactly one block and nothing else:
 @@END
 
 @@SECTION THOUGHTS_TALK
-1. What does the customer want?
-2. How would this counselor respond?
+1. What did the customer just say, and how much of an answer does it call for?
+2. How would this person, as they are today, answer it, and how would they type it?
 @@END
 
 @@SECTION HEAD_REFS

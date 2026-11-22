@@ -106,14 +106,14 @@ The owner never ends the dealing; however annoyed, they keep the shop open (neve
 @@END
 
 @@SECTION SELL
-The protagonist is offering to SELL an item to the owner (see [팔려는 물건]). Decide, from the owner's character and the fixed shop identity, whether this shop buys such a thing at all. If it does, judge the item's real worth as a whole — what it is, how rare, its condition, its effect or uses, what it would sell for here (a rare or strange piece may be worth far more than ordinary stock), and what the protagonist paid if known — then name the fair price this owner would pay for it: below what it would sell for, as greedy or generous as the owner is. The protagonist's words (they may name a price, or haggle on your earlier figure) move the figure only as far as this owner would really go. No program checks the figure, so the judgement is yours. Output <offer>N</offer> with the price in won you will pay now (the latest figure, even if unchanged), or <offer>none</offer> if the owner will not buy it. Put the price in the owner's line too. The shelf change mode is normally none while selling.
+The protagonist is offering to SELL an item to the owner (see [팔려는 물건]). Decide, from the owner's character and the fixed shop identity, whether this shop buys such a thing at all. If it does, judge the item's real worth as a whole — what it is, how rare, its condition, its effect or uses, what it would sell for here (a rare or strange piece may be worth far more than ordinary stock), and what the protagonist paid if known — then name the fair price this owner would pay for it: below what it would sell for, as greedy or generous as the owner is. The protagonist's words (they may name a price, or haggle on your earlier figure) move the figure only as far as this owner would really go. No program checks the figure, so the judgement is yours. Output <offer>N</offer> with the price in won you will pay now (the latest figure, even if unchanged), or <offer>none</offer> if the owner will not buy it. The owner's line names the figure when it is new or has changed. The shelf change mode is normally none while selling.
 Naming a price does not close the sale: until it is closed the owner has neither paid nor taken the item, and never speaks as if it had. Close it only when the protagonist's latest words plainly accept your current figure (or tell you to take it): then add <deal/> and let the owner's line pay and take the item. Without <deal/> nothing is sold.
 @@END
 
 @@SECTION TALK_OUTPUT
 Output, in this order:
 <owner>
-the owner's reply, in character, Korean, 1–4 sentences, no stage directions
+the owner's reply, in character, Korean, speech only (no stage directions); as much as this owner would say to that at this point, a word or two when that answers it, more when they have more to say. Each reply is judged on its own; how long the earlier replies ran is not a pattern to keep
 </owner>
 <change mode="none|partial|all">
 none: empty.
@@ -133,8 +133,8 @@ all: full new shelf, one item per line ({line}).
 
 @@SECTION THOUGHTS_TALK
 1. What did the player actually say or want (question, request, haggling, chat)?
-2. Given this owner's character and the shop identity, what is the honest reaction: answer only, fetch something, re-stock the whole shelf, lower a price, refuse, or end the dealing?
-3. Pick exactly one change mode. Only things within the shop identity may be added.
+2. How does this owner, being who they are, take that and answer it?
+3. Does anything on the shelf change because of it? Pick exactly one change mode; when it was only talk, nothing changes. Only things within the shop identity may be added.
 4. Write the owner's line in character.
 @@END
 

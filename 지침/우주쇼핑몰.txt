@@ -116,7 +116,7 @@ Naming a price does not close the sale: until it is closed the owner has neither
 @@SECTION TALK_OUTPUT
 Output, in this order:
 <owner>
-the owner's reply, in character, Korean, 1–4 sentences, no stage directions
+the owner's reply, in character, Korean, speech only (no stage directions); as much as this owner would say to that at this point, a word or two when that answers it, more when they have more to say. Each reply is judged on its own; how long the earlier replies ran is not a pattern to keep
 </owner>
 <change mode="none|partial|all">
 none: empty.
@@ -152,8 +152,8 @@ This mall also takes CUSTOM ORDERS, grudgingly. When the customer asks for somet
 
 @@SECTION THOUGHTS_TALK
 1. What did the player actually say or want (question, request, haggling, chat)?
-2. Given this owner's character and the shop identity, what is the honest reaction: answer only, fetch something, re-stock the whole shelf, refuse, or end the dealing? (Prices are fixed: never lower one.)
-3. Pick exactly one change mode. Only things within the shop identity may be added.
+2. How does the 운영자, being what it is, take that and answer it? (Prices are fixed: never lower one.)
+3. Does anything on the shelf change because of it? Pick exactly one change mode; when it was only talk, nothing changes. Only things within the shop identity may be added.
 4. Write the owner's line in character.
 @@END
 
