@@ -172,8 +172,10 @@ const openSite = async (site) => {
   await act('nav-tab', 'net');
   if (!(await page.$(`.ms-${site}`))) await act('br-go', site, 600);
 };
+const callLog = [];
+const dumpCalls = async (tag) => { const n = await llmCount(); for (let i = 0; i < n; i++) { const m = await llmAt(i); callLog.push(`${tag} #${i} ${String(m[0]?.content ?? '').slice(0, 60).replace(/\n/g, ' ')}`); } };
 const bootChat = async (chat0) => {
-  if (page) { allErrors.push(...errors); await page.close(); }
+  if (page) { await dumpCalls('우주'); allErrors.push(...errors); await page.close(); }
   ({ page, errors } = await boot(b, fx, chat0, 'pc', { store: STORE }));
   await openWin(page); await sleep(300);
   if (await page.evaluate(() => document.querySelector('.gw')?.hidden === false)) await closeEditor(page, true);
@@ -580,7 +582,10 @@ let snapAfterBuy;
   // 이 채팅(다시 굴린 c1b)은 이미 이 턴에 진열을 받았다 → 새 턴으로 넘긴 뒤 연다 (자동 호출은 턴마다 한 번)
   await closeWin(page);
   await mainRequest('잠깐 다른 일을 한다.', 'u2d');
+  const nb = await llmCount();
   await botReply(C2.replace('2800000', '10000000'), 'c2d');
+  await sleep(1500);
+  note(s, '응답 처리 중 나간 보조 호출 수(이 갈래 앞)', (await llmCount()) - nb);
   const n0 = await llmCount();
   await openSite('cos');
   await waitLlm(n0);
@@ -843,6 +848,8 @@ const bids = {};
   await saveState(s);
 }
 
+await dumpCalls('포인트');
+writeFileSync(`${OUT}호출목록.txt`, callLog.join('\n'));
 allErrors.push(...errors);
 writeFileSync(`${OUT}결과.json`, JSON.stringify({ commit: process.env.GIT_COMMIT ?? '', results, notes, pageErrors: allErrors }, null, 2));
 const fail = results.filter((r) => !r.ok);
