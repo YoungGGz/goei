@@ -139,7 +139,7 @@ test('자료·절: 상태 그림이 여러 장인 물건은 items_now 에 pictur
   assert.equal(U.buildUpdate(c2, store, [1], { settings: s, system: 'S', values: {}, names, items: null, away: [{ name: '우산' }] }).data.items_away, undefined, '소지품 절이 꺼져 있으면 없음');
   for (const [kind, text] of [['detailed', P.UPDATER_DETAILED], ['compact', P.UPDATER_COMPACT]]) {
     const g = U.assemblePrompt(text, new Set(['items']));
-    for (const w of ['`unequip`', '`left`', '`place`', '`pictures`', '`items_away`', 'new|update|unequip|left|gone|destroyed']) assert.ok(g.includes(w), `${kind}: ${w}`);
+    for (const w of ['`unequip`', '`left`', '`place`', '`pictures`', '`items_away`', '`equip`', 'new|update|equip|unequip|left|gone|destroyed']) assert.ok(g.includes(w), `${kind}: ${w}`);
   }
 });
 

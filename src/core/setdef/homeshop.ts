@@ -21,7 +21,7 @@ const mm = (k: string): SetCtl => pair(...HS_PAIRS[k]);
 export const HS_TEL_KEY = '$hs_tel';
 export const HS_RETRY_KEY = '$hs_retry';
 /** 켬/끔 줄 */
-export const HS_FLAG: Record<string, string> = { net: HS_KEY.net, cut: HS_KEY.cut, bulb: HS_KEY.bulb, tear: HS_KEY.tear, scan: HS_KEY.scan, turn: HS_KEY.turn, lock: HS_KEY.lock, drop: HS_KEY.drop, aud: HS_KEY.aud, peek: HS_KEY.peek, say: HS_KEY.say, barter: HS_KEY.barter, talk: HS_KEY.talk };
+export const HS_FLAG: Record<string, string> = { net: HS_KEY.net, cut: HS_KEY.cut, bulb: HS_KEY.bulb, tear: HS_KEY.tear, scan: HS_KEY.scan, turn: HS_KEY.turn, lock: HS_KEY.lock, drop: HS_KEY.drop, aud: HS_KEY.aud, peek: HS_KEY.peek, say: HS_KEY.say, barter: HS_KEY.barter, talk: HS_KEY.talk, hangup: HS_KEY.hangup };
 /** 기본값이 든 글 줄: [변수, 기본값, 글자 수 상한] (core/deftext: 기본값과 같거나 비우면 저장하지 않는다) */
 export const HS_DEF_TEXT: Record<string, [string, string, number]> = { tel: [HS_TEL_KEY, HS_TEL_DEFAULT, 20], read: [HS_KEY.read, HS_READ_DEFAULT, 200] };
 /** 그 밖의 줄 */
@@ -86,6 +86,7 @@ export const HOMESHOP_SET: SetPage = {
       rows: [
         row('barter', '물건 맞교환', on, '전화 주문에서 가진 물건을 내밀면 상담원이 감정해 받거나, 거절하거나, 더 내라고 해요. 감정할 때마다 한 번 호출해요.'),
         row('talk', '상담원과 흥정', on, '전화 주문에서 상담원에게 말로 조건을 정할 수 있어요. 한 마디마다 한 번 호출해요.'),
+        row('hangup', '통화 끊음', on, '켜면 상담원이 먼저 전화를 끊을 수 있어요.'),
         row('talkKeep', '통화 기록 줄 수', num('talkKeep'), '전화 주문 한 통화에서 남겨 두는 말 줄 수예요. 넘으면 오래된 말부터 지워요.'),
         row('orderKeep', '주문 기록 수', num('orderKeep'), '남겨 두는 주문 수예요. 새로 주문할 때 이 수를 넘으면 시연 호출까지 끝난 주문과 없던 일이 된 주문을 오래된 것부터 지워요. 상자를 아직 안 연 주문, 시연 호출이 남은 주문, 방금 상자를 연 주문은 지우지 않아서 이 수보다 많이 남을 수 있어요.'),
         row('peek', '스티커 들추기', on, '상품 스티커 창에서 모서리를 들추면 스티커 밑에 찍힌 원래 용도가 몇 글자만 보여요.'),

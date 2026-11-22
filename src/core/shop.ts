@@ -911,7 +911,7 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
     }
   }
   const closed = st.closed || (kick && r.closed);
-  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-keep.talk), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
+  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-keep.talk), closed, sell: closed && !(r.deal && typeof sell?.price === 'number') ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
 }
 
 /** 견적 수락 표시 (없거나 이미 수락했으면 null) */
@@ -1223,9 +1223,10 @@ export function programPrompt(src: ShopSource, s: ShopSettings, fill: Record<str
 }
 /** 망상홈쇼핑 전화 주문 상담원 (물건 맞교환 감정·흥정, 11-15 사용자: 상담원은 사람이 아니고 채널 몫부터 챙겨 후려친다).
  *  system: 누가 무엇을 아는지(KNOWS) + 상담원 + 맞교환/흥정 + 출력 꼴. user: 참고 자료·맥락(편성과 같은 길) + 지금 상품 + 내민 물건 + 지금 조건 + 통화 */
-export function operatorPrompt(src: ShopSource, s: ShopSettings, mode: 'barter' | 'talk', body: string, noMoney: boolean): CraftMessage[] {
+export function operatorPrompt(src: ShopSource, s: ShopSettings, mode: 'barter' | 'talk', body: string, noMoney: boolean, hangup: boolean): CraftMessage[] {
   const g = G('Hs');
-  const system = [fillGuide(g.KNOWS ?? '', {}), [fillGuide(g.OPERATOR ?? '', {}), fillGuide(mode === 'barter' ? g.OPERATOR_BARTER ?? '' : g.OPERATOR_TALK ?? '', {}), noMoney ? fillGuide(g.OPERATOR_NO_MONEY ?? '', {}) : ''].filter(Boolean).join(' '), fillGuide(g.OPERATOR_OUTPUT ?? '', {}), src.language ?? ''].filter(Boolean).join('\n\n');
+  // 통화 끊음 (상점의 KICK_ON·KICK_OFF·TALK_OUTPUT_END 와 같은 꼴): 켜면 끊을 수 있다는 절 + 출력 꼴 끝 절, 끄면 끊지 않는다는 절
+  const system = [fillGuide(g.KNOWS ?? '', {}), [fillGuide(g.OPERATOR ?? '', {}), fillGuide(mode === 'barter' ? g.OPERATOR_BARTER ?? '' : g.OPERATOR_TALK ?? '', {}), noMoney ? fillGuide(g.OPERATOR_NO_MONEY ?? '', {}) : '', fillGuide((hangup ? g.OPERATOR_HANGUP_ON : g.OPERATOR_HANGUP_OFF) ?? '', {})].filter(Boolean).join(' '), [fillGuide(g.OPERATOR_OUTPUT ?? '', {}), hangup ? fillGuide(g.OPERATOR_OUTPUT_END ?? '', {}) : ''].filter(Boolean).join('\n'), src.language ?? ''].filter(Boolean).join('\n\n');
   return craft([{ role: 'system', content: system }, { role: 'user', content: `${material(src, s, channelHead(src.st), 'Hs')}\n\n${body}\n\n${guideTxt('Hs', 'TASK_OPERATOR')}` }], s, fillGuide(g.THOUGHTS_OPERATOR ?? '', {}));
 }
 /** 망상홈쇼핑 머리 (지침 「망상홈쇼핑」의 HEAD_CHANNEL · HEAD_CHANNEL_HOST 절) */

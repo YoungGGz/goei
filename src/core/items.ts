@@ -1383,7 +1383,7 @@ function unEmptyName(it: Items, alive: Set<string>, id: string, icon: string | u
  * 보고된 변화를 목록에 (2026-11-12 다시 짬, /bugs_1112/물건_상태_그림_조사와_고침안.md 10절). 줄은 그 응답에 묶인다.
  *  new 더하기(같은 이름은 갱신 · 치운 같은 이름은 되살림 · 「빈 X」가 있는데 「… X」가 새로 오면 그 줄을 바꿈)
  *  update 설명·효과·상태·남은 횟수·무게·그림 말(상태가 바뀌면 갱신기가 그림을 다시 고른다) — 사용·장착 갈래는 받지 않는다 (갈래는 들어올 때 표로 정한 것. 「equip: none」에 갈래가 지워져 장착 단추가 사라지던 것)
- *  unequip 장착만 풂 · left 두고 옴(자리) · gone 없어짐 · destroyed 파괴 — 모두 숨기기만 하고 지우지 않는다 (removeItem)
+ *  equip 지닌 것을 장착 칸에(빈 칸이 없으면 그대로) · unequip 장착만 풂 · left 두고 옴(자리) · gone 없어짐 · destroyed 파괴 — 모두 숨기기만 하고 지우지 않는다 (removeItem)
  * 안전망: update 의 설명에 「두고 옴」 말이 있으면 left 로, 「벗음」 말만 있으면 unequip 으로 처리한다 (설정의 말 표).
  * opts.order = 채팅의 메시지 키 차례: 사용자가 「버리기」로 치운 물건은 버린 뒤의 메시지를 근거로 한 new 일 때만 되살린다
  */
@@ -1401,7 +1401,10 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
       if (word) c = { ...c, action: 'left' };
       else if (offWordIn(c.desc) && isEquipped(cur, live)) it = offItem(it, cur, c);
     }
-    if (c.action === 'unequip') {
+    if (c.action === 'equip') {
+      // 본문에서 입거나 손에 듦 (사용자 2026-11-22: 장착은 본문을 따른다): 제 갈래 칸, 갈래가 없으면 손 칸. 빈 칸이 없으면 그대로 둔다
+      if (cur && !isEquipped(cur, live)) it = equipItem(it, alive, cur.id);
+    } else if (c.action === 'unequip') {
       if (cur && isEquipped(cur, live)) it = offItem(it, cur, c);
     } else if (c.action === 'left') {
       if (cur) it = removeItem(it, cur.id, 'left', 'story', c.anchor, { quote: c.quote, place: c.place, ...(c.desc && !c.place ? { note: c.desc } : {}) });
@@ -1435,6 +1438,12 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
         continue;
       }
       it = addItem(it, alive, { name: c.name, desc: c.desc, effect: c.effect, use: c.use, uses: c.uses, equip: c.equip ?? undefined, state: c.state, icon: c.icon, weight: c.weight, from: 'story', anchor: c.anchor, quote: c.quote });
+      // 얻자마자 입었거나 손에 든 것은 장착 칸에 (되찾은 것도 같다)
+      if (c.worn) {
+        const now = liveItems(it, alive);
+        const got = now.find((e) => sameItemName(e.name, c.name));
+        if (got && !isEquipped(got, now)) it = equipItem(it, alive, got.id);
+      }
     }
   }
   return it;

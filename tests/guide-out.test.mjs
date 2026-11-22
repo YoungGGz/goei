@@ -169,9 +169,22 @@ test('기본 지침으로 만든 요청문 = 옮기기 전 코드가 만들던 �
     ['" to add, "~ 이름|새값" to change a price (won, or the agreed payment in words), "- 이름" to remove.', '" to add, "- 이름" to remove. Prices are fixed, so never change one.'],
     ['answer only, fetch something, re-stock the whole shelf, lower a price, refuse, or end the dealing?', 'answer only, fetch something, re-stock the whole shelf, refuse, or end the dealing? (Prices are fixed: never lower one.)'],
     ['never add an item and never re-stock the shelf (no "+" lines, no mode all). A price may still change ("~" lines) and an item may be withdrawn ("-" lines).', 'never add an item and never re-stock the shelf (no "+" lines, no mode all). Prices stay as listed (no "~" lines); an item may be withdrawn ("-" lines).'],
+    // 「문의 끊음」(사용자): 우주 쇼핑몰은 흥정이 없어 「끝없는 흥정」이 안 맞는다 — 그 몰 지침의 KICK_ON·KICK_OFF 만 운영자 글로
+    ['If the owner has had enough (insults, endless haggling, trouble), they may end the dealing: say so in character and add <closed/>.', 'If the 운영자 has had enough of this customer, by its own odd standards, it may end the enquiry: it says so in its own voice, and <closed/> follows after the blocks. Only the enquiry ends; the page goes on selling at its fixed prices.'],
+    ['<closed/> only if the owner ends the dealing.', '<closed/> only if the 운영자 ends the enquiry.'],
+    ['The owner never ends the dealing; however annoyed, they keep the shop open (never output <closed/>).', 'The 운영자 never ends the enquiry; it keeps answering (never output <closed/>).'],
   ];
   const cosLater = (k, t) => (/\.cos\b/.test(k) ? [...COS_LATER, ...COS_LATER.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t) : t);
-  for (const k of names) { const a = BASE[k], b = cosLater(k, later(OLD.calls[k])); if (a !== b && process.env.DBG) { let i = 0; while (a[i] === b[i]) i++; console.log(k, i, JSON.stringify(a.slice(i - 80, i + 160)), JSON.stringify(b.slice(i - 80, i + 160))); } assert.equal(a, b, k); }
+  // 사용자 2026-11-22: 주인·운영자 답 길이를 문장 수로 못박지 않는다, 반응을 메뉴에서 고르게 하지 않는다, 값은 새로 부르거나 바뀔 때만 말한다
+  const TALK_1122 = [
+    ["the owner's reply, in character, Korean, 1–4 sentences, no stage directions", "the owner's reply, in character, Korean, speech only (no stage directions); as much as this owner would say to that at this point, a word or two when that answers it, more when they have more to say. Each reply is judged on its own; how long the earlier replies ran is not a pattern to keep"],
+    ["2. Given this owner's character and the shop identity, what is the honest reaction: answer only, fetch something, re-stock the whole shelf, lower a price, refuse, or end the dealing?\n3. Pick exactly one change mode. Only things within the shop identity may be added.", '2. How does this owner, being who they are, take that and answer it?\n3. Does anything on the shelf change because of it? Pick exactly one change mode; when it was only talk, nothing changes. Only things within the shop identity may be added.'],
+    ["2. Given this owner's character and the shop identity, what is the honest reaction: answer only, fetch something, re-stock the whole shelf, refuse, or end the dealing? (Prices are fixed: never lower one.)\n3. Pick exactly one change mode. Only things within the shop identity may be added.", '2. How does the 운영자, being what it is, take that and answer it? (Prices are fixed: never lower one.)\n3. Does anything on the shelf change because of it? Pick exactly one change mode; when it was only talk, nothing changes. Only things within the shop identity may be added.'],
+    ["Put the price in the owner's line too.", "The owner's line names the figure when it is new or has changed."],
+    ["5. Write the owner's line with the figure, and the <offer>.", "5. Write the owner's line (it names the figure when the figure is new or has changed), and the <offer>."],
+  ];
+  const talk1122 = (t) => [...TALK_1122, ...TALK_1122.map(([a, b]) => [esc(a), esc(b)])].reduce((x, [a, b]) => x.split(a).join(b), t);
+  for (const k of names) { const a = BASE[k], b = talk1122(cosLater(k, later(OLD.calls[k]))); if (a !== b && process.env.DBG) { let i = 0; while (a[i] === b[i]) i++; console.log(k, i, JSON.stringify(a.slice(i - 80, i + 160)), JSON.stringify(b.slice(i - 80, i + 160))); } assert.equal(a, b, k); }
 });
 
 test('새 절이 없는 지침(옛 글로 고쳐 둔 것)이면 코드에 남긴 옛 글을 쓴다: 요청문이 같다', () => {

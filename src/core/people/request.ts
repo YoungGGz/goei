@@ -35,19 +35,14 @@ export interface RequestOpts {
   people?: string[];
 }
 
-/** 코드가 고르는 장면 인물: 항상 포함(always) + 글에 이름이 나온 사람·동행·장면 유지(byCode). 자리 수는 설정 「장면 인물 수」(항상 포함이 더 많으면 그 수) */
-function codePeople(chat: Chat, o: RequestOpts): { always: string[]; byCode: string[]; max: number } {
+/** 코드가 고르는 장면 인물: 항상 포함(always) + 글에 이름이 나온 사람·동행(named) + 장면에 남아 있는 사람(carried, 설정 「장면 인물 유지」).
+ *  자리 수는 설정 「장면 인물 수」(항상 포함이 더 많으면 그 수) */
+function codePeople(chat: Chat, o: RequestOpts): { always: string[]; named: string[]; carried: string[]; max: number } {
   const match = nameMatcher(entriesOf(o.store, o.extraNames ?? {}));
   const always = o.settings.always.filter((n) => o.store.people[n]);
-  const byCode = scenePeople(chat, o.store, match, { input: o.input, max: o.settings.sceneMax, carry: o.settings.sceneCarry ? carriedScene(o.store, chat) : [] }).filter((n) => !always.includes(n));
-  return { always, byCode, max: Math.max(o.settings.sceneMax, always.length) };
-}
-
-/** 코드가 고른 인물만으로 장면 인물 자리가 찼나. 차 있으면 모델 Router 가 고른 인물은 전부 잘리므로 그 호출을 건너뛴다 */
-export function sceneFullByCode(chat: Chat, o: RequestOpts): boolean {
-  if (!o.settings.on) return false;
-  const c = codePeople(chat, o);
-  return c.always.length + c.byCode.length >= c.max;
+  const named = scenePeople(chat, o.store, match, { input: o.input, max: o.settings.sceneMax }).filter((n) => !always.includes(n));
+  const carried = (o.settings.sceneCarry ? carriedScene(o.store, chat) : []).filter((n) => !always.includes(n) && !named.includes(n));
+  return { always, named, carried, max: Math.max(o.settings.sceneMax, always.length) };
 }
 
 /** 기록 문서 블록 (설정 「기록 문서 포함」): 사건·장소·세력·물건 문서 가운데 장면과 관련된 것(문서 이름이 입력·최근 글에 나왔거나 장면 인물이 얽힌 항목)을
@@ -68,10 +63,10 @@ export function peopleBlockFor(chat: Chat, o: RequestOpts): { text: string; peop
   // 코드 Router(이름이 직접 나온 인물·동행)는 늘 들어가고, 모델 Router 가 더 고른 인물(이름 없이 가리킨 제3자 등)을 뒤에 합친다.
   // 2026-11-07 전수검사 2 의 B: 모델 결과가 코드 결과를 대체하면 모델이 빠뜨린 인물이 그 턴 기록에서 사라졌다 (원본 includeMentionedCharacters 와 같게)
   // 항상 포함할 인물(설정 always, 원본 tracked)은 맨 앞에: 글에 안 나와도 그 턴 기록·Director 자료에 든다
-  // 장면에 남아 있는 인물(설정 「장면 인물 유지」)은 글에 나온 사람·동행 칸 뒤, 모델 Router 가 고른 사람 앞
-  const { always, byCode, max } = codePeople(chat, o);
-  const byModel = (o.people ?? []).filter((n) => o.store.people[n] && !always.includes(n) && !byCode.includes(n));
-  const people = [...always, ...byCode, ...byModel].slice(0, max);
+  // 장면에 남아 있는 인물(설정 「장면 인물 유지」)은 모델 Router 가 고른 사람 뒤: 앞에 두면 남아 있는 사람만으로 자리가 차 Router 몫이 늘 잘렸다 (2026-11-22 사용자: Router 를 켰는데 작동을 안 한다)
+  const { always, named, carried, max } = codePeople(chat, o);
+  const byModel = (o.people ?? []).filter((n) => o.store.people[n] && !always.includes(n) && !named.includes(n));
+  const people = [...new Set([...always, ...named, ...byModel, ...carried])].slice(0, max);
   if (!people.length) return { text: '', people: [], sheets: [] };
   const live: Liveness = liveness(chat);
   // 기록 문서 (설정 「기록 문서 포함」, 기본 끔): 컨텍스트 글자 상한을 「장면 인물 수 + 1」로 나눈 한 몫까지 쓰고, 쓴 만큼 인물 기록의 상한에서 뺀다

@@ -56,7 +56,7 @@ export interface SceneOpts {
   carry?: string[];
 }
 
-/** 장면 인물: 기록이 있는 사람 중 최근 글에 나온 사람 + 동행 칸 + 장면에 남아 있는 사람(carry). 나온 순서 (최근 글 먼저) */
+/** 장면 인물: 기록이 있는 사람 중 최근 글에 나온 사람 + 동행 칸. 나온 순서 (최근 글 먼저) */
 export function scenePeople(chat: Chat, store: PeopleStore, match: (text: string) => string[], o: SceneOpts = {}): string[] {
   const list = Array.isArray(chat.message) ? chat.message : [];
   const recent = list.slice(-(o.recent ?? 2)).reverse().map((m) => messageText(String(m.data ?? '')));
@@ -72,7 +72,6 @@ export function scenePeople(chat: Chat, store: PeopleStore, match: (text: string
     const tags = findStatusTags(String(lastBot.data ?? ''));
     for (const c of tags.at(-1)?.companions ?? []) for (const n of match(c)) push(n);
   }
-  for (const n of o.carry ?? []) push(n);
   return out.slice(0, o.max ?? Number(PP_DEFAULTS.scene_max));
 }
 

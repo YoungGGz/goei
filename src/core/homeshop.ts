@@ -131,7 +131,7 @@ export const HS_KEY = {
   clips: '$hs_clips', read: '$hs_read', scalePc: '$hs_scale_pc', scalePhone: '$hs_scale_ph',
   next: '$hs_next', turn: '$hs_turn', lock: '$hs_lock', left: '$hs_left',
   drop: '$hs_drop', dropRate: '$hs_drop_rate', dropFast: '$hs_drop_fast', dropStep: '$hs_drop_step', soonAt: '$hs_soon_at', endLo: '$hs_end_lo', endHi: '$hs_end_hi',
-  callLo: '$hs_call_lo', callHi: '$hs_call_hi', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk',
+  callLo: '$hs_call_lo', callHi: '$hs_call_hi', aud: '$hs_aud_on', peek: '$hs_peek', say: '$hs_say', barter: '$hs_barter', talk: '$hs_talk', hangup: '$hs_hangup',
   sayHost: '$hs_say_host', sayFlow: '$hs_say_flow', prevKeep: '$hs_prev_keep', talkKeep: '$hs_talk_keep', orderKeep: '$hs_order_keep', logKeep: '$hs_log_keep',
 } as const;
 /** 숫자 칸 범위·기본값 (설정 화면과 읽기가 같이 쓴다) */
@@ -240,6 +240,8 @@ export interface HsSettings {
   say: boolean;
   barter: boolean;
   talk: boolean;
+  /** 상담원이 먼저 전화를 끊을 수 있음 (끄면 응답의 <hangup/> 를 무시) */
+  hangup: boolean;
   /** 내 채팅 한 번에 같이 넘기는 진행자 대사 줄 수 · 흐른 채팅 줄 수 (내 줄까지 쳐서) */
   sayHost: number;
   sayFlow: number;
@@ -297,6 +299,7 @@ export function hsSettings(vars: Vars): HsSettings {
     say: vars?.[HS_KEY.say] !== '0',
     barter: vars?.[HS_KEY.barter] !== '0',
     talk: vars?.[HS_KEY.talk] !== '0',
+    hangup: vars?.[HS_KEY.hangup] !== '0',
     sayHost: n(vars, 'sayHost'),
     sayFlow: n(vars, 'sayFlow'),
     keep: { prev: n(vars, 'prevKeep'), talk: n(vars, 'talkKeep'), orders: n(vars, 'orderKeep'), log: n(vars, 'logKeep') },
@@ -348,6 +351,8 @@ export interface HsPart {
   inst?: number;
   /** 방송에서 정말 매진됐다 (큐시트의 sold 줄이 나온 뒤). 다시 열어도 매진 그대로, 주문을 받지 않는다 (11-15 사용자) */
   out?: true;
+  /** 상담원이 먼저 전화를 끊었다: 끊으며 한 마지막 말. 이 부는 전화 주문을 더 받지 않는다 (다시 열어도 그대로, 다음 부는 새 통화) */
+  hung?: string;
   /** 이 부가 방송되는 동안 흐르는 시청자 채팅 (11-12 사용자: 상품마다) */
   chat?: HsChatLine[];
 }
@@ -745,11 +750,16 @@ export function termsText(t: HsTerms, money = true): string {
   return parts.join(` ${guideTxt('Hs', 'ORDER_JOIN').trim() || '+'} `);
 }
 /** 상담원 응답: <operator> 말 + <terms> 조건 (「none」이면 조건 없음). 물건 이름은 내민 물건 가운데서만 찾는다 (모르는 이름은 버림). 값의 크기는 거르지 않는다 — 판단은 상담원(모델) 몫 */
-export function parseOperator(raw: string, offered: { id: string; name: string }[]): { line: string; terms: HsTerms | null } {
-  const line = clean(block(raw, 'operator'), 1000);
+export function parseOperator(raw: string, offered: { id: string; name: string }[], canHangup: boolean): { line: string; terms: HsTerms | null; hangup: boolean } {
+  // 상담원 말 안에 든 표식 글자는 보이지 않게 지운다. 말 맨 끝에 붙은 것은 끊음으로 친다 (말 가운데 것은 아님)
+  const inner = block(raw, 'operator');
+  const tail = /<hangup\s*\/?>\s*$/i.test(inner);
+  const line = clean(inner.replace(/<hangup\s*\/?>/gi, ''), 1000);
   if (!line) throw new HsError(guideTxt('Hs', 'ERR_NO_OPERATOR'));
+  // <hangup/> 은 상담원 말 밖에서, 줄 머리나 다른 블록 바로 뒤에 놓인 것만 (상점의 <closed/> 와 같은 기준). 설정 「통화 끊음」이 꺼져 있으면 읽지 않는다
+  const hangup = canHangup && (tail || /(?:^|<\/\w[\w-]*\s*>|\/>)[ \t]*<hangup\s*\/?>/im.test(raw.replace(/<operator\b[^>]*>[\s\S]*?<\/operator\s*>/gi, '')));
   const body = block(raw, 'terms');
-  if (!body || /^\s*(none|없음|-)\s*$/i.test(body)) return { line, terms: null };
+  if (!body || /^\s*(none|없음|-)\s*$/i.test(body)) return { line, terms: null, hangup };
   const t: HsTerms = { money: 0, items: [], appear: 0, other: '' };
   const key = (n: string) => n.replace(/\s+/g, '').toLowerCase();
   for (const l of body.split('\n')) {
@@ -765,7 +775,7 @@ export function parseOperator(raw: string, offered: { id: string; name: string }
       if (hit && !t.items.some((x) => x.id === hit.id)) t.items.push(hit);
     }
   }
-  return { line, terms: t.money || t.items.length || t.appear || t.other ? t : null };
+  return { line, terms: t.money || t.items.length || t.appear || t.other ? t : null, hangup };
 }
 const boxName = (name: string) => guideTxt('Hs', 'BOX_NAME', { name }).slice(0, 30);
 /** 새 주문 (장부 줄). 상자 물건은 부른 쪽이 소지품에 넣고 boxId 를 채운다. 출연 호출 턴은 상자를 열 때 뽑는다(openOrder) */

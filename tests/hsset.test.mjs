@@ -12,7 +12,7 @@ test('망상홈쇼핑 설정: 묶음과 줄 — 이 페이지에만 있는 줄�
     ['편성', ['cue', 'chat', 'prevKeep']],
     ['방송 흐름', ['speed', 'hold', 'frame', 'chatGap', 'next', 'turn', 'lock']],
     ['남은 수량', ['left', 'drop', 'dropRate', 'dropFast', 'dropStep', 'soonAt', 'end']],
-    ['주문', ['barter', 'talk', 'talkKeep', 'orderKeep', 'peek']],
+    ['주문', ['barter', 'talk', 'hangup', 'talkKeep', 'orderKeep', 'peek']],
     ['컨텍스트 포함', ['call', 'aud', 'logKeep']],
     ['진행자 동작', ['fill', 'fillCool', 'rareP', 'rareCool', 'read', 'clips']],
     ['방송 화면', ['tel', 'cut', 'bulb', 'tear', 'tearP', 'scan', 'scalePc', 'scalePh']],

@@ -1,27 +1,20 @@
-// PC 왼쪽 메뉴를 끌어서 (11-22 사용자): 메뉴 위에서 옆으로 쓸면(손가락) 또는 끌면(마우스) 접고 펴고,
-// 접은 아이콘 줄을 위아래로 끌면 아이콘 묶음 자리를 옮긴다. 표시는 따로 없다.
+// 접은 PC 메뉴의 아이콘 묶음 자리 옮기기 (11-22 사용자): 접은 아이콘 줄을 위아래로 끌면(손가락·마우스) 묶음이 따라 움직인다.
+// 옆으로 쓸기는 여기서 받지 않는다 — 메뉴 위에서도 뒤로·앞으로 쓸기(ui/swipeback.ts)가 받는다. 접고 펴기는 ‹ › 줄 끝의 단추.
 // 폰 배치의 아래 바에서는 하지 않는다. 아이콘 묶음 자리는 남는 높이를 위·아래 빈칸(.gx-nav-top / .gx-nav-gap)이 나눠 갖는 몫(0~100)이다.
 import { isPhone, zoomK } from './media';
 
-const FIRE = 40;
 /** 손가락을 뗀 뒤 브라우저가 지어내는 마우스 이벤트를 거르는 시간 */
 const TOUCH_GHOST_MS = 800;
 const bound = new WeakSet<HTMLElement>();
 
-export interface NavSwipeActs {
-  /** 접기(true)·펴기(false) */
-  fold: (on: boolean) => void;
-  /** 접은 아이콘 묶음 자리 (0 = 맨 위, 100 = 맨 아래) */
-  place: (at: number) => void;
-}
-
-export function bindNavSwipe(root: HTMLElement, acts: NavSwipeActs): void {
+/** place = 접은 아이콘 묶음 자리를 저장 (0 = 맨 위, 100 = 맨 아래) */
+export function bindNavSwipe(root: HTMLElement, place: (at: number) => void): void {
   if (bound.has(root)) return;
   bound.add(root);
   let nav: HTMLElement | null = null;
   let x0 = 0;
   let y0 = 0;
-  let mode: 'off' | 'wait' | 'side' | 'move' = 'off';
+  let mode: 'off' | 'wait' | 'move' = 'off';
   let free = 0;
   let top0 = 0;
   let at = 0;
@@ -33,7 +26,7 @@ export function bindNavSwipe(root: HTMLElement, acts: NavSwipeActs): void {
   const start = (t: EventTarget | null, x: number, y: number): void => {
     mode = 'off';
     if (isPhone()) return;
-    nav = (t as Element | null)?.closest?.<HTMLElement>('.gx-nav') ?? null;
+    nav = (t as Element | null)?.closest?.<HTMLElement>('.gx-nav.folded') ?? null;
     if (!nav) return;
     x0 = x;
     y0 = y;
@@ -46,40 +39,27 @@ export function bindNavSwipe(root: HTMLElement, acts: NavSwipeActs): void {
     const dy = y - y0;
     if (mode === 'wait') {
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return false;
-      if (Math.abs(dx) > Math.abs(dy) * 1.4) mode = 'side';
-      else if (nav.classList.contains('folded') && Math.abs(dy) > Math.abs(dx) * 1.4) {
-        const { top, gap } = parts(nav);
-        const th = top?.offsetHeight ?? 0;
-        free = th + (gap?.offsetHeight ?? 0);
-        // 아이콘이 칸을 꽉 채워 남는 높이가 없으면 옮길 데가 없다 (그때는 칸이 스크롤된다)
-        if (!top || !gap || free < 8) return (mode = 'off'), false;
-        top0 = th;
-        at = (th / free) * 100;
-        mode = 'move';
-      } else return (mode = 'off'), false;
-    }
-    if (mode === 'move') {
+      if (Math.abs(dy) <= Math.abs(dx) * 1.4) return (mode = 'off'), false;
       const { top, gap } = parts(nav);
-      at = Math.max(0, Math.min(100, ((top0 + dy / zoomK()) / free) * 100));
-      if (top) top.style.flexGrow = String(at);
-      if (gap) gap.style.flexGrow = String(100 - at);
+      const th = top?.offsetHeight ?? 0;
+      free = th + (gap?.offsetHeight ?? 0);
+      // 아이콘이 칸을 꽉 채워 남는 높이가 없으면 옮길 데가 없다 (그때는 칸이 스크롤된다)
+      if (!top || !gap || free < 8) return (mode = 'off'), false;
+      top0 = th;
+      mode = 'move';
     }
+    const { top, gap } = parts(nav);
+    at = Math.max(0, Math.min(100, ((top0 + dy / zoomK()) / free) * 100));
+    if (top) top.style.flexGrow = String(at);
+    if (gap) gap.style.flexGrow = String(100 - at);
     return true;
   };
   /** 끌기로 끝났으면 true */
-  const end = (x: number): boolean => {
+  const end = (): boolean => {
     const m = mode;
     mode = 'off';
-    if (!nav) return false;
-    if (m === 'move') return acts.place(Math.round(at)), true;
-    if (m !== 'side') return false;
-    const dx = x - x0;
-    if (Math.abs(dx) >= FIRE) {
-      // 메뉴가 붙은 벽 쪽으로 끌면 접고, 반대로 끌면 편다
-      const right = root.dataset.nav === 'right' || root.closest<HTMLElement>('[data-nav]')?.dataset.nav === 'right';
-      const toWall = right ? dx > 0 : dx < 0;
-      if (toWall !== nav.classList.contains('folded')) acts.fold(toWall);
-    }
+    if (m !== 'move') return false;
+    place(Math.round(at));
     return true;
   };
 
@@ -88,18 +68,18 @@ export function bindNavSwipe(root: HTMLElement, acts: NavSwipeActs): void {
     start(e.target, e.touches[0].clientX, e.touches[0].clientY);
   }, { passive: true });
   root.addEventListener('touchmove', (e) => {
-    if (move(e.touches[0].clientX, e.touches[0].clientY) && mode === 'move' && e.cancelable) e.preventDefault();
+    if (move(e.touches[0].clientX, e.touches[0].clientY) && e.cancelable) e.preventDefault();
   }, { passive: false });
-  root.addEventListener('touchend', (e) => {
+  root.addEventListener('touchend', () => {
     touchAt = Date.now();
-    end(e.changedTouches[0]?.clientX ?? x0);
+    end();
   }, { passive: true });
   root.addEventListener('touchcancel', () => {
     touchAt = Date.now();
     mode = 'off';
   }, { passive: true });
 
-  // 마우스: 메뉴에서 누른 채 끌면 같은 일을 한다. 놓는 곳이 메뉴 밖일 수 있어 움직임과 놓기는 문서에서 듣는다
+  // 마우스: 놓는 곳이 메뉴 밖일 수 있어 움직임과 놓기는 문서에서 듣는다
   const doc = root.ownerDocument;
   root.addEventListener('mousedown', (e) => {
     if (e.button !== 0 || Date.now() - touchAt < TOUCH_GHOST_MS) return;
@@ -111,9 +91,9 @@ export function bindNavSwipe(root: HTMLElement, acts: NavSwipeActs): void {
     if (!(e.buttons & 1)) return void (mode = 'off');
     if (move(e.clientX, e.clientY)) e.preventDefault();
   });
-  doc.addEventListener('mouseup', (e) => {
-    if (mode === 'off' || mode === 'wait') return void (mode = 'off');
-    eat = end(e.clientX);
+  doc.addEventListener('mouseup', () => {
+    if (mode === 'off') return;
+    eat = end();
     // click 이 오지 않는 경우(놓은 곳이 다른 칸)에도 다음 누르기를 삼키지 않게 곧 푼다
     if (eat) setTimeout(() => (eat = false), 0);
   });

@@ -341,19 +341,39 @@ test('망상홈쇼핑 상품 줄: 원 값·출연 칸 (둘 다 없으면 버림)
 test('망상홈쇼핑 상담원: 응답의 말·조건 읽기 (내민 물건만 가져간다) · 조건 글', () => {
   const { parseOperator, termsText } = homeshop;
   const offered = [{ id: 'i1', name: '은 나침반' }, { id: 'i2', name: '붕대' }];
-  const r = parseOperator('<operator>\n고객님, 이건 저희가 받기 어렵네요.\n</operator>\n<terms>\nmoney|300,000\nitems|은 나침반; 없는 물건\nappear|2\nother|계약서 한 장\n</terms>', offered);
+  const r = parseOperator('<operator>\n고객님, 이건 저희가 받기 어렵네요.\n</operator>\n<terms>\nmoney|300,000\nitems|은 나침반; 없는 물건\nappear|2\nother|계약서 한 장\n</terms>', offered, true);
   assert.equal(r.line, '고객님, 이건 저희가 받기 어렵네요.');
   assert.deepEqual(r.terms, { money: 300000, items: [{ id: 'i1', name: '은 나침반' }], appear: 1, other: '계약서 한 장' });
   assert.equal(termsText(r.terms), '300,000원 + 「은 나침반」 맞교환 + 다음 방송 시연 참여 + 계약서 한 장');
   assert.equal(termsText(r.terms, false), '「은 나침반」 맞교환 + 다음 방송 시연 참여 + 계약서 한 장');
-  assert.equal(parseOperator('<operator>안 됩니다</operator><terms>none</terms>', offered).terms, null);
-  assert.throws(() => parseOperator('<terms>none</terms>', offered), /operator/);
+  assert.equal(parseOperator('<operator>안 됩니다</operator><terms>none</terms>', offered, true).terms, null);
+  assert.throws(() => parseOperator('<terms>none</terms>', offered, true), /operator/);
+  assert.equal(r.hangup, false);
+});
+
+test('망상홈쇼핑 상담원: 먼저 끊기 <hangup/> — 말 밖·줄 머리나 블록 바로 뒤의 표식만, 설정이 꺼져 있으면 무시', () => {
+  const { parseOperator, hsSettings, HS_KEY } = homeshop;
+  const end = '<operator>이만 끊겠습니다.</operator>\n<terms>none</terms>\n<hangup/>';
+  const on = parseOperator(end, [], true);
+  assert.equal(on.hangup, true);
+  assert.equal(on.line, '이만 끊겠습니다.');
+  assert.equal(on.terms, null);
+  assert.equal(parseOperator('<operator>끊습니다.</operator><terms>none</terms><hangup/>', [], true).hangup, true, '블록 바로 뒤');
+  assert.equal(parseOperator('<operator>끊습니다.</operator>\n<terms>none</terms>\n<hangup>', [], true).hangup, true);
+  assert.equal(parseOperator(end, [], false).hangup, false, '설정 끔');
+  assert.equal(parseOperator('<operator>더 떠들면 <hangup/> 합니다.</operator>\n<terms>none</terms>', [], true).hangup, false, '말 안의 표식');
+  const inEnd = parseOperator('<operator>\n이만 끊겠습니다.\n<hangup/>\n</operator>\n<terms>none</terms>', [], true);
+  assert.deepEqual([inEnd.line, inEnd.hangup], ['이만 끊겠습니다.', true], '말 끝에 붙은 표식: 끊고, 글자는 안 보임');
+  assert.equal(parseOperator('<operator>더 떠들면 <hangup/> 합니다.</operator>\n<terms>none</terms>', [], true).line.includes('hangup'), false);
+  assert.equal(parseOperator('<operator>네.</operator>\n<terms>none</terms>\nThe operator does not output <hangup/> here.', [], true).hangup, false, '설명 문장 속 언급');
+  assert.equal(hsSettings({}).hangup, true, '기본 켬');
+  assert.equal(hsSettings({ [HS_KEY.hangup]: '0' }).hangup, false);
 });
 
 test('망상홈쇼핑 상담원 요청문: 상담원은 사람이 아니고 후려친다 · 돈을 못 받으면 그 줄 · 내민 물건·통화가 user 칸에', () => {
   const st = { ...core1112.emptyShop({ raw: '', shop: '망상홈쇼핑', owner: '레드 프라이데이' }, ''), loaded: true, identity: { sells: '망상홈쇼핑', never: '', prices: '' }, prev: [] };
   const src = { st, refs: '', story: '', status: '', situation: '', identity: '', language: null };
-  const msgs = core1112.operatorPrompt(src, core1112.shopSettings({}), 'barter', '[내민 물건]\n붕대|소모3|-|-', true);
+  const msgs = core1112.operatorPrompt(src, core1112.shopSettings({}), 'barter', '[내민 물건]\n붕대|소모3|-|-', true, true);
   const sys = msgs.find((m) => m.role === 'system').content;
   assert.match(sys, /not a human/);
   assert.match(sys, /underpays/);
@@ -361,9 +381,17 @@ test('망상홈쇼핑 상담원 요청문: 상담원은 사람이 아니고 후�
   assert.match(sys, /cannot take money/);
   assert.match(sys, /<terms>/);
   assert.match(msgs.find((m) => m.role === 'user').content, /\[내민 물건\]\n붕대/);
-  const talk = core1112.operatorPrompt(src, core1112.shopSettings({}), 'talk', '-', false).find((m) => m.role === 'system').content;
+  // 통화 끊음 켬: 끊을 수 있다는 절 + 출력 꼴 끝 절
+  assert.match(sys, /may end the call on its own/);
+  assert.match(sys, /<hangup\/> after the blocks/);
+  assert.doesNotMatch(sys, /never ends the call itself/);
+  const talk = core1112.operatorPrompt(src, core1112.shopSettings({}), 'talk', '-', false, false).find((m) => m.role === 'system').content;
   assert.match(talk, /has just spoken/);
   assert.doesNotMatch(talk, /cannot take money/);
+  // 통화 끊음 끔: 끊지 않는다는 절만
+  assert.match(talk, /never ends the call itself/);
+  assert.doesNotMatch(talk, /may end the call on its own/);
+  assert.doesNotMatch(talk, /<hangup\/> after the blocks/);
 });
 
 test('약조(돈·물건·시연이 아닌 대가): 상자를 열 때 받으러 오는 턴이 걸리고, 그 턴에만 본편에 붙는다', () => {
