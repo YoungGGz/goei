@@ -1,4 +1,4 @@
-// 망상홈쇼핑 전화 주문 (ui/homeshop.ts operatorAsk·order): 말로 받은 주문(<deal/>)의 시청 기록 차례 · 다시 굴린 주문의 통화 말 · 단추 주문 조건이 흥정 조건으로 섞이지 않음 · 가계부 끈 채 돈 조건 <deal/>
+// 망상홈쇼핑 전화 주문 (ui/homeshop.ts operatorAsk·order): 말로 받은 주문(<deal/>)의 시청 기록 차례 · 다시 굴린 주문의 통화 말 · 단추 주문 조건이 흥정 조건으로 섞이지 않음 · 가계부 끈 채 돈 조건 <deal/> · 주문이 안 들어간 수락의 말은 기록·통화에서 빠짐
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -174,4 +174,55 @@ test('다시 굴린 주문 뒤 같은 상품을 다시 주문해도: 없던 일�
   globalThis.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   const html = M.homeshopTab(R.ctx(), env);
   assert.ok(!html.includes('첫 판'), '통화 칸에도 없던 일이 된 말이 되살아나지 않는다');
+});
+
+/** 주문이 안 들어간 <deal/>: 수락하는 말과 「주문 받았습니다」는 시청 기록(본편)·다음 상담원 요청 [통화]·통화 칸에 없다 (2026-11-22 사용자) */
+async function failedDeal(vars, dealAnswer, notice, before = []) {
+  const M = await fresh();
+  M.resetHomeshop();
+  const R = setup(M, vars, [...before.map((b) => b.answer), dealAnswer, `<operator>\n네, 여보세요?\n</operator>\n${TERMS}`]);
+  await R.act('hs-pop', 'call');
+  for (const b of before) await b.run(R);
+  await R.act('hs-pay', 'talk');
+  await R.say('좋아요, 그걸로 주문할게요.');
+  await settle();
+  assert.equal(M.readOrders(R.chat.scriptstate).length, 0, '주문 안 됨');
+  const env = { render() {}, refresh: async () => {}, current: () => R.ctx() };
+  globalThis.matchMedia ??= () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
+  const html = M.homeshopTab(R.ctx(), env);
+  if (notice) assert.ok(html.includes(notice), '막힌 까닭 안내는 그대로');
+  assert.ok(!html.includes('그걸로 주문할게요') && !html.includes('주문 받았습니다'), '통화 칸에도 없다');
+  await R.say('여보세요? 주문 된 거예요?');
+  await settle();
+  const last = R.calls.at(-1);
+  assert.ok(last.includes('여보세요? 주문 된 거예요?'));
+  assert.ok(!last.includes('그걸로 주문할게요') && !last.includes('주문 받았습니다'), last);
+  const lines = types(M, R.chat).map((l) => `${l.type}:${l.text}`);
+  assert.ok(!lines.some((l) => l.includes('그걸로 주문할게요') || l.includes('주문 받았습니다')), lines.join('\n'));
+  assert.ok(lines.some((l) => l.includes('여보세요? 주문 된 거예요?')), '그 뒤 말은 그대로 적힌다');
+  return { M, R, lines };
+}
+
+test('잔고가 모자란 <deal/>: 수락 말·「주문 받았습니다」가 시청 기록·다음 상담원 요청·통화 칸에서 빠지고, 「잔고가 모자랍니다」는 뜬다', async () => {
+  await failedDeal({ $st_wallet: JSON.stringify({ start: 100000, list: [] }) }, `<operator>\n좋아요, 주문 받았습니다.\n</operator>\n${TERMS}\n<deal/>`, '잔고가 모자랍니다.');
+});
+
+test('가계부를 끈 채 돈 조건 <deal/>: 수락 말·「주문 받았습니다」가 기록·통화에서 빠진다', async () => {
+  await failedDeal({ $st_col_wallet: 'off' }, '<operator>\n좋아요, 주문 받았습니다.\n</operator>\n<terms>\nmoney|100000\nother|머리카락 한 줌\n</terms>\n<deal/>', '가계부가 꺼져 있어 돈으로 낼 수 없습니다.');
+});
+
+test('쓸 조건이 없는 <deal/>: 수락 말·「주문 받았습니다」가 기록·통화에서 빠진다', async () => {
+  await failedDeal({ $st_wallet: JSON.stringify({ start: 2000000, list: [] }) }, '<operator>\n좋아요, 주문 받았습니다.\n</operator>\n<terms>none</terms>\n<deal/>', '');
+});
+
+test('수락(<deal/>)이 아닌 흥정 말은 주문이 없어도 그대로 시청 기록에 남는다', async () => {
+  const M = await fresh();
+  M.resetHomeshop();
+  const R = setup(M, { $st_wallet: JSON.stringify({ start: 100000, list: [] }) }, [`<operator>\n이십오만 원에 시연 한 번.\n</operator>\n${TERMS}`]);
+  await R.act('hs-pop', 'call');
+  await R.act('hs-pay', 'talk');
+  await R.say('얼마예요?');
+  await settle();
+  const lines = types(M, R.chat).map((l) => `${l.type}:${l.text}`);
+  assert.ok(lines.some((l) => l.includes('얼마예요?')) && lines.some((l) => l.includes('이십오만 원에 시연 한 번.')), lines.join('\n'));
 });

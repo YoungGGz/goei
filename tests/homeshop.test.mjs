@@ -518,6 +518,12 @@ test('망상홈쇼핑 상담원: 말로 받아들이면 주문 <deal/> — 조�
   assert.equal(parseOperator('<operator>말만 하면 <deal/> 이지.</operator>\n<terms>\nmoney|1000\n</terms>', [], true).deal, false, '말 가운데 글자는 표식이 아니다');
   const tail = parseOperator('<operator>\n받았어.\n<deal/>\n</operator>\n<terms>\nmoney|1000\n</terms>', [], false);
   assert.deepEqual([tail.line, tail.deal], ['받았어.', true]);
+  // took: 조건이 없어도 끊지 않고 <deal/> 을 냈으면 수락한 것 (주문이 안 들어가면 그 말을 기록에서 뺀다, 2026-11-22 사용자)
+  assert.deepEqual([ok.took, both.took], [true, true]);
+  assert.equal(parseOperator('<operator>받았어.</operator>\n<terms>none</terms>\n<deal/>', [], true).took, true, '조건 없는 수락');
+  assert.equal(parseOperator('<operator>받았어.</operator>\n<deal/>', [], true).took, true, '조건 블록이 없는 수락');
+  assert.equal(parseOperator('<operator>끊는다.</operator>\n<terms>none</terms>\n<deal/>\n<hangup/>', [], true).took, false, '조건 없이 끊으면 끊음');
+  assert.equal(parseOperator('<operator>음.</operator>\n<terms>\nmoney|1000\n</terms>', [], true).took, false, '표식 없음');
   assert.equal(parseOperator('<operator>싫어.</operator>\n<terms>none</terms>\n<hangup/>', [], true).hangup, true, '거래 없이 끊는 것은 그대로');
   assert.equal(parseOperatorLine('<operator>…누구야.</operator>'), '…누구야.');
   assert.equal(parseOperatorLine('<thoughts>x</thoughts>\n…누구야.'), '…누구야.', '블록 없이 말만 와도 받는다');
