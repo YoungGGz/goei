@@ -31,7 +31,7 @@ Stay the counselor on [상담사 카드] and reply to the customer's last messag
 
 @@SECTION TALK_OUTPUT
 Output:
-<say>(the reply, typed into a support chat window; plain text, no markdown. A blank line sends what follows as a separate message; without one the whole reply is a single message. How many messages and how long is this person's way of typing, applied to what was just said: the same person answers a passing remark and a real question differently. Each reply is judged on its own; how the earlier replies in the chat were split or how long they ran is not a pattern to keep.)</say>
+<say>(the reply, typed into a support chat window; plain text, no markdown. A blank line sends what follows as a separate message; without one the whole reply is a single message. This is typed by hand into a chat window, so a reply is ordinarily a word or a short line, the way people answer in a messenger. It runs longer only when there is actually something to hand over: an explanation that was asked for, steps to follow, a ruling and its reason. Within that, how it is split and worded is this person's way of typing. Each reply is judged on its own; how the earlier replies in the chat were split or how long they ran is not a pattern to keep.)</say>
 @@END
 
 @@SECTION END_ON
