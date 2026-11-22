@@ -153,6 +153,13 @@ export function findStatusTags(text: string): StatusTag[] {
   return [...text.matchAll(TAG_RE)].map((m) => ({ raw: m[0], ...fieldsOf(m[1]) }));
 }
 
+/** 글에서 상태창 태그(findStatusTags 가 알아보는 줄)를 뺀다. 태그만 있던 줄은 줄째 빠진다 (상점·쇼핑몰·망상홈쇼핑 요청의 [최근 본문]에 잔고가 가지 않게, 2026-11-22 사용자) */
+export function stripStatusTags(text: string): string {
+  const tags = findStatusTags(text);
+  if (!tags.length) return text;
+  return tags.reduce((t, tag) => t.split(tag.raw).join(''), text).replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 /** 날짜·시각 → 분 (UTC 기준 그레고리력). 읽지 못하면 null */
 export function statusMinute(date: string, time: string): number | null {
   const d = /(\d{3,4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/.exec(date ?? '');

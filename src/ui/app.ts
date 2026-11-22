@@ -77,7 +77,7 @@ import { colConfig } from '../core/world/statuscols';
 import { invOn, itemStartOn } from '../core/items';
 import { adjustWallet, walletEditable, aliveAnchors, formatWon, parseWon, readWallet, removeWalletEntry, walletBalance, walletVars, WALLET_MAX, WALLET_START_DEFAULT, WALLET_VAR } from '../core/wallet';
 import { walletHeadButton, walletList, walletUi as walletTabUi } from './wallet';
-import { parsePoints, pointsOn, pointsVars, readPoints } from '../core/points';
+import { parsePoints, pointsMember, pointsVars, readPoints } from '../core/points';
 import { guideTxt } from '../core/guides';
 import { applyRecordsNav, closeToastHtml, endedReport, holdToast, releaseToast, syncCloseToast, handleRecords, journalList, rec, recordsInput, recordsNav, recordsTab, resetRecords, type RecordsEnv } from './records';
 import { PHONE_WATCH, foldStyle, isPhone, syncFoldStyles, zpx, zrect, zrectQ } from './media';
@@ -2165,7 +2165,7 @@ function commonDrawer(ctx: ChatContext | null): string {
 function browserSites(ctx: ChatContext | null): SiteId[] {
   // 망상홈쇼핑은 켜져 있고 「인터넷에 상시 노출」일 때만 (꺼도 카드로 접속하면 그 탭에서 열린다)
   const hs = ctx ? hsSettings(ctx.chat.scriptstate) : null;
-  return SITES.map((x) => x.id).filter((id) => (id !== 'bm' || (!!ctx && pointsOn(ctx.chat))) && (id !== 'hs' || (!!hs && hs.on && hs.net)));
+  return SITES.map((x) => x.id).filter((id) => (id !== 'bm' || (!!ctx && pointsMember(ctx.chat))) && (id !== 'hs' || (!!hs && hs.on && hs.net)));
 }
 
 /** 브라우저 틀에 넘길 값: 로그인 닉네임은 $br_login 이 1 일 때만 */

@@ -58,10 +58,11 @@ test('진열대 응답: 정체 블록·주인 대사·물건 줄(쓰임·그림 
   assert.equal(st.talk[0].text, '뭐 찾소.');
   assert.throws(() => parseShelf('<shelf>\n이름만\n</shelf>', null), /물건 줄/);
   assert.throws(() => parseShelf('<owner>a</owner>\n<shelf>\n손전등|1000|사용||0.5||\n</shelf>', null), /shop-identity/);
-  // 새로고침: 정체는 그대로, 지난 진열대는 prev 로
+  // 새로고침: 정체는 그대로, 지난 진열대는 prev 로. 지금 진열대에 걸린 것과 같은 이름(손전등)은 새 진열에서 빠진다 (2026-11-22 사용자, 설정 「지난 목록 피하기」)
   const r2 = parseShelf('<owner></owner>\n<shelf>\n밧줄|5000|사용|rope|0.5||\n손전등|18000|사용||0.5||\n</shelf>', st.identity);
   const st2 = applyShelf(st, r2, shopSettings({}));
-  assert.deepEqual(shelfItems(st2).map((x) => x.name), ['밧줄', '손전등']);
+  assert.deepEqual(shelfItems(st2).map((x) => x.name), ['밧줄']);
+  assert.deepEqual(shelfItems(applyShelf(st, r2, shopSettings({ $sh_prev: '0' }))).map((x) => x.name), ['밧줄', '손전등'], '설정을 끄면 그대로');
   assert.ok(st2.prev.includes('생수'));
 });
 
