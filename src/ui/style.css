@@ -2019,9 +2019,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .gx-navhist { display: none; }
 }
-/* 왼쪽 메뉴 접기 (11-22 사용자): ‹ › 위의 단추로 접으면 아이콘만 남은 세로줄. 카드는 얼굴만 작게(누르면 작은 창), ‹ › 는 좁게 남긴다 */
-.gx-nh.gx-navfold { flex: 0 0 44px; }
-.gx-nh.gx-navfold svg { width: 19px; height: 19px; }
+/* 왼쪽 메뉴 접기 (11-22 사용자): 표시 없이 메뉴 위에서 옆으로 쓸어 접으면 아이콘만 남은 세로줄. 카드는 얼굴만 작게(누르면 작은 창), ‹ › 는 좁게 남긴다 */
+.gx-nav-top { flex: 0 0 0; }
+@media (max-width: 600px), (max-height: 499px) and (pointer: coarse) { .gx-nav-top { display: none; } }
 .gx-nav-face { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--panel2); color: var(--dim); }
 .gx-nav-face img { width: 100%; height: 100%; object-fit: cover; }
 .gx-nav-face svg { width: 24px; height: 24px; }
@@ -2034,10 +2034,11 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
   .gx-nav.folded > .gx-nb { justify-content: center; width: 48px; padding: 0; }
   .gx-nav.folded > .gx-nb > span:not(.gx-nbadge) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .gx-nav.folded > .gx-nb .gx-nbadge { position: absolute; top: 6px; right: 6px; margin: 0; }
-  .gx-nav.folded > .gx-navhist { width: 100%; gap: 0; flex-direction: row; flex-wrap: wrap; padding-left: 0; padding-right: 0; bottom: -12px; margin-bottom: -12px; padding-bottom: 12px; }
-  .gx-nav.folded > .gx-navhist .gx-nh { height: 36px; padding: 0; min-width: 0; flex: 1 1 40%; width: auto; }
+  .gx-nav.folded { touch-action: pan-x; }
+  .gx-nav.folded > .gx-nav-top, .gx-nav.folded > .gx-nav-gap { flex-basis: 0; min-height: 0; }
+  .gx-nav.folded > .gx-navhist { width: 100%; gap: 0; flex-direction: row; padding-left: 0; padding-right: 0; bottom: -12px; margin-bottom: -12px; padding-bottom: 12px; }
+  .gx-nav.folded > .gx-navhist .gx-nh { height: 36px; padding: 0; min-width: 0; flex: 1 1 0; width: auto; }
   .gx-nav.folded > .gx-navhist .gx-nh svg { width: 18px; height: 18px; }
-  .gx-nav.folded > .gx-navhist .gx-navfold { order: -1; flex: 0 0 100%; }
 }
 /* 괴담톡 연락처: 대화가 있는 사람 이름 옆 말풍선 (글자 없이) */
 .ph-talk { flex: none; display: inline-grid; place-items: center; color: var(--dim); }
