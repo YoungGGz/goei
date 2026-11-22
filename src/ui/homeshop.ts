@@ -56,7 +56,7 @@ interface View {
   calling: boolean;
   done: string;
   /** 상담원과의 통화 (지금 부 상품에만. 부가 바뀌면 새로): 주고받은 말 · 상담원이 마지막으로 내놓은 조건 · 마지막으로 감정받은 물건 */
-  call: { pid: string; lines: { who: 'me' | 'op'; text: string }[]; terms: HsTerms | null; offered: string[] } | null;
+  call: { pid: string; lines: { who: 'me' | 'op'; text: string }[]; terms: HsTerms | null; offered: string[]; hung?: string } | null;
   /** 스티커를 들췄나 · 끌다 놓은 자리(그 자리부터 마저 젖힌다) · 방청 규칙 동의 · 방금 접수한 번호 */
   lifted: boolean;
   /** 들춘 스티커의 상품 (그사이 다음 부로 넘어가면 새 상품 스티커는 덮인 채로, 전수점검 보통-41) */
@@ -249,7 +249,7 @@ export async function homeshopAction(action: string, value: string | undefined, 
         const s = hsSettings(ctx.chat.scriptstate);
         if (!payOk(ctx, part, s, ui.pay)) ui.pay = firstPay(ctx, part, s);
         // 전화를 걸면 상담원의 첫 말이 화면에 나온다: 시청 기록에 적는다 (설정 「스티커·상담원」을 켠 때만 메인 요청에 간다)
-        if (!ui.call) {
+        if (!ui.call && !part.hung) {
           ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello }] : [], terms: null, offered: [] };
           if (!ordered && show.ops?.hello) saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: hsLogOperator(), text: show.ops.hello }], show);
         }
@@ -396,6 +396,19 @@ function soldOut(at: number): void {
   })).then(() => env.refresh()).catch(() => undefined);
 }
 
+/** 상담원이 이 부의 전화를 먼저 끊었나: 끊으며 한 마지막 말 (없으면 빈 글). 저장된 것(그 부의 hung) 또는 방금 끊겨 아직 저장 중인 통화 */
+const hungLine = (part: HsPart): string => part.hung ?? (ui.call?.pid === part.item.id ? ui.call.hung : undefined) ?? '';
+/** 상담원이 전화를 끊었을 때: 그 부에 끊김(마지막 말)을 적는다 (창을 다시 열어도, 화면을 새로 그려도 그대로) */
+function hangUp(ctx: ChatContext, env: HsEnv, show: HsShow, pid: string, line: string): void {
+  void whenIdle().then(() => updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    const cur = readShow(chat.scriptstate);
+    if (!sameProgram(cur, show)) return null;
+    const at = cur.parts.findIndex((p) => p.item.id === pid);
+    if (at < 0 || cur.parts[at].hung) return null;
+    return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...cur, parts: cur.parts.map((p, i) => (i === at ? { ...p, hung: line } : p)) }) } };
+  })).then(() => env.refresh()).catch(() => undefined);
+}
+
 /** 원 값을 낼 수 있나: 가계부가 켜져 있을 때만 (상점과 같은 조건) */
 const walletOn = (ctx: ChatContext): boolean => { const b = shopBlocked(ctx.chat.scriptstate); return b !== 'wallet' && b !== 'both'; };
 const itemsOn = (ctx: ChatContext): boolean => { const b = shopBlocked(ctx.chat.scriptstate); return b !== 'items' && b !== 'both'; };
@@ -428,7 +441,7 @@ function termsBlock(ctx: ChatContext, t: HsTerms): string {
 async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk', said: string): Promise<void> {
   const s = hsSettings(ctx.chat.scriptstate);
   const { show, part, ordered } = nowPart(ctx);
-  if (!part || ordered || ui.calling || soldNow(show)) return;
+  if (!part || ordered || ui.calling || soldNow(show) || hungLine(part)) return;
   if (mode === 'talk' && (!s.talk || !said)) return;
   if (mode === 'barter' && (!s.barter || !ui.offer.length)) return;
   if (!ui.call || ui.call.pid !== part.item.id) ui.call = { pid: part.item.id, lines: show.ops?.hello ? [{ who: 'op', text: show.ops.hello }] : [], terms: null, offered: [] };
@@ -464,14 +477,20 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
       `${g('HEAD_CALL')}\n${keep.map((l) => g(l.who === 'me' ? 'CALL_LINE_ME' : 'CALL_LINE_OP', { text: l.text })).join('\n')}`,
     ].join('\n\n');
     const gs = genSettings(ctx.chat.scriptstate);
-    const { value } = await generate(operatorPrompt(src, s.shop, mode, body, !walletOn(ctx)) as LlmMessage[], s.shop.model, (raw) => parseOperator(raw, offered.map((x) => ({ id: x.id, name: x.name }))), { retries: gs.retries, retryModel: gs.retryModel, concurrent: gs.concurrent, state: ctx.chat.scriptstate, label: `${hsName()} 상담원` });
+    const { value } = await generate(operatorPrompt(src, s.shop, mode, body, !walletOn(ctx), s.hangup) as LlmMessage[], s.shop.model, (raw) => parseOperator(raw, offered.map((x) => ({ id: x.id, name: x.name })), s.hangup), { retries: gs.retries, retryModel: gs.retryModel, concurrent: gs.concurrent, state: ctx.chat.scriptstate, label: `${hsName()} 상담원` });
     // 그사이 상품이 바뀌었으면 버린다
     if (ui.call !== call) return;
     call.lines.push({ who: 'op', text: value.line });
     if (call.lines.length > s.keep.talk) call.lines.splice(0, call.lines.length - s.keep.talk);
     call.terms = value.terms && !walletOn(ctx) ? (value.terms.money > 0 ? null : value.terms) : value.terms;
     const buyer = userInfo().name || guideTxt('Hs', 'SAY_ME_NICK');
-    saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: buyer, text: meLine, me: 1 }, { k: 'aside', p: show.at, who: hsLogOperator(), text: value.line }], show);
+    saveLog(ctx.charIndex, ctx.chatIndex, [{ k: 'aside', p: show.at, who: buyer, text: meLine, me: 1 }, { k: 'aside', p: show.at, who: hsLogOperator(), text: value.line }, ...(value.hangup ? [{ k: 'aside' as const, p: show.at, who: hsLogOperator(), text: guideTxt('Hs', 'LOG_HANGUP', { item: part.item.name }) }] : [])], show);
+    // 상담원이 먼저 끊었다: 조건은 사라지고, 이 부는 전화 주문을 더 받지 않는다
+    if (value.hangup) {
+      call.terms = null;
+      call.hung = value.line;
+      hangUp(ctx, env, show, part.item.id, value.line);
+    }
   } catch (error) {
     // 실패하면 내 말과 내민 물건을 되돌린다 (다시 보낼 수 있게)
     if (ui.call === call) {
@@ -490,7 +509,7 @@ async function operatorAsk(ctx: ChatContext, env: HsEnv, mode: 'barter' | 'talk'
 async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
   const s = hsSettings(ctx.chat.scriptstate);
   const pre = nowPart(ctx);
-  if (!pre.part || soldNow(pre.show)) return env.render();
+  if (!pre.part || soldNow(pre.show) || hungLine(pre.part)) return env.render();
   // 화면(callPop)이 보이는 결제 방법 그대로: 고른 방법이 이 상품에 안 맞으면 되는 첫 방법
   const pay = payOk(ctx, pre.part, s, ui.pay) ? ui.pay : firstPay(ctx, pre.part, s);
   if (!payOk(ctx, pre.part, s, pay)) return env.render();
@@ -506,7 +525,7 @@ async function order(ctx: ChatContext, env: HsEnv): Promise<void> {
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
     const show = readShow(chat.scriptstate);
     const part = show.loaded ? show.parts[show.at] : null;
-    if (!part || part.out || part.item.id !== pre.part!.item.id) return null;
+    if (!part || part.out || part.hung || part.item.id !== pre.part!.item.id) return null;
     const alive = aliveAnchors(chat);
     if (liveOrders(chat.scriptstate, alive).some((o) => o.id === `ho_${part.item.id}`)) return null;
     let items = readItems(chat.scriptstate);
@@ -759,6 +778,9 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
     return popShell('☎ 전화 주문', `${head}${op(ui.done || '주문이 접수되었습니다.')}<p class="hs-ok">택배 상자가 소지품에 도착했습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">확인</button><button data-action="hs-page" data-value="orders">주문 조회</button>');
   }
   if (soldNow(show)) return popShell('☎ 전화 주문', `${head}<p class="hs-none">매진되어 더 이상 주문을 받지 않습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">끊기</button>');
+  // 상담원이 먼저 끊었다: 마지막 말과 알림만 (매진과 같은 꼴). 값 결제·시연·맞교환·흥정 모두 닫힌다
+  const hung = hungLine(part);
+  if (hung) return popShell('☎ 전화 주문', `${head}${op(hung)}<p class="hs-none">상담원이 전화를 끊었습니다.</p>`, '<button class="pri" data-action="hs-pop" data-value="">끊기</button>');
   const call = ui.call?.pid === part.item.id ? ui.call : null;
   const pay = payOk(ctx, part, s, ui.pay) ? ui.pay : firstPay(ctx, part, s);
   // 꺼진 까닭: 설정·소지품·가계부 탓이면 그 말로, 상품에 그 결제가 없을 때만 「이 상품은 안 됨」 (전수점검 보통-40)
@@ -993,7 +1015,7 @@ export function homeshopSettingsPane(ctx: ChatContext): string {
   const b = (x: boolean) => (x ? '1' : '0');
   const n = (k: string) => { const raw = vars?.[HS_NUM[k].key]; return raw === undefined || raw === '' ? HS_NUM[k].def : Number(raw); };
   const vals: Record<string, string> = {
-    net: b(s.net), retry: String(retryOf(ctx)), say: b(s.say), turn: b(s.turn), lock: b(s.lock), drop: b(s.drop.on), barter: b(s.barter), talk: b(s.talk), peek: b(s.peek), aud: b(s.aud),
+    net: b(s.net), retry: String(retryOf(ctx)), say: b(s.say), turn: b(s.turn), lock: b(s.lock), drop: b(s.drop.on), barter: b(s.barter), talk: b(s.talk), hangup: b(s.hangup), peek: b(s.peek), aud: b(s.aud),
     clips: s.clipsText, cut: b(s.fx.cut), bulb: b(s.fx.bulb), tear: b(s.fx.tear), scan: b(s.fx.scan), scalePc: s.scalePc, scalePh: s.scalePhone,
     ...Object.fromEntries(Object.entries(HS_DEF_TEXT).map(([k, [name]]) => [k, String(vars?.[name] ?? '')])),
   };

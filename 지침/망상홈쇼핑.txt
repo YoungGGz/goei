@@ -139,6 +139,18 @@ other|any other price or promise it takes that is not money, a belonging or a de
 Write <terms>none</terms> when the operator will not ship the item on anything offered and sets no terms of its own. Write the terms in full every time, even when unchanged; they replace the earlier ones. The operator's line never says the order is placed; the caller places it by accepting the terms.
 @@END
 
+@@SECTION OPERATOR_HANGUP_ON
+The operator may end the call on its own, for reasons of its own, when it has had enough of this call or this caller: it says so in its own way and adds <hangup/>. After that this caller cannot reach it again about this item.
+@@END
+
+@@SECTION OPERATOR_HANGUP_OFF
+The operator never ends the call itself (never output <hangup/>).
+@@END
+
+@@SECTION OPERATOR_OUTPUT_END
+<hangup/> after the blocks, only if the operator ends the call.
+@@END
+
 @@SECTION THOUGHTS_OPERATOR
 1. What did the caller just offer, ask or object to, and what are the current terms? Does it call for a fresh appraisal or new terms, or only an answer in the flow of the call?
 2. Only if something new was put forward or the deal must be reweighed: for each thing on the table, what is it really, what was it made for, its condition, its worth to the channel, and what does the caller seem not to know about it?
@@ -438,6 +450,10 @@ watched by the user on the broadcast
 
 @@SECTION LOG_OPERATOR_NICK
 상담원
+@@END
+
+@@SECTION LOG_HANGUP
+(상담원이 먼저 전화를 끊었다. 「{item}」 전화 주문은 더 받지 않는다.)
 @@END
 
 @@SECTION ARRIVE
