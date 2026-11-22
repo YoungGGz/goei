@@ -2014,7 +2014,9 @@ h4.nw-h { font-size: 17px; border-bottom-style: dashed; }
 .gx-nh { flex: 1 1 0; display: grid; place-items: center; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--dim); }
 .gx-nh svg { width: 21px; height: 21px; }
 .gx-nh.fwd svg { transform: scaleX(-1); }
-.gx-nh.gx-navfold { flex: 0 0 44px; }
+/* 접는 단추는 늘 ‹ › 바로 윗줄 (11-22 사용자) */
+.gx-navhist:has(> .gx-navfold) { flex-wrap: wrap; }
+.gx-nh.gx-navfold { order: -1; flex: 0 0 100%; }
 .gx-nh.gx-navfold svg { width: 19px; height: 19px; }
 .gx-nh:hover:not(:disabled) { color: var(--text); background: var(--panel); }
 .gx-nh:disabled { opacity: .35; }

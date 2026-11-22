@@ -1877,7 +1877,7 @@ function navState(): NavState {
 
 /** PC 메뉴 맨 아래: ‹ 뒤로 · 앞으로 › (모바일 쓸기와 같은 기록) */
 function navHistBar(): string {
-  // 접는 단추는 ‹ › 줄 끝, 접으면 그 바로 윗줄 (11-22 사용자: 쓸어 접기는 실기에서 뒤로가기와 부딪혀 폐기)
+  // 접는 단추는 늘 ‹ › 바로 윗줄 (11-22 사용자: 쓸어 접기는 실기에서 뒤로가기와 부딪혀 폐기)
   const folded = getPrefs().navFold === true;
   return `<div class="gx-navhist">
     <button class="gx-nh" data-action="nav-back" aria-label="뒤로" title="뒤로">${ICONS.back}</button>
