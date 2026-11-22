@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   addItem, applyItemChanges, applyItemsPack, equipItem, equippedOf, gradeHits, gradeInQuote, inventoryText, isEquipped, itemLine, itemsBlock, itemsAwayOf, itemsNowOf, itemsVars, liveItems, matchItemIcon, movedNow, outItems,
-  parseItemRules, readItems, removeItem, setItemRules, stripGrades, totalWeight, traitsFor, itemPictureNames, formFamilies, ITEM_FORM_DEFAULT, ITEM_RULES_DEFAULT, ITEM_RULES_VAR, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_VAR,
+  parseItemRules, readItems, removeItem, setItemRules, stripGrades, totalWeight, traitsFor, itemPictureNames, startItemsState, readStartItems, formFamilies, ITEM_FORM_DEFAULT, ITEM_RULES_DEFAULT, ITEM_RULES_VAR, ITEM_LEFT_WORDS_VAR, ITEM_OFF_WORDS_VAR,
 } from '../dist-test/core.mjs';
 import { itemsPackText } from '../scripts/data-pack.mjs';
 
@@ -236,6 +236,25 @@ test('갱신기가 그림을 다시 고른다: update 의 그림 말이 저장�
   assert.equal(liveItems(n, alive).length, 1);
   assert.deepEqual([n.list[0].id, n.list[0].name, n.list[0].weight], [id, '고순도 꿈결 수집기', 0.2]);
   assert.equal(pic(n.list[0].name, n.list[0].icon, { desc: n.list[0].desc }), '꿈결 수집기 A등급');
+});
+
+test('시작 소지품 「빈 꿈결 수집기」: 첫 턴 갱신기가 물건 이름만(그림 말 형식 「괴이/꿈결 수집기/dream collector」·new 「꿈결 수집기」) 다시 적어도 빈 그림 그대로 (사용자 11-22: 초장부터 찬 그림)', () => {
+  const s = startItemsState(readStartItems([{ name: '빈 꿈결 수집기', desc: '괴담을 빠져나오거나 끝내면 꿈결로 차는 주사기 모양 눈금 실린더', icon: 'dream collector', weight: 0.2 }]));
+  const id = s.list[0].id;
+  const after = (c) => {
+    const u = applyItemChanges(s, alive, [ch({ anchor: 'c1', ...c })], { order });
+    const live = liveItems(u, alive);
+    return { n: live.length, name: live[0].name, id: live[0].id, pic: pic(live[0].name, live[0].icon, { desc: live[0].desc }) };
+  };
+  assert.equal(pic(s.list[0].name, s.list[0].icon, { desc: s.list[0].desc }), '빈 꿈결 수집기', '시작 직후');
+  // update 에 지침의 그림 말 형식(종류/물건말/english)으로 물건 이름만 적음: 어느 상태 그림인지 말하지 않았다
+  assert.deepEqual(after({ name: '빈 꿈결 수집기', action: 'update', desc: '허리춤에 찬 실린더', icon: '괴이/꿈결 수집기/dream collector' }), { n: 1, name: '빈 꿈결 수집기', id, pic: '빈 꿈결 수집기' });
+  // 이미 지닌 것을 「빈」 없는 이름으로 new: 같은 줄, 이름·그림은 그대로
+  assert.deepEqual(after({ name: '꿈결 수집기', action: 'new', desc: '허리춤에 찬 실린더', icon: '괴이/꿈결 수집기/dream collector' }), { n: 1, name: '빈 꿈결 수집기', id, pic: '빈 꿈결 수집기' });
+  assert.deepEqual(after({ name: '꿈결 수집기', action: 'new', desc: '허리춤에 찬 실린더' }), { n: 1, name: '빈 꿈결 수집기', id, pic: '빈 꿈결 수집기' });
+  // 등급 그림을 고르면(상태가 바뀜) 전처럼 찬 그림
+  assert.deepEqual(after({ name: '빈 꿈결 수집기', action: 'update', desc: '꿈결이 찬 실린더', icon: '꿈결 수집기 B등급' }), { n: 1, name: '꿈결 수집기', id, pic: '꿈결 수집기 B등급' });
+  assert.deepEqual(after({ name: '꿈결 수집기', action: 'new', desc: '꿈결이 찬 실린더', icon: '괴이/꿈결 수집기 B등급/dream collector' }), { n: 1, name: '꿈결 수집기', id, pic: '꿈결 수집기 B등급' });
 });
 
 test('그림 말은 본편 요청에 가지 않는다 (그림일 뿐): [Inventory] 글에 그림 말·등급 그림 이름이 없다', () => {
