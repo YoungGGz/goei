@@ -1,6 +1,6 @@
 {
   "name": "goei",
-  "version": "0.21.27",
+  "version": "0.21.28",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,6 +16,8 @@
   },
   "goei": {
     "updateBase": "https://raw.githubusercontent.com/ygberserk/goei/release",
+    "link": "https://github.com/ygberserk/goei",
+    "linkText": "GitHub 저장소",
     "minPlugin": "0.17.0"
   }
 }
