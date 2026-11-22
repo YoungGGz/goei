@@ -362,6 +362,9 @@ test('망상홈쇼핑 상담원: 먼저 끊기 <hangup/> — 말 밖·줄 머리
   assert.equal(parseOperator('<operator>끊습니다.</operator>\n<terms>none</terms>\n<hangup>', [], true).hangup, true);
   assert.equal(parseOperator(end, [], false).hangup, false, '설정 끔');
   assert.equal(parseOperator('<operator>더 떠들면 <hangup/> 합니다.</operator>\n<terms>none</terms>', [], true).hangup, false, '말 안의 표식');
+  const inEnd = parseOperator('<operator>\n이만 끊겠습니다.\n<hangup/>\n</operator>\n<terms>none</terms>', [], true);
+  assert.deepEqual([inEnd.line, inEnd.hangup], ['이만 끊겠습니다.', true], '말 끝에 붙은 표식: 끊고, 글자는 안 보임');
+  assert.equal(parseOperator('<operator>더 떠들면 <hangup/> 합니다.</operator>\n<terms>none</terms>', [], true).line.includes('hangup'), false);
   assert.equal(parseOperator('<operator>네.</operator>\n<terms>none</terms>\nThe operator does not output <hangup/> here.', [], true).hangup, false, '설명 문장 속 언급');
   assert.equal(hsSettings({}).hangup, true, '기본 켬');
   assert.equal(hsSettings({ [HS_KEY.hangup]: '0' }).hangup, false);

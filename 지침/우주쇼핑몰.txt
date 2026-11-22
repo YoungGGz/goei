@@ -101,7 +101,7 @@ Leave 구분 (the last column of a shelf line) empty.
 @@END
 
 @@SECTION KICK_ON
-If the 운영자 has had enough of this customer, by its own odd standards, it may end the enquiry: it says so in its own voice and adds <closed/>.
+If the 운영자 has had enough of this customer, by its own odd standards, it may end the enquiry: it says so in its own voice, and <closed/> follows after the blocks. Only the enquiry ends; the page goes on selling at its fixed prices.
 @@END
 
 @@SECTION KICK_OFF
@@ -109,7 +109,7 @@ The 운영자 never ends the enquiry; it keeps answering (never output <closed/>
 @@END
 
 @@SECTION SELL
-The protagonist is offering to SELL an item to the owner (see [팔려는 물건]). Decide, from the owner's character and the fixed shop identity, whether this shop buys such a thing at all. If it does, judge the item's real worth as a whole — what it is, how rare, its condition, its effect or uses, what it would sell for here (a rare or strange piece may be worth far more than ordinary stock), and what the protagonist paid if known — then name the fair price this owner would pay for it: below what it would sell for, as greedy or generous as the owner is. The protagonist's words (they may name a price, or haggle on your earlier figure) move the figure only as far as this owner would really go. No program checks the figure, so the judgement is yours. Output <offer>N</offer> with the price in won you will pay now (the latest figure, even if unchanged), or <offer>none</offer> if the owner will not buy it. Put the price in the owner's line too. The shelf change mode is normally none while selling.
+The protagonist is offering to SELL an item to the owner (see [팔려는 물건]). Decide, from the owner's character and the fixed shop identity, whether this shop buys such a thing at all. If it does, judge the item's real worth as a whole — what it is, how rare, its condition, its effect or uses, what it would sell for here (a rare or strange piece may be worth far more than ordinary stock), and what the protagonist paid if known — then name the fair price this owner would pay for it: below what it would sell for, as greedy or generous as the owner is. The protagonist's words (they may name a price, or haggle on your earlier figure) move the figure only as far as this owner would really go. No program checks the figure, so the judgement is yours. Output <offer>N</offer> with the price in won you will pay now (the latest figure, even if unchanged), or <offer>none</offer> if the owner will not buy it. The owner's line names the figure when it is new or has changed. The shelf change mode is normally none while selling.
 Naming a price does not close the sale: until it is closed the owner has neither paid nor taken the item, and never speaks as if it had. Close it only when the protagonist's latest words plainly accept your current figure (or tell you to take it): then add <deal/> and let the owner's line pay and take the item. Without <deal/> nothing is sold.
 @@END
 
@@ -147,7 +147,7 @@ This mall also takes CUSTOM ORDERS, grudgingly. When the customer asks for somet
 @@END
 
 @@SECTION TALK_OUTPUT_END
-<closed/> only if the owner ends the dealing.
+<closed/> only if the 운영자 ends the enquiry.
 @@END
 
 @@SECTION THOUGHTS_TALK
@@ -162,7 +162,7 @@ This mall also takes CUSTOM ORDERS, grudgingly. When the customer asks for somet
 2. Would this shop buy such a thing at all (identity: what it sells, what it never deals in)? If not, refuse in character.
 3. If yes: what is this thing actually worth? Weigh it as a whole — what it is and how rare, its condition, its effect or uses, what it would fetch on this shop's own shelf (a rare or strange piece can be worth far more than ordinary stock), what the protagonist paid if known, and how much this owner wants it.
 4. From that worth, decide a fair buying price for this owner (a shop buys below what it would sell for; greedy or generous as the character is). React to the protagonist's figure honestly — accept, counter, or laugh it off.
-5. Write the owner's line with the figure, and the <offer>.
+5. Write the owner's line (it names the figure when the figure is new or has changed), and the <offer>.
 6. Did the protagonist's latest words plainly agree to sell at the figure? Only then <deal/>; otherwise the owner is still waiting for an answer.
 @@END
 

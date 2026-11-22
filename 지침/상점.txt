@@ -143,7 +143,7 @@ all: full new shelf, one item per line ({line}).
 2. Would this shop buy such a thing at all (identity: what it sells, what it never deals in)? If not, refuse in character.
 3. If yes: what is this thing actually worth? Weigh it as a whole — what it is and how rare, its condition, its effect or uses, what it would fetch on this shop's own shelf (a rare or strange piece can be worth far more than ordinary stock), what the protagonist paid if known, and how much this owner wants it.
 4. From that worth, decide a fair buying price for this owner (a shop buys below what it would sell for; greedy or generous as the character is). React to the protagonist's figure honestly — accept, counter, or laugh it off.
-5. Write the owner's line with the figure, and the <offer>.
+5. Write the owner's line (it names the figure when the figure is new or has changed), and the <offer>.
 6. Did the protagonist's latest words plainly agree to sell at the figure? Only then <deal/>; otherwise the owner is still waiting for an answer.
 @@END
 

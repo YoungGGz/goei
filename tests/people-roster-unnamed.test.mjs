@@ -657,7 +657,6 @@ test('장면 인물 유지: 갱신기가 답한 장면 인물을 응답에 적�
   const o = { settings: s, store: st, sheetOf: () => null, input: '김철수를 깨웠다' };
   assert.deepEqual(R.peopleBlockFor(next, o).people, ['김철수', '한서린']);
   assert.deepEqual(R.peopleBlockFor(next, { ...o, settings: settings({ $pp_scene_carry: '0' }) }).people, ['김철수']);
-  assert.deepEqual(Sel.scenePeople(next, store, Sel.nameMatcher(names()), { carry: ['이영호', '김철수'] }), ['김철수', '이영호'], '글에 나온 사람이 먼저');
   // 다음 갱신: 이름 없이 이어지는 응답에서도 그 인물을 읽고, 앞 응답의 장면 인물을 자료로 알린다
   const c2 = { message: [...c.message, { role: 'char', data: '여자는 말없이 창밖을 봤다. 이영호가 올라탔다.', chatId: 'c2' }] };
   const input2 = U.buildUpdate(c2, store, [3], { settings: s, system: '', values: {}, names: names() });

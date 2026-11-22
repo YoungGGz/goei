@@ -404,7 +404,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       if (site !== 'cos') return true;
       v.ask = true;
       v.picking = false;
-      if (value) v.chip = value;
+      if (value && !st.closed) v.chip = value;
       break;
     case 'mall-ask-close':
       v.ask = false;
@@ -714,8 +714,10 @@ async function deskOpen(ctx: ChatContext, env: MallEnv): Promise<boolean> {
   const key = lastBot(ctx.chat)?.key ?? '';
   // 상담원이 끝낸 상담은 이어 가지 않는다: 끝내고 새로
   if (st.agent && st.anchor === key && !st.ended) return env.render(), true;
+  // 방금 상담을 끊은 상담원은 바로 다시 연결하지 않는다
+  const gone = st.ended ? st.agent?.id : undefined;
   if (st.agent) st = endDesk(st, ds.keep);
-  const again = pickAgain(st, ds);
+  const again = pickAgain(gone ? { ...st, past: st.past.filter((p) => p.id !== gone) } : st, ds);
   if (again) {
     st = { ...st, agent: again, anchor: key, past: st.past.filter((p) => p.id !== again.id), talk: [{ who: 'sys', text: deskHello(again, true) }] };
     await saveDesk(ctx, st);

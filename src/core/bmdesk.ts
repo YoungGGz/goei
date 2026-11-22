@@ -121,9 +121,10 @@ export class DeskError extends Error {
   raw = '';
 }
 const fail = (msg: string, raw: string) => Object.assign(new DeskError(msg), { raw });
-/** 말풍선 (빈 줄로 나눔, 최대 3) */
+/** 말풍선 (빈 줄로 나눔, 화면은 3개까지 — 넘는 것은 버리지 않고 셋째에 잇는다) */
 function bubbles(text: string): string[] {
-  return text.replace(/\r/g, '').split(/\n\s*\n/).map((x) => x.split('\n').map((l) => l.trim()).filter(Boolean).join('\n').slice(0, 600)).filter(Boolean).slice(0, 3);
+  const b = text.replace(/\r/g, '').split(/\n\s*\n/).map((x) => x.split('\n').map((l) => l.trim()).filter(Boolean).join('\n')).filter(Boolean);
+  return (b.length > 3 ? [b[0], b[1], b.slice(2).join('\n')] : b).map((x) => x.slice(0, 600));
 }
 
 /** 상담원 번호 (코드가 정한다) */

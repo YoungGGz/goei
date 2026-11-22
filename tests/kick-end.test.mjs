@@ -73,7 +73,7 @@ test('우주 쇼핑몰: 끊긴 뒤에도 구매는 된다 (문의만 막는다)'
   assert.ok(fn.length > 500 && !fn.includes('closed'));
   const cases = [...ui.matchAll(/\n    case '(mall-[a-z-]+)':[^\n]*\n(?:    case '[^\n]*\n)*([\s\S]*?)(?=\n    case '|\n    default:)/g)];
   const guarded = cases.filter((m) => m[2].includes('st.closed')).map((m) => m[1]).sort();
-  assert.deepEqual(guarded, ['mall-pick', 'mall-say', 'mall-sell-open', 'mall-sell-pick']);
+  assert.deepEqual(guarded, ['mall-ask', 'mall-pick', 'mall-say', 'mall-sell-open', 'mall-sell-pick']);
 });
 
 test('우주 쇼핑몰: 끊김 → 진열 새로고침 → 풀림, 그 전 대화(끊으며 한 말)가 다음 문의 요청문에 들어 있다', () => {

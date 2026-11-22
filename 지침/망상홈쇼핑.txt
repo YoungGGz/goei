@@ -71,7 +71,7 @@ done|what that operator says when an order is confirmed
 <cue>: for every item, in shelf order, a header line #n and then {cue} lines. Each line is one shot; the screen plays them in order. cut is one of {cuts}: wide = the whole studio with the product on the turntable, bust = the host close up to camera, product = product close-up, phone = a caller is on the line. mood is the motion the host makes while delivering that line, one of: {moods}; in bust these are also available: {moods_b}. line is one line the host says aloud, in Korean, at most 60 characters. event is what the screen graphics do on that line, one of {events}, or - for none: price = the price board comes up, left -N = the remaining stock drops by N, rush = orders pour in, soon = nearly sold out, sold = this item has just sold out and the channel stops taking orders for it, call = a caller is connected, tear = the signal tears, look = the host stares into the camera in silence.
 Stock pressure runs on left -N, rush and soon. A sell-out is an event, not a closing formula: use sold only when an item truly sells out tonight, and then it is that item's last cue line, where the host announces it; nothing after it in that item sells or asks for orders.
 <chat>: for every item, in shelf order, a header line #n and then {chat} lines of the live viewer chat while that item is on air, in the order they scroll by alongside its cue lines.
-<operator>: the phones are worked by the channel's own staff, not by a human clerk, and not by the same one every program. Both lines are in the voice of whichever one has the phones tonight, and sound like that one and no other; phone manners are its surface, as with the rest of the staff in the reference material.
+<operator>: the phones are worked by the channel's own staff, not by a human clerk, and not by the same one every program. Both lines are in the voice of whichever one has the phones tonight, and sound like that one and no other; phone manners are its surface, as with the rest of the staff in the reference material. The same two lines serve every call of this program, whichever item it is about and however it is paid for. Each is one line of at most 120 characters.
 @@END
 
 @@SECTION HOST
@@ -137,12 +137,12 @@ items|belongings from [내민 물건] it takes, joined with 「;」, written exa
 demo|yes, when the caller owes the channel a demonstration of this item on a coming broadcast
 other|any other price or promise it takes, in short Korean words (never a belonging of the caller)
 </terms>
-Write <terms>none</terms> when the operator will not ship the item on anything offered and sets no terms of its own. Write the terms in full every time, even when unchanged; they replace the earlier ones. The caller reads the terms on the order slip on their screen exactly as written here, so the spoken line does not read them out; it speaks of them only where they changed or where the operator has something to say about them. The operator's line never says the order is placed; the caller places it by accepting the terms.
-How much the operator says is one turn of talk on a phone: as much as it has to say to that at this point, a few words when that answers it, more when it has more to say. Each turn is judged on its own; how long the earlier turns under [통화] ran is not a pattern to keep.
+Write <terms>none</terms> when the operator will not ship the item on anything offered and sets no terms of its own. Write the terms in full every time, even when unchanged; they replace the earlier ones. The caller sees the current terms on their screen, taken from this block, so the spoken line does not read them out; it speaks of them only where they changed or where the operator has something to say about them. The operator's line never says the order is placed; the caller places it by accepting the terms.
+How much the operator says is one turn of talk on a phone: as much as it has to say to what the caller just said, a few words when that answers it, more when it has more to say. Each turn is judged on its own; how long the earlier turns under [통화] ran is not a pattern to keep.
 @@END
 
 @@SECTION OPERATOR_HANGUP_ON
-The operator may end the call on its own, for reasons of its own, when it has had enough of this call or this caller: it says so in its own way and adds <hangup/>. After that this caller cannot reach it again about this item.
+The operator may end the call on its own, for reasons of its own, when it has had enough of this call or this caller: it says so in its own way, and <hangup/> follows after the blocks. After that this caller cannot reach it again about this item.
 @@END
 
 @@SECTION OPERATOR_HANGUP_OFF

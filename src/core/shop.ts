@@ -911,7 +911,7 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
     }
   }
   const closed = st.closed || (kick && r.closed);
-  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-keep.talk), closed, sell: closed ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
+  return { ...st, items: capShelf(items, shelf), talk: talk.slice(-keep.talk), closed, sell: closed && !(r.deal && typeof sell?.price === 'number') ? null : sell, ...(notes.length ? { notes } : {}), ...(quotes.length ? { quotes } : {}) };
 }
 
 /** 견적 수락 표시 (없거나 이미 수락했으면 null) */
