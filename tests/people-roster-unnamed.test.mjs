@@ -415,7 +415,7 @@ test('이름 옮기기: 형식·근거가 맞지 않으면 버린다', () => {
   assert.deepEqual(reasons(run([{ from: h, to: '한서린', m, quote: '글에 없는 문장입니다' }])), [['rename', '인용이 원문에 없음']]);
   assert.deepEqual(reasons(run([{ from: h, to: '한서린', m: tagOf(input, 1), quote: '붉은 코트의 여자가' }])), [['rename', '확정 구간 밖 메시지']]);
   assert.deepEqual(reasons(run([{ from: h, to: '붉은 코트', m, quote: '한서린이라고 해요' }])), [['rename', '같은 이름']]);
-  assert.deepEqual(reasons(run([{ from: h, to: '한서린', m, quote: '한서린이라고 해요' }], { exclude: ['한서린'] })), [['rename', '유저가 연기하는 요원']]);
+  assert.deepEqual(reasons(run([{ from: h, to: '한서린', m, quote: '한서린이라고 해요' }], { exclude: ['한서린'] })), [['rename', '주인공']]);
   store.ignored.push('한서린');
   assert.deepEqual(reasons(run([{ from: h, to: '한서린', m, quote: '한서린이라고 해요' }])), [['rename', '사용자가 무시한 이름']]);
   assert.ok(store.people[h].provisional && !store.people.한서린, '버린 것은 아무것도 바꾸지 않는다');
@@ -549,7 +549,7 @@ test('새 인물·이름 옮기기: 이름 표의 다른 표기(영문 표기)�
   // 유저가 연기하는 요원은 영문 표기로 와도 받지 않는다
   x = mk([a.name]);
   rep = U.applyUpdate(x.store, c, x.input, { new_people: [{ name: a.english, aliases: [], m: x.m, quote: '붉은 눈의 여자가', identity: '미확인' }] }, x.ctx);
-  assert.deepEqual(rep.dropped.map((d) => d.reason), ['유저가 연기하는 요원']);
+  assert.deepEqual(rep.dropped.map((d) => d.reason), ['주인공']);
   assert.deepEqual(Object.keys(x.store.people), ['붉은 눈의 여자']);
   // 이름 옮기기의 to 도 같다
   x = mk();
@@ -558,7 +558,7 @@ test('새 인물·이름 옮기기: 이름 표의 다른 표기(영문 표기)�
   assert.deepEqual(Object.keys(x.store.people), [b.name]);
   x = mk([b.name]);
   rep = U.applyUpdate(x.store, c, x.input, { renames: [{ from: '붉은 눈의 여자', to: b.english, m: x.m, quote: '붉은 눈의 여자가' }] }, x.ctx);
-  assert.deepEqual(rep.dropped.map((d) => d.reason), ['유저가 연기하는 요원']);
+  assert.deepEqual(rep.dropped.map((d) => d.reason), ['주인공']);
   assert.deepEqual(Object.keys(x.store.people), ['붉은 눈의 여자']);
 });
 

@@ -6,7 +6,7 @@ import { generate, runModel, LlmError, type LlmMessage } from './llm';
 import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, repairDirector, runSearches, type DirectorInput, type DirectorNote } from '../core/people/director';
 import { loadContext, updateChat, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
-import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, dropGonePeople, pruneScene } from '../core/people/store';
+import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, dropGonePeople, pruneScene, undoGoneRenames } from '../core/people/store';
 import { foldCues, foldOpenness, pruneEntries, pruneNotes } from '../core/people/prune';
 import { genSettings } from '../core/advanced';
 import { hypaSummaries } from '../core/people/hypa';
@@ -129,10 +129,14 @@ export const chatId = (ctx: ChatContext) => `${String(ctx.char.chaId ?? ctx.char
 
 export const sheetOf = (ctx: ChatContext) => (name: string): string | null => bookText({ char: ctx.char, chat: ctx.chat }, name) || null;
 
-/** 기록하지 않는 이름: 유저가 연기하는 요원 (캐릭터로 플레이) */
+/** 기록하지 않는 이름: 주인공. 캐릭터로 플레이하면 그 요원, 아니면 페르소나 이름 (지침 Router 「never list the user's own character」, 갱신기 「@user = the persona」) */
+export function ownNames(lore: LoreEntry[] | undefined, vars: Record<string, unknown> | undefined, persona = userInfo().name): string[] {
+  const me = playerAgent(lore, vars);
+  const name = (me?.name || persona || '').trim();
+  return name ? [name] : [];
+}
 function excludedNames(ctx: ChatContext): string[] {
-  const me = playerAgent(ctx.char.globalLore, ctx.chat.scriptstate);
-  return me?.name ? [me.name] : [];
+  return ownNames(ctx.char.globalLore, ctx.chat.scriptstate);
 }
 
 /** 명부의 세력 코드 → 이름 (세력 평판 표시·해석용) */
@@ -206,7 +210,7 @@ export function appearingIn(chat: Chat, indexes: number[], entries: { name: stri
 
 /** 처음 등장한 인물의 기록을 만든다 (시트 → 시작값). 확정 구간 글에 이름이 나온, 아직 기록이 없는 사람.
  *  이름 표는 미리 만든 표 ∪ 명부(roster)라, 명부 인물은 초상 태그(<img=영문_표정>)만 떠도 등장으로 본다.
- *  유저가 연기하는 요원(exclude)은 기록하지 않는다 (있던 기록은 지운다). 호칭 시작값은 유저 신분(identity)으로 고른다.
+ *  주인공(exclude: 캐릭터로 플레이하는 요원 또는 페르소나)은 기록하지 않는다 (있던 기록은 지운다). 호칭 시작값은 유저 신분(identity)으로 고른다.
  *  만든 기록에는 처음 나온 응답(origin)을 적는다: 그 응답이 다시 굴려져 사라지면 기록도 같이 없앤다 (dropGonePeople) */
 export function seedAppearing(store: PeopleStore, chat: Chat, indexes: number[], sheet: (name: string) => string | null, o: { exclude?: string[]; identity?: Identity; roster?: RosterRow[]; confirm?: boolean; held?: string[]; factions?: Record<string, string> } = {}): string[] {
   const exclude = new Set(o.exclude ?? []);
@@ -245,7 +249,7 @@ export function liveAppearing(store: PeopleStore, chat: Chat, names: string[], f
   return new Set(appearingIn(chat, all, entries, (n) => store.people[n]?.faction ?? '', factions).keys());
 }
 
-/** 유저가 연기하는 요원의 기록을 지운다 (자기 자신은 기록 대상이 아니다). 지운 이름을 돌려준다 */
+/** 주인공의 기록을 지운다 (자기 자신은 기록 대상이 아니다). 지운 이름을 돌려준다 */
 export function dropExcluded(store: PeopleStore, exclude: string[]): string[] {
   const gone: string[] = [];
   for (const n of exclude) {
@@ -340,7 +344,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   // 상태창 신분 칸 (가장 최근 응답) → 기록. 상태창이 늘 우선
   const identity = statusIdentity(ctx.chat);
   const idChanged = !!identity && (!store.identity || store.identity.faction !== identity.faction || store.identity.rank !== identity.rank || store.identity.from !== 'status');
-  // 유저가 연기하는 요원은 기록하지 않는다
+  // 주인공은 기록하지 않는다
   const exclude = excludedNames(ctx);
   const dropped = dropExcluded(store, exclude);
   const roster = rosterOf(ctx.char.globalLore);
@@ -381,6 +385,8 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         break;
       }
       const curStore = peopleStore(fresh.chat);
+      // 사라진 응답이 한 이름 옮기기는 자료에서도 되돌린 모습으로 (저장은 아래 쓰기에서 같이)
+      undoGoneRenames(curStore, fresh.chat, settings.keepMsgs);
       if (pendingClear) clearStoryRecords(curStore, pendingClear);
       // 가계부: 상태창 잔고 칸을 쓰는 채팅이면 장부 잔고를 자료에 넣고 거래 절을 켠다 (core/wallet.ts)
       const walletOn = colConfig(fresh.chat.scriptstate).wallet !== 'off';
@@ -472,6 +478,8 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           if (!clearUndo && s.people[pendingClear]) clearUndo = takeClearUndo(s, pendingClear);
           clearedNow = clearStoryRecords(s, pendingClear);
         }
+        // 다시 굴려(지워서) 사라진 응답이 한 이름 옮기기를 먼저 되돌린다: 새 응답은 옮기기 전 기록 위에 읽힌다 (core/people/store.ts undoGoneRenames)
+        const unrenamed = undoGoneRenames(s, cur, settings.keepMsgs);
         const before = snapshotRun(s);
         const report = applyUpdate(s, cur, input, value, {
           settings,
@@ -501,7 +509,9 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         foldOpenness(s, cur, settings.keepMsgs);
         let next = cur;
         // 이름을 옮긴 기록이 설정 「항상 포함할 인물」에 옛 호칭으로 적혀 있으면 새 이름으로 고쳐 적는다 (이름으로 적는 채팅 저장값은 인물 기록 밖에 이것뿐)
-        const always = renameAlways(cur.scriptstate?.[PP('always')], report.applied.renamed);
+        // 되돌린 옮기기는 옛 호칭으로 먼저 되돌려 적는다
+        const back = renameAlways(cur.scriptstate?.[PP('always')], unrenamed);
+        const always = renameAlways(back ?? cur.scriptstate?.[PP('always')], report.applied.renamed) ?? back;
         if (always !== null) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), [PP('always')]: always } };
         if (report.wallet.length) {
           let w = readWallet(cur.scriptstate, walletStart);
@@ -773,6 +783,9 @@ let routerHints: RouterHint[] = [];
 /** 마지막 Router 가 본 미등록 이름 (갱신기 힌트) */
 export const routerHintsNow = (): RouterHint[] => routerHints;
 
+/** Router 재사용 열쇠: 자료·지침(buildRouter 의 key) + 부르는 모델 (Director 와 같다: 모델을 바꿔도 다시 묻는다) */
+export const routerCacheKey = (key: string, settings: PeopleSettings): string => `${key}|${settings.stageModel.router}|${settings.stageModelId.router}`;
+
 /** 모델이 고른 장면 인물. 실패·지연·빈 결과면 null (코드 Router 로). 입력·최근 글·명단이 같으면 재사용 */
 export async function routerPeople(chat: Chat, store: PeopleStore, input: string, settings: PeopleSettings, exclude: string[] = [], identityOf?: (name: string) => string | null | undefined, roster: RosterRow[] = []): Promise<string[] | null> {
   // 힌트는 이번 턴의 Router 가 본 것만 간다: 부르지 않거나 실패한 턴에 지난 턴 힌트가 갱신기로 가지 않게 먼저 비운다 (같은 입력의 재사용은 그때 힌트를 다시 쓴다)
@@ -781,7 +794,8 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
   // 켜져 있으면 매 턴 부른다 (2026-11-22 사용자: 코드가 고른 인물로 자리가 찼다고 건너뛰던 조건을 뺐다. 켰는데 한 번도 안 불렸다)
   const names = allNames(roster);
   const built = buildRouter(chat, store, names, input, { exclude, recent: settings.recentMsgs, max: settings.sceneMax, prompt: routerBase(), rules: settings.routerRules, identityOf });
-  if (routerCache?.key === built.key) {
+  const cacheKey = routerCacheKey(built.key, settings);
+  if (routerCache?.key === cacheKey) {
     routerHints = routerCache.hints;
     return routerCache.selected;
   }
@@ -794,10 +808,10 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
     ]);
     diag.raw = raw;
     diag.outChars = raw.length;
-    const r = parseRouter(raw, store, names, built.max);
+    const r = parseRouter(raw, store, names, built.max, exclude);
     diag.people = r.selected;
     diag.ok = true;
-    routerCache = { key: built.key, selected: r.selected, hints: r.newCharacters };
+    routerCache = { key: cacheKey, selected: r.selected, hints: r.newCharacters };
     routerHints = r.newCharacters;
     return r.selected.length ? r.selected : null;
   } catch (error) {
