@@ -616,12 +616,21 @@ function partyLabel(names: string[], support: number): string {
   return ['나', ...names, ...(support > 0 ? [`지원 ×${support}`] : [])].join(', ');
 }
 
+/** 본편 응답을 기다리는 동안에는 채팅에 카드를 놓거나 바꾸지 않는다 (요청 도중 채팅을 저장하면 응답이 사라지거나, 늦게 온 답이 카드 뒤에 붙어 지시가 모델에 안 간다) */
+export const WAIT_SEND_NOTE = '답을 기다리는 중이라 지금은 보낼 수 없어요. 답이 온 뒤에 해 주세요.';
+
 async function compose(ctx: ChatContext, env: FieldEnv, build: (latest: Chat, x: Ctx) => { chat: Chat }): Promise<void> {
+  if (isWaiting()) {
+    env.setNotice(WAIT_SEND_NOTE);
+    env.render();
+    return;
+  }
   env.setBusy(true);
   env.setNotice('');
   env.render();
   try {
     await updateChat(ctx.charIndex, ctx.chatIndex, (latest) => {
+      if (isWaiting()) throw new DirectiveError(WAIT_SEND_NOTE);
       const x = ctxOf(ctx, latest);
       return build(latest, x).chat;
     });
@@ -712,8 +721,8 @@ export function sendMission(ctx: ChatContext, env: FieldEnv, opening: boolean): 
 }
 
 /**
- * 임무 창 「요청 취소」: 그 요청의 카드가 아직 안 보낸 채 채팅 끝에 있으면 채팅 속 카드의 「취소」와 같이 카드째 물린다 (host/unsent.ts withdrawUnsentAt).
- * 카드가 이미 보내졌거나(응답을 기다리는 중 포함 — 요청 도중 채팅을 저장하면 응답이 사라질 수 있다) 없으면 상황판 대기만 지운다.
+ * 임무 창 「요청 취소」: 그 요청의 카드가 답 없이 채팅 끝에 있으면(안 보냈거나, 보냈지만 답 없이 끝남) 채팅 속 카드의 「취소」와 같이 카드째 물린다 (host/unsent.ts withdrawUnsentAt).
+ * 응답을 기다리는 중이거나(요청 도중 채팅을 저장하면 응답이 사라질 수 있다) 카드에 이미 답이 붙었으면 상황판 대기만 지운다.
  */
 async function cancelRequest(ctx: ChatContext, env: FieldEnv, kind: EventKind): Promise<void> {
   const target = readWorld(ctx.chat).pending[kind];

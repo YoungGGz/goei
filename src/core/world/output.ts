@@ -75,11 +75,14 @@ export function dropPendingVars(chat: Chat, lore: LoreEntry[] | undefined): Scri
 /**
  * 안 보낸 마지막 유저 메시지(자동 전송이 막힌 임무 요청 카드·직접 입력)를 물린 채팅. 임무 요청 카드면 걸어 둔 커스텀 임무도 거둔다 (dropPendingVars).
  * 채팅 속 카드의 「취소」와 임무 창의 「요청 취소」가 같이 쓴다. target 을 주면 그 목표의 임무 요청 카드일 때만 물린다. 물릴 것이 없으면 null.
+ * 창의 「요청 취소」(target)는 보냈지만 답 없이 끝난 카드(채팅 끝에 답 없이 남은 카드)도 물린다 — 남기면 다음 글에 취소한 임무 지시가 같이 갔다.
+ * 응답을 기다리는 중에는 부르는 쪽이 부르지 않는다 (ui/field.ts cancelRequest).
  */
 export function withdrawUnsent(chat: Chat, lore: LoreEntry[] | undefined, target?: string): Chat | null {
   const msgs = chat.message ?? [];
   const last = msgs[msgs.length - 1];
-  if (!last || last.role !== 'user' || typeof last.data !== 'string' || !isUnsent(last.data)) return null;
+  if (!last || last.role !== 'user' || typeof last.data !== 'string') return null;
+  if (target === undefined && !isUnsent(last.data)) return null;
   const card = hasSceneCard(last.data);
   if (target !== undefined && (!card || readScene(last.data)?.target !== target)) return null;
   const next: Chat = { ...chat, message: msgs.slice(0, -1) };
