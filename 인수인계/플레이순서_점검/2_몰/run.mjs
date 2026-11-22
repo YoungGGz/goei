@@ -587,6 +587,7 @@ let snapAfterBuy;
   const n1 = await llmCount();
   const heads = async (a, z) => { const o = []; for (let i = a; i < z; i++) { const m = await llmAt(i); o.push(String(m[0]?.content ?? '').slice(0, 70)); } return o; };
   note(s, '열 때 나간 보조 호출 머리', await heads(n0, n1));
+  note(s, '열고 난 뒤 화면 실패 안내·저장된 진열 턴', { fail: await page.evaluate(() => document.querySelector('.cs-fail')?.innerText ?? ''), at: (await vars())['$cos_shop_at'], turn: await page.evaluate(() => window.__chat.message.map((m) => m.chatId).join(',')) });
   const cosCalls = (await heads(n0, n1)).filter((h) => h.includes('우주 쇼핑몰')).length;
   check(s, '열자 우주몰 진열 호출 1회', cosCalls === 1, 1, cosCalls);
   const msgs = n1 > n0 ? await llmAt(n0) : [];
