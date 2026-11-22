@@ -3978,6 +3978,9 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 .br-prof .br-i { fill: #e8eaed; }
 .br .br-tabn { display: none; width: 22px; height: 22px; border: 2px solid var(--cic) !important; border-radius: 5px; place-items: center; font-size: 11px; font-weight: 700; color: var(--cic) !important; margin: 0 6px; flex: none; }
 .br .br-tb.mo { display: none; }
+/* 폰 주소창 오른쪽 끝 새로고침 (2026-11-23 사용자: 폰에도 새로 받는 단추, 주소창 안) */
+.br .br-orel { display: none; width: 30px; height: 30px; border-radius: 50%; place-items: center; flex: none; margin-right: -8px; }
+.br-orel:active { background: rgba(255, 255, 255, .18); }
 .br-bms { display: flex; align-items: center; gap: 2px; height: 30px; padding: 0 8px; background: var(--ct); border-bottom: 1px solid #4a4c50; overflow-x: auto; scrollbar-width: none; }
 .br .br-bm { display: flex; align-items: center; gap: 7px; padding: 0 8px; height: 24px; border-radius: 12px; font-size: 12px; white-space: nowrap; flex: none; }
 .br-page { position: relative; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: #fff; color: #1d2320; }
@@ -4015,7 +4018,7 @@ button.it-avbtn:hover { background: color-mix(in srgb, var(--signal) 6%, transpa
 @media (max-width: 600px), (max-height: 499px) and (pointer: coarse) {
   .br { grid-template-rows: auto auto minmax(0, 1fr); }
   .br-tabs, .br-tb.pc { display: none; }
-  .br .br-tb.mo, .br .br-tabn { display: grid; }
+  .br .br-tb.mo, .br .br-tabn, .br .br-orel { display: grid; }
   .br-tool { height: 56px; padding: 0 6px; }
   .br-omni { height: 40px; border-radius: 20px; background: #3c3c3f; margin: 0 4px; font-size: 15px; }
   .br-bms { height: 34px; }

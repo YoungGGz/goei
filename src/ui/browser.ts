@@ -218,7 +218,7 @@ export function chromeHtml(o: ChromeOpts): string {
     .map((x, i) => `<div class="br-tab${i === br.cur ? ' on' : ''}" role="tab" aria-selected="${i === br.cur}"><button class="br-tabb" data-action="br-tab" data-value="${i}">${siteLogo(x.site)}<span class="br-tt">${esc(tabTitle(x, i, o))}</span></button><button class="br-tx" data-action="br-close" data-value="${i}" aria-label="탭 닫기">${ic(IC.x, 'br-i s')}</button></div>`)
     .join('');
   const omni = s
-    ? `<span class="br-ti">${ic(IC.tune)}</span><span class="br-u"><b>${esc(s.host)}</b>${esc(o.path || s.path)}</span>`
+    ? `<span class="br-ti">${ic(IC.tune)}</span><span class="br-u"><b>${esc(s.host)}</b>${esc(o.path || s.path)}</span><button class="br-orel" data-action="br-reload" aria-label="새로고침">${ic(IC.rel)}</button>`
     : `<span class="br-ti">${ic(IC.srch)}</span><span class="br-u">검색어 또는 URL 입력</span>`;
   const prof = o.nick ? (o.photo ? `<img src="${esc(o.photo)}" alt="">` : `<b>${esc([...o.nick][0] ?? '')}</b>`) : ic(IC.acct);
   const bms = o.bookmarks
