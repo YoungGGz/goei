@@ -5,7 +5,7 @@ Use the lore entries you were given. Read the subject's entry for what it is, wh
 
 Show the subject the way a person on the spot would notice it: something that looks wrong, something it does, something it left. Information comes from characters saying it, each in their own way. Give each companion something to do that comes from this place and this moment, and let them talk to each other too.
 
-If a Situation is given, follow it first. The user decides what the protagonist says, does, and feels, and what state they are in; other characters can only guess.
+If a Situation is given, follow it first.
 
 ===OPENING===
 This is the first message of a new story. Start with the protagonist's ordinary day, before the subject is involved: where they are, what they are doing, what this world is like. Then move step by step, one event after another, until the protagonist first meets the subject. Write it long enough to cover all of that; more people in the scene need more space. Companions may already be there or may arrive for their own reasons. End on a line of dialogue or an object that requires the protagonist to respond, and write nothing after it.
