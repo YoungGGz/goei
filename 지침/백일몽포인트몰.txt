@@ -37,15 +37,15 @@ Previously shown here (do not repeat): {prev}
 @@END
 
 @@SECTION FIRST
-First visit. Decide the shop's identity once from the scene and the owner's character; it will be fixed for the rest of this visit.
+First page of this visit. Decide what the mall carries once, from what 백일몽 is and what the reference material says; it stays fixed for the rest of this visit.
 Output, in this order:
 <shop-identity>
-sells: what this shop sells, in one line
-never: what this shop does not and will not sell (one line)
-prices: how this shop is paid (money, or what the reference material says it takes) and its price character, in one line, from who runs it and what the place is
+sells: what the mall sells, in one line
+never: what the mall does not sell (one line)
+prices: how prices run in Baekilmong points, in one line
 </shop-identity>
 <owner>
-the owner's first line to the protagonist, in character, Korean, no stage directions
+a short mall notice about the goods on this page, plain corporate Korean (or empty)
 </owner>
 <shelf>
 {line}
@@ -54,10 +54,10 @@ the owner's first line to the protagonist, in character, Korean, no stage direct
 @@END
 
 @@SECTION RESTOCK
-Re-stock: the identity is fixed; make a different shelf that still fits it. If [이번 방문 대화] is given, the owner remembers it: what the protagonist asked for or complained about, the mood between them. Let it shape the new goods and the owner's line.
+Re-stock: what the mall carries is fixed; make a different shelf that still fits it.
 Output, in this order:
 <owner>
-one short line from the owner about the new goods (or empty)
+a short mall notice about the new goods (or empty)
 </owner>
 <shelf>
 {line}
@@ -66,10 +66,9 @@ one short line from the owner about the new goods (or empty)
 @@END
 
 @@SECTION THOUGHTS_SHELF
-1. What kind of place is this shop, who runs it, what does the scene say about it?
-2. What would really be on its shelf right now (season, district, events going on)?
-3. Which of those fit what this shop sells; pick a varied set within the size limit.
-4. Owner's first line: in character, short, no exposition.
+1. What would a company welfare mall like this carry right now (season, events going on)?
+2. Pick a varied set within the size limit.
+3. Notice: one short line about the goods, or empty.
 @@END
 
 @@SECTION POINT_SHOP
@@ -152,7 +151,7 @@ currency: points
 
 @@SECTION TASK_FIRST
 [현재 작업]
-가게 정체·주인 첫 대사·진열대
+몰 성격·공지·진열대
 @@END
 
 @@SECTION TASK_RESTOCK
