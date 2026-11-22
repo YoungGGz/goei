@@ -291,3 +291,18 @@ test('망상홈쇼핑을 꺼 두면 남아 있는 시청 기록을 메인 요청
   assert.equal(hsMainContext(chatOf({ ...vars, $hs_on: '0' }), RULE, null, 0), '');
   assert.notEqual(hsMainContext(chatOf(vars), RULE, null, 0), '');
 });
+
+test('본편 참고 기록: 주문에 묶인 상담원 통화 말(ref)도 그 주문이 없던 일이 되면 넘기지 않는다', () => {
+  const show = showOf('k1');
+  const order = { id: 'ho_a1', item: { name: '행운의 무전기' }, n: 0, anchor: 'gone', turn: 1, dues: [], boxId: '' };
+  const vars0 = appendLog({}, show, [
+    { k: 'aside', p: 0, who: '상담원', text: '이십오만 원입니다.' },
+    { k: 'aside', p: 0, who: '김솔음', text: '그걸로 할게요.', me: 1, ref: 'ho_a1' },
+    { k: 'aside', p: 0, who: '상담원', text: '주문 받았습니다.', ref: 'ho_a1' },
+    buy(0, '전화 주문: 「행운의 무전기」', 'ho_a1'),
+  ]);
+  assert.equal(readLog(vars0).entries[2].ref, 'ho_a1', '저장해도 ref 가 남는다');
+  const texts = (c) => body(hsMainContext(c, RULE, null, 0)).records[0].lines.map((l) => l.text);
+  assert.deepEqual(texts(chatOf({ ...vars0, ...homeshop.ordersVars([order]) })), ['이십오만 원입니다.']);
+  assert.deepEqual(texts(chatOf({ ...vars0, ...homeshop.ordersVars([{ ...order, anchor: '' }]) })), ['이십오만 원입니다.', '그걸로 할게요.', '주문 받았습니다.', '전화 주문: 「행운의 무전기」']);
+});
