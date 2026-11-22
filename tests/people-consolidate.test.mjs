@@ -19,7 +19,7 @@ const T = await mod('types');
 const St = await mod('settings');
 const U = await mod('updater');
 
-const chat = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '쟈알디가 왔다. 명단을 봤다. 팔을 다쳤다.', chatId: 'c1' }] };
+const chat = { message: [{ role: 'user', data: 'a', chatId: 'u1' }, { role: 'char', data: '쟈알디가 왔다. 명단을 봤다. 팔을 다쳤다.', chatId: 'c1' }, { role: 'user', data: 'b', chatId: 'u2' }, { role: 'char', data: '다음 응답', chatId: 'c2' }] }; // 항목은 마지막 응답(c2)이 아닌 c1 에 묶인다 (마지막 응답의 항목은 정리에서 빠짐)
 const person = (name) => ({ name, faction: 'A00', seeded: { from: 'none', at: '' }, slots: {}, affinity: { base: 0 }, address: { toUser: '요원', register: '반말' }, express: 1, aliases: [] });
 const e = (id, text, extra = {}) => ({ id, text, src: 'story', anchor: 'c1', seq: 1, quote: '왔다', ...extra });
 

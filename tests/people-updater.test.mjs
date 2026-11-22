@@ -152,7 +152,13 @@ test('반영: 다시 굴려 응답이 바뀌면 그 응답 근거 항목·계기
 });
 
 test('새 인물: 2턴 규칙·별명 충돌·상한, 확인 모드 (역할로 된 이름을 코드가 걸러내지 않는다)', () => {
-  const { c, store, input } = setup();
+  // 이름 있는 새 인물은 그 이름이 보낸 글에 나와야 한다 (점검 11-22 문제 3b): 여기 쓰는 이름들을 응답 글에 넣는다
+  const c = base();
+  c.message[3].data = c.message[3].data.replace('데쥬레는', '김철수와 택시 기사, 박영희가 지나갔다. 데쥬레는');
+  const store = T.emptyStore();
+  store.people.쟈알디 = person('쟈알디');
+  store.people.데쥬레 = person('데쥬레');
+  const input = U.buildUpdate(c, store, [3], { settings: settings(), system: 'SYS', values: {}, names });
   const np = (name, extra = {}) => ({ name, aliases: [], m: 'm4', quote: '감싸 안으며', identity: '관리국 사람', ...extra });
   let rep = U.applyUpdate(store, c, input, { new_people: [np('김철수'), np('택시 기사'), np('Jyaldi')] }, { settings: settings({ twoTurn: true }) });
   assert.ok(rep.held.some((h) => h.who === '김철수' && /2턴/.test(h.reason)));

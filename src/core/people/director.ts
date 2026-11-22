@@ -91,7 +91,8 @@ export function buildDirector(chat: Chat, store: PeopleStore, people: string[], 
     .replace('{{LINES}}', s.directorLen === 'normal' ? '3' : '1');
   const data = { people: persons, ...(rhythm.length ? { rhythm, rhythm_clock: rhythmClockLines(rhythmClock(store, chat, live)) } : {}), ...(memory.length ? { memory } : {}), recent, input: input.slice(0, 4000) };
   // 최근 글도 열쇠에 넣는다: 같은 입력을 두 번 보내도 장면이 나아갔으면 다시 묻는다. 리롤은 최근 글이 같아 그대로 재사용 (전수검사 11-13)
-  const key = hash(JSON.stringify({ people: persons.map((p) => [p.name, p.affinity, tails[p.name].state, tails[p.name].threads, p.unknown_to, p.slots]), input, recent: recent.map((r) => r.text.slice(0, 400)) }));
+  // 지침 글(system)도 넣는다: Director 방식·언어·길이·덧붙인 지침·켠 기능을 바꾸면 같은 입력이라도 다시 묻는다 (점검 11-22 문제 5)
+  const key = hash(JSON.stringify({ system, people: persons.map((p) => [p.name, p.affinity, tails[p.name].state, tails[p.name].threads, p.unknown_to, p.slots]), input, recent: recent.map((r) => r.text.slice(0, 400)) }));
   return { system, data, key, people, search: s.directorSearch };
 }
 

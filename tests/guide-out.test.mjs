@@ -165,6 +165,8 @@ test('기본 지침으로 만든 요청문 = 옮기기 전 코드가 만들던 �
     ['\nFactions: 1 Management Bureau · 2 Fake Management Bureau · 3 Baekilmong · 4 Civilian · 5 Freelancer\n', '\n'],
     // 사용자 2026-11-14: 「무기」 칸 → 「손」 칸 (손에 드는 것 전부)
     ['무기 (held and fought with)', '손 (held in the hand to be used or fought with: weapons, tools, lights, umbrellas and anything else the protagonist holds rather than wears; the protagonist has two hands)'],
+    // 사용자 2026-11-22: 이번 턴에 산 것은 「This turn: just bought」에만 (「Recently: got」에 되풀이하지 않는다)
+    ['Recently: got 손전등\n', ''],
   ];
   // 요청문은 JSON 글자열 꼴(따옴표 \\")로 견주므로 두 꼴 모두 입힌다
   const esc = (t) => JSON.stringify(t).slice(1, -1);

@@ -36,7 +36,7 @@ export interface HsLogEntry {
   text: string;
   /** say: 내가 친 줄 (없으면 돌아온 반응) */
   me?: 1;
-  /** buy: 주문 id (그 주문이 없던 일이 되면 본편에 넘기지 않는다) */
+  /** 주문 id: buy 줄, 그리고 주문을 받는 말·주문 뒤 상담원 말 (그 주문이 없던 일이 되면 본편에 넘기지 않는다) */
   ref?: string;
 }
 export interface HsLogItem { name: string; pay: string; desc: string }
@@ -77,6 +77,12 @@ export function readLog(vars: Vars): HsLog {
   } catch {
     return emptyLog();
   }
+}
+/** 같은 주문 id 로 주문을 다시 넣을 때: 없던 일이 된 앞 주문(주문한 응답을 다시 굴림)에 묶인 줄을 기록에서 뺀 채팅 변수. 주문 기록에서도 앞 주문은 새 주문으로 갈린다 */
+export function dropRefVars(vars: Vars, ref: string): Vars {
+  const log = readLog(vars);
+  if (!log.entries.some((e) => e.ref === ref)) return vars;
+  return { ...(vars ?? {}), ...logVars({ ...log, entries: log.entries.filter((e) => e.ref !== ref) }) };
 }
 export const logVars = (log: HsLog): Record<string, string> => ({ [HS_LOG_VAR]: log.entries.length ? JSON.stringify(log) : '' });
 
@@ -206,9 +212,9 @@ export function hsMainContext(chat: Chat, rule: string, focus?: Focus | null, ca
   const log = readLog(vars);
   // 「넘기는 기간」: 마지막으로 방송을 본 턴부터 그 턴 수만큼만 넘긴다 (0 = 다음 편성을 받을 때까지)
   if (set.turns > 0 && hsLogAge(chat, log) >= set.turns) return '';
-  // 없던 일이 된 주문(주문한 응답이 지워짐)은 뺀다
-  const orders = log.entries.some((e) => e.k === 'buy' && e.ref) ? new Set(liveOrders(vars, aliveAnchors(chat)).map((o) => o.id)) : null;
-  const entries = log.entries.filter((e) => set.kinds.includes(e.k) && !(e.k === 'buy' && e.ref && !orders?.has(e.ref)));
+  // 없던 일이 된 주문(주문한 응답이 지워짐)은 뺀다: 주문 줄과 그 주문에 묶인 상담원 통화 말
+  const orders = log.entries.some((e) => e.ref) ? new Set(liveOrders(vars, aliveAnchors(chat)).map((o) => o.id)) : null;
+  const entries = log.entries.filter((e) => set.kinds.includes(e.k) && !(e.ref && !orders?.has(e.ref)));
   if (!entries.length) return '';
   const limit = cap ?? set.tokens;
   const withShow = set.kinds.includes('show');

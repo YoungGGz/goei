@@ -4,6 +4,7 @@
 import type { Chat } from './types';
 import { findStatusTags, statusMinute } from './world/status';
 import type { ShopItem } from './shop';
+import type { MallPaid } from './items';
 import { messageKey } from './people/store';
 import { guideTxt } from './guides';
 
@@ -202,8 +203,8 @@ export const bmOrdersKeep = (vars: Vars): number => keepOf(vars?.[BM_ORDERS_KEEP
 
 /** 수령 대기 한 줄. item 은 살 때 진열대의 것 그대로 (숨긴 진실 포함) */
 export type BmOrder = Pick<CosOrder, 'id' | 'anchor' | 'price' | 'item' | 'walletId' | 'taken' | 'takenKey'> & {
-  /** 본편에 「포인트로 삼」으로 넘길 글 (살 때 적어 둔다, 받을 때 물건에 그대로) */
-  paidWith?: string;
+  /** 치른 사실 (살 때 적어 둔다, 받을 때 물건에 그대로 — core/items.ts MallPaid) */
+  mallPaid?: MallPaid;
   /** 「받기」를 누른 때의 마지막 응답 키 (2026-11-16 사용자: 갈 수 없는 상황인데 받아 버리면 뜬금없다 → 본편이 확인해야 들어온다).
    *  그 응답이 아직 마지막 응답인 동안만 「수령하러 감」이다 (bmGoing). 다음 응답이 나오면 저절로 묵은 표시가 된다 — 지우지 않아도 「수령 대기」로 돌아온다.
    *  그 다음 응답을 다시 굴리면 다시 마지막 응답이 되어 「수령하러 감」으로 되살아난다 */

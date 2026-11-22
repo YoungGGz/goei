@@ -715,6 +715,13 @@ export function pointPrice<T extends { price: number; pay?: string }>(x: T): T {
   return { ...rest, price: x.price + n } as T;
 }
 
+/** 포인트몰 진열 응답: 「900p」 값을 포인트로 읽고, 정가 포인트가 아닌 줄(현물·대가가 남았거나 값이 0 이하)은 버린다 (사용자 결정 「정가 포인트 구매만」 — 현물 값이 0포인트 공짜 물건이 되지 않게). 다 버려지면 읽을 물건이 없는 응답 */
+export function pointShelf(r: ShelfReply): ShelfReply {
+  const items = r.items.map(pointPrice).filter((x) => !x.pay && x.price > 0);
+  if (!items.length) throw new ShopError(guideTxt('Shop', 'ERROR_NO_ITEMS', { line: lineOf('Bm') }));
+  return { ...r, items };
+}
+
 export type TalkMode = 'none' | 'partial' | 'all';
 export interface TalkReply {
   owner: string;
@@ -823,7 +830,9 @@ function withIds(st: ShopState, list: Omit<ShopItem, 'id'>[], exclude: ShopItem[
 /** 첫 호출·새로고침 결과를 상태에 */
 export function applyShelf(st: ShopState, r: ShelfReply, s: ShopSettings): ShopState {
   const base: ShopState = { ...st, identity: st.loaded ? st.identity : r.identity, loaded: true };
-  const items = withIds(base, r.items, [], st.items.filter((x) => x.sold)).slice(0, s.shelf);
+  // 설정 「지난 목록 피하기」가 켜져 있으면 새 진열에서 지금 진열대(안 팔린 것)·산 것과 같은 이름은 뺀다 (새로고침해도 같은 물건이 다시 걸리지 않게, 2026-11-22 사용자)
+  const fresh = s.avoidPrev ? r.items.filter((x) => !st.items.some((y) => sameShopName(y.name, x.name))) : r.items;
+  const items = withIds(base, fresh, [], st.items.filter((x) => x.sold)).slice(0, s.shelf);
   if (!items.length) throw new ShopError('받은 물건 줄이 모두 겹쳐서 버렸어요. 다시 받아 보세요.');
   const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-s.keep.prev);
   const talk = r.owner ? [...st.talk, { who: 'owner' as const, text: r.owner, ...keyOf(st) }] : st.talk;
@@ -1070,12 +1079,15 @@ export interface ShopSource {
 // 지침 글은 플러그인 내장 지침 「Shop」(지침/상점.txt, 설정 → 지침 → 상점에서 고침). 여기는 절을 골라 자리만 채운다 (2026-11-07 사용자: 지침은 전부 지침 메뉴에서)
 const G = (name: GuideName = 'Shop') => guideSections(name);
 
-/** 「다시 내지 말 것」 목록: 지난 진열대에 남았던 것 + 여기서 산 것 (2026-11-22 사용자: 다 사고 새로고침하면 같은 물건이 다시 나옴) */
-const prevNames = (st: ShopState): string[] => [...new Set([...st.prev, ...st.items.filter((x) => x.sold).map((x) => x.name)])];
+/** 「다시 내지 말 것」 목록: 지난 진열대에 남았던 것 + 여기서 산 것 + (진열 요청이면) 지금 진열대에 걸린 안 팔린 것 (2026-11-22 사용자: 다 사고 새로고침하면 같은 물건이 다시 나옴).
+ *  지금 걸린 것은 applyShelf 가 새 진열을 받은 뒤에야 prev 에 넣으므로 여기서 같이 넣는다 (아무것도 안 사고 새로고침해도 같은 물건이 다시 나오지 않게).
+ *  문의 요청(talk)은 지금 진열을 따로 넘기고 그 물건의 값 바꾸기·빼기를 받으므로 지금 진열은 넣지 않는다 */
+export const prevNames = (st: ShopState, talk = false): string[] => [...new Set([...st.prev, ...st.items.filter((x) => x.sold || !talk).map((x) => x.name)])];
 
 const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, guide: GuideName = 'Shop', truthMode: TruthMode = 'mix', talk = false) => {
   const r = s.size;
-  const v = { size: r[0] === r[1] ? guideTxt(guide, 'SIZE_EXACT', { n: r[0] }) : guideTxt(guide, 'SIZE_RANGE', { min: r[0], max: r[1] }), line: lineOf(guide), price: s.price, prev: prevNames(st).join(', '), truth_rule: guideTxt(guide, `TRUTH_${truthMode.toUpperCase()}`) };
+  const avoid = prevNames(st, talk);
+  const v = { size: r[0] === r[1] ? guideTxt(guide, 'SIZE_EXACT', { n: r[0] }) : guideTxt(guide, 'SIZE_RANGE', { min: r[0], max: r[1] }), line: lineOf(guide), price: s.price, prev: avoid.join(', '), truth_rule: guideTxt(guide, `TRUTH_${truthMode.toUpperCase()}`) };
   return [
     fillGuide(g.SHELF, v),
     guide === 'Cos' ? fillGuide(g.SHELF_SECRET, v) : '',
@@ -1085,7 +1097,7 @@ const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, 
     s.diverse ? fillGuide(g.VARIETY, v) : '',
     fillGuide(s.price ? g.PRICE_GUIDE : g.PRICE_DEFAULT, v),
     fillGuide(g.PRICING, v),
-    s.avoidPrev && prevNames(st).length ? fillGuide(g.AVOID_PREV, v) : '',
+    s.avoidPrev && avoid.length ? fillGuide(g.AVOID_PREV, v) : '',
   ].filter(Boolean).join('\n');
 };
 

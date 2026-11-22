@@ -11,7 +11,9 @@ import { placeholderOrgs, relationStage, STAGE_VALUE } from '../world/records';
 
 interface BasePerson { faction: string; values: string; express: 0 | 1 | 2 | 3; temper: Temper; english: string[] }
 interface RelationsBase { version: number; people: Record<string, BasePerson>; pairs: Record<string, { aff: number; src: string }>; orgs: Record<string, number> }
-interface AliasesBase { version: number; names: Record<string, { aliases: string[]; titles: string[] }>; ambiguous: Record<string, string[]> }
+/** corroborate: 이 인물의 이름·별명 가운데 흔한 낱말·직함이거나 별명(동물 별명·가면 이름 등)이라, 그것만 글에 나와서는 처음 등장으로 보지 않는 것.
+ *  같은 글(응답과 그 앞 메시지)에 그 사람의 초상 태그나 소속이 같이 있을 때만 처음 등록한다 (2026-11-22 사용자). 기록된 뒤 장면 인물을 찾는 데는 그대로 열쇠다 */
+interface AliasesBase { version: number; names: Record<string, { aliases: string[]; titles: string[]; corroborate?: string[] }>; ambiguous: Record<string, string[]> }
 /** 호칭 표 (address.json): 그 인물의 직급 단계, 말투, 자기 호칭, 유저가 상급·동급·하급·외부인일 때 부르는 말 */
 interface AddressRow { level: number | null; register: string; self: string; up: string; peer: string; down: string; outsider: string }
 interface AddressBase { version: number; names: Record<string, AddressRow> }
@@ -91,3 +93,6 @@ export function allNames(roster: RosterRow[] = []): NameEntry[] {
   return [...out.values()];
 }
 export const extraNames = (roster: RosterRow[] = []): Record<string, { aliases?: string[]; titles?: string[] }> => Object.fromEntries(allNames(roster).map((e) => [e.name, { aliases: e.aliases, titles: e.titles }]));
+
+/** 처음 등장 판정에서 다른 근거가 있어야 하는 열쇠 (aliases.json corroborate). 없으면 빈 목록 */
+export const corroborateKeys = (name: string): string[] => ALIASES.names[name]?.corroborate ?? [];

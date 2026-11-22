@@ -76,6 +76,16 @@ function subOf(el: Element, rowLabel: string): string {
   return rest === rowLabel ? '' : rest;
 }
 
+/** 입력 칸이 수 칸인가: type=number·range, 또는 자릿점을 찍어 보이는 글 칸(type=text inputmode=numeric, 우주몰 값 등급 하한·상한)이 min·max 를 갖고 있으면.
+ *  수 칸이면 상담이 「백만원」 같은 글을 적어도 받지 않고 옛 값을 둔다(core/consult.ts consultValue) — 글 칸으로 넘어가 빈칸이 되던 것 (11-22) */
+export function numKind(type: string, inputmode: string | null, min: string | null, max: string | null): { lo: number; hi: number; digits: boolean } | null {
+  const digits = type === 'text' && inputmode === 'numeric';
+  if (!(type === 'number' || type === 'range' || digits) || min === null || max === null) return null;
+  const lo = Number(min);
+  const hi = Number(max);
+  return Number.isFinite(lo) && Number.isFinite(hi) ? { lo, hi, digits } : null;
+}
+
 /** 메뉴 화면 한 장(HTML)에서 줄을 읽는다 */
 export function pageRows(html: string, page: string, menu: string): CatRow[] {
   const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -131,12 +141,14 @@ export function pageRows(html: string, page: string, menu: string): CatRow[] {
         const lone = isGrid && !!cg && gcols.filter(([g]) => g === cg).length === 1;
         const sub = isGrid ? (lone ? cg : [cg, co].filter(Boolean).join(' ')) : subOf(e, label);
         const value = (e.tagName === 'TEXTAREA' ? e.textContent ?? '' : input.getAttribute('value') ?? '').replace(/\r/g, '');
-        const lo = Number(input.getAttribute('min'));
-        const hi = Number(input.getAttribute('max'));
-        const isNum = (type === 'number' || type === 'range') && input.hasAttribute('min') && input.hasAttribute('max') && Number.isFinite(lo) && Number.isFinite(hi);
+        const nk = numKind(type, input.getAttribute('inputmode'), input.getAttribute('min'), input.getAttribute('max'));
+        const isNum = !!nk;
+        const lo = nk?.lo ?? 0;
+        const hi = nk?.hi ?? 0;
+        const digits = !!nk?.digits;
         const unit = (lone ? co : '') || txt(e.closest('.st-step')?.querySelector(':scope > span')) || txt(e.parentElement?.querySelector(':scope > output')).replace(/^-?[\d,.\s]+/, '') || undefined;
         const max = Number(input.getAttribute('maxlength')) || undefined;
-        push({ id: key ? `${action}.${key}` : action, name: sub, kind: isNum ? 'num' : 'text', cur: isNum ? value.trim() : value.trim(), ...(isNum ? { lo, hi, unit } : { max, multi: e.tagName === 'TEXTAREA' }), locked, colGroup: cg || undefined, ctl: { t: 'input', action, key } });
+        push({ id: key ? `${action}.${key}` : action, name: sub, kind: isNum ? 'num' : 'text', cur: digits && isNum ? value.replace(/,/g, '').trim() : value.trim(), ...(isNum ? { lo, hi, unit } : { max, multi: e.tagName === 'TEXTAREA' }), locked, colGroup: cg || undefined, ctl: { t: 'input', action, key } });
         continue;
       }
       const action = e.dataset.action ?? '';

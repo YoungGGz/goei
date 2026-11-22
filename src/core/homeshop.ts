@@ -781,8 +781,9 @@ export function parseOperatorLine(raw: string): string {
   if (!line) throw new HsError(guideTxt('Hs', 'ERR_NO_OPERATOR'));
   return line;
 }
-/** deal: 손님이 말로 조건을 받아들여 상담원이 주문을 받았다 (<deal/>, 2026-11-22 사용자). 조건이 있고 끊지 않았을 때만 */
-export function parseOperator(raw: string, offered: { id: string; name: string }[], canHangup: boolean): { line: string; terms: HsTerms | null; hangup: boolean; deal: boolean } {
+/** deal: 손님이 말로 조건을 받아들여 상담원이 주문을 받았다 (<deal/>, 2026-11-22 사용자). 조건이 있고 끊지 않았을 때만.
+ *  took: 끊지 않고 <deal/> 을 냈다 (조건이 없거나 못 쓰는 것이어도). 주문이 들어가지 않은 수락의 말을 기록에서 빼는 데 쓴다 */
+export function parseOperator(raw: string, offered: { id: string; name: string }[], canHangup: boolean): { line: string; terms: HsTerms | null; hangup: boolean; deal: boolean; took: boolean } {
   // 상담원 말 안에 든 표식 글자는 보이지 않게 지운다. 말 맨 끝에 붙은 것은 끊음으로 친다 (말 가운데 것은 아님)
   const inner = block(raw, 'operator');
   const tail = /<hangup\s*\/?>\s*$/i.test(inner);
@@ -794,7 +795,7 @@ export function parseOperator(raw: string, offered: { id: string; name: string }
   const outside = raw.replace(/<operator\b[^>]*>[\s\S]*?<\/operator\s*>/gi, '');
   const dealMark = (/<deal\s*\/?>\s*$/i.test(inner) || /(?:^|<\/\w[\w-]*\s*>|\/>)[ \t]*<deal\s*\/?>/im.test(outside));
   const body = block(raw, 'terms');
-  if (!body || /^\s*(none|없음|-)\s*$/i.test(body)) return { line, terms: null, hangup, deal: false };
+  if (!body || /^\s*(none|없음|-)\s*$/i.test(body)) return { line, terms: null, hangup, deal: false, took: dealMark && !hangup };
   const t: HsTerms = { money: 0, items: [], appear: 0, other: '' };
   const key = (n: string) => n.replace(/\s+/g, '').toLowerCase();
   for (const l of body.split('\n')) {
@@ -812,7 +813,7 @@ export function parseOperator(raw: string, offered: { id: string; name: string }
   }
   const terms = t.money || t.items.length || t.appear || t.other ? t : null;
   const deal = dealMark && !!terms;
-  return { line, terms, hangup: hangup && !deal, deal };
+  return { line, terms, hangup: hangup && !deal, deal, took: dealMark && (deal || !hangup) };
 }
 const boxName = (name: string) => guideTxt('Hs', 'BOX_NAME', { name }).slice(0, 30);
 /** 새 주문 (장부 줄). 상자 물건은 부른 쪽이 소지품에 넣고 boxId 를 채운다. 출연 호출 턴은 상자를 열 때 뽑는다(openOrder) */

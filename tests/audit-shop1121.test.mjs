@@ -18,7 +18,8 @@ const base = { shop: '철물점', owner: '주인', key: 'k1', loaded: true, iden
 const it = (name, extra = {}) => ({ name, desc: '', effect: '', use: false, price: 1000, ...extra });
 
 test('보통-29: 산 물건과 같은 이름이 새 진열 같은 자리에 와도 id 가 겹치지 않는다', () => {
-  const s = M.shopSettings({});
+  // 「지난 목록 피하기」를 켜면 산 것과 같은 이름은 새 진열에서 빠진다(2026-11-22). 끈 채로 같은 이름이 올 때의 id 를 본다
+  const s = M.shopSettings({ $sh_prev: '0' });
   const first = M.applyShelf(base, { identity: base.identity, owner: '', items: [it('생수'), it('손전등')] }, s);
   const water = first.items.find((x) => x.name === '생수');
   const bought = M.markSold(first, water.id, 'k1');
