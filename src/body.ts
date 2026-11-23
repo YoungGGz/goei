@@ -36,7 +36,7 @@ import { BOARD_NAME } from './core/boards';
 import { prefetchFactions } from './ui/images';
 import { SEED_CLOSE, SEED_OPEN, seedBody } from './core/seed';
 import type { Chat, LoreEntry } from './core/types';
-import { cleanOutput, hasWorldTags, parseCatalog, processOutput, readDirectory, rerollRequestVars, worldOn } from './core/world';
+import { cleanOutput, hasWorldTags, parseCatalog, processOutput, readDirectory, requestWorldVars, worldOn } from './core/world';
 import { basicSettings, missingBasicVars, worldSettings } from './core/settings';
 import { staleFactionVars } from './core/factions';
 import { supplementAssets } from './host/asset';
@@ -308,10 +308,10 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   return out;
 }
 
-/** 다시 굴린 요청이면 상황판·소속 변수를 버린 응답 전으로 되감은 문맥, 아니면 그대로 (core/world/output.ts rerollRequestVars) */
+/** 다시 굴린(또는 앞 응답을 지운) 요청이면 상황판·소속 변수를 버린 응답 전으로 되감은 문맥, 아니면 지금 상태·카드로 브리핑을 다시 만든 문맥 (core/world/output.ts requestWorldVars) */
 function rerollContext(ctx: ChatContext): ChatContext {
   if (!worldOn(ctx.chat)) return ctx;
-  const vars = rerollRequestVars(ctx.chat, parseCatalog(ctx.char.globalLore), worldSettings(ctx.char.globalLore, ctx.chat.scriptstate));
+  const vars = requestWorldVars(ctx.chat, parseCatalog(ctx.char.globalLore), worldSettings(ctx.char.globalLore, ctx.chat.scriptstate));
   return vars ? { ...ctx, chat: { ...ctx.chat, scriptstate: { ...ctx.chat.scriptstate, ...vars } } } : ctx;
 }
 

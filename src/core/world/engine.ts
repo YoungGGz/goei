@@ -566,6 +566,8 @@ function applyAnomalies(w: WorldState, c: Catalog, s: WorldSettings, faction: st
       e = matchAn(w, t.region, canon ?? t.name);
       const key = canon ?? t.name;
       if (e && named.has(e) && key !== e.name && key !== e.presetName) continue; // 지역만 맞은 다른 이름 태그는 버린다 (전수검사 11-13)
+      // 방금 끝난 괴이(이름 막기)는 모델이 다시 적어도 새로 받지 않고, 같은 지역의 다른 항목에 그 이름을 붙이지도 않는다 (사건과 같게. 지침 「do not revive closed entries」)
+      if ((blocked(w, 'an', t.name) || (!!canon && blocked(w, 'an', canon))) && (!e || (key !== e.name && key !== e.presetName))) continue;
       if (!e && t.state === '활성' && validName(t.name) && !w.an.some((x) => x.name === t.name)) {
         // 모델이 스스로 낸 괴이는 추가 여유분 안에서만 받는다 (요청 대기 중인 커스텀 임무 몫은 남김)
         const extra = w.an.filter((x) => x.origin !== 'auto').length + (pending ? 1 : 0);
@@ -658,6 +660,8 @@ function applyMysticSites(w: WorldState, c: Catalog, s: WorldSettings, faction: 
     } else {
       if (t.state !== '출현' || !c.mysticSites.some((m) => m.name === t.name)) continue;
       const pending = w.pending.ms;
+      // 방금 끝난 특수(이름 막기)는 모델이 다시 적어도 새로 받지 않는다. 커스텀 임무로 다시 요청한 것은 받는다
+      if (pending !== t.name && blocked(w, 'ms', t.name)) continue;
       const reserved = pending && pending !== t.name && !w.ms.some((x) => x.name === pending) ? 1 : 0;
       const extra = w.ms.filter((x) => x.origin !== 'auto').length + reserved;
       const loc = uniqueRegion(t.region);
@@ -882,6 +886,27 @@ export function endEvent(w: WorldState, key: string): boolean {
   else if (ev.kind === 'in') endIn(w, w.inc[ev.index], 'manual');
   else endMs(w, w.ms[ev.index], 'manual');
   return true;
+}
+
+/**
+ * 리롤 기준 상태(그 응답이 반영되기 전)에 손 종료를 옮길 때: 그 응답이 처음 띄운 상황은 기준 상태에서 아직 발생 예정이거나 없다.
+ * 발생 예정이면 그 예정을 거두고, 이름을 막아(끝낸 것과 같게) 그 응답을 다시 굴려도 손으로 끝낸 상황이 되살아나지 않게 한다. key = activeEvents 의 열쇠
+ */
+export function endUpcoming(w: WorldState, key: string): void {
+  const parts = key.split('|');
+  if (parts.length < 4) return;
+  const kind = parts[0];
+  const loc = parts[1];
+  const born = parts[parts.length - 1];
+  const name = parts.slice(2, -1).join('|');
+  if (kind !== 'an' && kind !== 'in' && kind !== 'ms') return;
+  // 같은 자리의 발생 예정, 또는 같은 자리·같은 이름이면 같은 항목이다 (한 자리에는 한 항목만 있다. 발생 시각은 처음 뜰 때 채워지기도 해서 기준 상태와 다를 수 있다)
+  const same = (e: { loc: string; name: string; born: number | null; state: string }) => e.loc === loc && (e.state === '발생대기' || e.name === name || (e.born !== null && String(e.born) === born));
+  if (kind === 'an') w.an = w.an.filter((e) => !same(e));
+  else if (kind === 'in') w.inc = w.inc.filter((e) => !same(e));
+  else w.ms = w.ms.filter((e) => !same(e));
+  block(w, kind, name);
+  w.skip[kind] = loc;
 }
 
 export type MissionKind = 'an' | 'ms' | 'lm';

@@ -89,8 +89,8 @@ test('다시 굴린 요청이 아니면 되감지 않는다 (다음 턴·앞 메
   const afterA = m.processOutput({ ...chat0, message: [user, { role: 'char', data: A, chatId: 'c1' }] }, 1, A, catalog, S, never);
   // 다음 턴: 응답 뒤에 새 유저 메시지
   assert.equal(m.rerollRequestVars({ ...afterA, message: [...afterA.message, { role: 'user', data: '다음', chatId: 'u2' }] }, catalog, S), null);
-  // 응답과 유저 메시지를 지우고 같은 자리에 새 유저 메시지 (앞 메시지 열쇠가 다르다)
-  assert.equal(m.rerollRequestVars({ ...afterA, message: [{ role: 'user', data: '새로', chatId: 'u9' }] }, catalog, S), null);
+  // 응답과 유저 메시지를 지우고 같은 자리에 새 유저 메시지: 지운 응답이 만든 것은 되돌아간다 (전수점검 2차 15-Q2)
+  assert.equal(m.rerollRequestVars({ ...afterA, message: [{ role: 'user', data: '새로', chatId: 'u9' }] }, catalog, S).$goei_world, chat0.scriptstate.$goei_world);
   // 상황판 꺼짐
   assert.equal(m.rerollRequestVars({ ...afterA, message: [user], scriptstate: { ...afterA.scriptstate, $st_anomaly_on: '0' } }, catalog, S), null);
 });
@@ -108,9 +108,9 @@ test('안 보낸 임무 카드 물리기: 카드를 빼고 걸어 둔 임무를 
   const b = m.withdrawUnsent(chat, lore, '명일 아파트');
   assert.deepEqual(b, a, '카드의 취소와 같은 결과');
   assert.equal(m.withdrawUnsent(chat, lore, '소라 랜드'), null, '다른 목표의 카드는 물리지 않는다');
-  // 이미 보낸 카드(안 보냄 표시 없음)는 물리지 않는다
+  // 보냈지만 답 없이 끝난 카드(안 보냄 표시 없음): 창 「요청 취소」는 물리고, 채팅 속 카드 「취소」(안 보낸 것만)는 아니다 (전수점검 2차 06-4)
   const sent = pendingChat([prev, { role: 'user', data: m.sceneRecord({ target: '명일 아파트', party: '나' }, '지시문') }]);
-  assert.equal(m.withdrawUnsent(sent, lore, '명일 아파트'), null);
+  assert.deepEqual(m.withdrawUnsent(sent, lore, '명일 아파트').message, [prev]);
   assert.equal(m.withdrawUnsent(sent, lore), null);
   // 직접 입력(카드 없음)은 카드 취소로만 빠지고 상황판은 그대로, 창 취소로는 안 빠진다
   const direct = pendingChat([{ role: 'user', data: m.setUnsent('직접 입력', true) }]);
@@ -153,7 +153,7 @@ test('채팅 중 커스텀 임무 턴·보통 턴의 다시 굴리기, 상황판
   assert.ok(after5.scriptstate.$an_report.includes('두 번째 버린 글'));
   const v5 = m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, u4] }, catalog, S0);
   assert.equal(v5.$an_report, after3.scriptstate.$an_report, '앞 턴이 반영한 상태로 되감는다');
-  // 응답을 지우고 새 메시지를 보냄: 다시 굴리기가 아니라 되감지 않는다
-  assert.equal(m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, u4, { role: 'user', data: '다른 말', chatId: 'u6' }] }, catalog, S0), null);
-  assert.equal(m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, { role: 'user', data: '바꾼 말', chatId: 'u7' }] }, catalog, S0), null);
+  // 응답을 지우고 새 메시지를 보냄: 지운 응답이 만든 것은 되돌아간다 (다시 굴리기와 같은 기준, 전수점검 2차 15-Q2)
+  assert.equal(m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, u4, { role: 'user', data: '다른 말', chatId: 'u6' }] }, catalog, S0).$an_report, after3.scriptstate.$an_report);
+  assert.equal(m.rerollRequestVars({ ...after5, message: [u0, c1, card, c3, { role: 'user', data: '바꾼 말', chatId: 'u7' }] }, catalog, S0).$an_report, after3.scriptstate.$an_report);
 });

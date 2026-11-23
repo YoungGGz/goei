@@ -323,9 +323,9 @@ test('상한: 일지는 오래된 줄부터, 보고서는 고정 안 된 것 가
   assert.deepEqual(t.journal.rows.map((x) => x.rpt), ['r1', undefined, undefined, 'r4', 'r5'], '지워진 보고서를 가리키던 줄은 남고 연결만 끊긴다');
   assert.equal(pinReport(r, '없음', true), r);
   assert.equal(pinReport(r, 'r1', false).items[0].pin, undefined);
-  // 되감기는 고정한 보고서와 그 줄을 둔다
+  // 되감기는 고정한 보고서와 그 줄도 지운다 (다시 굴리면 그 응답이 만든 것은 되돌아간다, 전수점검 2차 18-B1)
   const rw = rewindClosures(j, r, 1);
-  assert.ok(rw.journal.rows.some((x) => x.id === 'j1') && rw.reports.items.some((x) => x.id === 'r1'));
+  assert.ok(!rw.journal.rows.some((x) => x.id === 'j1') && !rw.reports.items.some((x) => x.id === 'r1'));
   const rw2 = rewindClosures(j, r, 2);
   assert.ok(!rw2.journal.rows.some((x) => x.id === 'j2') && !rw2.reports.items.some((x) => x.id === 'r2'));
   // 깨진 값은 빈 저장소, 깨진 줄은 버림

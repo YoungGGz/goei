@@ -13,6 +13,8 @@ import {
   activeEvents, type Catalog, endedShown, codesToNames, factionNames, lastStatusFields, locName, parseCatalog, readWorld, rosterFor, startWorldVars, agentLocked, readDirectory, worldOn,
 } from '../core/world';
 import { loadContext, updateChat, type ChatContext } from '../host/risu';
+import { isWaiting, onWaiting } from '../host/waiting';
+import { freeUseLock } from '../host/usebox';
 import { prepareBaseDocs } from '../core/wiki';
 import { facePic, loadModuleAssets, mainPic } from '../host/assets';
 import { playableAgents, playerAgent } from '../core/player';
@@ -63,7 +65,7 @@ import { startCctvFx, stopCctvFx } from './cctvfx';
 import { declutterOps, elapsedText, markCapOverflow, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
 import { evArt } from './evpic';
 import { agentContact, handlePhone, openAgentDm, openCheck, phone, phoneContent, phoneInput, phonePickList, phoneTab, phoneUnread, resetPhone, type PhoneEnv } from './phone';
-import { boardMapUrl, field, handleField, mapTab, mapSuggestFor, missionList, missionTab, newMessage, resetField, showOnMap, type FieldEnv } from './field';
+import { boardMapUrl, field, handleField, mapTab, mapSuggestFor, missionList, missionTab, newMessage, resetField, showOnMap, WAIT_SEND_NOTE, type FieldEnv } from './field';
 import { noticeClass, sendNow } from '../host/send';
 import { markUnsent } from '../host/unsent';
 import { startRecord } from '../core/dispatch';
@@ -232,6 +234,10 @@ function setShown(v: boolean): void {
   shown = v;
   shownListener?.(v);
 }
+// 첫 장면 답을 기다리는 동안 띄운 창: 답 없이 기다림이 끝나면(요청 실패) 다시 고를 수 있게 화면을 다시 정한다 (core/start.ts unsentOpening)
+onWaiting((w) => {
+  if (!w && shown && view.kind === 'started' && (view.ctx.chat.message ?? []).length === 1) void refresh();
+});
 const phoneEnv: PhoneEnv = {
   render: () => render(),
   refresh: () => refresh(),
@@ -884,7 +890,9 @@ async function refresh(): Promise<void> {
       view = { kind: 'error', message: `선택된 채팅이 없어요. ${BRAND.name} 채팅을 연 뒤 다시 눌러 주세요.` };
     } else {
       const manifest = readManifest(ctx.char.globalLore);
-      const phase = chatPhase(ctx.chat);
+      // 첫 카드 하나뿐인 채팅: 요청이 답 없이 끝났으면(중지·실패) 기다림 시간이 남아 있어도 다시 고를 수 있게 리수 화면을 먼저 본다 (host/usebox.ts freeUseLock)
+      if (isWaiting() && (ctx.chat.message ?? []).length === 1) await freeUseLock();
+      const phase = chatPhase(ctx.chat, isWaiting());
       if (manifest) {
         applyAdvanced(ctx.chat.scriptstate);
         void readPersona();
@@ -961,7 +969,7 @@ async function stagedTheme(ctx: ChatContext, value: string | undefined): Promise
   if (value !== 'light' && value !== 'dark' && value !== 'paper') return;
   try {
     const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) =>
-      chatPhase(chat) === 'started' || chat.scriptstate?.['$st_fixed_theme'] === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), $st_fixed_theme: value } },
+      chatPhase(chat, isWaiting()) === 'started' || chat.scriptstate?.['$st_fixed_theme'] === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), $st_fixed_theme: value } },
     );
     if (saved) ctx.chat = saved;
   } catch (error) {
@@ -1493,8 +1501,8 @@ async function start(): Promise<void> {
     // 시작 메시지: 자동 전송 없이 첫 장면 아래에 「적고 전송」 안내 (Risu가 첫 장면을 다시 그리기 전에 켠다)
     setOpeningHint(plan.kind === 'opening' ? (plan.scene ?? null) : null);
     const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-      if (chatPhase(chat) === 'started') throw new StartError('그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
-      const next = applyStart(chat, plan);
+      if (chatPhase(chat, isWaiting()) === 'started') throw new StartError(isWaiting() ? WAIT_SEND_NOTE : '그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
+      const next = applyStart(chat, plan, '', isWaiting());
       if (situation) next.message = [...(next.message ?? []), newMessage(startRecord(situation))];
       // 새 채팅 기본값(설정 창)을 이 채팅에 적어 둔다. 나중에 기본값을 바꿔도 이 채팅은 그대로 (원본 ensureDefaults) 시작 잔고도 지금 기본값으로 적는다 (전수점검 보통-84)
       const theme = getPrefs().theme ?? 'dark';
