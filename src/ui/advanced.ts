@@ -36,7 +36,7 @@ function control(f: AdvFeature, item: AdvItem, cur: string): string {
   const down = Math.max(min, n - step);
   const up = Math.min(max, n + step);
   return `<div class="st-step adv-step${stepSize(max === Number.MAX_SAFE_INTEGER ? 9999999 : max, item.unit ?? '', item.zero ?? '')}"><button class="gx-step" data-action="adv-set" data-value="${id}=${down}" ${n <= min ? 'disabled' : ''} aria-label="${esc(item.label)} 줄이기">−</button>
-    <input class="adv-val" ${numType(max)} min="${min}" max="${item.max ?? ''}" step="${step}" data-change="adv-set" data-key="${id}" value="${zero ? '' : numTxt(n, max)}"${item.zero ? ` placeholder="${esc(item.zero)}"` : ''} aria-label="${esc(item.label)}">${item.unit && !zero ? `<span>${esc(item.unit)}</span>` : ''}
+    <input class="adv-val" ${numType(max)} min="${min}" max="${item.max ?? ''}" step="${step}" data-change="adv-set" data-key="${id}" value="${zero ? '' : numTxt(n, max)}"${item.zero ? ` placeholder="${esc(item.zero)}" data-zero="${esc(item.zero)}"` : ''} aria-label="${esc(item.label)}">${item.unit && !zero ? `<span>${esc(item.unit)}</span>` : ''}
     <button class="gx-step" data-action="adv-set" data-value="${id}=${up}" ${n >= max ? 'disabled' : ''} aria-label="${esc(item.label)} 늘리기">+</button></div>`;
 }
 

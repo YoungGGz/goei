@@ -24,6 +24,12 @@ test('AI2: 「2만」「2만 토큰」「20k」「20,000」은 20000, 단위가 
   assert.equal(C.consultValue(budget, '30만'), null, '범위 밖');
   assert.equal(C.consultValue(reit, '2회'), '2');
   assert.equal(C.consultValue(reit, '1.5'), null);
+  // 단위가 없는 줄(돈 칸): 뒤의 짧은 글은 단위로 보고 떼지만, 큰 수 낱말은 다 읽는다 (「2억」을 2로, 「5천만」을 5천으로 읽지 않는다)
+  const wallet = { id: 'w', menu: '', group: '', name: '잔고', kind: 'num', cur: '0', lo: 0, hi: 1e12 };
+  for (const [raw, want] of [['2억', '200000000'], ['2억 원', '200000000'], ['5천만', '50000000'], ['5천만원', '50000000'], ['3백만', '3000000'], ['1억 5천만', '150000000'], ['2만 5천', '25000'], ['120만', '1200000'], ['1,200,000원', '1200000'], ['2만원', '20000'], ['30초', '30']]) assert.equal(C.consultValue(wallet, raw), want, raw);
+  for (const raw of ['만', '2만만', '12 34', '1.5', '2만.5', '이만']) assert.equal(C.consultValue(wallet, raw), null, raw);
+  assert.equal(C.consultValue(budget, '5천만'), null, '범위 밖');
+  assert.equal(C.consultValue(budget, '1만 5천 토큰'), '15000');
   const { ok, bad } = C.checkConsult([budget], [{ id: budget.id, raw: '2만원' }]);
   assert.deepEqual(ok, []);
   assert.equal(bad.length, 1, '못 받으면 알린다');
@@ -39,7 +45,16 @@ test('AI1: 0의 뜻(「제한 없음」「안 함」)을 받고, 0인 줄은 그
 
 test('AI1·AI6: 설정 목록은 빈 수 칸을 0으로, 자리 글·data-zero 를 0의 뜻으로, 수로 시작하지 않는 막대 옆 글은 단위로 읽지 않는다', async () => {
   const cat = await src('ui/editor/catalog.ts');
-  assert.match(cat, /const zero = isNum \? input\.getAttribute\('placeholder'\) \|\| input\.dataset\.zero \|\| undefined : undefined;/);
+  // 0의 뜻은 data-zero 로만: 자리 글(「비우면 할인 없음」「25」)을 0의 뜻으로 읽지 않는다
+  assert.match(cat, /const zero = isNum \? input\.dataset\.zero \|\| undefined : undefined;/);
+  assert.doesNotMatch(cat, /getAttribute\('placeholder'\) \|\| input\.dataset\.zero/);
+  // 0일 때 칸을 비우고 자리 글을 보이는 수 상자 네 곳은 그 말을 data-zero 에도 적는다
+  for (const f of ['ui/advanced.ts', 'ui/editor/flowpage.ts', 'ui/setrow.ts', 'ui/famtable.ts']) {
+    const t = await src(f);
+    const boxes = [...t.matchAll(/<input class="adv-val"[^\n]*/g)].map((m) => m[0]).filter((x) => x.includes('placeholder='));
+    assert.ok(boxes.length > 0, f);
+    for (const x of boxes) assert.match(x, /placeholder="([^"]+)" data-zero="\1"|placeholder="\$\{esc\((\w+(?:\.\w+)?)\)\}" data-zero="\$\{esc\(\2\)\}"/, f);
+  }
   assert.match(cat, /cur: isNum && raw === '' && zero \? '0' : raw/);
   assert.match(cat, /\{ lo, hi, unit, zero \}/);
   assert.match(cat, /const outUnit = \/\^-\?\[\\d,\.\]\+\\s\*\(\\D\*\)\$\/\.exec\(out\)/);

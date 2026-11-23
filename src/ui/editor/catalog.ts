@@ -151,8 +151,9 @@ export function pageRows(html: string, page: string, menu: string): CatRow[] {
         const outUnit = /^-?[\d,.]+\s*(\D*)$/.exec(out)?.[1].trim() ?? '';
         const unit = (lone ? co : '') || txt(e.closest('.st-step')?.querySelector(':scope > span')) || outUnit || undefined;
         const max = Number(input.getAttribute('maxlength')) || undefined;
-        // 0의 뜻: 수 칸은 0일 때 칸을 비우고 자리 글(「안 함」「제한 없음」)을 보인다. 막대는 data-zero 에 적는다. 빈 칸은 0으로 읽는다 (2차 점검 AI1)
-        const zero = isNum ? input.getAttribute('placeholder') || input.dataset.zero || undefined : undefined;
+        // 0의 뜻: 수 상자는 0일 때 칸을 비우고 자리 글(「안 함」「제한 없음」)을 보인다. 그런 칸과 막대는 data-zero 에 그 말을 적는다. 그 칸이 비었으면 0으로 읽는다 (2차 점검 AI1).
+        // 자리 글만으로는 판단하지 않는다: 「비우면 할인 없음」「25」 같은 자리 글은 0의 뜻이 아니다 (우주 쇼핑몰 시그니처 상품)
+        const zero = isNum ? input.dataset.zero || undefined : undefined;
         const raw = digits && isNum ? value.replace(/,/g, '').trim() : value.trim();
         push({ id: key ? `${action}.${key}` : action, name: sub, kind: isNum ? 'num' : 'text', cur: isNum && raw === '' && zero ? '0' : raw, ...(isNum ? { lo, hi, unit, zero } : { max, multi: e.tagName === 'TEXTAREA' }), locked, colGroup: cg || undefined, ctl: { t: 'input', action, key } });
         continue;

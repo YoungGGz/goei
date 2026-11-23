@@ -106,7 +106,7 @@ const sameStep0 = (html: string): string => (/class="st-step[^"]* lg"/.test(html
  *  zero = 0일 때 수 대신 보이는 말 */
 export const stepIn = (action: string, key: string, n: number, lo: number, hi: number, unit: string, aria: string, busy = false, zero = ''): string => {
   const b = (dir: '-' | '+', on: boolean, name: string) => `<button class="gx-step" data-action="${action}" data-value="${esc(key ? `${key}:${dir}` : dir)}" ${on && !busy ? '' : 'disabled'} aria-label="${esc(aria)} ${name}">${dir === '-' ? '−' : '+'}</button>`;
-  return `<div class="st-step adv-step${stepSize(hi, unit, zero)}">${b('-', n > lo, '줄이기')}<input class="adv-val" ${numType(hi)} min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="${action}"${key ? ` data-key="${esc(key)}"` : ''} value="${zero && n === 0 ? '' : numTxt(n, hi)}"${zero ? ` placeholder="${esc(zero)}"` : ''} aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit && !(zero && n === 0) ? `<span>${esc(unit)}</span>` : ''}${b('+', n < hi, '늘리기')}</div>`;
+  return `<div class="st-step adv-step${stepSize(hi, unit, zero)}">${b('-', n > lo, '줄이기')}<input class="adv-val" ${numType(hi)} min="${lo}" max="${hi}" step="${stepOf(hi)}" data-change="${action}"${key ? ` data-key="${esc(key)}"` : ''} value="${zero && n === 0 ? '' : numTxt(n, hi)}"${zero ? ` placeholder="${esc(zero)}" data-zero="${esc(zero)}"` : ''} aria-label="${esc(aria)}"${busy ? ' disabled' : ''}>${unit && !(zero && n === 0) ? `<span>${esc(unit)}</span>` : ''}${b('+', n < hi, '늘리기')}</div>`;
 };
 export const stepBox = (action: string, key: string, cur: string | number, lo: number, hi: number, unit: string, aria: string, busy = false): string => {
   const raw = String(cur ?? '').trim();
