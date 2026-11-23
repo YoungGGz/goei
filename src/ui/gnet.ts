@@ -1092,6 +1092,12 @@ function moveTo(next: GnetUi['sub']): void {
   gnet.sub = next;
 }
 
+/** 게시판 첫 화면 (로고·즐겨찾기 공용. 즐겨찾기는 보던 글에 머물렀다, 2차 점검 B3) */
+export function gnetHome(): void {
+  moveTo('board');
+  Object.assign(gnet, { open: null, openDm: null, compose: null, cat: '', q: '', page: 1, settings: false });
+}
+
 function closeDm(): void {
   moveTo('board');
   if (gnet.compose && gnet.compose.kind !== 'post' && gnet.compose.kind !== 'comment') gnet.compose = null;
@@ -1248,8 +1254,7 @@ export async function handleGnet(action: string, value: string | undefined, base
       void refreshBoard(ctx, env);
       return true;
     case 'gn-home':
-      moveTo('board');
-      Object.assign(gnet, { open: null, openDm: null, compose: null, cat: '', q: '', page: 1, settings: false });
+      gnetHome();
       break;
     case 'gn-cat':
       moveTo('board');

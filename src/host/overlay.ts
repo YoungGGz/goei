@@ -208,6 +208,8 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
   if (!button) throw new Error('여는 버튼을 만들지 못했어요.');
 
   let pos = await loadPos();
+  /** 사용자가 놓은 자리. 좁은 화면에 맞춰 당긴 자리(pos)와 따로 둔다: 폴드를 접었다 펴거나 폰을 돌렸다 되돌리면 놓은 자리로 돌아온다 */
+  let want = { ...pos };
   const applyPos = async () => {
     await host.setStyle('right', `${pos.right}px`);
     await host.setStyle('bottom', `${pos.bottom}px`);
@@ -263,6 +265,7 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
           await host.setAttribute('x-goei-drag', 'true');
         }
         pos = dragTo(d.start, dx, dy, hit.vw, hit.vh);
+        want = { ...pos };
         await applyPos();
       }
     } catch {
@@ -354,7 +357,19 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
 
   return {
     async setVisible(next, intro = false) {
-      if (shown === next && !intro) return;
+      if (shown === next && !intro) {
+        // 떠 있는 동안 창 크기가 바뀌면 화면 안으로 다시 당긴다 (2차 점검 20-1: 폴드를 펴거나 폰을 돌리면 단추가 화면 밖으로 나갔다)
+        if (next && !drag) {
+          const { vw, vh } = await viewport();
+          const fit = clampPos(want, vw, vh);
+          // 크기를 재는 사이 끌기가 시작됐으면 끄는 손을 따른다
+          if (!drag && (fit.right !== pos.right || fit.bottom !== pos.bottom)) {
+            pos = fit;
+            await applyPos();
+          }
+        }
+        return;
+      }
       const reappear = next && !shown;
       shown = next;
       if (reappear) await bind().catch(() => {});
@@ -364,7 +379,7 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
         pending = null;
       } else {
         const { vw, vh } = await viewport();
-        pos = clampPos(pos, vw, vh);
+        pos = clampPos(want, vw, vh);
         await applyPos();
       }
       endIntro();
