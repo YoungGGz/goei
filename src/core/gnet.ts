@@ -1338,7 +1338,8 @@ export function commitIncoming(st: GState, rows: unknown, plan: IncomingPlan, da
     throw new GnetError(`선쪽지 형식을 확인해 주세요 (${reasons.join('; ')}).`);
   }
   const chosen = pick as { nick: string; body: string };
-  const post = postOverride ? findPost(st, postOverride.id) : findPost(st, plan.post.id);
+  // 게시판 새로고침에서는 출처 글이 같은 응답으로 바뀌어 빠질 수 있다 (보호 안 된 남의 글은 바꾸라고 시킨다): 그때는 요청에 실어 보낸 그 글(plan.post)을 출처로 쓴다 — 쪽지를 허락해 놓고 버리지 않게
+  const post = postOverride ? findPost(st, postOverride.id) : findPost(st, plan.post.id) ?? plan.post;
   if (!post) return false;
   const comment = plan.commentIndex ? post.comments[plan.commentIndex - 1] : undefined;
   if (plan.commentIndex && (!comment || !comment.mine || comment.body !== plan.comment?.body)) return false;

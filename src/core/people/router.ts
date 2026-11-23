@@ -42,12 +42,14 @@ export function buildRouter(chat: Chat, store: PeopleStore, names: NameEntry[], 
   const base = o.prompt?.trim() ? o.prompt.trim() : [guideTxt('Router', 'ROLE'), guideTxt('Router', 'RULES')].filter(Boolean).join('\n');
   const system = [base.replace('{{MAX}}', String(max)), o.rules?.trim() ? `${guideTxt('Router', 'USER_RULES.HEAD')}\n${o.rules.trim()}` : ''].filter(Boolean).join('\n');
   const data = { input: input.slice(0, 4000), recent, catalog };
-  const key = hash(JSON.stringify({ input, recent: recent.map((r) => r.text.slice(0, 400)), names: catalog.map((c) => c.name), system: system.length, max }));
+  // 재사용 열쇠: 지침은 글 전체로 본다 (같은 길이의 다른 덧붙일 지침으로 바꿔도 다시 묻는다)
+  const key = hash(JSON.stringify({ input, recent: recent.map((r) => r.text.slice(0, 400)), names: catalog.map((c) => c.name), system, max }));
   return { system, data, key, max };
 }
 
 /** 응답 읽기: 기록에 있는 정식 이름만 (별명으로 답하면 정식 이름으로), 상한, 미등록 이름은 힌트 */
-export function parseRouter(raw: string, store: PeopleStore, names: NameEntry[], max = ROUTER_MAX): RouterResult {
+/** exclude = 주인공 이름 (기록하지 않는다): 미등록 이름 힌트에서 뺀다 */
+export function parseRouter(raw: string, store: PeopleStore, names: NameEntry[], max = ROUTER_MAX, exclude: string[] = []): RouterResult {
   let t = raw.replace(/<(thoughts|think)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '').trim();
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(t);
   if (fence) t = fence[1].trim();
@@ -69,7 +71,7 @@ export function parseRouter(raw: string, store: PeopleStore, names: NameEntry[],
     if (name && !selected.includes(name)) selected.push(name);
     if (selected.length >= max) break;
   }
-  const known = new Set([...Object.keys(store.people), ...names.flatMap((n) => [n.name, ...n.aliases])]);
+  const known = new Set([...Object.keys(store.people), ...names.flatMap((n) => [n.name, ...n.aliases]), ...exclude]);
   const newCharacters: RouterHint[] = [];
   for (const x of (Array.isArray(v.new_characters) ? v.new_characters : []) as Record<string, unknown>[]) {
     const name = plain(x?.name, 30);

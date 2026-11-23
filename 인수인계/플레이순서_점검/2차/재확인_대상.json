@@ -1,0 +1,1228 @@
+[
+ {
+  "key": "01_상점",
+  "area": "상점",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/01_상점/",
+  "items": [
+   {
+    "id": "S2-2",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "특가 물건을 다른 대가로 흥정하면 「-100%」 특가로 보임",
+    "symptom": "특가(800→500) 붓을 「먹 한 자루 갈아 드리기」로 흥정하면 특가 구획에 -100%, 줄 그은 800 옆에 대가 글이 떠 공짜처럼 보인다.",
+    "repro": "첫 진열 → 붓에 대해 「돈 대신 먹을 갈아 드리면…」 → 주인 `~ 족제비털 붓|먹 한 자루 갈아 드리기` (단계05, 상태05.json)",
+    "expected_basis": "사용자 11-07 특가 = 원래 값에서 깎아 내놓은 것(core/shop.ts ShopItem.tag 주석), parseLine 은 대가 줄을 특가로 안 받음(src/core/shop.ts:669)",
+    "evidence": "src/core/shop.ts:882 (흥정 값 바꾸기가 tag·was 유지), src/ui/shop.ts:206 (was > price 0 → 특가)",
+    "verdict1": "real_bug",
+    "reason1": "src/core/shop.ts:876-880 applyTalk 의 값 바꾸기는 pay 를 붙이고 price 를 0으로 바꾸지만 tag:'sale'·was 는 그대로 둔다. src/ui/shop.ts:206 은 was(800) > price(0) 이면 특가로 보고 -100% 를 그린다. 읽는 쪽 parseLine(src/core/shop.ts:669 `!cost.pay`)은 대가 줄을 특가로 받지 않으므로, 두 코드가 서로 어긋난다. 대가로 하는 흥정은 사용자 11-08 결정이고, 특가는 원래 값에서 깎은 물건이라는 정의(ShopItem.tag 주석)와도 맞지 않는다.",
+    "plain": "특가 물건을 일이나 물건 같은 다른 대가로 흥정하면, 진열대에 「-100%」 특가로 떠서 공짜처럼 보인다."
+   },
+   {
+    "id": "S2-3",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "대가로 산 물건을 팔 때 「bought earlier for 0 won」·화면 「산 값 0」",
+    "symptom": "「옛 책 한 권」으로 산 물건을 내밀면 주인 요청에 0원에 샀다고 가고 판매 칸에도 「산 값 0」이 보여, 주인이 헐값을 부를 수 있다. 원+대가로 산 것은 원 몫만 간다.",
+    "repro": "손때 묻은 필사첩(값 옛 책 한 권) 구매 → 판매 → 그 물건 고르기 → 보냄 (단계15_팔기_대가로산물건_산값.txt)",
+    "expected_basis": "지침 상점 SELL 「what the protagonist paid if known」, 소지품 paidWith 에 치른 대가가 적혀 있음",
+    "evidence": "src/ui/shop.ts:694 (대가 물건 price 0 저장), src/ui/shop.ts:574 (paid: mine.price), src/ui/shop.ts:229 (산 값 표시)",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/shop.ts:693 원이 아닌 대가로 산 물건은 소지품에 price 0(target.price)으로 들어가고, paidWith 에 대가 글이 따로 적힌다. 팔 때 src/ui/shop.ts:574 는 paid: mine.price 만 넘기므로, 팔기 요청에는 SELLING_PAID 줄로 「0원에 샀다」가 간다(src/core/shop.ts:1187). 화면도 src/ui/shop.ts:229 에서 「산 값 0」을 그린다. 지침/상점.txt:109·144 는 산 값을 알 때만 쓰게 한다. 대가를 아는데도 0원이라는 틀린 값을 넘기는 셈이다.",
+    "plain": "돈이 아닌 대가(예: 옛 책 한 권)로 산 물건을 팔면, 주인에게 「0원에 산 물건」으로 알려지고 화면에도 산 값 0 이 떠서 헐값을 부를 수 있다."
+   },
+   {
+    "id": "S2-5",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "백일몽 소속이 아닌데 일반 상점에서 팔아 포인트가 생김",
+    "symptom": "관리국 주인공이 「백일몽 사내 매점」(정체 currency: points)에서 물건을 팔면 $st_points 에 +500 이 생기고 본편에 「500 Baekilmong points 에 팔았다」가 간다. 흥정·팔기도 다 열린다.",
+    "repro": "관리국 신입, [shop: 백일몽 사내 매점|] → 열기(가짜 정체 currency: points) → 판매 → 한지 노트 → 값 500 → 판매 (단계37_갈래_포인트_비소속)",
+    "expected_basis": "사용자 11-08: 포인트는 백일몽 소속일 때만·포인트몰에서만 사용·몰이 지급 X, 포인트몰은 팔기·흥정 X (goei-baekilmong-points, MEMORY 설정 11-08)",
+    "evidence": "src/core/shop.ts:700 (currency 만 보고 포인트 가게, 소속 확인 없음), src/ui/shop.ts:396 (팔기 장부 = 포인트)",
+    "verdict1": "real_bug",
+    "reason1": "사용자 11-08 결정(goei-baekilmong-points, MEMORY 설정 11-08)은 「포인트는 백일몽 소속일 때만」이다. 그런데 src/core/shop.ts:699-701 parseShelf 는 정체의 currency 글만 보고 points 가게로 정하고, 소속은 확인하지 않는다. 그다음 팔기(src/ui/shop.ts:396 ledgerOf(...,p))는 $st_points 에 수입을 적는다. 지침/상점.txt:50 이 복지몰만 포인트라고 시키지만, 모델이 그 지시를 어기면 막는 코드가 없다. 가게 이름이 「백일몽 사내 매점」이면 모델이 그렇게 낼 만한 경우다. 백일몽이 아닌 주인공에게 포인트가 생기는 것은 사용자 결정과 정면으로 어긋난다. 다만 모델이 지침을 어길 때만 생기는 일이다.",
+    "plain": "백일몽 소속이 아닌 주인공도 「백일몽 매점」 같은 가게에서 물건을 팔면 백일몽 포인트가 생긴다."
+   },
+   {
+    "id": "S2-7",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "문의 답을 기다리는 사이 본편 응답이 오면 주인 답이 본편에 영영 안 감",
+    "symptom": "흥정을 보내고 답 전에 본편을 진행하면, 늦게 온 주인 답(「백오십에 드리지요」)은 값만 바꾸고 어느 본편 요청에도 실리지 않는다.",
+    "repro": "「송연먹 백오십에…」 보냄(답 붙잡음) → 창 닫고 본편 요청 → 같은 가게 응답 c2 → 답 풀림 → 다음 본편 요청 (단계29_갈래_늦은답_같은가게_다음턴.txt, _2.txt, 상태29.json)",
+    "expected_basis": "사용자 11-07 이번 방문 대화 전부를 다음 턴 본편에(goei-store-thread), 점검지침 4 「늦게 온 답」",
+    "evidence": "src/ui/shop.ts:457 (가게 이름만 비교해 저장), src/core/shop.ts:946 (대화 줄 키 = 요청 때 c1), src/core/shop.ts:1026 (c2 턴에서 거름)",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/shop.ts:455 늦은 답은 가게 이름만 같으면 저장한다(설계대로). 그런데 그 답의 대화 줄은 요청할 때 상태(st0)의 키 c1 로 찍힌다(applyTalk → keyOf(st0), src/core/shop.ts:946). mergeLate(src/core/shop.ts:844)는 키를 다시 찍지 않는다. 그래서 다음 본편의 shopEvents(src/core/shop.ts:1026 `x.k === st.key`=c2)에서 걸러져 어디에도 실리지 않는다. 값 바꾸기는 상태에 들어가 있다. 저장은 하면서 전달은 영영 안 되는, 일관되지 않은 내부 동작이다. 사용자에게 물을 일이 아니다(goei-feedback-dont-ask-internals-1122). 창을 닫고 본편을 보낼 때만 생겨 드물다.",
+    "plain": "주인에게 흥정을 보내 놓고 답이 오기 전에 이야기를 진행하면, 늦게 온 주인의 답(값을 깎아 주겠다는 말 등)은 값에만 반영되고 이야기에는 전해지지 않는다."
+   },
+   {
+    "id": "S2-Q2",
+    "kind": "question",
+    "reproduced": true,
+    "title": "쫓겨난 방문을 연 응답을 다시 굴려도 쫓겨남은 남음",
+    "symptom": "c1 을 다시 굴리면 그 방문에서 산 것은 되돌아오는데, 쫓겨남(closed)과 대화는 남아 새 응답에서도 거래가 막혀 있다.",
+    "repro": "구매 → 주인 <closed/> → c1 을 c1b 로 다시 굴림 (단계39_갈래_쫓겨난뒤_다시굴리기, 상태39.json)",
+    "expected_basis": "점검지침 3-D 다시 굴리기 기대값은 대상마다 따로 — 쫓겨남은 정한 적 없음",
+    "evidence": "src/core/shop.ts reviveShop (sold·sales 만 되살림, closed 그대로)",
+    "verdict1": "real_bug",
+    "reason1": "내부 일관성 문제라 사용자 결정 「다시 굴리면 그 응답이 만든 것은 다 되돌아감」(goei-feedback-dont-ask-internals-1122)을 따라 정했다. src/core/shop.ts:990 reviveShop 은 죽은 응답 키에 묶인 산 것·판 것·쪽지·견적은 되살린다. 그런데 closed 는 키 없는 플래그라 그대로 남는다(src/core/shop.ts:922). c1 을 다시 굴려 같은 가게 표식이 오면 settleShop 이 cur 를 이어받는다({...cur, key}). 그래서 같은 방문에서 산 것은 없던 일이 되는데 쫓겨남만 남아 거래가 막힌다. 같은 방문에서 생긴 일이 반만 되돌아간다.",
+    "plain": "상점에서 쫓겨난 뒤 그 장면 응답을 다시 굴리면, 산 물건은 되돌아오는데 쫓겨난 것은 그대로라 새 장면에서도 그 가게와 거래할 수 없다."
+   }
+  ]
+ },
+ {
+  "key": "02_우주쇼핑몰",
+  "area": "우주 쇼핑몰",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/02_우주쇼핑몰/",
+  "items": [
+   {
+    "id": "cos-1",
+    "title": "운영자·진열 요청 [최근 본문]에 완성 알림 표식 [shop-ready: …] 이 샘",
+    "symptom": "맞춤 주문이 완성된 뒤 운영자에게 물으면 운영자 모델이 플러그인 표식 줄을 본문으로 읽습니다. 그래서 알림을 아는 듯 말하거나 표식 꼴을 흉내 낼 수 있습니다.",
+    "repro": "선납 → 납기 지난 응답 c3(표식 붙음) → 운영자에게 질문 → 전송. out/단계11_PC_납기지남_완성표식_문의요청.txt:362",
+    "expected_basis": "src/core/orders.ts:114-115 주석 「모델에는 보내지 않는다」, 지침 3-A 내부 표식",
+    "evidence": "src/ui/shop.ts:385 (상태창 줄만 뺌), src/core/refs.ts:248-261 messageText",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/orders.ts:114-115 주석이 표식을 「모델에는 보내지 않는다」고 정했는데, 막는 곳은 본편 요청의 core/sanitize.ts:50 뿐이다. 몰 요청의 [최근 본문]은 src/ui/shop.ts:385 에서 상태창 줄(stripStatusTags)만 빼고 [shop-ready] 는 남긴다. run.mjs:340 에서 표식을 붙인 것은 점검 틀이 아니라 플러그인임을 확인했고, 그 표식이 out/단계11_…문의요청.txt:362 에 그대로 실려 있다. 이와 어긋나는 사용자 결정은 없다.",
+    "plain": "맞춤 주문이 완성된 뒤 운영자에게 물으면, 플러그인 안에서만 쓰는 완성 알림 표식이 운영자 쪽 모델에도 본문처럼 넘어갑니다."
+   },
+   {
+    "id": "cos-2",
+    "title": "「~ 이름|값」 값 바꾸는 줄을 받아 깎인 값으로 팔림",
+    "symptom": "흥정하면 운영자 모델이 지침을 어길 때 우산 2,200,000원이 100,000원으로 바뀝니다. 그 값으로 살 수 있습니다.",
+    "repro": "진열 → 「깎아 주세요」 → 답 partial ~ 말 듣는 우산|100000 → 장바구니·입금. 단계21, out/상태21.json",
+    "expected_basis": "지침/우주쇼핑몰.txt COMMON 「Prices are fixed… never lowers a price」, TALK_OUTPUT 「never change one」",
+    "evidence": "src/core/shop.ts:786, :879 applyTalk",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "question_for_user",
+    "reason1": "흥정 줄 「~ 이름|값」은 사용자 결정이다(11-08 「수정 해보자」, a2e0b0366: 흥정·다른 대가. goei-settings-unify-1108.md:21-22, shop.ts:879 주석). 11-08 논의에는 「문의로 다른 대가 합의」도 들어 있다. 한편 우주몰 지침 COMMON 「never haggles」과 TALK_OUTPUT 「Prices are fixed」(지침/우주쇼핑몰.txt:4,123)는 Claude 가 쓴 글로, 우주몰을 흥정에서 빼라는 사용자 결정은 메모리에서 찾지 못했다. 사용자 11-07 「프로그램이 값대로 거르지 말 것」과 PRICING 「No program checks the prices」도 있다. 그래서 「우주몰에서 흥정이 되느냐」는 게임 설계 문제다. 코드가 그 줄을 받는 것은 shop.ts:786 와 :879 에서 확인했다.",
+    "plain": "우주 쇼핑몰 운영자가 흥정에 응해 값을 깎아 주는 게 맞는지 정해 주셔야 합니다. 지금은 지침이 「깎지 않는다」고 하는데, 운영자 모델이 깎아 주면 그 값으로 살 수 있습니다."
+   },
+   {
+    "id": "cos-3",
+    "title": "현물 값 상품이 0원 송금으로 공짜에 들어옴 + COMMON·SHELF 값 규칙 충돌",
+    "symptom": "값 칸이 「기억 한 조각」인 상품이 ₩0으로 뜨고, 잔고가 그대로인 채 소지품에 들어옵니다. 본편은 「송금 + 기억 한 조각」을 치렀다고 읽습니다.",
+    "repro": "진열 답에 기억 저금통|기억 한 조각 → 장바구니(₩0) → 입금. 단계22, 단계22_…_본편.txt",
+    "expected_basis": "지침 COMMON 「bank transfer in Korean won」「won as plain integers」「cheapest about a million」. 포인트몰은 같은 경우를 버림(1차 Codex 05)",
+    "evidence": "src/ui/malls.ts:314 (포인트몰만 막음), 지침/우주쇼핑몰.txt:8 SHELF",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "question_for_user",
+    "reason1": "원이 아닌 대가로 사는 구조는 사용자 결정이다(11-08: 「원 아니면 가계부 X·다음 턴 본편에 무엇으로 치르고 샀다」, goei-settings-unify-1108.md:21-22). 그래서 잔고가 그대로이고 본편에 「+ 기억 한 조각」이 가는 것은 설계대로다. 화면에도 cosCard(malls.ts:822)가 「+ 대가」를 함께 보여 주므로 ₩0 만 뜨는 것은 아니다. 다만 우주몰 지침 안에서 COMMON(원 정수만)과 SHELF(돈이 아니면 다른 대가, 지침/우주쇼핑몰.txt:8)가 서로 어긋난다. 포인트몰은 「정가 포인트 구매만」이라는 사용자 결정(goei-baekilmong-points.md:13)이 있어 1차 Codex 05 를 버그로 봤지만, 우주몰에는 그런 결정이 없다. 우주몰이 원 말고 다른 대가를 받을지는 설정 문제다.",
+    "plain": "우주 쇼핑몰이 돈 말고 다른 대가(예: 「기억 한 조각」)로도 물건을 파는지 정해 주셔야 합니다. 지금은 그런 상품이 나오면 돈이 빠지지 않고, 본편에는 그 대가를 치르고 산 것으로 갑니다."
+   },
+   {
+    "id": "cos-4",
+    "title": "답 기다리는 중 페이지 새로고침 → 답 없는 내 말이 남고 본편에 감",
+    "symptom": "창을 다시 열면 운영자가 대답하지 않은 질문이 그대로 남습니다. 본편에도 운영자 답 없이 그 질문만 가서, 본편 모델이 답을 지어낼 수 있습니다.",
+    "repro": "「우산은 어때?」 전송 → 답 전 새로고침 → 문의 창·다음 본편. 단계27, 상태27.json",
+    "expected_basis": "같은 함수 실패 처리 src/ui/malls.ts:229-243 이 답 없는 내 말을 지움, 지침 4절 새로고침",
+    "evidence": "src/ui/malls.ts:626",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/malls.ts:626 은 보내기 전에 내 말을 저장한다. 되돌리는 처리는 같은 함수의 catch(malls.ts:226-243)에만 있어서, 답이 안 오면 내 말을 지우고 입력칸에 돌려준다. 페이지를 새로고침해 호출이 사라진 경우도 「답이 안 온」 경우인데 여기는 처리가 없어 서로 어긋난다. 그 결과 저장 상태에 답 없는 me 줄이 남고, mallEvents 가 그 줄을 본편에 넘긴다(상태27.json, 단계27_본편). 되돌리기의 일관성 문제라서 goei-feedback-dont-ask-internals-1122 에 따라 묻지 않고 버그로 정했다.",
+    "plain": "운영자 답을 기다리는 중에 페이지를 새로고침하면, 대답 없는 내 질문이 문의 창에 남고 본편에도 답 없이 그대로 넘어갑니다."
+   },
+   {
+    "id": "cos-5",
+    "title": "운영자 답이 본편 다음 턴 뒤에 오면 본편에 영영 안 감",
+    "symptom": "답을 기다리는 사이 본편이 한 턴 넘어가면 운영자가 한 말을 본편이 끝내 모릅니다. 그 턴 본편에는 내 질문만 답 없이 갑니다.",
+    "repro": "전송 → 답 전 본편 u2·c2 → 답 도착 → u3. 단계28 _본편1·_본편2",
+    "expected_basis": "지침 3-C 사건 한 번 전달, 4절 늦게 온 답",
+    "evidence": "src/ui/malls.ts:622,197 (보낼 때 키), src/core/malls.ts:262",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "답이 오면 src/ui/malls.ts:197 이 보낼 때의 ctx 키로 줄에 도장을 찍는다. 같은 함수 :206 에서 지금 키를 구해 두고도 쓰지 않는다. src/core/malls.ts:262 mallEvents 는 지금 마지막 응답 키와 같은 줄만 넘기고, me 줄이 있어야만 보낸다. 그래서 본편이 한 턴 넘어간 뒤 온 답은 어느 본편에도 가지 않는다. 같은 함수 주석 「마지막 응답 뒤에 한 것만」과도 어긋나는 사건 누락이다. 실제 Risu 에서 이런 일이 얼마나 자주 생기는지는 확인하지 못했다.",
+    "plain": "운영자 답을 기다리는 사이 본편이 한 턴 넘어가면, 운영자가 한 말이 본편에 끝내 전해지지 않습니다."
+   },
+   {
+    "id": "cos-6",
+    "title": "설정 「희귀·특가」를 꺼도 화면에 딱지가 뜸",
+    "symptom": "희귀·특가를 꺼도 모델이 구분 칸을 채우면 ★굉장한 상품★·※세일※ 딱지와 줄 그은 원래 값이 보입니다.",
+    "repro": "$cos_sh_feature 0 → 상품 가져오기(답에 특가·희귀). 단계29",
+    "expected_basis": "끈 요청의 SHELF_PLAIN 「구분: always leave it empty」, 설정 희귀·특가",
+    "evidence": "src/core/shop.ts:668 parseLine, src/ui/malls.ts:819 cosCard",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "같은 설정을 기본 상점 화면(src/ui/shop.ts:177-179)과 몰 격자 순서(malls.ts:877-878, 933)는 따르는데, 우주몰 상품 카드 cosCard(malls.ts:816-819)만 s.feature 를 보지 않고 딱지와 줄 그은 원래 값을 그린다. 사용자 설정을 따라야 한다는 규칙(no-hardcoding)에 비춰 화면끼리 어긋나는 결함이다.",
+    "plain": "설정에서 「희귀·특가」를 꺼도, 모델이 표시를 붙이면 우주 쇼핑몰 상품에 ★굉장한 상품★·※세일※ 딱지와 줄 그은 원래 값이 뜹니다."
+   },
+   {
+    "id": "cos-7",
+    "title": "같은 턴에 사서 판 물건은 본편에 판 일만 감",
+    "symptom": "산 우산을 같은 턴에 운영자에게 팔면, 본편에는 「팔았다」만 가고 「샀다」와 도착 글은 빠집니다. 본편은 주인공이 갖지도 않은 물건을 팔았다고 읽습니다.",
+    "repro": "우산 입금 → 팔기 <deal/> → 다음 본편. 단계25 _본편",
+    "expected_basis": "지침 3-C 샀다·팔았다 사건 각 한 번",
+    "evidence": "src/core/items.ts:960 boughtPassing(살아 있는 물건만)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/items.ts:960 boughtPassing 은 살아 있는 물건(live)만 넘기고, 같은 턴에 판 물건은 live 에서 빠진다. 그래서 「just bought」와 도착 글은 빠지고, soldNow(items.ts:942)의 「just sold」만 간다(단계25_본편). newlyBought 주석 「아직 본편이 모르는 것」과 11-10 사용자 결정(산 일·판 일을 본편에 넘김)에 비추면 산 일이 빠지는 누락이다. 잔고와 소지품 상태는 맞다. 드문 경우의 사소한 문제다.",
+    "plain": "우주 쇼핑몰에서 산 물건을 같은 턴에 되팔면, 본편에는 판 일만 가서 주인공이 갖지도 않은 물건을 판 것으로 읽힙니다."
+   }
+  ]
+ },
+ {
+  "key": "03_백일몽포인트몰",
+  "area": "백일몽 포인트몰·1:1 상담",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/03_백일몽포인트몰/",
+  "items": [
+   {
+    "id": "BM2-1",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "1:1 상담 요청에 원 잔고·지난 포인트가 [최근 본문] 상태창 줄로 감",
+    "symptom": "상담사가 주인공 원 잔고(140000)를 아는 듯 말하거나, 남은 포인트를 [손님] 칸의 3,800 대신 본문 줄의 5,000 으로 잘못 말할 수 있다.",
+    "repro": "PC: 포인트로 구매(5,000→3,800) → 1:1 상담 단추. out/단계06_PC_상담_연결_단추.txt (302행 [상태창]은 잔고 뺌, 314행 [최근 본문]에 …|백일몽/사원|140000|5000])",
+    "expected_basis": "사용자 11-22 「숨길 수 있으면 숨기고」(상점·몰·홈쇼핑). shop.ts:346 주석은 상담에서 상태창 줄을 남기는 까닭을 포인트(CUSTOMER)로만 듦. 상담 지침 COMMON: 상담사는 [손님] 계정·채팅으로만 손님을 안다",
+    "evidence": "src/ui/malls.ts:646 (shopSource(...,true)), src/ui/shop.ts:346,385",
+    "verdict1": "real_bug",
+    "reason1": "사용자 11-22 결정 「숨길 수 있으면 숨기고」(MEMORY.md, goei-playthrough-audit-plan-1122)는 상점·몰·홈쇼핑 모두에 걸린다. src/ui/shop.ts:385에서 keepStatus면 [최근 본문]의 상태창 줄을 거르지 않는데, malls.ts:646 deskSource는 keepStatus=true로 부른다. 그래서 원 잔고 140000과 지난 포인트 5000이 상담 요청에 그대로 간다. keepStatus를 둔 까닭으로 든 「포인트는 CUSTOMER로 받는다」는 이미 [손님] 칸(balanceOf, 3,800p)이 맡고 있다. 같은 함수가 [상태창] 칸에서는 wallet·points를 빼므로 코드 안에서도 서로 어긋난다. keepStatus는 8dbcea7에서 Claude가 고른 것이고 사용자가 정한 것이 아니다. 상담 지침 COMMON이 이 자료는 작가용이라고 적어 피해는 줄지만, 사용자 결정과 어긋나는 것은 그대로다.",
+    "plain": "1:1 상담원에게 주인공 원 잔고와 이전 포인트(산 뒤 줄기 전 값)가 넘어가서, 상담원이 모를 돈 사정을 알거나 남은 포인트를 틀리게 말할 수 있다."
+   },
+   {
+    "id": "BM2-2",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "끝난 상담은 본편에 안 감 (상담원 <end/>·「상담 종료」·「다른 상담사 연결」)",
+    "symptom": "상담에서 들은 말이나 상담원이 끊은 일을 본편이 모른다. 「상담 종료」를 누르면 그 턴 상담이 본편에 하나도 안 넘어간다.",
+    "repro": "① 상담 → 「환불도 되나요?」 → 상담원 <end/> → × → 다시 1:1 상담(새 상담원) → 「수령 시간…」 → 다음 본편: 뒤 상담만 감 (단계08~10, 단계10 465행). ② 새 턴에 상담 → 말 한 번 → 「상담 종료」 → 다음 본편: 상담 줄 없음 (단계49)",
+    "expected_basis": "shopctx.ts 머리 주석 「상점에서 한 일(…1:1 상담)은 다음 턴 메인 요청에」, 설정 「메인 요청에 붙이는 것 · 1:1 상담」 기본 켬, malls.ts:252 mallEvents 주석(2026-11-10 사용자 「쇼핑몰에서 한 일이 본편에 하나도 안 넘어갔다」)",
+    "evidence": "src/core/bmdesk.ts:103 endDesk 가 talk:[] 로 비움, src/ui/malls.ts:591·716 deskOpen, src/core/malls.ts:289",
+    "verdict1": "real_bug",
+    "reason1": "bmdesk.ts:103 endDesk가 talk:[]로 대화를 비운다. 이 함수는 「상담 종료」(malls.ts:591), 「다른 상담사 연결」, 상담원 <end/> 뒤 다시 열 때(deskOpen 716~) 모두 불린다. core/malls.ts:289 mallEvents는 지금 남아 있는 $bm_desk.talk만 읽는다. 그래서 그 턴에 끝난 상담은 본편에 안 넘어간다. 「메인 요청에 붙이는 것 · 1:1 상담」(기본 켬)과 mallEvents 주석(11-10 사용자 「쇼핑몰에서 한 일이 본편에 하나도 안 넘어갔다」)과 어긋난다. 끝낸 상담은 넘기지 않는다는 사용자 결정은 찾지 못했다.",
+    "plain": "상담을 「상담 종료」로 끝내거나 상담원이 끊으면 그 상담에서 나눈 말이 다음 본편에 하나도 전해지지 않는다."
+   },
+   {
+    "id": "BM2-3",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "백일몽을 나온 뒤 남은 포인트몰 탭에서 진열·1:1 상담 호출이 나가고, 구매 실패 안내가 「포인트 부족」",
+    "symptom": "관리국이 된 뒤에도 저장된 탭으로 백일몽 사내몰 진열을 새로 받고 상담원과 대화한다. 사려 하면 포인트가 충분한데 「포인트가 부족하거나 품절」이 뜬다.",
+    "repro": "백일몽일 때 포인트몰 탭 열어 둠 → 상태창 신분 관리국/신입 응답 → 페이지 새로고침 → 창 열기 → 주소창 새로고침(진열 호출 1) → 1:1 상담(연결 호출 1) → 구매(막힘, 엉뚱한 안내). 단계78, 상태78.json",
+    "expected_basis": "사용자 11-08 「포인트: 백일몽 소속일 때만」·「백일몽 포인트몰(백일몽만)」, points.ts:49 pointsMember 주석 「포인트몰(즐겨찾기·새 탭·서랍·구매·매 턴 진열)은 백일몽 소속일 때만」",
+    "evidence": "src/ui/malls.ts:365 (mall-refresh), :716-719 (deskOpen), :314 (구매만 막음), :407 (실패 까닭 안 가림); 탭은 $br_tabs 로 되살아남",
+    "verdict1": "real_bug",
+    "reason1": "사용자 11-08 「백일몽 포인트몰(백일몽만)」·「포인트: 백일몽 소속일 때만」(goei-baekilmong-points, goei-browser-design). points.ts:49 pointsMember 주석도 「즐겨찾기·새 탭·서랍·구매·매 턴 진열은 소속일 때만」이라고 적는다. malls.ts:314 buy는 「열려 있던 탭 등 다른 길로 와도」 막는다고 주석까지 달았는데, 같은 경로의 mall-refresh(:365)와 deskOpen(:716)에는 pointsMember 확인이 없다. 그래서 진열·상담 호출이 그대로 나간다. 구매가 막힐 때도 :407 안내는 늘 「포인트가 부족하거나 품절」이다.",
+    "plain": "백일몽을 나와 관리국이 된 뒤에도 열어 두었던 포인트몰 탭에서 상품을 새로 받고 상담원과 대화할 수 있다. 사려고 하면 포인트가 넉넉한데도 「포인트가 부족하거나 품절」이 뜬다."
+   },
+   {
+    "id": "BM2-4",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "폰에서는 진열이 남아 있으면 새로 받을 단추가 없음",
+    "symptom": "폰에서 마음에 안 드는 진열을 새로 받으려 해도 단추가 없어, 다 사서 진열이 빌 때까지 못 바꾼다(자동 호출 기본 수동).",
+    "repro": "폰 390×844: 서랍 → 포인트몰 → 상품 불러오기 → 하나 구매 → 보이는 br-reload·mall-refresh 0개. 단계33, out/폰_진열.png",
+    "expected_basis": "점검 지침 4절 「PC / 폰: 같은 동작이 두 배치에서 다 되나」. PC 는 주소창 새로고침으로 됨(단계11). 자동 호출 기본 수동(사용자 11-22)",
+    "evidence": "src/ui/browser.ts:231 (br-reload 가 class pc), src/ui/malls.ts:945 (상품 불러오기는 빈 진열일 때만); 우주몰도 같은 구조 src/ui/malls.ts:891 (코드만)",
+    "verdict1": "question_for_user",
+    "reason1": "browser.ts:231의 뒤로·앞으로·새로고침 단추는 class pc라 PC에만 있다. 폰 도구줄은 홈·주소·프로필·탭 수만 있다(모바일 크롬 모양). 이건 포인트몰만의 일이 아니다. 괴담넷 등 게시판(gnet.ts:749)과 우주몰(malls.ts:891)도 폰에서는 목록이 빌 때만 새로 받는 단추가 나온다. 폰 브라우저 전체에 단추를 새로 넣는 일이라, CLAUDE.md 「시키지 않은 UI 추가 X」·「PC와 폰 배치를 똑같이 만들지 않는다」에 따라 사용자가 정해야 한다. 자동 호출 기본값을 수동으로 정한 것(11-22)은 사용자 결정이다.",
+    "plain": "폰에서는 진열이 남아 있으면 새 상품을 받을 단추가 없다. 게시판·우주몰도 같다. 폰에 새로고침 단추를 둘지 정해 주세요."
+   },
+   {
+    "id": "BM2-6",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "상담 답을 기다리는 중 페이지 새로고침하면 답 없는 내 말이 대화·본편에 남음",
+    "symptom": "본편은 주인공이 물었는데 상담원이 답하지 않은 것으로 읽고, 다시 물으면 손님 줄이 둘 남는다. 입력칸도 비어 있다.",
+    "repro": "상담 중 「대여창고 몇 시까지 해요?」 전송 → 답 오기 전 페이지 새로고침 → 1:1 상담 → 다음 본편. 단계47, 상태47.json",
+    "expected_basis": "같은 함수의 실패 처리(deskRun catch: 내 말을 지우고 입력칸에 돌려줌, 단계45 에서 확인), 점검 지침 4절 페이지 새로고침",
+    "evidence": "src/ui/malls.ts:614-616 (답 받기 전에 saveDesk)",
+    "verdict1": "real_bug",
+    "reason1": "malls.ts:614~616이 답을 받기 전에 내 말을 saveDesk로 저장한다. 내 말을 바로 보이게 하려는 것으로 11-11 사용자 결정이다. 그런데 페이지를 새로고침해 요청이 끊기면 catch의 되돌림(내 말을 빼고 입력칸에 돌려줌)이 돌지 않는다. 다시 열 때 deskOpen도 답이 없는 끝 줄을 정리하지 않는다. 그래서 $bm_desk.talk 끝에 답 없는 me 줄이 남고, mallEvents가 그 줄을 본편에 넘긴다. 같은 함수의 실패 처리와 결과가 다르다. 이것은 내부 일관성 문제라 사용자에게 묻지 않는 쪽(goei-feedback-dont-ask-internals-1122)으로 정했다. 흔치 않은 경우라 사소하다.",
+    "plain": "상담원 답을 기다리는 중에 페이지를 새로고침하면 답 없는 내 질문이 대화에 남는다. 본편은 상담원이 대답하지 않은 것으로 읽고, 다시 물으면 같은 질문이 두 번 남는다."
+   },
+   {
+    "id": "BM2-Q1",
+    "kind": "question",
+    "reproduced": false,
+    "title": "진열 배정 값 등급 상한 9,999p 라 값표의 10,000p 이상 상품이 못 나옴",
+    "symptom": "배정이 켜진 기본값에서는 재생 물약 10,000p·독 170,000p·소원권 500,000p 급 상품이 진열에 나올 수 없다.",
+    "repro": "상품 불러오기 → 단계03 [이번 진열 배정] 최고가 3,000-9,999 p",
+    "expected_basis": "사용자 11-08 값표(goei-baekilmong-points.md)와 ROLL_TIERS 기본값이 어긋남. ROLL_TIERS 는 저장소 옮김(144c313) 이전 것이라 누가 정했는지 확인 못 함 → 사용자에게 물음",
+    "evidence": "지침/백일몽포인트몰.txt:274-280 (ROLL_TIERS), ASSIGN_RULE",
+    "verdict1": "question_for_user",
+    "reason1": "지침/백일몽포인트몰.txt:274~280 ROLL_TIERS의 최고가 상한은 9,999p다. 사용자 11-08 값표(goei-baekilmong-points: 재생 물약 10,000p·독 170,000p·소원권 500,000p)와 범위가 다르다. 등급은 설정에서 고칠 수 있지만(core/malls.ts:96·110) 기본값을 얼마로 둘지는 게임 경제 설계라 사용자가 정할 일이다. ROLL_TIERS를 누가 정했는지는 옛 저장소 검색이 끝나지 않아 확인하지 못했다.",
+    "plain": "기본 설정에서는 포인트몰 진열 값이 9,999p를 넘지 않아, 값표의 재생 물약(10,000p)·독·소원권 급 상품이 진열에 나오지 않는다. 상한을 값표에 맞출지 정해 주세요."
+   }
+  ]
+ },
+ {
+  "key": "04_망상홈쇼핑",
+  "area": "망상홈쇼핑",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/04_망상홈쇼핑/",
+  "items": [
+   {
+    "id": "HS2-1",
+    "title": "소지품 끔 상태에서 원 결제 주문: 돈은 빠지고 상자는 안 보이며 본편에 ARRIVE 없음",
+    "symptom": "소지품을 끄고 원으로 주문하면 잔고는 빠지는데 상자가 소지품 화면에 없어 열 수 없고, 본편도 상자 도착을 모른다. 돈만 나가고 물건·시연은 영영 못 받는다.",
+    "repro": "$it_on 0(가계부 켬) → 편성2 1부 전화 주문 → 800,000원 결제 → 다음 턴 본편 → 소지품 탭 (run.mjs 단계34, out/단계34_갈래_소지품끔_원주문.txt, 상태34.json)",
+    "expected_basis": "사용자 11-16 「주문하면 미개봉 택배 상자가 소지품에, 그 턴 메인 요청에 받는 법 한 번」(src/core/homeshop.ts:675 주석). 맞교환은 소지품 끔이면 이미 막힘.",
+    "evidence": "src/ui/homeshop.ts:414 (payOk won 은 가계부만 봄), src/ui/homeshop.ts:606 (소지품 꺼져도 addItem), src/core/items.ts:1235-1239 (소지품 끔이면 ARRIVE 안 보냄)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/homeshop.ts:414 payOk('won') 은 가계부(walletOn)만 보고, order() 는 소지품이 꺼져도 :606 addItem 으로 상자를 넣고 :595 근처에서 잔고를 뺀다. src/core/items.ts:1235-1239 inventoryText 는 소지품 끔이면 판 일·몰 사건만 보내고 ARRIVE·상자를 안 보낸다. 사용자 11-07 「상점은 소지품·가계부에 딸림」(goei-inv-settings-1107), 몰도 core/malls.ts:60 on: shopBlocked()==='' 로 소지품이 꺼지면 닫히고, 같은 파일의 맞교환도 소지품 끔이면 막혀(:416, :854 「소지품이 꺼져 있음」) 원·출연 결제만 빠져 있다. 사용자 11-16 「주문하면 상자가 소지품에, 그 턴에 받는 법 한 번」과 어긋나 상자를 둘 데가 없는데도 돈이 나간다. 소지품을 다시 켜면 상자가 보일 수는 있으나(장부 유지), 꺼 둔 동안엔 돈만 빠지고 본편도 모른다.",
+    "plain": "소지품을 꺼 둔 채 망상홈쇼핑에서 돈으로 주문하면 잔고는 빠지는데 상자가 어디에도 안 보이고, 본편도 물건이 왔다는 걸 모른다."
+   },
+   {
+    "id": "HS2-3",
+    "title": "내 채팅 응답 실패 시 입력이 지워지고, 실패한 채팅이 시청 기록(본편 user_chat)에는 들어감",
+    "symptom": "채팅이 「전달되지 않았어요」인데 쓴 글은 입력칸에서 사라져 다시 써야 하고, 그 줄은 방송 채팅 칸과 시청 기록에 남아 본편이 주인공이 공개 채팅을 친 것으로 읽는다.",
+    "repro": "방송 중 채팅 「실패할 채팅 한 줄」 → 보내기 → 응답 실패 (단계26, 상태26.json, 결과.json 26)",
+    "expected_basis": "같은 파일 상담원 실패 처리(src/ui/homeshop.ts:545-550 실패하면 내 말 되돌림), 재검토 몰 문제2 bug 판정(실패 때 입력 되돌림이 기준)",
+    "evidence": "src/ui/homeshop.ts:678 (ui.input=''), :681 (playerSay), :714 (실패에도 되돌리지 않음), finally playerFlush",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/homeshop.ts:678 보내기 전에 ui.input='' , :681 playerSay 로 채팅 칸에 올리고, 실패하면 catch(:714) 가 안내만 띄울 뿐 입력도 줄도 되돌리지 않는다. finally 의 playerFlush 가 그 줄을 시청 기록($hs_log)에 넘겨 본편 user_chat 으로 간다. 같은 파일의 상담원 실패 처리(:545-550)는 내 말을 빼고 입력을 되돌리고, 재검토 몰 문제2 도 실패 때 입력을 되돌리는 쪽을 bug 기준으로 삼았다. 창에는 「전달되지 않았어요」라고 하면서 기록엔 보낸 것으로 남아 서로 어긋난다. 내부 동작이라 사용자에게 묻지 않고 되돌리는 쪽으로 정할 일(goei-feedback-dont-ask-internals-1122).",
+    "plain": "방송 채팅이 「전달되지 않았어요」로 실패해도 쓴 글은 입력칸에서 사라지고, 그 줄은 채팅 칸과 본편 기록에 보낸 것으로 남는다."
+   },
+   {
+    "id": "HS2-4",
+    "title": "기본 모서리가 오른쪽 아래(br)인 상품은 스티커를 눌러도 밑글이 한 글자도 안 보임",
+    "symptom": "상품 약 4개 중 1개는 스티커를 젖혀도 빈 바닥만 보이고, 본편에 「스티커 밑에서 본 것」도 안 간다.",
+    "repro": "상품 스티커 보기 → 스티커 모서리 누르기, 상품 id 를 바꿔 PC 24개·폰 12개 (스티커_진단.mjs, out/스티커_pc_0.png br 빈 바닥, out/스티커_pc_1.png tr 보임). PC 7/24, 폰 4/12 가 빈 글, 모두 br(1개 bl)",
+    "expected_basis": "사용자 11-15 「밑에 진짜 글, 아주 일부만 보임」, 11-20 「들린 자리만큼만 보이게」, fitUnder 주석 「글이 스티커 넓이를 채울 만큼」(src/ui/homeshop.ts:974)",
+    "evidence": "src/core/homeshop.ts:569-573 stickerLook(id 해시로 기본 모서리), src/ui/homeshop.ts:904 밑글 왼쪽 위부터, :975-986 fitUnder",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "question_for_user",
+    "reason1": "밑글을 「떼지는 자리에 맞춰 놓지 않고 보통 글로 왼쪽 위부터 반듯하게」 두는 것은 11-22 사용자 결정이다(src/ui/homeshop.ts:893 주석). 그러면 글이 짧을 때 오른쪽 아래 모서리에는 글이 없을 수 있고, 「들린 자리만큼만 보이게」(11-20)를 문자 그대로 따르면 빈 바닥이 보이는 것도 결정과 맞는다. 글자 크기를 맞추는 fitUnder(11~30px)는 Claude 가 넣은 것이고 사용자에게 아직 안 보였다(goei-playthrough-audit-1122). 진단은 숨은 효과를 30자 남짓의 짧은 글 3개로만 돌렸고(스티커_진단.mjs truths), 실제 편성 글 길이로는 안 봤다. 그래서 7/24 라는 비율은 부풀려졌을 수 있다. 캡처 파일은 out/ 에 없다. 기본 모서리를 들췄을 때 빈 종이가 보여도 되는지는 화면 설계라 사용자가 정할 일이다.",
+    "plain": "숨은 효과 글이 짧은 상품은 기본 모서리가 오른쪽 아래면 스티커를 눌러 젖혀도 빈 종이만 보이는데, 이대로 둘지 정해 주셔야 합니다."
+   },
+   {
+    "id": "HS2-5",
+    "title": "여러 턴 지나 사이트를 열어도 편성이 한 칸만 넘어감 (설정 설명과 다름)",
+    "symptom": "본편 3턴 뒤 앱을 켜도 놓친 상품 바로 다음 상품이 방송 중이다. 설정 설명은 턴마다 한 칸이라고 한다.",
+    "repro": "편성2 1부에서 닫음 → 본편 3턴 → 사이트 열기 → at 0→1 (단계36, 상태36.json)",
+    "expected_basis": "설정 「턴이 넘어가면 다음 부로」 설명 「턴이 한 번 진행될 때마다 편성이 한 칸 넘어가요」(src/core/setdef/homeshop.ts:68). 설명도 Claude 글일 수 있어 어느 쪽이 맞는지 사용자 확인 필요",
+    "evidence": "src/core/homeshop.ts:527-530 turnStep, src/ui/homeshop.ts:207-213",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "src/core/homeshop.ts:526-530 turnStep 은 tk 가 바뀌었는지만 보고 한 칸 넘긴다(주석 「본편 턴이 넘어갔으면 편성 한 칸 (보던 부는 지나간다)」). 반면 설정 설명 src/core/setdef/homeshop.ts:68 은 「턴이 한 번 진행될 때마다 편성이 한 칸」이라고 한다. 이 부분에 대한 사용자 결정은 기억·인계 어디에도 없다. 둘 다 Claude 글(커밋 170acda)이다. 여러 턴 만에 열었을 때 그 턴 수만큼 방송을 놓치게 할지는 게임 설계라 사용자가 정할 일이다. 상태가 틀어지지는 않는다.",
+    "plain": "본편이 여러 턴 지난 뒤에 망상홈쇼핑을 열어도 편성은 한 칸만 넘어가는데, 설정 설명에는 턴마다 한 칸이라고 적혀 있습니다. 어느 쪽으로 맞출지 정해 주셔야 합니다."
+   }
+  ]
+ },
+ {
+  "key": "05_인물기록",
+  "area": "인물 기록",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/05_인물기록/",
+  "items": [
+   {
+    "id": "P5-2-1",
+    "title": "다시 굴리거나 지운 응답이 만든 인물이 다음 갱신 저장 전까지 남아 다시 굴리는 요청·인물 화면·Router 명단에 나옴",
+    "symptom": "다시 굴렸는데 그 다시 쓰는 요청에 버린 응답에서만 나온 인물(도준)의 기록이 Router 명단과 본편 인물 글에 실려, 버린 사람이 또 나올 수 있다. 수동 갱신이면 「새 응답 읽기」를 누를 때까지 인물 화면과 매 턴 Router 명단에 계속 남는다.",
+    "repro": "단계16: c4(큐라스 첫 등장+도준 등록) → c4 다시 굴리기(응답 빼고 같은 입력으로 다시 요청, Router 가 도준 고름) / 단계17: c4·u4 지우기 → 인물 화면 → 다음 입력 / 단계18: 수동 갱신에서 c4 다시 굴려 c4b → 인물 화면 → 다음 입력. 파일 out/단계16_다시굴리기_요청에_사라진응답의_인물*.txt, 단계17_*, 단계18_*, 상태16~18.json",
+    "expected_basis": "사용자 11-14 F-1 (나) 「다시 굴려 사라진 응답이 만든 변경은 버린다」, src/core/people/store.ts:485 dropGonePeople 주석, src/host/people.ts:210 「그 응답이 다시 굴려져 사라지면 기록도 같이 없앤다」",
+    "evidence": "src/host/people.ts:494 (없애기는 갱신기 저장 안에서만), src/body.ts:477 withPeople → src/core/people/router.ts:29 catalog=store.people 전부",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/host/people.ts:492-494 에서 dropGoneChanges·dropGonePeople 은 갱신기 저장 안에서만 돈다. 본편 앞 src/core/people/router.ts:29 catalog=Object.values(store.people) 는 사라진 응답이 만든 인물을 거르지 않는다. 그 인물의 항목은 liveEntries 로 걸러져 '빈 기록'이 된다. out/단계16 Router 요청 catalog 에 도준이 있고, 단계16_본편.txt:510 에 '## 도준 (living record' 가 실린 것을 직접 확인했다. 1차 재검토 문제4(bug)를 고친 것이 '다음 갱신 저장 때'만 없애서 남은 부분이고, 사용자 결정 F-1(나)와 11-22 '다시 굴리면 그 응답이 만든 것은 다 되돌아감'(goei-feedback-dont-ask-internals-1122)과 어긋난다. 내부 동작이라 묻지 않는다.",
+    "plain": "마음에 안 들어 다시 굴려도, 버린 응답에만 나온 사람이 다시 쓰는 요청과 인물 화면에 남아 또 나올 수 있다. 수동 갱신이면 「새 응답 읽기」를 누를 때까지 계속 남는다."
+   },
+   {
+    "id": "P5-2-2",
+    "title": "이름을 밝힌 응답을 다시 굴려도 「이름 옮기기」(노점 주인→대식)가 되돌아가지 않음",
+    "symptom": "다시 굴려 버린 응답에서만 나온 이름 「대식」이 그 인물 기록의 이름으로 굳고, 「항상 포함할 인물」 설정도 「대식」으로 남는다. 본편이 아직 이름을 밝히지 않은 사람을 그 이름으로 부를 수 있다.",
+    "repro": "단계25: 노점 주인 호칭 기록(provisional) → $pp_always=노점 주인 → 응답 c5n 「제 이름은 대식입니다」 + 갱신기 renames{노점 주인→대식} → c5n 다시 굴림(c5n2, 이름 안 나옴) → 갱신기 → 인물 화면 → 다음 본편. 파일 out/단계25_호칭기록_이름옮기기_다시굴리기_*.txt, 상태25.json",
+    "expected_basis": "F-1 (나) 「사라진 응답이 만든 변경은 버린다」, 1차 문제4(다시 굴린 응답이 만든 인물은 없앰)와 같은 원칙",
+    "evidence": "src/core/people/updater.ts:858-864, src/core/people/store.ts:307 renamePerson (되돌릴 기준 응답 없음), src/core/people/updater.ts:860 seedPerson 에 origin 없음 → dropGonePeople 대상 아님",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/people/updater.ts:858-864 는 renamePerson 으로 기록을 통째로 옮기고 seedPerson 에 origin 을 두지 않는다. 그래서 dropGonePeople 대상이 아니고, 되돌리기는 사용자가 '마지막 갱신 되돌리기'를 누를 때만 된다. 결과.json 단계25에서 다시 굴린 뒤에도 people=[에일린,큐라스,대식], always=대식 인 것을 확인했다. 사용자의 '다시 굴리면 그 응답이 만든 것은 다 되돌아감'(dont-ask-internals-1122)과 어긋나는 내부 동작이라 묻지 않고 버그로 둔다.",
+    "plain": "이름을 밝힌 응답을 다시 굴려 없애도 그 사람 기록이 밝혀진 이름으로 굳는다. 다음 이야기에서 아직 이름을 말하지 않은 사람이 그 이름으로 불릴 수 있다."
+   },
+   {
+    "id": "P5-2-3",
+    "title": "주인공(페르소나) 이름이 인물 기록으로 생길 수 있음 — Router·갱신기 요청에 「누가 주인공인가」가 없음",
+    "symptom": "본편이 주인공을 이름으로 부르는 채팅에서 주인공 자신의 인물 기록(한서준)이 생기고, 인물 화면과 매 턴 Router 명단·장면 인물에 끼어든다.",
+    "repro": "단계24: 페르소나 이름 한서준 → 응답 「\"한서준 씨, 이제 왔어요?\" 한서준은 가방을 내려놓고…」 → Router new_characters 에 한서준 → 갱신기 new_people 에 한서준. Router 자료는 input·recent·catalog 뿐, Router 힌트가 갱신기 name_hints 로 그대로 감, 갱신기 자료의 주인공 이름은 shop_check.protagonist 에만(상점을 갱신기가 판단하는 턴만). 파일 out/단계24_주인공_이름_*.txt, 상태24.json",
+    "expected_basis": "지침 Router.txt RULES 3 「never list the user's own character」, 갱신기 지침 1절 「@user = the persona」, src/host/people.ts:132 「기록하지 않는 이름: 유저가 연기하는 요원」, 같은 파일 상점 판단은 주인공 이름을 뺌(src/host/people.ts:410)",
+    "evidence": "src/host/people.ts:133-136 excludedNames(연기하는 요원만), src/core/people/updater.ts:781, src/core/people/router.ts:44 (자료에 주인공 없음), src/core/people/updater.ts:399 name_hints",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/host/people.ts:131-135 excludedNames 는 캐릭터로 플레이할 때의 요원 이름만 뺀다. 주인공(페르소나) 이름 userInfo().name 은 상점 판단(410, 910)과 Director 메모(889)에만 쓴다. out/단계24_갱신기.txt 를 직접 보니 Router 자료는 input·recent·catalog 뿐이다. 갱신기 자료에서 주인공 이름은 shop_check.protagonist 에만 있고, name_hints 로 한서준이 그대로 넘어가 new_people 이 받아들여졌다. 지침 Router RULES 3 'never list the user's own character'에 필요한 정보가 요청에 없다. 페르소나 이름을 기록하라는 사용자 결정은 없다. 실제 모델이 이 이름을 낼지는 가짜 답이라 보지 못했지만, 정보가 빠진 것과 빼는 목록이 빠진 것은 코드로 확정된다.",
+    "plain": "이야기가 주인공을 이름으로 부르면 주인공 자신이 인물 기록에 생겨, 인물 화면과 매 턴 장면 인물에 끼어들 수 있다."
+   },
+   {
+    "id": "P5-2-4",
+    "title": "Router 재사용 열쇠가 Router 모델·덧붙일 지침 글을 보지 않음",
+    "symptom": "Router 모델을 바꾸거나 덧붙일 지침을 같은 길이의 다른 글로 바꾼 직후, 같은 입력의 다시 굴리기·다시 보내기에서 Router 를 다시 부르지 않고 바꾸기 전 선택을 그대로 쓴다. 입력이 바뀌면 다시 부르므로 영향은 작다.",
+    "repro": "단계23: 같은 입력 한 번 보냄 → $pp_model_router=main 후 같은 입력 다시 보내기(Router 호출 0) → router_rules 「큐라스는 늘 고른다.」→「에일린은 늘 고른다.」 후 다시 보내기(Router 호출 0). 파일 out/단계23_Router_재사용_설정바꿈_*.txt",
+    "expected_basis": "1차 문제5(Director)를 고칠 때 같은 원칙으로 열쇠에 모델을 넣음(src/host/people.ts:824 「모델을 바꿔도 다시 묻는다」), 점검지침 3-E",
+    "evidence": "src/core/people/router.ts:45 (열쇠에 지침은 길이만, 모델 없음), src/host/people.ts:784",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/people/router.ts:46 의 열쇠는 input·recent·names·system.length·max 뿐이라 모델이 없고, 지침은 길이만 본다. src/host/people.ts:784 는 이 열쇠만 보고 재사용한다. 같은 종류인 Director 는 1차 재검토 문제5(bug)를 고치며 열쇠에 모델을 넣었다(people.ts:823-824). 같은 입력의 재사용 자체는 의도지만(776 주석), 설정을 바꾼 뒤에도 재사용하는 것은 Director 와 일관되지 않는다. 영향은 작다.",
+    "plain": "Router 모델이나 덧붙일 지침을 바꾼 직후 같은 입력으로 다시 굴리면 바뀐 설정이 한 번 반영되지 않는다."
+   },
+   {
+    "id": "P5-2-5",
+    "title": "「확인 뒤 등록」: 근거 응답을 다시 굴린 직후에도 등록 대기 줄과 「등록」 단추가 남음",
+    "symptom": "다시 굴려 버린 응답에서만 나온 이름(큐라스·도준)이 새 응답의 갱신이 저장될 때까지 등록 대기에 보이고, 그 사이 「등록」을 누르면 버린 응답의 인물 기록이 만들어진다. 수동 갱신이면 오래 남는다.",
+    "repro": "단계26: 새 인물 「확인 뒤 등록」 → c4(큐라스·도준 대기) → c4 다시 굴림(c4b) → 갱신 전 인물 화면. 파일 out/상태26.json, 결과.json 단계26",
+    "expected_basis": "src/core/people/store.ts:367 prunePending 주석 「다시 굴리거나 지운 응답에서만 나온 이름」, F-1 (나)",
+    "evidence": "src/core/people/updater.ts:768 (prunePending 은 갱신기 적용 안에서만), src/ui/people.ts:1136 pp-register 가 근거 응답 생존을 안 봄",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "P5-2-1 과 원인이 같다. prunePending 은 updater.ts:768, 즉 갱신기 적용 안에서만 불린다. 화면 src/ui/people.ts:616 은 store.pending 을 그대로 보이고, 1136-1148 pp-register 는 근거 응답이 살아 있는지 보지 않고 seedPerson 을 만든다(origin 없음). 그래서 이렇게 생긴 기록은 나중에 dropGonePeople 로도 사라지지 않는다. store.ts:367 주석의 의도('다시 굴리거나 지운 응답에서만 나온 이름'을 버림)와 F-1(나)에 어긋난다.",
+    "plain": "「확인 뒤 등록」에서 버린 응답에만 나온 이름이 등록 대기에 남는다. 그 사이 「등록」을 누르면 버린 응답의 사람이 기록으로 굳는다."
+   }
+  ]
+ },
+ {
+  "key": "06_시작_첫장면_커스텀임무",
+  "area": "시작 화면·첫 장면·커스텀 임무·이동",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/06_시작_첫장면_커스텀임무/",
+  "items": [
+   {
+    "id": "06-1",
+    "title": "첫 커스텀 임무 카드의 답을 기다리는 중에 창을 열면 목표 고르기가 다시 뜨고, 작전 개시를 누르면 보낸 카드와 상황판 대기가 바뀜",
+    "symptom": "첫 장면 답을 만드는 중에 창을 열면 목표 고르기 화면이 다시 뜹니다. 여기서 다른 목표로 작전 개시를 누르면 채팅 카드는 새 목표(명일 아파트)로 바뀌는데, 늦게 온 답은 처음 고른 교회 이야기입니다. 교회는 멋대로 발생(origin model)으로 처리되고, 상황판에는 고르지 않은 대기(명일 아파트)가 남습니다.",
+    "repro": "run.mjs R: 프리랜서 → 커스텀 임무 → 교회 → 작전 개시(본편 요청 나감, 답은 아직) → 창 다시 열기 → 명일 아파트 → 작전 개시 → 교회 답이 늦게 도착. 근거 파일: out/단계R02_기다리는중_창다시열기_화면.txt, out/상태R03.json, out/상태R04.json",
+    "expected_basis": "src/host/unsent.ts:2 「이미 보내져 응답을 만드는 중이면 지우지 않는다 (요청 도중 채팅을 저장하면 응답이 사라질 수 있다)」, src/body.ts:292 의 같은 규칙, src/ui/field.ts:720 의 cancelRequest 는 !isWaiting() 일 때만 카드를 건드림",
+    "evidence": "src/core/start.ts:31-37 unsentOpening 이 보낸 카드도 「첫 전송 전」으로 봄 → src/ui/app.ts:924-927 opening 화면; src/ui/field.ts:617-639 compose, 679-711 sendMission 에 기다림 검사가 없음; field.ts:596-602 placeRecord 가 카드를 바꿔 끼움",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "코드를 따라가 확인함. src/core/start.ts:31-37 unsentOpening 은 카드 하나뿐인 채팅이면 보냈든 안 보냈든 '첫 전송 전'으로 봄. 그래서 src/ui/app.ts:927 이 기다리는 중에도 opening 화면을 띄움. src/ui/field.ts:617-639 compose 와 679-711 sendMission 에는 isWaiting 검사가 없고, 596-602 placeRecord 가 마지막 카드를 바꿔 끼운 채팅을 저장함. 같은 코드베이스가 스스로 정한 '요청 도중 채팅 저장 금지' 규칙과 어긋남(src/host/unsent.ts:2, src/body.ts:292, field.ts:720 cancelRequest 의 !isWaiting()). 사용자 결정 가운데 이와 부딪히는 것은 없음(재검토.md 6절의 intended 는 NEW 줄·OPENING·Companions 이야기). 기다림이 끝난 뒤(실패) 다시 고르는 것은 그대로 허용해야 하므로, 고칠 곳은 기다리는 동안뿐임. 재현 파일 상태R03·R04 도 열어서 맞는지 확인함.",
+    "plain": "첫 장면 답이 오는 중에 창을 열어 다른 목표로 작전 개시를 누르면, 채팅 카드는 새 목표로 바뀌는데 도착하는 답은 처음 고른 곳 이야기입니다. 상황판에는 고르지 않은 요청 대기가 남습니다."
+   },
+   {
+    "id": "06-2",
+    "title": "답을 기다리는 중에 「뒤로(다시 고르기)」로 다른 시작을 출발하면 보낸 커스텀 임무 카드가 지워짐",
+    "symptom": "첫 장면을 만드는 중에 시작을 다시 고르면, 만들던 교회 카드가 채팅에서 사라지고 새 직접 입력 카드만 남습니다. 늦게 온 답은 이제 채팅에 없는 카드에 대한 답이 됩니다.",
+    "repro": "run.mjs R(R05): 커스텀 임무 → 교회 → 작전 개시(답은 아직) → 창 열기 → 머리의 뒤로(repick) → 프리랜서·직접 입력 「다른 시작.」 → 출발. 근거 파일: out/상태R05.json",
+    "expected_basis": "06-1 과 같음 (unsent.ts:2, body.ts:292 의 「요청 도중 채팅 저장 금지」)",
+    "evidence": "src/core/start.ts:176 applyStart 가 unsentOpening 이면 메시지를 비움; src/ui/app.ts:1496 은 'started' 상태만 막음",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "06-1 과 원인이 같음. src/core/start.ts:176 applyStart 는 unsentOpening 이면 메시지를 비우는데, 기다리는 중인지는 보지 않음. src/ui/app.ts:1496 은 chatPhase 가 'started' 일 때만 막고, 카드 하나뿐인 채팅은 'staged' 로 남아 통과함. 그래서 응답을 만드는 동안 채팅을 저장하고 보낸 카드를 지움. unsent.ts:2 와 body.ts:292 의 규칙에 어긋남. 상태R05 와 코드 경로를 확인함.",
+    "plain": "첫 장면 답이 오는 중에 시작을 다시 골라 출발하면, 만들던 커스텀 임무 카드가 채팅에서 사라집니다. 늦게 온 답은 이제 채팅에 없는 요청에 대한 답이 됩니다."
+   },
+   {
+    "id": "06-3",
+    "title": "채팅 중 본편 답을 기다리는 동안 「임무 요청」을 누르면 카드가 그때 채팅에 붙고, 지시문은 한 번도 모델에 안 감",
+    "symptom": "답을 기다리는 동안 커스텀 임무를 요청하면 카드가 바로 채팅 끝에 붙습니다. 늦게 온 답이 그 카드 뒤에 붙으면 카드는 이미 답을 받은 지난 지시문으로 처리됩니다. 그래서 다음 요청에는 Subject 만 가고 COMMON·CONTINUATION 지시는 빠집니다. 고른 임무는 이야기에 나오지 않고 상황판에는 「요청 대기」가 계속 남습니다.",
+    "repro": "run.mjs S: 관리국 첫 장면으로 두 턴 → 「복도로 나간다.」 보냄(답은 아직) → 임무 → 커스텀 → 소라 랜드 → 임무 요청 → 답 도착 → 「다음 행동.」 전송. 근거 파일: out/상태S01.json, out/단계S02_늦게온_답_붙고_다음턴.txt. 가짜 Risu 는 생성 중인 답 메시지를 미리 만들지 않으므로 답을 카드 뒤에 붙여 흉내 냈음",
+    "expected_basis": "unsent.ts:2 와 body.ts:292 의 요청 도중 채팅 저장 금지 규칙, 1차 확인 「채팅 중 지시문은 CONTINUATION 으로 한 번 간다」",
+    "evidence": "src/ui/field.ts:617-639 compose 와 679-711 sendMission 에 기다림 검사가 없음; src/core/request.ts:71-73 은 뒤에 assistant 가 있으면 지시 문장을 뺌. 지도 출발(depart, field.ts:642-677)도 같은 compose 를 쓰지만 출발은 코드로만 확인함",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/field.ts:679-711 sendMission 과 642-677 depart 는 둘 다 compose(617-639) 를 거침. compose 는 기다리는지 보지 않고 updateChat 으로 카드를 채팅 끝에 붙여 저장한 뒤 sendNow 를 부름. 이것은 요청 도중 채팅 저장 금지 규칙(unsent.ts:2, body.ts:292)에 어긋남. 늦은 답이 카드 뒤에 붙으면 src/core/request.ts:71-73 이 이 카드를 '답 받은 지난 지시문'으로 보고 COMMON·CONTINUATION 을 뺌. 그 결과 1차 확인('채팅 중에는 CONTINUATION 으로 한 번 간다')이 깨짐. 점검 틀은 생성 중인 답 메시지를 흉내만 냈음. 하지만 실제 리수에서도 생성 중에 채팅을 저장하면 응답이 사라지거나 sendChat 이 막힘. 어느 쪽이든 결함이고, 묻지 않을 내부 동작이라 real_bug 로 정함.",
+    "plain": "채팅 중 답을 기다리는 동안 임무를 요청하면 카드가 바로 채팅에 붙고, 고른 임무의 지시가 모델에 한 번도 가지 않습니다. 이야기에는 그 임무가 안 나오고 상황판에는 요청 대기만 계속 남습니다."
+   },
+   {
+    "id": "06-4",
+    "title": "임무 요청이 답 없이 실패한 뒤 「요청 취소」를 누르면 대기만 지워지고, 카드는 남아 다음 보통 전송에 지시문째 감",
+    "symptom": "요청이 실패해 답이 없는 상태에서 임무 창의 요청 취소를 눌러도 채팅의 카드는 그대로 남습니다. 다음에 「주변을 둘러본다.」처럼 보통 글을 보내면, 그 글이 카드의 Situation 으로 합쳐집니다. 그래서 취소한 소라 랜드 지시문(COMMON·CONTINUATION·Subject)이 그대로 모델에 갑니다. NEW 줄이 없으므로 모델이 소라 랜드를 쓰면 멋대로 발생으로 처리됩니다.",
+    "repro": "run.mjs Y: 설정 「메인 응답 대기」를 1분으로 둠 → 채팅 중 소라 랜드 임무 요청 → 본편 요청은 나갔지만 답이 안 옴 → 70초 뒤 임무 창 「요청 대기 · 소라 랜드」의 요청 취소 → 「주변을 둘러본다.」 전송. 근거 파일: out/단계Y02_요청실패뒤_요청취소_화면.txt, out/단계Y03_요청취소뒤_보통전송.txt",
+    "expected_basis": "채팅 속 카드의 「취소」는 카드와 대기를 같이 거둠(src/host/unsent.ts:50-59). 1차 문제2 를 고친 기준은 「같은 취소인데 창 쪽만 반쪽이면 안 된다」. 1차가 정상이라고 한 것은 답이 이미 붙은 뒤의 취소였음",
+    "evidence": "src/ui/field.ts:716-738 cancelRequest → src/core/world/output.ts:82 withdrawUnsent 는 「전송 대기」 표시가 있는 카드만 물림(field.ts:713-715 주석); src/core/request.ts:76-80 이 뒤의 유저 글을 Situation 으로 합침",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/field.ts:716-738 cancelRequest 는 기다림이 끝났을 때 withdrawUnsentAt 를 부름. 그런데 src/core/world/output.ts:82-93 withdrawUnsent 는 '전송 대기' 표시(isUnsent)가 있는 카드만 물림. 전송은 됐지만 답 없이 실패한 카드는 그대로 남고, 상황판 대기만 지워짐. 그다음 보통 글을 보내면 src/core/request.ts:76-80 이 그 글을 카드의 Situation 으로 합침. 그래서 취소한 지시문(COMMON·CONTINUATION·Subject)이 NEW 줄 없이 모델에 감. '보낸 카드는 대기만 지운다'(field.ts:713-715)는 Claude 가 넣은 것(2e69f7e)이고 사용자 결정이 아님. 1차 재검토가 정상이라고 한 경우는 답이 붙은 뒤의 취소였음. 1차 문제2 를 고친 기준('같은 취소인데 반쪽')과 같은 꼴의 내부 일관성 문제라 묻지 않고 real_bug 로 정함. 실패한 요청과 취소가 겹쳐야만 생기는 좁은 경우임.",
+    "plain": "임무 요청이 답 없이 실패한 뒤 요청을 취소해도, 다음에 아무 글이나 보내면 취소한 임무가 지시째 모델에 갑니다. 모델이 그 대상을 쓰면 상황판은 모델이 멋대로 만든 발생으로 처리합니다."
+   }
+  ]
+ },
+ {
+  "key": "07_본편요청조립",
+  "area": "본편 요청 조립(매 턴)",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/07_본편요청조립/",
+  "items": [
+   {
+    "id": "07-1",
+    "title": "첫 응답에 상태창 줄이 없으면 둘째 턴부터도 「첫 턴이다」 블록을 보냄",
+    "symptom": "모델이 상태창 줄을 한 번 빠뜨리면 다음 요청에 「No status line yet: this is the first turn」이 가서, 모델이 앞 장면을 무시하고 새 이야기처럼 쓸 수 있다. 날짜·시각·장소는 안 넘어가고 잔고만 넘어간다.",
+    "repro": "시작 화면 관리국·02코드네임 출발 → 첫 전송 → 상태창 줄 없는 가짜 응답 → 둘째 전송. out/단계F02_상태창줄없는응답뒤_요청.txt",
+    "expected_basis": "지침 메인요청_덧붙임.txt STATUS.FIRST 글이 첫 턴용(\"this is the first turn\"), statusctx.ts 주석 「첫 턴(상태창 줄이 아직 없음)」",
+    "evidence": "src/core/statusctx.ts:99-112",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "코드를 따라가 보니 맞다. src/core/statusctx.ts:38-46 lastStatusLine 은 앞의 응답들을 모두 뒤져 상태창 줄이 하나도 없으면 null 을 돌려주고, 그러면 :102-112 가 몇 번째 턴이든 STATUS.FIRST 블록을 넣는다. 지침/메인요청_덧붙임.txt:6-10 STATUS.FIRST 글은 'No status line yet: this is the first turn.' 이다. out/단계F02 의 573줄에 첫 응답(상태창 줄 없음)이 history 로 갔고, 576-578줄에 '[Previous status] No status line yet: this is the first turn.' 이 둘째 턴에 간 것을 확인했다. 사용자 결정 파일(MEMORY.md·silo/*)에도 재검토.md 에도 이 동작을 정한 것은 없다. 블록이 하는 일은 장부 값을 넘기는 것이고(11-09 사용자 결정, 주석 :103-104) 이건 제대로 된다. 틀린 것은 둘째 턴 이후에 '첫 턴'이라고 말하는 문구뿐이다. 내부 세부라서 사용자에게 물을 일은 아니다(goei-feedback-dont-ask-internals-1122). 영향은 작다. 모델은 앞 장면을 history 로 다 보고 있으니 '새 이야기로 쓴다'는 우려는 과장이다. 첫 응답들이 모두 줄을 빠뜨린 경우에만 생긴다.",
+    "plain": "모델이 첫 응답에서 상태창 줄을 빠뜨리면 둘째 턴부터도 모델에게 '지금이 첫 턴'이라고 잘못 알려 준다. 잔고는 제대로 넘어간다."
+   }
+  ]
+ },
+ {
+  "key": "08_소지품_가계부",
+  "area": "소지품·가계부·장착",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/08_소지품_가계부/",
+  "items": [
+   {
+    "id": "B1",
+    "title": "다시 굴리기 뒤에도 갱신기 update(설명·고장)가 남음",
+    "symptom": "다시 굴려 없던 일이 된 고장·설명 바뀜이 그대로 남아 다음 요청에도 고장으로 실리고 물건을 못 쓴다.",
+    "repro": "응답 받음 → 갱신기 손전등 update(설명, state broken) → 그 응답 다시 굴리기(바뀜 없는 답). out/단계17_본문_남은횟수_다시굴리기_고장뒤다시굴리기_다음본편.txt, 상태17.json",
+    "expected_basis": "같은 응답의 얻음·사용·버림은 응답 열쇠에 묶여 다시 굴리기로 돌아옴(코드 규칙). update 만 예외일 근거 없음",
+    "evidence": "src/core/items.ts:501, src/core/items.ts:1431",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/items.ts:501 updateItem 은 줄을 그 자리에서 고쳐 쓰고 응답 열쇠(anchor)에 묶지 않는다. applyItemChanges(:1431) 머리 주석은 '줄은 그 응답에 묶인다'라고 하고, 같은 함수 안에서도 남은 횟수(leftByLog)·잃음(removeItem)은 열쇠에 묶어 다시 굴리면 돌아오게 해 두었다. 결과_pc.json 17단계를 보면 남은 횟수는 5로 돌아왔는데 설명은 '하얀 붕대 세 개'로 남았고, 우산은 다시 굴린 뒤에도 broken 이어서 다음 요청에 '[broken, cannot be used]'로 실렸다. 사용자 결정 goei-feedback-dont-ask-internals-1122(다시 굴리면 그 응답이 만든 것은 다 되돌아감)와도 어긋난다. 점검자 증상 글에는 '손전등'이라 적혔지만 실제로 돌린 것은 검은 우산이다(작은 오기).",
+    "plain": "고장 난 응답을 다시 굴려 멀쩡한 답을 받아도 물건이 고장 난 채로 남아 쓸 수 없고, 바뀐 설명도 그대로 남는다."
+   },
+   {
+    "id": "B2",
+    "title": "본문 장착·벗음이 다시 굴리기로 안 돌아옴",
+    "symptom": "조끼를 벗은 응답을 다시 굴려 안 벗은 답이 나와도 조끼가 벗은 채로 남는다.",
+    "repro": "본문 벗음/듦 → 갱신기 unequip/equip → 다시 굴리기(안 벗은 답). out/단계112_갈래_본문벗음_다시굴리기_본편.txt, 상태18.json, 상태112.json",
+    "expected_basis": "사용자 11-22 「장착은 본문을 따른다」; 버린 본문은 없던 일",
+    "evidence": "src/core/items.ts:276, src/core/items.ts:303, src/core/items.ts:1544",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "applyItemChanges 의 equip/unequip 갈래(src/core/items.ts:1441-1444)는 equipItem(:276)·unequipItem(:303)으로 slot 을 직접 고쳐 쓴다. offItem(:1544)이 남기는 'off' 기록은 열쇠에 묶이지만 칸 상태는 그 기록과 상관없이 바뀐 채로 남는다. 결과_pc.json 18단계에서는 다시 굴린 뒤에도 방망이가 slot 0 에 있었고, 결과_branch.json 112단계에서는 조끼가 벗은 채로 남았다. 사용자 11-22 '장착은 본문을 따른다'가 있으니, 버린 본문을 따르는 것은 맞지 않다. 내부 되돌리기 세부라 사용자에게 묻지 않는다는 결정(1122)에 따라 버그로 둔다. 손으로 한 장착(UI)은 응답과 상관없으므로 대상이 아니다.",
+    "plain": "방망이를 든 응답이나 조끼를 벗은 응답을 다시 굴려 안 그런 답이 나와도 장착 칸은 버린 응답대로 남는다."
+   },
+   {
+    "id": "B3",
+    "title": "꿈결 수집기 그림·이름(「빈」 뗌)이 다시 굴리기로 안 돌아옴",
+    "symptom": "수집기가 찬 응답을 다시 굴려 안 찬 답이어도 「꿈결 수집기」·B등급 그림·찬 설명이 남는다.",
+    "repro": "갱신기가 수집기 그림 B등급으로 바꿈 → 다시 굴리기(안 찬 답). out/단계113_갈래_수집기그림_다시굴리기_갱신기.txt, 상태113.json",
+    "expected_basis": "버린 응답의 바뀜은 사라짐(B1과 같은 규칙)",
+    "evidence": "src/core/items.ts:1413, src/core/items.ts:501",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "B1 과 원인이 같다. unEmptyName(src/core/items.ts:1413)이 updateItem 으로 이름에서 '빈'을 떼고, 그림·설명도 updateItem 으로 바꾼다. 둘 다 열쇠에 묶이지 않는다. 결과_branch.json 113단계를 보면 다시 굴린 뒤에도 name '꿈결 수집기', icon 'b등급', desc '노란 빛이 짙게 찬 수집기'가 그대로다. 같은 함수에서 new 로 들어오는 '빈 X → X' 바뀜은 획득 기록에 묶는데, 이 길만 빠져 있다.",
+    "plain": "수집기가 찬 응답을 다시 굴려 안 찬 답이 나와도 「꿈결 수집기」 이름과 찬 그림·설명이 그대로 남는다."
+   },
+   {
+    "id": "B4",
+    "title": "합침·잃음·두고 옴이 같은 요청에 This turn 과 Recently 두 번",
+    "symptom": "한 요청의 [Inventory]에 같은 사건이 두 번 실려 모델이 두 번 쓸 수 있다.",
+    "repro": "소모품 합치기 / 본문 잃음·두고 옴 → 다음 본편. out/단계15_합치기_본편겹침_본편.txt, out/단계16_본문_잃음_두고옴_얻음_본편.txt",
+    "expected_basis": "사용자 11-22 21:28: This turn 과 겹치면 Recently 에서 뺀다",
+    "evidence": "src/core/items.ts:1102, src/core/items.ts:1113, src/core/items.ts:1265",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "recentItemLog(src/core/items.ts:1102)는 이번 턴에 산 것(boughtListed)만 Recently 에서 뺀다(:1113, 주석 '2026-11-22 사용자: 두 번 적힘'). 같은 마지막 응답 열쇠의 merge·left·gone 기록은 mergedNow·movedNow(:914, :920)로 This turn 에도 들어가므로 두 번 실린다. 결과_pc.json 15·16단계의 실제 출력: 'Recently: combined into 부적 묶음; lost 손전등; left behind 방검 조끼'가 This turn 의 combined/no longer has/left at 과 겹친다. 사용자 11-22 21:28 결정(겹침은 간단하면 정리)은 산 것을 두고 한 말이지만 겹침의 꼴이 같고, 내부 세부는 일관되게 정하라는 결정(1122)도 있다. 상태가 틀어지지는 않고 글만 겹치는 작은 문제다.",
+    "plain": "합치기·잃음·두고 옴이 다음 요청 소지품 글에 「이번 턴」과 「최근」 두 군데로 실려, 모델이 같은 일을 두 번 쓸 수 있다."
+   },
+   {
+    "id": "Q2",
+    "title": "응답 지운 뒤 새 메시지: 걸어 둔 사용이 말없이 사라짐",
+    "symptom": "사용을 걸고 보낸 뒤 응답을 지우고 새 메시지를 보내면 사용이 화면·요청 어디에도 없고 안내도 없다(변수엔 남음).",
+    "repro": "사용 걸고 보냄 → 응답 지우기 → 새 메시지. out/단계105_갈래_응답지우기_새메시지_본편.txt, 상태105.json",
+    "expected_basis": "정해진 것 없음. 다시 실을지 비울지 물음",
+    "evidence": "src/ui/items.ts (useQueue), src/core/items.ts pendingItemUse",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "real_bug",
+    "reason1": "queueUseVars(src/core/items.ts:1210 근처) 주석은 '응답을 지워 그 유저 메시지가 끝이면 아직 안 쓰인 자리다'라고 해서, 지운 응답의 사용을 아직 안 쓴 것으로 본다. 그런데 useBoxNames(src/host/usebox.ts)는 $st_item_use_at 이 있으면 칩을 숨기고, pendingItemUse 는 at(u2)이 새 유저 키(u3)와 다르면 싣지 않는다. 그래서 결과_branch.json 105단계에서 남은 횟수는 3으로 돌아왔지만 칩은 안 보이고 새 요청에 uses 도 없으며, 변수에는 남아 있다. 게다가 다음에 다른 물건을 넣으면 queueUseVars 가 done=false(at u2 가 마지막 응답 뒤 키)로 옛 진통제를 이어 붙여, 숨어 있던 사용이 갑자기 다시 실린다. 코드 스스로의 설계와 어긋나는 내부 동작이라 결정 1122 에 따라 묻지 않고 버그로 둔다.",
+    "plain": "사용을 걸고 보낸 뒤 응답을 지우고 새 메시지를 보내면, 걸어 둔 사용이 안내 없이 화면과 요청에서 사라졌다가 다음에 다른 물건을 걸 때 슬그머니 같이 실린다."
+   }
+  ]
+ },
+ {
+  "key": "09_괴담넷_게시판_DM",
+  "area": "괴담넷·게시판·DM",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/09_괴담넷_게시판_DM/",
+  "items": [
+   {
+    "id": "GN-1",
+    "title": "선쪽지 출처 글이 같은 새로고침에서 빠지면 모델이 쓴 선쪽지를 말없이 버림",
+    "symptom": "기본 설정에서 남의 글에 댓글을 단 뒤 새로고침하면, 그 댓글을 보고 오는 쪽지가 사실상 오지 않는다. 알림도 없고 토큰만 쓴다.",
+    "repro": "run.mjs branch2 단계01: 새로고침 → 남의 글 1846001 에 댓글 → 본편 두 턴 → 새로고침(가짜 답은 옛 남의 글을 새 글로 바꾸고 incoming 1통). out/단계01_B2_선쪽지출처글_빠짐.txt, 상태01.json",
+    "expected_basis": "요청이 incomingAllowed:true·출처=그 댓글로 보냈음(지침 INCOMING.COMBINED). 지침 AUTO.GUIDELINE 은 보호 안 된 남의 글을 바꾸라고 시키고, 기본값은 「내 댓글 있는 글 = 교체」라 그 글은 늘 빠진다.",
+    "evidence": "src/core/gnet.ts:1052 (commitIncoming 이 새 게시판에서 출처 글을 못 찾아 return false), src/ui/gnet.ts:195 (saveIncoming 이 false 면 알림 없이 끝), src/ui/gnet.ts:253 (저장된 출처 그대로 씀)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "코드를 따라가 확인했고, 요청 원문도 다시 봤다. 기본값 keepReplied=0 이면 protectedPost(src/core/gnet.ts:472-475)가 내 댓글이 달린 남의 글을 보호하지 않는다. 지침 AUTO.GUIDELINE(지침/괴담넷.txt:112)은 보호 안 된 남의 글을 바꾸라고 시킨다. 그런데 refreshPrompt 는 그 글을 incomingOrigin 으로 보내 쪽지를 허락한다(out/단계01_B2_선쪽지출처글_빠짐.txt:414, incomingAllowed:true). 저장할 때 commitIncoming(gnet.ts:1312~, findPost(st, plan.post.id))은 새로 바뀐 게시판에서 그 글을 다시 찾는데, 이미 빠져 있어 return false 가 된다. 그러면 saveIncoming(src/ui/gnet.ts:195-198)은 알림도, 쉬는 턴도 남기지 않고 끝난다. 요청은 허락해 놓고 결과는 버리는 셈이라 내부 모순이다. 내부 동작 세부라서 사용자에게 묻지 않는다(goei-feedback-dont-ask-internals-1122). 재검토.md 와 사용자 결정 어디에도 이 동작을 정한 것이 없다.",
+    "plain": "기본 설정에서 남의 글에 댓글을 달고 게시판을 새로고침하면, 그 댓글을 보고 오는 쪽지가 거의 오지 않는다. 모델은 쪽지를 써 보냈는데 알림 없이 버려진다."
+   },
+   {
+    "id": "GN-Q1",
+    "title": "연어 마켓 직거래 결정(11-08)이 코드에 없음",
+    "symptom": "팝니다 글쓰기에 소지품 고르기가 없고, 연락 수 설정도, 만나서 가계부·소지품을 바꾸는 처리도 없다. 채팅은 본편 참고 기록으로만 넘어간다.",
+    "repro": "코드 읽기. 연어 마켓 글쓰기 화면(run.mjs sites 단계04)",
+    "expected_basis": "기억 goei-browser-design.md(팝니다=소지품 물건 골라 그림, 직거래 → 본편에서 주고받은 만큼 가계부·소지품), goei-browser-settings-plan.md(연어 연락 수 최소·최대). goei-browser-progress.md 는 「남은 것」으로 적음 — 아직 살아 있는 결정인지 확인 필요",
+    "evidence": "src/ui/gnet.ts:598, src/core/boards.ts:23",
+    "reproduced": false,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "사용자 결정(goei-browser-design.md 11-08)은 연어 마켓의 핵심을 직거래로 정했다. 팝니다 글을 쓸 때 소지품 물건을 고르고, 연락 수는 최소·최대로 정하고(goei-browser-settings-plan.md), 본편에서 만나 주고받은 만큼 가계부·소지품이 바뀌는 흐름이다. goei-browser-progress.md 는 이것을 「남은 것」으로 적었다. 코드에서는 직거래가 안내문(src/ui/gnet.ts:809)과 지침 설명에만 나오고, 소지품 고르기·연락 수 설정·가계부 처리는 없다. 결함이 아니라 아직 안 만든 기능이고, 그 뒤에 이 결정을 뺐다는 기록도 없다(11-14 결정은 탭 제목·사이트 설정만 다룸). 기능을 넣을지 말지, 언제 넣을지는 사용자가 정할 일이다.",
+    "plain": "연어 마켓에서 팝니다 글을 쓸 때 소지품 물건을 고를 수 없다. 거래하고 만나도 가계부와 소지품이 바뀌지 않는다. 11-08에 정한 직거래 기능이 아직 만들어지지 않았다. 지금 만들지 묻는다."
+   }
+  ]
+ },
+ {
+  "key": "10_괴담톡",
+  "area": "10 괴담톡(폰)",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/10_괴담톡",
+  "items": [
+   {
+    "id": "F1",
+    "title": "손 답장 대기 중 본편 응답이 끝나면 그 턴의 「매 턴」 자동 확인이 빠짐",
+    "symptom": "톡을 손으로 보낸 직후의 본편 턴에서는 새 톡·공지·초대 자동 확인이 아예 나가지 않는다. 창을 다시 열어도 안 나가고, 다음 턴에야 나간다.",
+    "repro": "자동 「매 턴」 → 에일린 방에서 「지금 어디세요?」 보내기(답 대기) → 본편 「지하상가로 간다.」 응답 끝 → 손 답장 도착 → 창 다시 열기 → 다음 턴. out/상태35.json, out/결과-auto2.json (run.mjs auto2)",
+    "expected_basis": "src/core/setdef/phone.ts auto '1' 도움말 「메인 응답이 끝날 때마다 모델을 한 번 더 불러요」",
+    "evidence": "src/ui/phone.ts:533 (autoBusy면 도장 전에 return, 다시 부르는 길 없음); 같은 꼴 src/ui/phone.ts:555 autoView(코드만)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "코드를 따라가 봄. src/ui/phone.ts:531-533 autoRefresh 는 autoBusy(phoneBusy 또는 parked, :154-156)이면 $ph_auto_last 도장을 찍기 전에 return 한다. 「매 턴」은 src/body.ts:775 onOutput 에서 한 번만 부르고, 다시 부르는 길이 없다. openCheck(:576)는 autoOpen 일 때만 다시 부른다. 그래서 손 작업이 도는 사이에 끝난 본편 턴의 자동 확인은 사라진다. :154 주석은 「다음 자동 작업만 미룬다」고 쓰여 있는데 실제로는 미루지 않고 버린다. 설정 도움말(src/core/setdef/phone.ts auto '1') 「메인 응답이 끝날 때마다」와도 어긋난다. out/결과-auto2.json 의 재현(호출 0, 창 다시 열어도 0, 다음 턴 1)과 run.mjs:997-1035 순서(hold 로 손 답장 대기 → 본편 끝)도 확인했다. 실제로 생길 수 있는 순서이고 가짜 틀 때문에 생긴 문제가 아니다. 이 동작을 정한 사용자 결정이나 1차 재검토 항목은 없다. 내부 동작 세부라 goei-feedback-dont-ask-internals-1122 에 따라 묻지 않는다. 다만 바쁠 때 건너뛰는 꼴은 v0.21.20 전부터 있었고 괴담넷(gnet.ts:1146 jobs.has)도 같다. 그러니 고칠 때 미루기로 바꾸는 범위는 같이 따져야 한다. autoView(:555)는 코드로만 확인했다.",
+    "plain": "톡을 손으로 보내고 답을 기다리는 사이에 본편 답이 끝나면, 그 턴에는 다른 사람 새 톡·공지·초대 자동 확인이 아예 안 나가고 다음 턴으로 넘어가요."
+   },
+   {
+    "id": "Q1",
+    "title": "한 번에 요청 때 봉투 지침과 HABITS(<ph-habits> 덧붙이기) 지침이 어긋남",
+    "symptom": "통합 요청 겉 지시는 JSON 하나만, 덧붙임 없이라고 하고 독립 출력 제한보다 우선한다고 하는데, 같은 요청 안 HABITS는 뒤에 <ph-habits>를 붙여도 된다고 한다. 모델이 말버릇 칸을 빼먹을 수 있다(가짜 답이라 모델 반응은 못 봄, 코드는 봉투 밖 칸을 받아 줌).",
+    "repro": "괴담넷·괴담톡 자동 한 번에 요청 → 본편 응답 끝. out/단계51_J_한번에요청.txt (run.mjs joint)",
+    "expected_basis": "근거 없음 - 지침 글 결정이라 물음",
+    "evidence": "지침/요청공통.txt:3 JOINT.ENVELOPE; 지침/괴담톡.txt:157-158 HABITS; src/host/joint.ts:69-71,149",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "real_bug",
+    "reason1": "요청 글이 서로 어긋나는 것은 글로 확정했다. 지침/요청공통.txt:3 JOINT.ENVELOPE 는 「JSON 하나만, commentary 없이, outer envelope overrides standalone output-only restrictions」라고 한다. 지침/괴담톡.txt 157-158 HABITS 는 「출력 블록 뒤에만 <ph-habits> 를 붙일 수 있다, the only allowed trailing text」라고 한다. 반면 코드 src/host/joint.ts:68-71,149 는 <ph-habits> 가 봉투 밖에 붙어 온다고 보고 떼어서 phone 칸에 돌려준다. 코드가 기대하는 꼴을 봉투 지침이 알려 주지 않아서, 모델이 봉투 지시를 따르면 말버릇 칸을 뺄 수 있다. 이것은 게임 설정이나 기능 방향이 아니라 지침과 코드가 맞는지의 내부 세부다. goei-feedback-dont-ask-internals-1122 에 따라 묻지 않고 real_bug 로 정한다. 단, 가짜 답으로만 돌려서 실제 모델이 정말 빼먹는지는 확인하지 못했다. 사용자 결정 「지침은 실제 모델로 돌려 본 뒤에만 내보냄」에 따라 고친 뒤 실제 모델(Gemini 3.7 Flash)로 확인해야 한다.",
+    "plain": "괴담넷·괴담톡을 한 번에 요청할 때, 모델이 겉 지시를 따르면 말버릇을 적는 칸을 빼먹을 수 있어요. 그러면 상대의 말버릇이 저장되지 않아요."
+   }
+  ]
+ },
+ {
+  "key": "11_괴이위키",
+  "area": "괴이위키",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/11_괴이위키/",
+  "items": [
+   {
+    "id": "문제1",
+    "kind": "bug",
+    "title": "다른 채팅으로 옮긴 뒤 앞 채팅의 위키 작성 실패 안내가 지금 채팅 위키에 뜸",
+    "symptom": "채팅0에서 문서 작성을 눌러 두고 채팅1로 옮기면, 채팅0 요청이 실패했을 때 채팅1 위키에 「「빛이 없으라」 문서를 만들지 못했어요」와 「최근 실패 원문」이 뜬다. 이 채팅엔 그 문서도 작성 화면도 없다.",
+    "repro": "switch part 단계13 W_작성중_다른채팅_실패: 채팅0 위키 「빛이 없으라」 → 문서 작성(답 붙잡음) → 창 닫기 → 채팅1로 옮겨 위키 열기 → 채팅0 답이 빈 답으로 실패. out/상태13.json, out/결과-switch.json",
+    "expected_basis": "src/ui/wiki.ts:78 resetWiki 주석 「다른 채팅으로 옮겼을 때 앞 채팅의 최근 실패 원문·알림도 비운다 (전수점검 사소-59)」. 성공 쪽은 :239 에서 chatKey 로 지금 채팅을 확인함",
+    "evidence": "src/ui/wiki.ts:228, :242, :243 (실패 안내·원문을 지금 보는 채팅 확인 없이 전역 wiki 에 씀)",
+    "reproduced": true,
+    "verdict1": "real_bug",
+    "reason1": "src/ui/wiki.ts:228·242·243 이 실패 안내·원문을 지금 보는 채팅 확인 없이 전역 wiki 에 쓴다. 성공 쪽 :239 는 chatKey(cur)===key 로 확인하고, resetWiki(true)(:78-81, app.ts:897)는 채팅을 옮길 때 실패 원문을 비우도록 일부러 짜여 있다. 같은 꼴의 괴담넷(gnet.ts:1155-1157 「창이 다른 채팅을 보고 있으면 그 화면의 알림은 건드리지 않는다」, 채팅마다 uiSaved)과도 어긋난다. 사용자 결정과 부딪치는 것 없음. 점검 단계13 재현 기록 있음.",
+    "plain": "채팅 A에서 위키 문서를 쓰다가 채팅 B로 옮기면, A의 문서가 실패했을 때 B의 위키에 「문서를 만들지 못했어요」와 실패 원문이 뜬다."
+   },
+   {
+    "id": "문제2",
+    "kind": "bug",
+    "title": "자동 작성 「매 턴」이 기본 문서 제목을 고르면 기본 문서를 안 보고 새로 써서 덮음",
+    "symptom": "자동 작성을 「매 턴」으로 켜 두면, 이야기 무대가 된 괴이·장소(예: 소라 랜드)의 기본 문서가 그 문서를 참고하지 않은 새 글로 바뀐다. 손으로 다시 쓸 때는 기본 문서를 이전 문서로 넣는다.",
+    "repro": "branch part 단계21~23: $nw_auto=turn → 본편 응답(장면 소라 랜드) → 제목 답 {\"title\":\"소라 랜드\"} → 본문 요청에 [이전 위키] 없음, 채팅 문서 「소라 랜드」가 기본 문서를 덮음. 제목 요청 [이미 쓴 문서]엔 기본 문서 제목이 빠짐. out/단계23_B_자동매턴_기본문서제목.txt, out/단계21_B_자동매턴_제목고르기_제목.txt, 비교 out/단계08_PC_기본인물문서_다시쓰기_되돌리기.txt",
+    "expected_basis": "같은 기본 문서를 손으로 다시 쓰면 기본 본문이 [이전 위키]로 감(단계08 PC). 설정 「다시 쓸 때 이전 문서 참조」 기본 켬(src/core/setdef/wiki.ts 도움말)",
+    "evidence": "src/ui/wiki.ts:294 generate(..., !!old && !old.base, ...) — 기본 문서면 새 문서로 가서 :215 previousDoc=null; :303 written 이 !d.base 로 기본 문서를 뺌",
+    "reproduced": true,
+    "verdict1": "real_bug",
+    "reason1": "같은 기본 문서를 손으로 다시 쓰면 wiki-rw-go(:1084-1086)가 regenerate=true 로 기본 본문을 [이전 위키]로 넘기는데(설정 refreshPrevious 기본 켬), 자동 작성(:294)과 호출 흐름 미리 계산(:1154)은 !old.base 로 기본 문서를 새 문서로 다뤄 previousDoc=null(:215). 기본 문서는 CLAUDE.md 상 원 설정(카드/wiki-base.json)이라 맹신 X 대상이 아님. 같은 문서를 두 길이 다르게 다루는 내부 일관성 문제라 묻지 않고 real_bug. 다만 [이미 쓴 문서]에서 기본 문서를 빼는 것(:303)은 후보 149개 거의 다 기본 문서가 있어서, 넣으면 자동 작성이 고를 게 없어지므로 의도로 봄 — 버그는 [이전 위키] 빠짐 쪽만.",
+    "plain": "위키 자동 작성을 「매 턴」으로 켜 두면, 기본 문서가 있는 괴이·장소 문서가 그 기본 문서를 참고하지 않고 새로 쓴 글로 바뀐다(손으로 다시 쓸 때는 참고함)."
+   }
+  ]
+ },
+ {
+  "key": "12_AI상담",
+  "area": "AI 상담(설정 편집)",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/12_AI상담/",
+  "items": [
+   {
+    "id": "AI1",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "수 칸을 0(안 함·제한 없음)으로 바꾸면 바뀌었는데 「바꾸지 못했어요」, 판 없음",
+    "symptom": "상담이 껐다고 했는데 화면에 「바꾸지 못했어요: 다시 보기」가 뜬다. 실제로는 바뀌었고 되돌릴 판이 없다. 「제한 없음으로 해 줘」는 고를 수 없는 값으로 빠지고, 요청 글에는 빈 수 칸이 「(비어 있음)」으로 가서 상담이 제한 없음·안 함이라는 뜻을 모른다.",
+    "repro": "설정›생성 공통 → AI 상담 「다시 보기를 1회로」→「응」→「다시 보기 꺼 줘」(set adv-set.gen:reiterate=0)→「응」(apply yes). 단계 파일 out/단계08·08b·08c·08d·08e, 상태08.json",
+    "expected_basis": "src/ui/editor/consult.ts 머리 「적용 뒤 화면을 다시 읽어 정말 바뀌었는지 본다」, 판·되돌리기 설계(11-12 사용자 시안). 화면은 0을 자리 글 「안 함」「제한 없음」으로 보임",
+    "evidence": "src/ui/advanced.ts:39·src/ui/famtable.ts:271 (0이면 value=\"\"+placeholder), src/ui/editor/catalog.ts:151 (빈 value를 cur로), src/ui/editor/consult.ts:334 (now.cur === p.value 비교), src/core/consult.ts:133 (num은 zero 이름 안 받음)",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/advanced.ts:39 (famtable.ts:271도 같음): 0이면 value=\"\"에 자리 글만 둔다. catalog.ts:151은 그 빈 value를 cur로 읽고, input 수 칸에는 zero를 넘기지 않는다. 그래서 적용 판정 consult.ts:334 now.cur===p.value 에서 ''≠'0'이 되어 실제로 바뀌었는데도 failed로 빠지고 판이 없다. core/consult.ts:133도 num 칸에서 「제한 없음」을 받지 못한다. 0의 뜻을 정한 사용자 결정(advanced.ts zero:'제한 없음'/'안 함')과 어긋나는 쪽은 코드다",
+    "plain": "상담으로 '안 함·제한 없음'(0)으로 바꾸면 실제로는 바뀌었는데 「바꾸지 못했어요」가 뜨고 되돌리기 판도 남지 않는다. '제한 없음으로 해 줘'는 받아들이지 않는다."
+   },
+   {
+    "id": "AI2",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "「2만」 같은 값을 2로 받아 적용",
+    "symptom": "상담원은 「2만 토큰으로 바꿀까요?」라고 묻고 사용자가 동의하면 요청 토큰 상한이 2토큰이 된다. 알림이 없고 판의 「→ 2토큰」을 봐야만 안다.",
+    "repro": "설정›생성 공통 → 「요청 토큰 상한을 2만으로」(set adv-set.gen:budget=2만)→「응」(apply yes). out/단계09·09b, 상태09.json",
+    "expected_basis": "src/core/consult.ts 머리 「고를 수 없는 값, 범위 밖 수는 여기서 걸러 적용될 길이 없다」. 받지 않고 알리거나 20000이어야 함",
+    "evidence": "src/core/consult.ts:133 /^-?\\d+\\s*\\D{0,3}$/ 가 숫자 뒤 글자 3개까지를 단위로 보고 버림(2만·3천·20k·2만토큰 → 앞 숫자만)",
+    "verdict1": "real_bug",
+    "reason1": "src/core/consult.ts:133의 /^-?\\d+\\s*\\D{0,3}$/와 parseInt 때문에 '2만'은 2가 된다. 같은 파일 머리의 「고를 수 없는 값은 걸러 적용될 길이 없다」는 설계와 어긋난다. 이 값을 다르게 정한 사용자 결정은 없다",
+    "plain": "상담원이 '2만 토큰으로 바꿀까요?' 해서 동의하면 요청 토큰 상한이 2토큰이 되고, 아무 알림도 없다."
+   },
+   {
+    "id": "AI3",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "같이 바뀐 짝 줄이 판에 없고, 되돌려도 안 돌아옴",
+    "symptom": "상담으로 아바타 동작 간격 최소를 30초로 바꾸면 최대도 몰래 30초로 바뀐다. 판에는 최소만 나오고, 되돌려도 최소만 12초로 돌아오며 최대는 30초로 남는다.",
+    "repro": "설정›소지품 → 「아바타 동작 간격 최소를 30초로」(set set-items-act-min.n=30, 지금 12/24)→「응」→판 「되돌리기」. out/단계07·07b, 상태07.json ($it_act_gap_min 12, $it_act_gap_max 30)",
+    "expected_basis": "판 「되돌리기」의 뜻(바꾸기 전으로). src/ui/editor/consult.ts:325-327 주석이 「한 줄을 바꾸면 다른 줄이 같이 바뀌는 설정이 있다」를 알고 있음",
+    "evidence": "src/ui/settings.ts:1045 (최소>최대면 최대를 민다), src/ui/editor/consult.ts:330-336 (판은 pending 줄만), ai-undo 는 판 줄만 되돌림",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/settings.ts:1045에서 최소가 최대보다 크면 최대도 같이 민다. 그런데 consult.ts:330-336의 판은 pending 줄만 적고, ai-undo(403-422)는 판 줄만 되돌린다. 주석(325-327)이 짝 줄이 같이 바뀌는 경우를 알고 있는데도 판에 남지 않는다. 되돌리기의 뜻은 '바꾸기 전으로'다. 내부 동작이라 묻지 않고 버그로 정한다(goei-feedback-dont-ask-internals-1122)",
+    "plain": "상담으로 아바타 동작 간격 최소를 올리면 최대도 몰래 같이 바뀐다. 되돌려도 최소만 돌아오고 최대는 바뀐 채로 남는다."
+   },
+   {
+    "id": "AI4",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "꼴이 조금 틀린 <set> 줄(글머리표)을 말없이 버림",
+    "symptom": "상담이 「바꿀까요?」라고 해서 「응」 했는데 아무것도 안 바뀌고 「바꾸자고 한 것이 없어서…」만 뜬다. 제안할 때 알림이 없어서 까닭을 모른다.",
+    "repro": "설정›인물 → 「인물 갱신을 수동으로」(답 <set>\\n- pp-set.when=수동\\n</set>)→「응」. out/단계10·10b, 상태10.json",
+    "expected_basis": "같은 코드가 목록에 없는 id·고를 수 없는 값은 「바꿀 수 없는 것은 뺐어요」로 알림(src/ui/editor/consult.ts:344). 지침 AI상담.txt OUTPUT 의 꼴",
+    "evidence": "src/core/consult.ts:115 (줄 정규식이 안 맞으면 버림, <say> 가 있어서 형식 오류 재시도도 안 함)",
+    "verdict1": "real_bug",
+    "reason1": "core/consult.ts:115의 줄 정규식은 '- pp-set.when=수동'을 읽지 못해 그 줄을 버린다. <say>가 있으니 형식 오류 재시도도 하지 않는다. 목록에 없는 id나 고를 수 없는 값이면 editor/consult.ts:344가 「바꿀 수 없는 것은 뺐어요」로 알리는데, 이 경로만 알림이 없다. 모델이 형식을 어긴 때에만 생긴다. 1차 재검토 홈쇼핑 문제4(같은 종류)도 bug로 판정했다",
+    "plain": "상담이 '바꿀까요?'라고 해서 '응' 했는데 아무것도 안 바뀌고 '바꾸자고 한 것이 없어서…'만 뜬다. 왜 그런지 알 수 없다."
+   },
+   {
+    "id": "AI5",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "<apply> 안이 yes 가 아니면 「바꿨어요」만 남기고 말없이 버림",
+    "symptom": "상담이 「네, 수동으로 바꿨어요」라고 답했는데 값은 그대로다. 판도 알림도 없다.",
+    "repro": "정상 제안(pending when=manual) → 「응」(답 <say>네, 수동으로 바꿨어요.</say><apply>네</apply>). out/단계11·11b, 상태11.json",
+    "expected_basis": "지침 CHANGE 「Never write that a setting was changed unless this reply carries <apply>yes</apply>」. 모델이 어겼을 때 코드가 받는 쪽 문제. 1차 재검토 홈쇼핑 문제4(받았다고 했는데 아무 일 없음, 모델이 어긴 때만)도 bug 로 판정",
+    "evidence": "src/core/consult.ts:116 /<apply>\\s*yes\\s*<\\/apply>/i, src/ui/editor/consult.ts:316 me.pending = [] 로 버림",
+    "verdict1": "real_bug",
+    "reason1": "core/consult.ts:116은 <apply>yes</apply>만 적용으로 본다. <apply>네</apply>이면 editor/consult.ts:316 me.pending=[]로 조용히 버린다. 지침 CHANGE를 모델이 어긴 때에만 생긴다. 1차 재검토 홈쇼핑 문제4(받았다고 했는데 아무 일 없음)와 같은 종류라 그 판정을 따랐다. 드물다",
+    "plain": "상담이 '바꿨어요'라고 답했는데 실제 값은 그대로다. 판도 알림도 없다."
+   },
+   {
+    "id": "AI6",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "요청 글의 「메시지당 변화 상한」 값·범위가 깨짐 (10±10, 0~100±10)",
+    "symptom": "상담이 이 설정의 지금 값을 「10±10」처럼 엉뚱하게 받아서 설명이 틀릴 수 있다. 0일 때는 「0한도 없음」이 된다(코드로 확인).",
+    "repro": "설정›인물에서 상담에 아무 질문. out/단계02 요청 user, out/탐색_전부.txt",
+    "expected_basis": "화면 값과 같은 꼴(±10, 범위 0~100). catalog.ts 머리 「화면에 보이는 값과 상담이 아는 값이 다를 수 없고」",
+    "evidence": "src/ui/editor/catalog.ts:149 (range 옆 <output> 글을 단위로 읽음), src/ui/people.ts:429 (<output>±N / 한도 없음)",
+    "verdict1": "real_bug",
+    "reason1": "catalog.ts:149는 range 옆 <output> 글에서 맨 앞 숫자만 떼고 나머지를 단위로 쓴다. people.ts:429의 output은 '±10'이나 '한도 없음'인데 숫자로 시작하지 않아 통째로 단위가 된다. 그래서 '10±10', '0~100±10', '0한도 없음'이 된다. catalog 머리의 「화면 값과 상담이 아는 값이 다를 수 없다」는 설계와 어긋난다",
+    "plain": "상담이 '메시지당 변화 상한'의 지금 값을 '10±10'처럼 엉뚱하게 받아서 잘못 설명할 수 있다."
+   },
+   {
+    "id": "AI7",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "글 칸 값의 따옴표를 그대로 저장",
+    "symptom": "항상 포함할 인물에 \"에일린\"이 따옴표째 들어가서 어떤 기록 이름과도 안 맞고, 아무도 안 들어간다.",
+    "repro": "「에일린만」(답 <set>pp-always=\"에일린\"</set>)→「응」. out/단계12d·12e, 상태12.json",
+    "expected_basis": "같은 파일의 고르기 처리(norm)는 「」\"' 따옴표를 걷어 냄. 근거는 이것뿐이라 약함",
+    "evidence": "src/core/consult.ts consultValue text 갈래(따옴표 처리 없음) vs norm",
+    "verdict1": "unclear",
+    "reason1": "core/consult.ts consultValue의 text 갈래에는 따옴표를 걷는 처리가 없다. 다만 모델이 지침 OUTPUT('the whole new text')을 어기고 따옴표를 씌운 때에만 생긴다. 글 칸 전반(지침 글 같은 긴 글)은 따옴표가 원래 글일 수 있어서, 걷는 게 맞는지 근거가 고르기 칸의 norm 하나뿐이다. 결함으로 확정하지 못함",
+    "plain": ""
+   },
+   {
+    "id": "AI8",
+    "kind": "bug",
+    "reproduced": true,
+    "title": "지침 KNOWLEDGE 의 「동시 요청」 범위가 코드·설정 설명과 다름",
+    "symptom": "「상점이 느려」 같은 질문에 상담이 동시 요청과는 상관없다고 답할 수 있다. 실제로는 상점·몰·홈쇼핑 요청에도 동시 요청 한도가 걸린다.",
+    "repro": "아무 질문의 요청 전문. out/단계02 (system 의 KNOWLEDGE 와 user 의 설정 설명이 서로 다름)",
+    "expected_basis": "코드와 설정 설명(src/core/advanced.ts:69 「괴담넷·괴담톡·위키·상점·쇼핑몰·망상홈쇼핑」)",
+    "evidence": "지침/AI상담.txt KNOWLEDGE 「limits how many 인터넷, 괴담톡 and 위키 requests」; src/ui/shop.ts:436, src/ui/malls.ts:173·676, src/ui/homeshop.ts:171·472·511·711 concurrent: g.concurrent. 덧붙임(코드만 읽음): 생성 공통 요청 토큰 상한이 AI 상담 요청에도 걸림(src/ui/editor/consult.ts:281). 지침·설명 어디에도 없음",
+    "verdict1": "real_bug",
+    "reason1": "지침/AI상담.txt KNOWLEDGE는 '동시 요청'을 '인터넷, 괴담톡 and 위키'에만 건다고 적는다. 그런데 코드(shop.ts:436, malls.ts:173·676, homeshop.ts:171·472·511·711 concurrent: g.concurrent)와 설정 설명(core/advanced.ts:69)은 상점·쇼핑몰·홈쇼핑에도 건다. 같은 요청 안에서 지침과 설정 설명이 서로 다르다. 지침을 고칠 때는 실모델(Gemini 3.7 Flash)로 확인해야 한다(사용자 규칙). 덧붙인 '요청 토큰 상한이 상담 요청에도 걸림'은 코드(editor/consult.ts:281-300)로 맞다",
+    "plain": "'상점이 느려' 같은 질문에 상담이 동시 요청과는 상관없다고 잘못 답할 수 있다."
+   }
+  ]
+ },
+ {
+  "key": "13_이미지태그_에셋",
+  "area": "이미지 태그·에셋·사진",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/13_이미지태그_에셋/",
+  "items": [
+   {
+    "id": "13-1",
+    "title": "보조 모델 방식: 상점 표식이 이미지 보충 요청의 본문 단락으로 감",
+    "symptom": "상점이 있는 턴에는 내부 표식 [shop: 가게|주인]이 보조 모델에 번호 붙은 단락으로 갑니다. 모델이 그 단락에 태그를 달면 그림이 본문 끝, 표식이 있던 자리에 붙습니다.",
+    "repro": "run.mjs B: 시작(A00·상황 2) → 첫 턴 → 설정 → 이미지 → 모델 「보조 모델」 → 상점 표식이 붙은 응답 받음(B02, 상태창 있음) / 상태창 없이 표식만 있음(B14). 요청 전문: out/단계B02_첫응답_보충요청.txt 의 Narrative 칸 [5] [shop: 관리국 매점|], out/단계B14_상태창없음_상점표식.txt 의 [2] [shop: …]",
+    "expected_basis": "지침/상점.txt:151 은 표식을 「상태창 줄 바로 앞」에 쓰라고 합니다. 그런데 보조 요청은 상태창 줄([▣|)부터 뒤만 떼어 냅니다(src/core/asset.ts:87-89). 같은 경로에서 생각 칸·주석·상태창·완성 표식(stripReadyTags)은 빼므로, 플러그인 표식은 보조 모델에 가지 않는 것이 기대값입니다(점검지침 3-A 넣지 말아야 할 것).",
+    "evidence": "src/core/asset.ts:83-96 (splitNarrative), src/host/asset.ts:48 (stripReadyTags 만 함), 지침/상점.txt:151, out/단계B02_첫응답_보충요청.txt, out/단계B14_상태창없음_상점표식.txt",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/host/asset.ts:48 은 planAsset(stripReadyTags(msg.data)) 로 완성 표식만 빼고 상점 표식은 빼지 않는다. 지침/상점.txt MAIN_TAG 는 표식을 「상태창 줄 바로 앞」에 쓰게 하고, src/core/asset.ts splitNarrative 는 [▣| 부터만 잘라 내므로 표식이 마지막 단락으로 남는다. out/단계B02 87행 '[5] [shop: 관리국 매점|]', 단계B14 64행에서 직접 확인했다. 같은 파일 61·66행은 저장할 때 상점 표식을 의식해서 빼고 다시 붙이므로, 요청에서만 빠뜨린 것은 빠진 처리다. body.ts:696 settleShop 은 이번 응답의 표식을 남긴다. 반대되는 사용자 결정은 없다. 다만 영향은 작다. 저장 본문은 맞고, 그림이 본문 끝에 붙을 수 있는 정도다.",
+    "plain": "상점이 있는 턴에 보조 모델 이미지 보충 요청에 내부 상점 표식이 본문 한 단락처럼 같이 가서, 그림이 본문 맨 끝에 엉뚱하게 붙을 수 있습니다."
+   },
+   {
+    "id": "13-Q1",
+    "title": "출발 직후(첫 전송 전) 설정 창에서 바꾼 이미지 설정이 이 채팅에 안 들어감",
+    "symptom": "출발을 눌러 첫 장면이 뜬 뒤 설정에서 이미지를 「보조 모델」이나 「OFF」로 바꿔도, 첫 요청에는 메인 이미지 지침이 그대로 갑니다. 값은 새 채팅 기본값에만 적힙니다.",
+    "repro": "run.mjs B01: 시작 → 출발 → (보내기 전) 설정 → 이미지 → 「보조 모델」 → 첫 전송: $st_asset_model=main 그대로, prefs.basic.assetModel=aux, 요청 끝에 메인 이미지 지침. P01(폰): 같은 때 「사용 OFF」 → $st_asset_on=1 그대로, prefs.basic.assetOn=false, 지침 그대로. out/결과-B.json B01, out/결과-P.json P01",
+    "expected_basis": "근거 없음. 화면에는 「새 채팅 기본값 (시작 전)」이라는 범위 이름이 보입니다(src/ui/app.ts:1107-1109 staged=picker → defaults). 출발 뒤 첫 전송 전 상태에서 이 채팅 값을 바꾸게 할지는 사용자 결정이 없습니다.",
+    "evidence": "src/ui/app.ts:925-928, 1105-1109; src/ui/settings.ts:1223-1228 (defaults 경로) vs 1421-1429 (chat 경로)",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "src/ui/app.ts:1107-1108 은 출발 뒤 첫 전송 전(staged 시작 패널·opening)을 일부러 '시작 전'으로 보고 설정 범위를 defaults 로 연다. 화면에도 「새 채팅 기본값 (시작 전)」, 「첫 전송 전까지 다시 고를 수 있어요」가 나온다. 그래서 값이 이 채팅에 안 들어가는 것은 코드상 의도된 범위다. 이 상태에 「이 채팅」 범위를 따로 둘지는 설정 화면 구성(UI 추가)에 관한 일인데, 사용자 결정 기록은 메모리·재검토 어디에도 없다. 시키지 않은 UI 를 추가하지 않는다는 규칙도 있어 Claude 가 혼자 정할 수 없다.",
+    "plain": "출발을 누른 뒤 첫 메시지를 보내기 전에 설정에서 이미지 방식을 바꾸면, 지금 채팅이 아니라 새 채팅 기본값에만 들어갑니다. 이때도 지금 채팅에 바로 들어가게 할까요?"
+   },
+   {
+    "id": "13-Q2",
+    "title": "보조 답의 꼴이 틀려도 메모가 「붙일 이미지가 없었어요」",
+    "symptom": "보조 모델이 JSON 대신 글을 돌려주면 설정 탭에 「이번 응답에는 붙일 이미지가 없었어요.」라고 나옵니다. 실패인지 정말 태그할 사람이 없었는지 구분되지 않습니다.",
+    "repro": "run.mjs B07: 보조 답 「잼트리에게 smile 태그를 붙이세요.」 → 본문 그대로, 메모 「이번 응답에는 붙일 이미지가 없었어요.」. B06 의 [] 와 같은 메모입니다. 빈 답(B05)은 「모델이 빈 응답을 보냈어요」로 따로 나옵니다. out/단계B07_꼴틀림.txt",
+    "expected_basis": "근거 없음. src/host/asset.ts:24 주석 「실패해도 … 이유를 설정 탭에 한 줄 남긴다」 정도입니다. 꼴 틀림을 실패로 따로 알릴지 사용자 결정이 없습니다.",
+    "evidence": "src/host/asset.ts:51-54, src/core/asset.ts:141-160 (parsePatches 가 빈 목록)",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "real_bug",
+    "reason1": "src/host/asset.ts:24 주석은 실패하면 이유를 설정 탭에 한 줄 남긴다고 하고, 빈 응답은 「모델이 빈 응답을 보냈어요」로 따로 알린다. 그런데 core/asset.ts parsePatches 는 JSON 이 아닌 답을 [] 로 돌려주고, asset.ts:52-53 이 이를 정상 빈 배열과 똑같이 「붙일 이미지가 없었어요」로 적는다(out/단계B07 확인). 내부 동작 세부라 사용자에게 묻지 않는다는 결정(goei-feedback-dont-ask-internals-1122)에 따라 판정을 직접 정했다. 실패 이유 안내와 어긋나는 사소한 결함이다.",
+    "plain": "보조 모델이 이미지 답을 엉뚱한 꼴로 보내 실패했는데도, 설정 탭에는 「이번 응답에는 붙일 이미지가 없었어요」라고만 나와 실패인지 알 수 없습니다."
+   }
+  ]
+ },
+ {
+  "key": "14_호출흐름_진행창",
+  "area": "호출 흐름 미리 보기·진행 창",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/14_호출흐름_진행창/",
+  "items": [
+   {
+    "id": "14-1",
+    "title": "Router가 시간 제한에 걸려도 진행 창에는 성공으로 보임",
+    "symptom": "Router 답이 시간 제한을 넘겨 본편이 코드 Router로 넘어가도 진행 창은 계속 '라우터 도는 중'이다가, 답이 늦게 오면 '완료'로 바뀌고 턴은 실패 0인 '끝'으로 닫힌다. Router가 매번 늦어 본편에 쓰이지 않아도 사용자가 알 수 없다.",
+    "repro": "$pp_router_timeout 5, 가짜 Router 답을 7.5초 지연 → 한 턴. 단계10_Router_시간초과.txt (본편이 5,121ms에 넘어감, 본편 대기 중 라우터:run·위 줄은 '보조 모델 · 보냄 829', 끝에는 라우터:done·'끝')",
+    "expected_basis": "기억 goei-guides-router-1122: 11-22 사용자에게 '남은 것: Router 시간 제한에 걸려도 진행 창은 성공으로 보임'으로 알렸고 아직 고치지 않음. 그 턴 본편은 Router 답을 쓰지 않았음",
+    "evidence": "src/host/people.ts:791-794 (Promise.race는 끊고 넘어가도 runModel이 계속 돎), src/host/llm.ts:120-124 (늦게 끝나면 ok로 적음). Director도 같은 꼴 people.ts:833-836 (코드로만 확인)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/host/people.ts:791-794: Promise.race 가 시간 제한으로 끊고 코드 Router 로 넘어가도 runModel 은 계속 돈다. 늦게 끝나면 src/host/llm.ts:120-124 done(ok) 가 진행 창과 기록을 성공으로 적는다. Director 도 people.ts:833-836 에서 같은 꼴이다. 기억 goei-guides-router-1122 에 사용자에게 「남은 것(안 고침)」으로 알린 결함으로 적혀 있고, 의도라고 정한 기록은 없다. 단계10 결과와 코드가 맞는다.",
+    "plain": "Router 가 시간 제한에 걸려 그 턴에 쓰이지 못해도, 진행 창에는 늦게 온 답 때문에 라우터가 '완료', 턴이 '끝'(실패 0)으로 보여 매번 늦는지 알 수 없다."
+   },
+   {
+    "id": "14-2",
+    "title": "앞 턴의 뒤 작업(인터넷·위키·쇼핑몰 자동 호출)이 다음 턴 진행 창과 '지난 턴'에 섞임",
+    "symptom": "다음 턴을 빨리 보내면, 그 턴 응답이 오기도 전에 진행 창의 '우주 쇼핑몰' 칸이 실패로 뜬다. 끝나면 '· 2회'에 '호출 4회'(실제는 3회)가 되고, 호출 흐름 '지난 턴' 쇼핑몰 토큰은 두 번 치 합(26,085, 예상은 13,159)이 된다.",
+    "repro": "호출 흐름 단추로 인물 기록 끔·위키 매 턴·우주 쇼핑몰 매 턴 → 턴 A 응답(위키 2.5초) → 리스너가 끝나자 바로 턴 B 전송 → 3.5초 → 턴 B 응답. 단계15_뒤작업_도는중_다음턴.txt, 단계15_…_호출흐름.txt",
+    "expected_basis": "진행 창은 '한 턴에 라우터→…→인터넷이 어떻게 도는지'(progress.ts 머리, 11-09 사용자), 지난 턴은 그 턴의 호출(flowpage.ts lastTurn). 실제 Risu도 리스너가 끝나면 다음 전송을 받음(재검토 Codex 08)",
+    "evidence": "src/body.ts:763,785-786 (리스너는 뒤 작업을 기다리지 않고 차례로 돌림), src/core/progress.ts:181 progressCallStart·src/host/trace.ts:277 traceMark (시작할 때 열린 턴에 붙음)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/body.ts:763-788: 뒤 작업(위키→쇼핑몰)은 차례로 돌고 리스너는 그것을 기다리지 않는다. src/host/trace.ts:270-281 traceMark 와 src/core/progress.ts:181 progressCallStart 는 호출을 '시작할 때 열린 턴'에 붙인다. 그래서 앞 턴 뒤 작업이 다음 턴이 열린 뒤에 시작하면 다음 턴에 붙는다. trace.ts 주석 '전수점검 보통-7'이 앞 턴 자동 호출이 다음 턴에 보이는 것을 고치려던 것이라 설계 취지와 어긋난다. 실제 Risu 도 리스너가 끝나면 다음 전송을 받는다(재검토 Codex 08).",
+    "plain": "다음 턴을 빨리 보내면 앞 턴의 쇼핑몰·위키 자동 호출이 새 턴 진행 창에 섞인다. 아직 안 돈 칸이 실패로 뜨고, 호출 수와 '지난 턴' 토큰이 두 턴 치로 부풀어 보인다."
+   },
+   {
+    "id": "14-3",
+    "title": "턴 중에 누른 단추 호출(AI 상담)이 그 턴 진행 창과 '보조 지난 턴' 합계에 들어감",
+    "symptom": "본편을 기다리는 동안 AI 상담을 쓰면 채팅 턴 카드에 'AI 상담' 줄이 생긴다. '호출 5회'가 되고 폰 '인터넷' 점이 켜지며, 호출 흐름 '보조 지난 턴'이 35,550(이 턴 합 29,536 + 상담 6,014)으로 부풀어 보인다.",
+    "repro": "한 턴 보냄 → 본편 대기 중 설정 → 호출 흐름 → AI 상담에 질문 → 응답 → 호출 흐름. 단계17_본편대기중_AI상담.txt",
+    "expected_basis": "src/ui/editor/flowpage.ts:86 '턴 밖에서 누른 호출만 있는 묶음(상점 열기·AI 상담 등)은 「지난 턴」이 아니다', :93 '손으로 누른 호출(manual)은 맨 위 합계처럼 뺀다'",
+    "evidence": "src/host/trace.ts:277-281 (열린 턴이면 단추 호출도 before/after로 적음), src/core/progress.ts:181",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/editor/flowpage.ts:369 맨 위 '보조 지난 턴' 합계와 :94 real() 은 phase 가 manual 인 호출만 뺀다. 그런데 src/host/trace.ts:277-281 은 턴이 열려 있으면 단추 호출(AI 상담)도 before/after 로 적어 합계에 들어간다. flowpage.ts:86 주석 '상점 열기·AI 상담 등 손으로 누른 호출은 지난 턴이 아니다'의 취지와 어긋난다. 다만 턴 카드에 단추 호출 줄이 생기는 것 자체는 progress.ts 가 'other' 묶음을 두어 받아들인 설계라 문제가 아니다. 문제는 합계가 부푸는 것과 점이 켜지는 것(14-4)이다.",
+    "plain": "본편을 기다리는 동안 AI 상담을 쓰면 그 토큰이 호출 흐름의 '보조 지난 턴' 합계에 더해진다. 턴마다 드는 토큰이 실제보다 많아 보인다."
+   },
+   {
+    "id": "14-4",
+    "title": "턴과 상관없는 단추 호출이 폰 막대 점을 켬",
+    "symptom": "채팅 턴 없이 AI 상담만 써도 폰 진행 막대의 '인터넷' 점이 돈다.",
+    "repro": "턴 없이 설정 → AI 상담에 질문. 단계16_수동호출_AI상담.txt (dots 인터넷:run)",
+    "expected_basis": "src/core/progress.ts:7 'other = 채팅 턴과 상관없는 단추 작업(상점 등): 폰 막대 점에는 안 나온다 (릴리스 점검 11-09: 상점이 「인터넷」 점을 켰다)'",
+    "evidence": "src/core/progress.ts:157-163 groupOf는 '상점'만 other이고 나머지는 net. 코드로 보면 망상홈쇼핑·우주몰 문의·1:1 상담·괴담톡 답장·게시판 댓글도 인터넷 점을 켜고, 위키 수동('위키 글')은 갱신기 점을 켬 (이것들은 돌려 보지 않음)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/progress.ts:7 주석은 '채팅 턴과 상관없는 단추 작업은 폰 막대 점에 안 나온다(11-09 상점이 인터넷 점을 켰다)'이다. 그런데 :157-163 groupOf 는 '상점'만 other 로 두고 'AI 상담' 등 나머지 단추 호출 이름은 net 으로 떨어진다. 단계16 dots '인터넷:run' 과 맞는다. 11-09 에 고친 것과 같은 결함이 다른 단추에 남아 있는 것이다.",
+    "plain": "채팅 턴 없이 AI 상담(또는 홈쇼핑·쇼핑몰 문의 같은 단추)만 써도 폰 진행 막대의 '인터넷' 점이 켜진다."
+   },
+   {
+    "id": "14-5",
+    "title": "호출 흐름의 포인트몰 1:1 상담 줄이 백일몽이 아닌 소속에도 '보낼 때마다 1회'로 켜져 있음",
+    "symptom": "관리국 채팅의 호출 흐름 화면에 포인트몰 1:1 상담이 '보낼 때마다 1회 (상담사 연결 1회 더)'로 켜진 색으로 나온다. 백일몽 포인트몰 줄도 '수동 (새로고침 때만)'으로 나온다.",
+    "repro": "관리국 채팅에서 창 → 설정 → 호출 흐름. 단계01_기본설정_호출흐름화면.txt",
+    "expected_basis": "사용자 11-08 '포인트: 백일몽 소속일 때만', '백일몽 포인트몰(백일몽만)'",
+    "evidence": "src/ui/editor/flow.ts:206, src/ui/editor/flowpage.ts:330 (상담 켬·몰 켬만 보고 소속은 안 봄. 1차 Codex 09는 꺼졌을 때만 고침)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/malls.ts:305-307 mallAutoTurn 과 src/ui/app.ts:2164-2167 browserSites 는 포인트몰을 백일몽 소속(pointsMember)일 때만 연다(사용자 11-08 '백일몽만'). 그런데 src/ui/editor/flow.ts:206 과 flowpage.ts:330 의 1:1 상담 줄은 상담 켬·몰 켬만 본다. 그래서 관리국 채팅에서도 '보낼 때마다 1회'·켜짐으로 나온다. 같은 화면의 진열 줄은 소속을 보므로 서로 맞지 않는다. 진열 줄의 '수동 (새로고침 때만)'은 설정값(수동)을 그대로 보인 것이라 그 부분은 문제로 보지 않는다. 글과 색만 틀리고 호출 수 셈에는 들어가지 않는다.",
+    "plain": "백일몽이 아닌 소속 채팅에서도 호출 흐름 화면에 포인트몰 1:1 상담이 '보낼 때마다 1회'로 켜진 색으로 나온다. 실제로는 그 소속에서 포인트몰을 쓸 수 없다."
+   },
+   {
+    "id": "14-Q2",
+    "title": "호출 흐름 '생성 공통'에 '모델 오류 재시도'가 없음",
+    "symptom": "호출 흐름 화면은 '호출 수와 모델을 바꾸는 값만 모았다'고 하는데, 실패 때 호출을 늘리는 '모델 오류 재시도'(기본 2회)는 화면에 없다. 형식 오류 재시도와 다시 보기는 있다.",
+    "repro": "코드만 읽음 (화면 글 단계01_기본설정_호출흐름화면.txt '생성 공통'에 두 줄만 있음)",
+    "expected_basis": "화면 설명 문장 외에 정한 근거 없음",
+    "evidence": "src/core/advanced.ts:62 transient, src/ui/editor/flowpage.ts common 행 목록",
+    "reproduced": false,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "src/core/advanced.ts:62 transient(모델 오류 재시도, 기본 2)가 src/ui/editor/flowpage.ts:340-343 common 행에 없다. 화면 설명(flowpage.ts:379 '호출 수와 모델을 바꾸는 값만 모았고')과 어긋나 보일 수는 있다. 그러나 줄을 넣는 것은 화면 구성을 바꾸는 일이고, 시키지 않은 UI 추가는 금지(CLAUDE.md)다. 정한 기록도 없어 사용자 몫이다. 동작이 틀린 것은 아니다.",
+    "plain": "호출 흐름 화면의 '생성 공통'에 '모델 오류 재시도'(오류 때 호출이 늘어나는 값) 줄을 넣을지 정해 주세요. 지금은 '형식 오류 재시도'와 '다시 보기'만 보입니다."
+   }
+  ]
+ },
+ {
+  "key": "15_상황판_지도_요원_명부",
+  "area": "상황판·지도·요원·명부",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/15_상황판_지도_요원_명부/",
+  "items": [
+   {
+    "id": "15-1",
+    "title": "처음 뜬 응답을 다시 굴리면 손으로 끝낸 상황이 되살아나고 일지는 「직접 종료」 그대로",
+    "symptom": "응답에서 처음 뜬 특수를 상황판에서 끝낸 뒤 그 응답을 다시 굴리면, 상황판에 다시 「출현」으로 뜨는데 기록 탭 일지는 끝났다고 말한다.",
+    "repro": "run.mjs R: 시작(관리국 02) → 첫 응답(맨홀 출현) → 상황판 큰 보기 휴지통 두 번 → 첫 응답 다시 굴리기 → 같은 꼴 새 답. 단계R02_첫응답_다시굴림_요청.txt, 상태R01·R03.json",
+    "expected_basis": "src/core/world/output.ts:246-249 prevWorldVars 주석(손으로 바꾼 것을 리롤 기준에도 반영, 안 그러면 리롤 때 사라짐), src/core/journal/store.ts:119(수동 종료는 되살아나지 않으므로 일지 줄을 둔다)",
+    "evidence": "src/core/world/output.ts:252-263, src/core/world/engine.ts:878 (endEvent 가 발생대기를 뺀 activeEvents 에서만 찾아 리롤 기준 상태에선 아무것도 안 함), src/ui/field.ts:758",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "코드 의도와 실제 동작이 어긋남. output.ts:246-249(prevWorldVars 주석)와 journal/store.ts:119(rewindClosures)는 둘 다 '손으로 끝낸 것은 리롤 기준에도 반영돼 되살아나지 않는다'고 적었고, 그래서 일지의 manual 줄을 남겨 둔다. 그런데 engine.ts:876-884 endEvent는 activeEvents(발생대기 제외)에서만 대상을 찾는다. 그 응답에서 처음 뜬 항목은 기준 상태에서 아직 발생대기라서 false가 되고 아무것도 바뀌지 않는다(field.ts:758 saveWorld). out/상태R01.json을 보면 기준 world.ms가 비어 있고 맨홀은 ended에만 있다. 상태R03.json에서는 리롤 뒤 ms에 맨홀 '출현', ended는 빈 채다. 같은 시점 일지에는 '직접 종료' 줄이 남아 상황판과 기록 탭이 서로 다른 말을 한다. 사용자 결정 중 이와 부딪히는 것은 없다(11-22 '다시 굴리면 그 응답이 만든 것은 되돌아간다'를 따르더라도 일지와 상황판은 맞아야 함).",
+    "plain": "처음 뜬 상황을 상황판에서 끝낸 뒤 그 응답을 다시 굴리면, 상황판에는 그 상황이 다시 뜨는데 기록 탭 일지는 끝났다고 한다."
+   },
+   {
+    "id": "15-2",
+    "title": "손으로 끝낸 괴이·특수를 모델이 다음 응답에 다시 적으면 새로 등록됨 (사건은 막음)",
+    "symptom": "방금 끝낸 특수가 다음 응답에서 모델이 태그를 다시 적으면 그대로 진행 중으로 돌아오고, 흐린 종료 카드도 사라진다.",
+    "repro": "run.mjs A: A05 상황 종료(맨홀) → A06 다음 요청 → A07 답에 [MS|부산광역시 연제구|얼굴 없는 장터 맨홀|출현|…]. 상태A07.json (origin model 로 출현)",
+    "expected_basis": "지침 상태창_태그.txt:47 「do not revive closed entries」, 같은 엔진 사건(IN)은 모델이 새로 적은 태그를 이름 막기로 버림(engine.ts:631)",
+    "evidence": "src/core/world/engine.ts:569 (괴이 모델 등록에 blocked 검사 없음), :659 (특수 같음), :631 (사건만 blocked)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "끝난 항목은 engine.ts:311-330 endAn/endIn/endMs가 block()으로 이름을 막아 둔다. 그런데 이 막기를 검사하는 곳이 자동 추첨(:342, :361, :383)과 사건의 모델 등록(:631)뿐이다. 괴이 모델 등록(:569 근처)과 특수 모델 등록(:659 근처)에는 blocked 검사가 없다. 지침 상태창_태그.txt:47 'do not revive closed entries'와도, 사건의 같은 길과도 어긋나는 빠짐이다. 상태A07.json에서 맨홀이 origin model로 다시 '출현'한다. endedShown(:872)은 살아 있는 같은 이름이 있으면 흐린 카드를 빼므로, 종료 카드가 사라지는 것도 맞다. 막기를 따로 할지 정하는 것은 내부 판정 일관성 문제라 사용자에게 묻지 않는다(goei-feedback-dont-ask-internals-1122).",
+    "plain": "상황판에서 끝낸 괴이나 특수를 다음 응답에서 모델이 다시 적으면 그대로 진행 중으로 돌아오고, 흐린 종료 카드도 사라진다."
+   },
+   {
+    "id": "15-3",
+    "title": "명부를 고쳐도 지금 채팅의 다음 요청엔 옛 요원 명단이 감 (응답 한 번 뒤에야 바뀜)",
+    "symptom": "명부에서 요원을 관리국 목록에서 숨기면 상황판에선 바로 빠지지만, 다음 본편 요청엔 그 요원 AG 줄과 code 목록이 한 턴 더 간다.",
+    "repro": "run.mjs D: 첫 응답 뒤 설정 › 세계 › 요원 › 데쥬레 › 관리국 칩 끔 → 닫기(저장) → 다음 전송. 단계D01_명부_요원목록숨김.txt(P012 있음), 단계D01b_응답한번뒤_요청.txt(빠짐)",
+    "expected_basis": "src/ui/directory.ts:2 「이 카드의 모든 채팅에 바로 적용된다」, directory.ts:775 사용법 글",
+    "evidence": "src/ui/editor/index.ts:1001 (명부 저장이 카드 로어북만 고치고 $ag_report 를 다시 만들지 않음), 요청은 src/body.ts fixLore 에서 저장된 $ag_report 를 그대로 씀. 비교: src/ui/settings.ts:1405-1409 요원 표시 인원은 저장 때 다시 만듦",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/ui/editor/index.ts saveNow(:993-1012)는 updateCharacterLore와 host.refresh만 하고, $ag_report/$an_report를 worldVars로 다시 만들지 않는다. 요청을 만드는 body.ts fixLore(:402)는 저장된 $ag_report를 그대로 쓴다(output.ts:59). 반면 settings.ts:1403-1410 set-agent는 저장할 때 브리핑을 다시 만든다. 그래서 두 설정 길이 서로 다르고, directory.ts:2와 :775의 '모든 채팅에 바로 적용된다'와도 어긋난다. 단계D01 요청 120·122줄에 '[AG|P012|내근|연구실]'과 'P012 데쥬레'가 남아 있고, D01b에는 P012가 0번 나온다.",
+    "plain": "명부에서 요원을 숨기면 상황판에서는 바로 빠지는데, 다음 한 턴 동안은 모델에게 그 요원이 여전히 우리 소속 요원으로 전해진다."
+   },
+   {
+    "id": "15-Q1",
+    "title": "끝난 항목을 요청에 알릴지 — 지침은 「closures reported in World Entries」인데 그런 줄이 없음",
+    "symptom": "상황판에서 손으로 끝낸 상황은 다음 요청에서 줄이 없어질 뿐 끝났다는 말이 없어, 모델은 앞 장면 글만 보고 계속 진행 중으로 쓸 수 있다(문제 2 로 이어짐).",
+    "repro": "run.mjs A: A05 상황 종료 → A06 다음 요청. 단계A06_수동종료_다음요청.txt",
+    "expected_basis": "근거 없음(설계 결정): 지침 상태창_태그.txt:47 문장 vs engine.ts reports() 는 진행 중·발생대기만 적음, tags.ts cleanOutput 이 종료 태그도 저장 본문에서 지움, journal/settings.ts:3 주석은 「종료 태그가 본문에 남는다」고 적음",
+    "evidence": "지침/상태창_태그.txt:47, src/core/world/engine.ts reports(), src/core/world/tags.ts cleanOutput, src/core/journal/settings.ts:3",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "journal/settings.ts:3에 사용자 결정(10-29)이 있다. '일지를 본편 요청에 참고로' 설정을 뺀 것인데, 이유가 '종료 태그가 채팅 본문에 남아 모델이 매 턴 본다'였다. 지금은 tags.ts:228-253 cleanOutput이 종료 태그까지 저장 본문에서 지우고, engine.ts reports()는 진행 중·발생대기만 적는다. 그래서 그 결정의 전제가 더는 맞지 않는다. 지침 상태창_태그.txt:47의 'Reflect closures reported in World Entries'는 새 저장소 첫 커밋(leepc25, 144c313)부터 있었다. 사용자가 일부러 뺀 기능(일지를 요청에 넘기기)을 되살릴지, 아니면 지침 문장만 바꿀지는 기능을 넣고 빼는 일이라 사용자가 정한다. 15-2는 이것과 상관없이 코드에서 막을 수 있다.",
+    "plain": "상황판에서 끝낸 상황을 모델은 다음 요청에서 그 줄이 없어진 것으로만 알게 된다. 끝났다고 따로 알려 줄지 정해야 한다(예전에 '종료 태그가 본문에 남는다'는 이유로 일지 넘기기를 뺐는데, 지금은 그 태그도 지워진다)."
+   },
+   {
+    "id": "15-Q2",
+    "title": "본편 응답을 「지우기」 했을 때 상황판·요원 상태를 되돌릴지",
+    "symptom": "응답이 괴이를 격리로 끝내고 요원을 사망으로 적은 뒤 그 응답을 지우고 다른 말을 보내도, 괴이는 끝난 채·요원은 사망 그대로이고 사망 셈이 이어져 결번까지 간다. 다시 굴리기는 되돌린다.",
+    "repro": "run.mjs G: 응답2 [AN|…|어두운 정원|격리|…] [AG|P001|사망|순직] → 응답2 지우기 → 「아니, 사무실에 남는다.」 전송. 단계G01_응답지우고_새턴.txt, 상태G01.json",
+    "expected_basis": "근거 없음: 사용자 11-22 「다시 굴리면 그 응답이 만든 것은 다 되돌아간다」는 다시 굴리기만 말함, 지우기 결정은 못 찾음",
+    "evidence": "src/core/world/output.ts:105-111 rerollBase 가 같은 번호 자리만 리롤로 봄",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "real_bug",
+    "reason1": "되돌리기 동작이라 사용자에게 묻지 않는 내부 세부다(goei-feedback-dont-ask-internals-1122). 플러그인의 다른 기능은 '지우기'를 다시 굴리기와 똑같이 되돌린다. 물건 items.ts:212, ui/items.ts:342, 가계부·주문 orders.ts:52·144, 홈쇼핑 homeshop.ts:677, 몰 malls.ts:766, 인물 기록 people/prune.ts:2('응답을 지우면 기록이 되돌아가야 하므로'), people/store.ts:367·380, 상태창 status.ts:150이 그렇다. 상황판·요원만 output.ts:105-111 rerollBase가 '같은 번호 + 같은 앞 메시지'만 보기 때문에 지운 응답을 되돌리지 못한다. 상태G01.json에서 일지 '어두운 정원 종료'가 남고, P001 사망 셈이 이어져 결번까지 간다. 일관된 쪽(지운 응답이 만든 것은 되돌아감)이 맞다고 판단했다.",
+    "plain": "응답을 지우고 다른 말을 보내면 소지품·가계부·인물 기록은 되돌아가는데, 상황판(끝난 괴이)과 요원 상태(사망)만 그대로 남아 결번까지 이어진다."
+   }
+  ]
+ },
+ {
+  "key": "16_설정화면",
+  "area": "설정 화면 전체",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/16_설정화면/",
+  "items": [
+   {
+    "id": "문제1",
+    "title": "괴담톡 「초대받은 단톡방 정리」가 기본값 저장·불러오기·초기화에서 빠짐",
+    "symptom": "「초대받은 단톡방 정리」를 켜고 수를 정해 기본값으로 저장해도 새 채팅에서는 다시 꺼져 있다. 불러오기로 돌아오지 않고, 초기화해도 이 값만 남는다.",
+    "repro": "1) 설정 → 괴담톡에서 「초대받은 단톡방 정리」를 켜고 수를 바꾼다. 2) 점검 → 저장·불러오기에서 「기본값으로 저장」을 누른다. 3) 변수를 비우고 「불러오기」를 누른다. 4) 「초기화」를 누른다. 기록: out/a1_단계11_기본값으로_저장.txt, a1_단계12_비우고_불러오기.txt, a1_단계13_초기화.txt, a1_상태10~13.json",
+    "expected_basis": "같은 페이지의 DM·단톡·공지 정리처럼 기본값에 담기고, 불러오기로 돌아오고, 초기화로 지워져야 한다. 근거: 사용자 11-08 「저장·불러오기·초기화는 점검 한 곳」.",
+    "evidence": "src/core/settings.ts:196 PREF_VAR 에 storage_(auto|limit)_(dm|group|notice) 만 있고 invited 가 없음. 설정 칸은 src/core/setdef/phone.ts:6, :104. 새 채팅이 기본값을 받는 곳은 src/ui/app.ts:1504",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/settings.ts:196 PREF_VAR 에 들어 있는 것은 $ph_storage_(auto|limit)_(dm|group|notice) 뿐이고 invited 는 없다. 그런데 설정 칸은 src/core/setdef/phone.ts:104 keep('invited') 로 있고, src/ui/phone.ts:1224·1607 에서 dm·group·notice 와 같은 묶음으로 다룬다. 기본값은 src/core/phone.ts:55 STORAGE.invited=20(사용자 11-17)이다. src/host/prefs.ts:19,34,44 의 저장·불러오기·초기화는 모두 PREF_VAR.test 로 거르기 때문에 invited 만 빠진다. 「기본값 덮어쓰기·초기화는 점검 한 곳」(설정 11-08)과도 어긋나고, 이 동작을 정한 사용자 결정은 없다. 점검 기록 a1_단계11~13 과도 맞는다.",
+    "plain": "괴담톡 「초대받은 단톡방 정리」는 기본값으로 저장해도 새 채팅에서 꺼진 채로 나오고, 불러오기·초기화도 이 칸에만 듣지 않아요."
+   },
+   {
+    "id": "문제2",
+    "title": "관제 페이지 수 칸에 범위 밖 수를 치면 칸에 친 수가 그대로 남음",
+    "symptom": "관제(호출 흐름) 페이지에서 「형식 오류 재시도」에 1003 을 치면 저장값은 3인데 칸에는 1003 이 그대로 보인다. 다른 페이지에 갔다 와야 3이 보인다. 「자동 다시 연결」(-5)과 「다시 보기」(1002)도 같다.",
+    "repro": "1) 설정 → 관제를 연다. 2) 「형식 오류 재시도」 칸을 눌러 1003 을 치고 Enter, Tab 을 누른다. 3) 칸 값과 $gen_retries 를 비교한다. 기록: out/f_단계01~03_*.txt, out/결과_f.json, out/b_단계19_수칸_모음.txt",
+    "expected_basis": "칸이 끝값(3, 0, 2)으로 바뀌어야 한다. 근거: 사용자 11-19 「모든 칸 직접 입력」 결정. 다른 페이지는 같은 입력에서 칸이 끝값으로 바뀐다 (파트 b 통과).",
+    "evidence": "src/ui/editor/flowpage.ts:71 (칸 값은 그릴 때만 넣음), src/ui/app.ts:982 (fl-do 는 원래 처리기만 부르고 관제 페이지를 다시 그리지 않는 것으로 보임)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "관제 페이지는 노드 manage:flow 다. src/ui/app.ts:1635 의 render() 는 editorOnSettings() 일 때만 편집 창을 다시 그리는데, src/ui/editor/index.ts:165 의 editorOnSettings 는 isSetNode(set:* 만)라서 manage:flow 는 다시 그려지지 않는다. app.ts:982~ 의 fl-do 는 원래 처리기(adv-set 등)만 부른다. 그래서 값은 끝값(3)으로 저장되지만, flowpage.ts:71 에서 그릴 때 넣은 input 값 1003 이 그대로 남는다. 점검 기록 f_단계01(칸 1003, $gen_retries=3)과 맞는다. 다른 기능 페이지는 같은 입력에서 끝값으로 바뀐다(b 통과). 사용자 11-19 「모든 칸 직접 입력」과도 어긋난다.",
+    "plain": "관제 화면 수 칸에 범위를 넘는 수를 치면, 실제로는 끝값으로 저장됐는데 칸에는 친 수가 그대로 보여요. 다른 페이지에 갔다 와야 맞는 값이 보여요."
+   },
+   {
+    "id": "문제3",
+    "title": "비우면 기본 글이 쓰이는 지침 절 18개에 「비우면 기본 글이 쓰여요」 표시가 없음",
+    "symptom": "지침 편집 화면에서 Router ROLE 같은 절을 비우면, 표시가 없어서 플레이어는 그 글이 요청에서 빠진다고 알게 된다. 실제로는 기본 글이 그대로 들어간다.",
+    "repro": "core 번들로 setGuideOverride 를 써서 절을 비운다. 그러면 guideSec 는 null, guideTxt 는 기본 글을 돌려주는데 blankUsesDefault 는 false 다. Router ROLE, Hs ORDERS_NONE, Phone MAIN_CONTEXT.VIEWS, Bm PICKUP_TRY 로 확인했다. 전체 목록: out/c_단계02_빈칸표시_대조.txt",
+    "expected_basis": "전수검사 11-13 나-51 사용자 결정 「표시 = 실제로 기본 글을 쓰는 절」, 그리고 src/core/guides.ts 의 blankUsesDefault 주석",
+    "evidence": "src/core/guides.ts:219 BLANK_DEFAULT_MOVED, :236 blankUsesDefault, :250 guideTxt. 읽는 자리: src/core/homeshop.ts:743, src/core/items.ts:1024, src/core/people/director.ts:86-87, src/core/people/router.ts:42, src/core/phone.ts:956·1207, src/core/shop.ts:1164",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/guides.ts:203-204 주석(전수검사 11-13 나-51 사용자: 기본 글을 쓰는 절에는 빈 칸에 「비우면 기본 글이 쓰여요」 표시)이 기준이다. guideTxt(:250)는 고친 글이 비면 기본 파일 절로 돌아간다. 그런데 blankUsesDefault(:236)가 쓰는 BLANK_DEFAULT·BLANK_DEFAULT_MOVED 목록에는 Router ROLE·RULES(router.ts:42 guideTxt), Phone MAIN_CONTEXT.VIEWS·HABITS(phone.ts:1207), Bm PICKUP_TRY(items.ts:1024), Hs ORDERS_NONE·HEAD_ORDERS(homeshop.ts:748 g()) 등이 없다. 그래서 실제로는 기본 글이 쓰이는데 표시가 빠진다. 표시가 실제 동작과 맞는지는 내부 일관성 문제라서 묻지 않고 고칠 대상이다(goei-feedback-dont-ask-internals-1122).",
+    "plain": "지침 편집에서 일부 절은 비워도 기본 글이 그대로 요청에 들어가는데, 「비우면 기본 글이 쓰여요」 표시가 없어 그 글이 빠지는 것처럼 보여요."
+   }
+  ]
+ },
+ {
+  "key": "17_설치_업데이트_자료팩",
+  "area": "설치·업데이트·자료 팩",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/17_설치_업데이트_자료팩/",
+  "items": [
+   {
+    "id": "17-2",
+    "title": "내 봇 설치 화면의 「새 버전 확인」이 눌리지 않음",
+    "symptom": "괴이 카드가 아닌 봇에서 설치 화면을 열고 「새 버전 확인」을 눌러도 아무 일도 없다.",
+    "repro": "내 봇 → 「괴이 ː ANOMALY 설치·업데이트」 → 「새 버전 확인」. out/단계13_B_설치화면_새버전확인.txt (받은 파일 없음)",
+    "expected_basis": "src/ui/update.ts:237 upd-check → checkLatest(env, true); 단추가 켜진 채 보임",
+    "evidence": "src/ui/app.ts:1165 (upd-* 는 view started·picker 일 때만 handleUpdate, 내 봇은 not-lite)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "설치 화면(src/ui/app.ts:832-849, host.ctx가 not-lite일 때 installCtx)이 updateGroup을 그리고, 거기에 켜진 「새 버전 확인」(upd-check, src/ui/update.ts:194)이 늘 나온다. 그런데 app.ts:1165는 upd-* 동작을 view가 started·picker일 때만 handleUpdate로 넘긴다. 그래서 내 봇의 not-lite 화면에서는 이 동작이 그냥 버려진다. out/단계13을 보면 받은 파일이 없다. 사용자 결정과 어긋나는 점이 없고, 단추를 그려 두고 처리만 빠진 연결 누락이다.",
+    "plain": "다른 봇에서 설치 화면을 열고 「새 버전 확인」을 눌러도 아무 반응이 없어요."
+   },
+   {
+    "id": "17-3",
+    "title": "커스텀 임무 고르기 화면에서 「카드 업데이트 준비」가 눌리지 않음",
+    "symptom": "커스텀 임무로 출발해 첫 지시문을 보내기 전 화면에서 설치·업데이트를 열면, 카드 v0.21.30 → v0.21.33 과 준비 단추가 보이지만 눌러도 아무것도 받지 않는다.",
+    "repro": "카드 판 0.21.30 → 시작 화면 「커스텀 임무」로 출발 → 「설치·업데이트」 → 「카드 업데이트 준비」. out/단계57_E_첫장면고르기화면에서_업데이트.txt",
+    "expected_basis": "같은 단추가 시작 화면·진행 중 채팅에서는 동작(out/단계53_E_준비.txt), src/ui/update.ts:252 upd-prepare",
+    "evidence": "src/ui/app.ts:1165 조건에 view 'opening' 없음 (app.ts:111, app.ts:832 설치 창 ctx 는 opening 도 받음)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "view 'opening'(커스텀 임무를 골랐고 첫 지시문을 아직 안 보낸 상태, app.ts:110-111)에서도 설치 창의 ctx는 opening을 받는다(app.ts:832). 그래서 카드 v0.21.30 → v0.21.33 줄과 「카드 업데이트 준비」(update.ts:198)가 그려진다. 그런데 app.ts:1165 조건에 opening이 없어 handleUpdate가 불리지 않는다. 같은 단추가 started 화면에서는 동작한다(out/단계53). out/단계57에서 받은 파일이 없는 것을 확인했다. 17-2와 같은 줄에서 생기는 연결 누락이다.",
+    "plain": "커스텀 임무를 고르고 첫 장면을 보내기 전에 업데이트 화면을 열면 「카드 업데이트 준비」와 「새 버전 확인」을 눌러도 아무 일도 없어요."
+   },
+   {
+    "id": "17-Q1",
+    "title": "받기 창으로 본체가 뜬 뒤 처음 누른 설치 화면을 이어서 열어야 하나",
+    "symptom": "내 봇에서 「설치·업데이트」 → 받기 실패 → 「다시 받기」 성공 시 창만 닫히고 아무 변화가 없어 보인다. 사이드바 단추를 다시 눌러야 설치 화면이 뜬다. 세계 자료 창의 「다시 받기」도 같다.",
+    "repro": "out/단계25_C_다른봇_햄버거_받기실패후_다시받기.txt, out/단계94_H_받기창_다시받기.txt",
+    "expected_basis": "정해진 기대값 없음 — 물을 것",
+    "evidence": "src/main.ts:233-235 (ensure(true) 가 null 이면 install() 안 부름)",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "real_bug",
+    "reason1": "내부 흐름 세부라서 사용자에게 묻지 않고 정한다(goei-feedback-dont-ask-internals-1122). 사이드바 단추의 뜻은 「본체를 꺼내 설치 화면을 연다」로 적혀 있다(src/main.ts:227-228 주석). 그런데 받기에 실패하면 ensure(true)가 null을 돌려주고, 이어서 받기 창의 install()(main.ts:131-149)이 성공해도 창만 닫고 b.install()을 다시 부르지 않는다. 괴이 카드가 아닌 봇에는 유령 단추도 없어서, 다시 받기가 성공했는데도 화면에 아무 변화가 없다. 사용자는 실패한 줄로 알게 된다. 단추를 한 번 더 누르면 되니 심각하지는 않다.",
+    "plain": "다른 봇에서 설치 단추를 눌렀다가 받기에 실패해 「다시 받기」로 성공해도, 창만 닫히고 설치 화면이 안 떠서 단추를 다시 눌러야 해요."
+   }
+  ]
+ },
+ {
+  "key": "18_기록_저널_보고서",
+  "area": "기록·일지·보고서 카드",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/18_기록_저널_보고서/",
+  "items": [
+   {
+    "id": "18-B1",
+    "title": "고정한 보고서는 다시 굴려도 남아 일지「종료」·상황판「활성」이 어긋나고, 다시 끝나면 같은 괴이가 일지에 두 줄로 쌓임",
+    "symptom": "보고서를 한 번 고정하고 그 응답을 다시 굴리면, 상황판에서는 괴이가 진행 중인데 기록에는 끝났다고 남는다. 나중에 실제로 끝나면 같은 사건이 일지와 연대기에 두 번 끝난 것으로 쌓이고, 버린 답의 결과 글과 잔고도 고정 보고서에 그대로 남는다.",
+    "repro": "run.mjs R: 3턴 격리 응답 → 보고서 창「고정」(R03) → 그 응답 다시 굴리기 → 안 끝나는 새 답 → 다음 턴 다시 격리(R04). out/상태R03.json, out/상태R04.json",
+    "expected_basis": "사용자 11-22「다시 굴리면 그 응답이 만든 것은 다 되돌아간다」(재검토.md 망상홈쇼핑 물을것2 판정). 고정하지 않은 보고서는 실제로 되돌아감(R01 통과). 상황판과 일지가 서로 다른 말을 함(2차 15 문제1과 같은 종류).",
+    "evidence": "src/core/journal/store.ts:115-130 (rewindClosures 가 pinned 보고서와 그 줄을 건너뜀, 주석「고정한 보고서도 둔다」— 사용자 결정은 못 찾음)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/journal/store.ts:115-130 rewindClosures 가 pin 된 보고서와 그 rpt 를 가진 일지 줄을 지우지 않는다. 주석「고정한 보고서도 둔다」는 커밋 144c313(저장소 옮김) 때 그대로 넘어온 옛 코드이고, 사용자 결정 기록에서는 찾지 못했다. out/상태R03.json 을 직접 보면 일지에는 어두운 정원 종료 줄(j3brxr8)이 남아 있는데 world.an 은 '03-11|어두운 정원|활성'이다. 상태R04.json 에는 같은 괴이의 종료 줄 두 개(j3brxr8, j31sc29)와 보고서 두 건이 있다. 사용자 결정 goei-feedback-dont-ask-internals-1122(다시 굴리면 그 응답이 만든 것은 다 되돌아감, 내부 동작이라 묻지 않음)와 어긋나고, 상황판과 일지가 서로 다른 말을 한다. 고정은 상한 셈에서 빼는 표시일 뿐이라(pinReport 주석) 되감기를 막을 근거가 없다.",
+    "plain": "보고서를 고정한 뒤 그 응답을 다시 굴리면 상황판은 괴이가 진행 중인데 기록에는 끝났다고 남습니다. 나중에 실제로 끝나면 같은 사건이 일지에 두 번 쌓입니다."
+   },
+   {
+    "id": "18-Q1",
+    "title": "보고서「투입」칸·소요·「이 사건 동안」이 내가 간 때가 아니라 상황판에 뜬 때부터 셈",
+    "symptom": "배경으로 10:00에 활성이 된 괴이에 11:30에 출동했는데, 보고서 창과 PNG에「투입 10:00 · 소요 3시간 10분」으로 나온다. 같은 기간으로 가계부를 세서, 출동 전 활성 응답의 거래(첫 실행에서 −139,000 잔고 맞춤)가 이 사건 거래로 들어갔다.",
+    "repro": "run.mjs A: 1턴 배경 활성 → 2턴 투입 칸「투입」→ 3턴 격리 → 보고서 창. out/화면A03_보고서창_PC.png, out/화면A04_보고서.png, out/상태A01.json",
+    "expected_basis": "근거 없음. 칸 이름「투입」과 값 since(활성 시작 분)가 다른 뜻. 이름을 바꿀지 값을 바꿀지 사용자 결정 필요.",
+    "evidence": "src/ui/records.ts:335, src/core/journal/png.ts:247, src/core/world/engine.ts:599, src/core/journal/mine.ts periodOf",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "records.ts:335, png.ts:247 의「투입」칸 값은 h.since 다. since 는 engine.ts:599 에서 상황판 항목이 「활성」이 된 시각이고, 「발생」(born)과는 따로 있다. 보고서는 상황판 항목 단위(상태창_태그 지침의 활성·배치)로 만들어지니, 관리국이 투입한 때로 읽으면 설계대로일 수도 있다. 다만 상태창 줄에도 플레이어의「투입」칸이 있어서(상태R03 statusKey '…|투입|…', 11:30) 같은 낱말이 두 뜻으로 쓰인다. 칸 이름을 바꿀지 값을 바꿀지는 화면 글과 기능 뜻에 관한 것이고, 사용자 결정을 찾지 못했다. 가계부「이 사건 동안」기간(mine.ts periodOf)은 이 결정을 따라간다.",
+    "plain": "보고서의「투입」시각과 소요가 내가 출동한 때가 아니라 상황판에 괴이가 뜬 때부터 셉니다. 그래서 출동 전에 쓴 돈도 이 사건 가계부에 들어갑니다."
+   },
+   {
+    "id": "18-Q2",
+    "title": "보고서 PNG 바닥글에 판과 무관한「ANOMALY SIMULATION 2.4」가 박혀 있음",
+    "symptom": "이미지로 저장한 보고서 아래에 지금 판 0.21.33과 상관없는「2.4」라는 판 번호가 찍힌다.",
+    "repro": "run.mjs A04: 보고서 창「이미지로 저장」. out/화면A04_보고서.png",
+    "expected_basis": "사용자 시안(Card.dc.html)에서 온 글인지 확인 못 함. 첫 화면에서는 같은 줄을 뺐다(ui/landing.ts:45, 사용자 10-23).",
+    "evidence": "src/core/journal/png.ts:418",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "png.ts:418 에 'ANOMALY SIMULATION 2.4' 가 박혀 있다. 저장소 옮김 커밋 144c313 부터 있었고, 출처(사용자 시안인지)는 확인하지 못했다(goei-plugin 검색은 시간 초과). landing.ts:45 에는 사용자 10-23 결정으로 같은 줄을 첫 화면에서 뺐다는 주석이 있다. 다만 그 결정이 보고서 PNG 에도 적용되는지는 적혀 있지 않다. 화면 글은 승인 시안을 따르라는 규칙이 있으니, 시안의 글이라면 그대로 두는 게 맞다. 그대로 둘지는 사용자가 정할 일이다.",
+    "plain": "이미지로 저장한 보고서 아래쪽에 지금 판과 상관없는「ANOMALY SIMULATION 2.4」가 찍힙니다."
+   },
+   {
+    "id": "18-Q3",
+    "title": "필드 출동 잔재(새 보고서 알림 notify.ts·종류 fd·원인 field·뺀 설정 주석)가 남아 있음",
+    "symptom": "화면이나 요청에는 영향이 없다. 쓰지 않는 코드가 남아 있다.",
+    "repro": "코드 읽기만 함: emitReport/onReport/lastReportNotice 를 부르는 곳 없음(grep), records.ts gmark·shot·reportpng.ts 의 fd 갈래, records.ts:5 주석「일지를 메인 요청에」",
+    "expected_basis": "사용자 11-07「안 쓰는 기능은 코드·지침 절·자료 칸·설정 키까지 다 뺀다」(no-legacy-rule). 뺄 목록은 보여 드리고 허락받아야 함.",
+    "evidence": "src/core/journal/notify.ts:1-33, src/core/journal/types.ts:10-14, src/ui/records.ts:5",
+    "reproduced": false,
+    "kind": "question",
+    "verdict1": "real_bug",
+    "reason1": "grep 해 보면 src/core/journal/notify.ts 의 emitReport·onReport·lastReportNotice 를 부르는 곳이 src 전체에 없다. types.ts:10-14 의 fd·field, records.ts:105·181, reportpng.ts:52, chronicle.ts:87, store.ts:18-19 의 fd/field 갈래는 필드 기능(v0.20.4 에서 뺌, goei-field-removed-1104 에 따르면 fd 줄은 더 이상 생기지 않음)의 잔재다. records.ts:5 주석의「일지를 메인 요청에」도 뺀 설정이다. 사용자 결정 no-legacy-rule(11-07「안 쓰는 기능은 코드·자료 칸·설정 키까지 다 뺀다」)에 어긋나므로 사용자에게 물을 일이 아니다. 다만 같은 규칙에 따라 지우기 전에 목록을 보여 드리고 허락받아야 한다. 화면과 요청에는 영향이 없다.",
+    "plain": "화면에는 영향이 없습니다. 없어진 필드 출동 기능의 코드와 주석이 남아 있어 정리가 필요합니다(지우기 전에 목록을 보여 드리고 허락받음)."
+   }
+  ]
+ },
+ {
+  "key": "19_인터넷브라우저",
+  "area": "인터넷 브라우저·사이트 (탭·즐겨찾기·소속별 사이트·뒤로/앞으로·로그인·탭 저장·카드 단독 창)",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/19_인터넷브라우저/",
+  "items": [
+   {
+    "id": "B1",
+    "title": "카드 단독 창을 닫은 뒤 PC 메뉴 ‹ 를 누를 때마다 우주몰 탭이 새로 생기고 저장됨",
+    "symptom": "채팅 카드 「접속하기」로 우주몰을 본 뒤 상황판 인터넷에서 뒤로 가기를 누르면, 누를 때마다 우주몰 탭이 하나씩 새로 열려 쌓인다. 이 탭들은 저장돼서 새로고침해도 남는다.",
+    "repro": "PC: 인터넷 → 괴담넷 → 위키 → 창 닫기 → 카드 [shop: 우주 쇼핑몰|@web:cos] 「접속하기」 → 닫기 → 창 열기 → 왼쪽 아래 ‹ 4번. out/단계61_갈래_카드단독창_뒤_전역뒤로.txt, out/상태61.json ($br_tabs = wk,cos,cos,cos,cos)",
+    "expected_basis": "사용자 11-20 「카드로 본 망상홈쇼핑이 상황판 인터넷 창에 남아 있다」(app.ts soloBack 주석), 단독 창은 인터넷 창을 통째로 띄우지 않음",
+    "evidence": "src/ui/app.ts:179-185 (endSolo 가 restoreTabs 로 탭 id 를 새로 매김, navHist 는 안 비움), src/ui/app.ts:1815 (단독 창에서도 navHist.record), src/ui/app.ts:1930-1935 (기록의 탭 id 가 없으면 newTab), src/ui/browser.ts:174-189",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "사용자 11-20 결정(goei-homeshop-fixes-1120.md: 카드로 연 단독 창은 상황판 인터넷 탭에 흔적을 남기지 않음, app.ts:177 soloBack 주석)과 어긋남. 코드를 따라가 보니 endSolo(app.ts:179-185)가 restoreTabs(browser.ts:174-189, unpackTab 의 id: seq++)로 탭 id 를 모두 새로 매기는데, navHist 는 비우지 않음. 단독 창일 때도 app.ts:1815 에서 navHist.record 를 함. 그래서 navStep(app.ts:1930-1935)이 기록에 있는 옛 bt 를 못 찾고 newTab() 을 부름. out/단계61 hops 를 보면 ‹ 를 누를 때마다 탭이 2→3→… 로 늘고, 상태61 의 $br_tabs 는 wk,cos×4 로 저장됨. 1차 재검토 목록에는 이 건이 없음.",
+    "plain": "채팅 카드로 우주몰을 봤다가 닫은 뒤 상황판 인터넷에서 뒤로 가기를 누르면, 누를 때마다 우주몰 탭이 하나씩 새로 생긴다. 이 탭들은 새로고침해도 남는다."
+   },
+   {
+    "id": "B2",
+    "title": "폰에서 쓸어 뒤로 가면 다른 탭으로 건너감",
+    "symptom": "폰에서 새 탭을 열고 뒤로 쓸다 보면 그 탭의 첫 화면에서 멈추지 않고 갑자기 앞 탭(괴담넷)으로 넘어간다. PC 의 주소줄 ‹·마우스 제스처는 같은 자리에서 멈춘다.",
+    "repro": "폰 390×844: 서랍 괴담넷 → 탭 수 단추 → 새 탭 → 서랍 괴이위키 → 문서 → 오른쪽으로 3번 쓸기. 3번째에 cur 0, br-p-gn. out/단계43_폰_쓸어서_뒤로.txt",
+    "expected_basis": "사용자 11-10 「탭별로 움직여야 한다」(app.ts 346 주석: 인터넷 창에서는 실제 브라우저처럼 지금 탭의 기록만). 폰에는 주소줄 ‹ › 가 없어(PC 전용) 쓸기가 유일한 뒤로",
+    "evidence": "src/ui/app.ts:1813 (bindSwipeBack 이 navStep 만 부름), src/ui/app.ts:346-356 (탭 기록 분기는 마우스 제스처에만), src/ui/app.ts:1930-1933",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "사용자 11-10 「탭별로 움직여야 한다」(app.ts:346 주석: 인터넷 창에서는 실제 브라우저처럼 지금 탭의 기록만). 그런데 이 원칙은 c935a0354 에서 마우스 제스처에만 들어갔고, 폰 쓸기는 bindSwipeBack(root, navStep)(app.ts:1813)으로 창 전체 기록을 그대로 씀. navStep(app.ts:1930-1933)은 기록에 적힌 탭으로 br.cur 를 바꿈. 폰에는 주소줄 ‹ › 가 없어서 폰 사용자는 탭 기록만 따라 뒤로 갈 방법이 없음. out/단계43 sw3: cur 0, 괴담넷으로 넘어감. 폰 쓸기를 창 전체 기록으로 두라는 사용자 결정은 메모리(nav-fold-1122 등)에서 찾지 못함.",
+    "plain": "폰에서 인터넷 새 탭을 열고 뒤로 쓸다 보면, 그 탭의 처음에서 멈추지 않고 갑자기 앞에 열어 둔 다른 탭(괴담넷)으로 넘어간다."
+   },
+   {
+    "id": "B3",
+    "title": "보고 있는 게시판 사이트의 즐겨찾기를 누르면 첫 화면으로 안 가고 보던 글에 머묾",
+    "symptom": "괴담넷 글을 보다가 즐겨찾기 「괴담넷」을 눌러 목록으로 가려 해도 화면·주소가 그대로다. 위키는 같은 경우 대문으로 간다.",
+    "repro": "PC: 괴담넷 새로고침 → 글 열기(/board/free/1846003) → 즐겨찾기 괴담넷. out/상태07.json (url goedam.net/board/free/1846003)",
+    "expected_basis": "src/ui/app.ts:2237 goSite 주석 「지금 탭에서 사이트를 연다 (그 사이트 첫 화면부터)」, 위키는 resetWiki 로 대문",
+    "evidence": "src/ui/app.ts:2238-2246 (게시판 화면 상태 gnet.open 을 비우지 않음, 위키만 resetWiki)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "goSite 주석(app.ts:2237)은 「그 사이트 첫 화면부터」이고 위키는 resetWiki 로 대문으로 감(app.ts:2243). 게시판은 gnet 화면 상태를 비우지 않아서, 보던 글에서 같은 사이트 즐겨찾기를 누르면 상태07 주소가 /board/free/1846003 그대로임. 같은 즐겨찾기를 다른 사이트를 거쳐 누르면 상태08 처럼 목록(goedam.net/board/free)으로 감. 같은 단추가 거쳐 온 길에 따라 다르게 움직이는 일관성 문제. 사용자 결정과 부딪히는 것은 없음.",
+    "plain": "괴담넷 글을 보다가 즐겨찾기 「괴담넷」을 눌러도 목록으로 안 가고 보던 글에 그대로 머문다. 다른 사이트를 거쳐서 누르면 목록으로 간다."
+   },
+   {
+    "id": "B4",
+    "title": "뒤로 많이 간 탭을 새로고침하면 보던 화면 대신 사이트 첫 화면",
+    "symptom": "위키 문서를 여러 개 넘겨 보다 한참 뒤로 돌아간 상태에서 페이지를 새로고침하면, 보던 문서가 아니라 위키 대문이 뜨고 뒤로도 못 간다.",
+    "repro": "PC: 위키 탭에서 문서 12개 차례로 열기 → ‹ 11번(중림 지하상가) → 페이지 새로고침 → 인터넷. 결과 괴이위키:대문, back false. out/단계69_갈래_뒤로많이간_탭_새로고침.txt",
+    "expected_basis": "사용자 11-08 「새로고침해도 탭이 남게: 열린 사이트·보던 탭·탭마다 최근 기록」(browser.ts 157 주석)",
+    "evidence": "src/ui/browser.ts:161 (packTab: 끝 10칸만 남기고 위치가 그보다 앞이면 -1), src/ui/browser.ts:165",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "사용자 11-08 「새로고침해도 탭이 남게: 열린 사이트·보던 탭·탭마다 최근 기록」(browser.ts:157). packTab(browser.ts:161)은 끝 10칸만 남기고, 지금 위치가 그보다 앞이면 a 를 -1 로 적음. 되살리면 at=-1 이 되어 사이트 기본 화면이 뜨는데 앞으로 가기는 켜져 있는 어긋난 상태가 됨. out/단계69: far 는 중림 지하상가, after 는 대문, back false·fwd true. 기록을 10칸만 두는 것은 의도대로이고, 보던 칸이 빠지는 것이 결함. 내부 동작 세부라 사용자에게 묻지 않음.",
+    "plain": "위키 문서를 많이 넘겨 본 뒤 한참 뒤로 돌아간 상태에서 새로고침하면, 보던 문서 대신 위키 대문이 뜨고 뒤로 가기가 안 된다."
+   },
+   {
+    "id": "Q1",
+    "title": "인터넷 안에서 PC 메뉴 ‹ › 와 주소줄 ‹ › 기록이 어긋남",
+    "symptom": "인터넷에서 왼쪽 메뉴 ‹ 로 새 탭 화면에 돌아오면 그 탭 기록에 새 칸이 붙어, 주소줄 › 로 방금 보던 위키에 다시 갈 수 없다.",
+    "repro": "PC: 괴담넷 → + → 위키 → 왼쪽 메뉴 ‹ → 주소줄 › 꺼짐. out/상태62.json",
+    "expected_basis": "인터넷 안에서 메뉴 ‹ › 도 탭 기록만 따라야 하는지 정한 말 없음(마우스 제스처만 11-10 결정)",
+    "evidence": "src/ui/app.ts:1816-1820 (그린 뒤 recordTab 이 다른 화면이면 앞쪽을 버리고 새로 붙임), src/ui/browser.ts:111-119",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "real_bug",
+    "reason1": "내부 기록의 일관성 문제라 사용자에게 묻지 않음(goei-feedback-dont-ask-internals-1122). 왼쪽 메뉴 ‹ › 는 창 전체 기록으로 움직이는데, 그린 뒤 recordTab(browser.ts:91-99)이 지금 칸과 다르면 앞쪽을 잘라 내고 새 칸을 붙임. 그래서 탭 기록이 [새 탭, 위키, 새 탭] 처럼 겹쳐 쌓이고, 주소줄 › 는 꺼지며 주소줄 ‹ 는 방금 앞으로 갔던 위키로 감. 상태62: back true·fwd false. 메뉴 ‹ › 를 오가면 탭 기록이 계속 늘어남. 창 전체 기록으로 이미 그 탭 기록에 있는 칸에 닿았을 때는 위치만 옮기는 쪽이 맞음.",
+    "plain": "인터넷에서 왼쪽 메뉴 뒤로 가기를 쓰면 주소줄의 앞으로 가기가 꺼지고, 주소줄 뒤로 가기는 방금 보던 페이지로 가는 등 두 뒤로 가기가 서로 어긋난다."
+   }
+  ]
+ },
+ {
+  "key": "20_메뉴_조작_폰",
+  "area": "메뉴·창·조작(PC/폰)",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/20_메뉴_조작_폰/",
+  "items": [
+   {
+    "id": "20-1",
+    "title": "화면 크기가 바뀌면 유령 단추가 화면 밖으로 나가 못 누름",
+    "symptom": "폴드를 펼치거나 폰을 가로로 돌리면 유령 단추가 화면 위 밖으로 나가 사라진 것처럼 보인다. 다른 화면에 갔다 와야 다시 나타난다.",
+    "repro": "단추를 위쪽으로 옮겨 둠(fab-pos right16·bottom780) → 344x882 에서 752x749 로 크기 바꿈 → 3초 뒤 단추 y=-79. 390x844(bottom700) → 844x390 에서 y=-358. out/단계24_유령단추_폴드_커버에서_펼침.txt, out/단계25_유령단추_폰_세로에서_가로.txt, 상태24·25.json",
+    "expected_basis": "src/core/fab.ts:1-2 「창 크기가 바뀌어도 모서리 기준으로 그대로 남는다」, 보일 때 clampPos 로 화면 안에 당김. 같은 본 화면 요소인 진행 창은 릴리스 점검 11-09 「창 크기를 바꿔도 그대로였다」로 매 초 다시 맞추게 고침. 폴드가 모바일 기준 기기(MEMORY.md).",
+    "evidence": "src/host/overlay.ts:357 (보임이 바뀔 때만 진행), src/host/overlay.ts:367 (clampPos 는 setVisible 안에서만)",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "real_bug",
+    "reason1": "src/core/fab.ts:1-2 says the button stays anchored to the corner when the window resizes and is pulled back inside the screen. But src/host/overlay.ts:357-368 only calls clampPos when visibility changes (it returns early when shown===next), and body.ts:1033 only calls fab.setVisible when next.changed. Nothing re-clamps on resize, while the progress window is re-fit every second (body.ts:1041). applyPos (overlay.ts:211) writes right/bottom straight through, so bottom 700 in a window 390 tall puts the button at y=-358. The rerun output out/단계25 matches this (390x844 -> 844x390, y=-358). No user decision allows the button to sit off screen (the only button decisions are the rejected left-bottom move and FAB overlap notes in the memory files).",
+    "plain": "폴드를 펼치거나 폰을 가로로 돌리면, 위쪽으로 옮겨 둔 유령 단추가 화면 위로 나가 안 보이고 못 누릅니다. 다른 화면에 갔다 와야 다시 나타납니다."
+   },
+   {
+    "id": "20-Q1",
+    "title": "펼친 폴드 배율 88% 이상이면 메뉴가 늘 아이콘 줄이 되고 ID카드·얼굴이 사라짐",
+    "symptom": "설정 「펼친 폴드 화면 배율」을 90%로 올리면 펼친 상태인데도 왼쪽 메뉴가 61px 아이콘 줄이고 ID카드가 안 보이며, 접기 단추를 눌러도 모양이 거의 그대로이고 얼굴 단추도 안 보인다. 70%에서는 정상.",
+    "repro": "prefs foldZoom 90 → 752x749 에서 창 열기 → 메뉴 확인 → 접기 단추 누름. out/단계21_폴드_배율90_갈래.txt, 상태21.json",
+    "expected_basis": "11-22 롤백 뒤 사용자 결정: PC 화면을 통째로 줄이고 601~860 폭에 화면별 규칙을 다시 붙이지 않음, 배율은 크기만(goei-release-0-21-25). 다만 남은 규칙은 0.21.24(11-21)에 넣은 것이라 높은 배율에서 걸리는 것이 의도인지 근거 없음 → 물을 것.",
+    "evidence": "src/ui/style.css:5706 (601~860 폭 아이콘 줄·카드 숨김 규칙), src/ui/media.ts:45 (@media 폭을 배율만큼 줄여 860*배율>=752 일 때 다시 걸림)",
+    "reproduced": true,
+    "kind": "question",
+    "verdict1": "question_for_user",
+    "reason1": "The trigger is confirmed. In zoom mode, foldCss in src/ui/media.ts multiplies @media widths by the zoom, so at 90% the 752 screen behaves like an 835 CSS-px window. That hits the 601~860 narrow-window rule at style.css:5706 (from 0.21.24 f928137, written for fold screens), which turns the nav into an icon bar and sets .gx-nav-brand to display:none. The ID card and the face button live inside .gx-nav-brand (app.ts:2267), so both disappear and the fold button does almost nothing. This contradicts the 11-22 fold spec (goei-nav-fold-1122: folded shows a small face), so the ID card is unreachable from the nav. It is not a bare bug, though. A plain PC window 601~860 wide gets the same rule, and per goei-release-0-21-25 the 11-22 rollback rebuilt on 0.21.24, which still contains this rule, and the user said not to add per-screen rules at 601~860 and that zoom is size only. Removing or keeping this layout rule is a UI-shape decision. The user forbids changing UI shape without being asked, so only the user can decide. The default of 70% does not trigger it.",
+    "plain": "「펼친 폴드 화면 배율」을 88% 넘게 올리면 왼쪽 메뉴가 아이콘 줄로 바뀌고 ID카드와 얼굴 단추가 사라져, 메뉴에서 내 ID카드를 열 수 없습니다. 좁은 PC 창(601~860 폭)에서도 똑같습니다. 이 좁은 창 규칙을 그대로 둘지 정해 주셔야 합니다."
+   }
+  ]
+ },
+ {
+  "key": "99_빠진것",
+  "area": "생각 블록 안 표식(빠진 것 점검이 찾음)",
+  "folder": "/home/user/goei-rel/인수인계/플레이순서_점검/2차/99_빠진것",
+  "items": [
+   {
+    "id": "99-1",
+    "title": "생각 블록 안의 상점 표식으로 상점이 열림",
+    "symptom": "생각 블록(<Thoughts>·<think>) 안에만 [shop: …] 표식이 있어도 상점 카드가 뜨고 방문이 시작된다. 다른 가게를 보고 있으면 그 진열·대화가 바뀐다. 홈쇼핑 접속도 같은 원인.",
+    "repro": "99_빠진것/thoughts_shop.mjs",
+    "expected_basis": "생각 블록은 본문이 아님",
+    "evidence": "src/core/shop.ts:251-258·521, src/body.ts:700, src/core/homeshop.ts:27",
+    "reproduced": true,
+    "kind": "bug",
+    "verdict1": "unclear",
+    "reason1": "검증자 없음",
+    "plain": "생각 블록 안 표식으로 상점이 열림"
+   }
+  ]
+ }
+]

@@ -91,6 +91,16 @@ jobs:
             echo
             echo '## 자동으로 받지 못할 때'
             echo '괴이 카드를 열었을 때 「받지 못했어요」 창이 뜨면 먼저 「다시 받기」를 누릅니다. 그래도 받지 못하면 아래 Assets 에서 「본체」와 「세계 자료」를 받아 「파일로 넣기」로 차례로 넣습니다.'
+            # 업데이트 내역: 업데이트내역/<판>.md 가 있으면 접힌 칸으로 붙인다 (2026-11-23 사용자: 접어 놓은 상태로)
+            if [ -f "업데이트내역/${TAG}.md" ]; then
+              echo
+              echo '<details>'
+              echo "<summary>업데이트 내역 (${TAG})</summary>"
+              echo
+              cat "업데이트내역/${TAG}.md"
+              echo
+              echo '</details>'
+            fi
           } > out/notes.md
           if gh release view "$TAG" >/dev/null 2>&1; then
             for a in $(gh release view "$TAG" --json assets -q '.assets[].name'); do gh release delete-asset "$TAG" "$a" -y; done

@@ -7,7 +7,7 @@
 import type { Chat } from './types';
 import { guideTxt, type GuideName } from './guides';
 import { aliveAnchors } from './wallet';
-import { messageKey } from './people/store';
+import { messageKey, FOLD_KEEP_MSGS } from './people/store';
 import type { PromptMessage } from './request';
 import type { ItemChange, ItemNow } from './people/updater';
 import { currentShop, shopEvents, shopOn, shopGuide } from './shop';
@@ -116,9 +116,16 @@ export interface Item {
   backAt?: string;
   /** 합쳐 들어간 줄의 id (전수점검 보통-24): 줄을 지우지 않고 남는 줄(host)이 살아 있는 동안만 숨는다. 남은 횟수는 이 줄의 응답이 살아 있는 동안 host 에 더해진다 (itemUsed) — 어느 쪽 응답을 다시 굴려도 그쪽 몫만 돌아간다 */
   mergedInto?: string;
+  /** 본문이 바꾼 칸의 옛 값 (응답 키 at 에 묶음): 그 응답을 다시 굴리거나 지우면 옛 값으로 돌아간다 (viewItem). 설명·상태·그림·이름·장착 칸 등 */
+  edits?: ItemEdit[];
   at: string;
 }
 export type ItemOut = 'left' | 'gone' | 'drop' | 'destroy';
+/** 본문(응답 at)이 바꾸기 전의 값. null = 그 칸이 없었다 */
+export interface ItemEdit { at: string; was: Partial<Record<EditKey, unknown>> }
+/** 응답에 묶어 되돌리는 칸 (얻음·사용·치움은 따로 기록·표시로 묶여 있다) */
+const EDIT_KEYS = ['name', 'desc', 'effect', 'state', 'icon', 'weight', 'quote', 'slot', 'held'] as const;
+type EditKey = (typeof EDIT_KEYS)[number];
 
 /** left = 두고 옴(화면 말은 「없어짐」, 자리는 메모에), off = 본문에서 장착을 풂 */
 export type ItemLogWhat = 'get' | 'use' | 'drop' | 'gone' | 'destroy' | 'merge' | 'sell' | 'left' | 'off';
@@ -173,7 +180,8 @@ const storedUses = (v: unknown): number | undefined => {
   return Number.isSafeInteger(n) && n >= 1 ? Math.min(USES_STORE_MAX, n) : undefined;
 };
 function normItem(x: Item): Item {
-  const { uses: u0, equip: e0, slot: s0, held: h0, icon: i0, weight: w0, ...rest } = x;
+  const { uses: u0, equip: e0, slot: s0, held: h0, icon: i0, weight: w0, edits: d0, ...rest } = x;
+  const edits = Array.isArray(d0) ? d0.filter((d) => !!d && typeof d.at === 'string' && !!d.at && !!d.was && typeof d.was === 'object') : [];
   const uses = storedUses(u0);
   const weight = itemWeight(w0);
   const equip = itemEquip(e0);
@@ -183,7 +191,7 @@ function normItem(x: Item): Item {
   const icon = cleanIcon(i0);
   return {
     ...rest, desc: clean(x.desc, 80), effect: clean(x.effect, 60), use: x.use === true || !!uses, state: itemState(x.state),
-    ...(uses ? { uses } : {}), ...(equip ? { equip } : {}), ...(slot !== undefined ? { slot } : {}), ...(held ? { held } : {}), ...(icon ? { icon } : {}), ...(weight !== undefined ? { weight } : {}),
+    ...(uses ? { uses } : {}), ...(equip ? { equip } : {}), ...(slot !== undefined ? { slot } : {}), ...(held ? { held } : {}), ...(icon ? { icon } : {}), ...(weight !== undefined ? { weight } : {}), ...(edits.length ? { edits } : {}),
   };
 }
 
@@ -239,18 +247,107 @@ const withKids = (list: Item[], ids: Set<string>): Set<string> => {
   return ids;
 };
 
-/** 살아 있는 물건 (직접 넣은 건 늘, 나머지는 기준 메시지가 남아 있을 때). 소모성은 남은 횟수가 0이면 빠진다 */
+/** 본문이 바꾼 칸을 지금 채팅으로 본 물건: 바꾼 응답이 사라졌으면(다시 굴림·지움) 그 칸은 옛 값 (사용자 2026-11-22: 다시 굴리면 그 응답이 만든 것은 다 되돌아간다).
+ *  뒤의 살아 있는 응답이나 사용자가 다시 바꾼 칸은 그대로 둔다. 얻음·사용·치움·팖이 기준 응답에 묶여 돌아오는 것과 같은 방식 */
+export function viewItem(e: Item, alive: Set<string>): Item {
+  if (!e.edits?.length) return e;
+  const fixed = new Set<string>();
+  let out: Record<string, unknown> | null = null;
+  for (let i = e.edits.length - 1; i >= 0; i--) {
+    const d = e.edits[i];
+    const keys = Object.keys(d.was).filter((k): k is EditKey => (EDIT_KEYS as readonly string[]).includes(k));
+    if (alive.has(d.at)) { for (const k of keys) fixed.add(k); continue; }
+    for (const k of keys) {
+      if (fixed.has(k)) continue;
+      out ??= { ...e };
+      const v = d.was[k];
+      if (v === null || v === undefined) delete out[k];
+      else out[k] = v;
+    }
+  }
+  return out ? (out as unknown as Item) : e;
+}
+const deadEdit = (e: Item, alive: Set<string>): boolean => !!e.edits?.some((d) => !alive.has(d.at));
+/** 사라진 응답이 바꾼 칸을 옛 값으로 굳히고 그 기록을 뺀다. 저장된 줄을 고치기 전에 부른다 (고친 값이 사라진 응답의 옛 값에 덮이지 않게).
+ *  그 칸을 뒤의 응답이 또 바꿨으면 값은 두고, 사라진 응답의 옛 값을 그 뒤 기록에 넘긴다: 뒤 응답까지 사라지면 사라진 응답들이 바꾸기 전 값으로 돌아간다
+ *  (가운데 응답을 지운 뒤 뒤 응답을 다시 굴리면 지운 응답이 적은 값이 되살았다) */
+export function settleEdits(it: Items, alive: Set<string>): Items {
+  if (!it.list.some((e) => deadEdit(e, alive))) return it;
+  return {
+    ...it,
+    list: it.list.map((e) => {
+      if (!deadEdit(e, alive)) return e;
+      const { edits: _d, ...rest } = viewItem(e, alive);
+      const all = (e.edits ?? []).map((d) => ({ at: d.at, was: { ...d.was } }));
+      all.forEach((d, i) => {
+        if (alive.has(d.at)) return;
+        for (const k of Object.keys(d.was) as EditKey[]) {
+          const next = all.slice(i + 1).find((x) => k in x.was);
+          if (next) next.was[k] = d.was[k];
+        }
+      });
+      const edits = all.filter((d) => alive.has(d.at));
+      return edits.length ? { ...rest, edits } : (rest as Item);
+    }),
+  };
+}
+const sameVal = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+/** before → after 에서 바뀐 칸을 응답 at 에 묶어 적는다 (그 응답이 사라지면 viewItem 이 옛 값으로 본다). at 이 비면 사용자가 손으로 바꾼 것:
+ *  그 칸은 앞서 본문이 바꾼 기록에서 빼어, 응답을 다시 굴려도 사용자가 정한 값이 남는다. 새로 생긴 줄은 그 자체가 응답에 묶여 있어 적지 않는다 */
+export function noteEdits(before: Items, after: Items, at: string): Items {
+  if (before === after) return after;
+  const old = new Map(before.list.map((e) => [e.id, e]));
+  let touched = false;
+  const list = after.list.map((e) => {
+    const b = old.get(e.id);
+    if (!b) return e;
+    const keys = EDIT_KEYS.filter((k) => !sameVal(b[k], e[k]));
+    if (!keys.length) return e;
+    touched = true;
+    const mine = (b.edits ?? []).map((d) => d);
+    if (!at) {
+      const edits = mine.map((d) => ({ ...d, was: Object.fromEntries(Object.entries(d.was).filter(([k]) => !keys.includes(k as EditKey))) })).filter((d) => Object.keys(d.was).length);
+      const { edits: _d, ...rest } = e;
+      return edits.length ? { ...rest, edits } : (rest as Item);
+    }
+    const was = Object.fromEntries(keys.map((k) => [k, b[k] ?? null]));
+    const last = mine[mine.length - 1];
+    // 같은 응답이 여러 번 바꿨으면 처음 값만 (한 응답 = 한 기록)
+    const edits = last?.at === at ? [...mine.slice(0, -1), { at, was: { ...was, ...last.was } }] : [...mine, { at, was }];
+    return { ...e, edits };
+  });
+  return touched ? { ...after, list } : after;
+}
+/** 채팅 뒤쪽 keep 개 메시지 밖의 살아 있는 응답이 바꾼 기록은 굳힌다 (줄이 끝없이 길어지지 않게. 인물 기록의 FOLD_KEEP_MSGS 와 같은 기준) */
+function foldEdits(it: Items, order: string[], keep: number): Items {
+  const cut = order.length - keep;
+  if (cut <= 0 || !it.list.some((e) => e.edits?.length)) return it;
+  const pos = new Map(order.map((k, i) => [k, i]));
+  const old = (d: ItemEdit) => (pos.get(d.at) ?? cut) < cut;
+  if (!it.list.some((e) => e.edits?.some(old))) return it;
+  return {
+    ...it,
+    list: it.list.map((e) => {
+      if (!e.edits?.some(old)) return e;
+      const edits = e.edits.filter((d) => !old(d));
+      const { edits: _d, ...rest } = e;
+      return edits.length ? { ...rest, edits } : (rest as Item);
+    }),
+  };
+}
+
+/** 살아 있는 물건 (직접 넣은 건 늘, 나머지는 기준 메시지가 남아 있을 때). 소모성은 남은 횟수가 0이면 빠진다. 본문이 바꾼 칸은 지금 채팅으로 본 값 (viewItem) */
 export function liveItems(it: Items, alive: Set<string>): Item[] {
-  return it.list.filter((e) => rowAlive(e, alive) && !mergedAway(it, e, alive) && (it.keep || e.uses === undefined || (itemLeft(it, e, alive) ?? 1) > 0));
+  return it.list.map((e) => viewItem(e, alive)).filter((e) => rowAlive(e, alive) && !mergedAway(it, e, alive) && (it.keep || e.uses === undefined || (itemLeft(it, e, alive) ?? 1) > 0));
 }
 /** 치운 물건인가: 치운 응답이 살아 있고(사용자가 버린 것은 늘), 되찾은 응답이 살아 있지 않을 때 */
 export const isOut = (e: Item, alive: Set<string>): boolean => !!e.outHow && (!e.outAt || alive.has(e.outAt)) && !(e.backAt && alive.has(e.backAt));
 /** 치운 물건 가운데 되살릴 수 있는 같은 이름의 것 (파괴된 것·기준 메시지가 사라진 것·판 것은 아님) */
 export function outItemOf(it: Items, alive: Set<string>, name: string): Item | undefined {
-  return it.list.find((e) => e.outHow && e.outHow !== 'destroy' && isOut(e, alive) && (!e.anchor || alive.has(e.anchor)) && !(e.soldAt && alive.has(e.soldAt)) && sameItemName(e.name, name));
+  return it.list.map((e) => viewItem(e, alive)).find((e) => e.outHow && e.outHow !== 'destroy' && isOut(e, alive) && (!e.anchor || alive.has(e.anchor)) && !(e.soldAt && alive.has(e.soldAt)) && sameItemName(e.name, name));
 }
 /** 치운 물건들 (화면 기록·시험용): 지금 숨어 있는 줄 */
-export const outItems = (it: Items, alive: Set<string>): Item[] => it.list.filter((e) => isOut(e, alive) && (!e.anchor || alive.has(e.anchor)));
+export const outItems = (it: Items, alive: Set<string>): Item[] => it.list.map((e) => viewItem(e, alive)).filter((e) => isOut(e, alive) && (!e.anchor || alive.has(e.anchor)));
 
 /** 장착 칸 차지: 갈래별 칸 번호 → 물건 (같은 칸에 둘이면 앞의 것) */
 export function equippedOf(list: Item[]): Record<ItemEquip, (Item | undefined)[]> {
@@ -425,6 +522,12 @@ export function mallPaidText(p: MallPaid): string {
 
 /** 포인트몰 수령 대기 줄이 물건에 넘길 치른 사실 (살 때 적은 것, 없으면 그 값만큼 포인트) */
 export const bmOrderPaid = (o: BmOrder): MallPaid => o.mallPaid ?? { mall: 'bm', by: 'points', amount: o.price };
+
+/** 원으로만 치른 값 (상점에 팔 때 「산 값」으로 넘기는 것). 다른 대가·포인트로 치렀으면 원 값을 모르니 undefined (「0원에 샀다」가 되지 않게) */
+export function paidWon(it: { price?: number; paidWith?: string; mallPaid?: MallPaid }): number | undefined {
+  if (it.mallPaid) return it.mallPaid.by !== 'points' && !it.mallPaid.pay && Number.isSafeInteger(it.mallPaid.amount) ? it.mallPaid.amount : undefined;
+  return Number.isSafeInteger(it.price) && !it.paidWith ? it.price : undefined;
+}
 
 /** 획득 기록의 값: 원 · 원이 아닌 대가 */
 const paidNote = (e: ItemInput): string =>
@@ -708,7 +811,9 @@ export function sellItem(it: Items, id: string, anchor: string, note?: string): 
   const cur = it.list.find((x) => x.id === id);
   if (!cur || !anchor) return it;
   const { slot: _slot, held: _held, ...rest } = cur;
-  return addItemLog({ ...it, list: it.list.map((x) => (x.id === id ? { ...rest, soldAt: anchor } : x)) }, { name: cur.name, item: id, ...(cur.icon ? { icon: cur.icon } : {}), what: 'sell', by: 'manual', anchor, ...(note ? { note } : {}) });
+  // 장착 칸에서 뺀 것도 판 응답에 묶는다: 그 응답을 다시 굴려 물건이 돌아오면 제 칸에 있다
+  const sold = noteEdits(it, { ...it, list: it.list.map((x) => (x.id === id ? { ...rest, soldAt: anchor } : x)) }, anchor);
+  return addItemLog(sold, { name: cur.name, item: id, ...(cur.icon ? { icon: cur.icon } : {}), what: 'sell', by: 'manual', anchor, ...(note ? { note } : {}) });
 }
 
 /** 합칠 수 있나 (2026-11-08 사용자): 둘 다 소모성이고 이름에 같은 낱말이 있을 때만 — 같은 소모품이 두 칸으로 갈라진 것을 한 묶음으로 */
@@ -1165,6 +1270,23 @@ export function pendingItemUse(vars: Record<string, unknown> | undefined, userKe
   const at = typeof vars?.[ITEM_USE_AT_VAR] === 'string' ? (vars[ITEM_USE_AT_VAR] as string) : '';
   return !at || at === userKey ? readItemUse(vars) : [];
 }
+/** 「사용」 자리를 보낸 턴의 유저 키. 그 턴의 답이 지워져 그 유저 메시지 뒤(upto 앞)에 봇 응답이 하나도 없으면 아직 안 쓰인 자리라 '' —
+ *  기록도 그 답과 함께 빠져 횟수가 돌아왔으니, 칩에 다시 보이고 다음 요청(새 메시지든 다시 보내기든)에 실린다.
+ *  그 유저 메시지를 찾을 수 없으면(지움·시작 표식) 적힌 그대로 */
+export function useSentAt(chat: Chat, upto?: number): string {
+  const at = typeof chat.scriptstate?.[ITEM_USE_AT_VAR] === 'string' ? (chat.scriptstate[ITEM_USE_AT_VAR] as string) : '';
+  if (!at || at === USE_START) return at;
+  const list = chat.message ?? [];
+  const from = list.findIndex((m, i) => messageKey(m, i) === at);
+  if (from < 0) return at;
+  const end = Math.min(upto ?? list.length, list.length);
+  for (let i = from + 1; i < end; i++) if (list[i].role === 'char') return at;
+  return '';
+}
+const usePending = (chat: Chat, userKey: string): ItemUse[] => {
+  const at = useSentAt(chat);
+  return !at || at === userKey ? readItemUse(chat.scriptstate) : [];
+};
 
 /** 이 유저 턴에서 볼 「사용」: 보통은 자리 그대로(pendingItemUse).
  *  reroll = 답이 온 뒤 새로 넣어 자리를 새로 시작했는데(사본 있음) 그 답이 사라졌다(다시 굴리기·지움): 그 턴에 보낸 사본을 다시 보내고, 새 자리는 다음 메시지용으로 둔다 (11-14 재검토: 지난 사용이 사라지고 새 물건이 지난 메시지에 쓰였다).
@@ -1176,7 +1298,7 @@ function useTurn(chat: Chat, userKey: string, anchor = '', asked?: boolean): { r
   const keys = aliveAnchors(chat);
   const there = (k: string | undefined) => (k && keys.has(k) ? k : '');
   if (mine && (asked ?? (!keys.has(mine.from) || mine.from === anchor))) return { reroll: true, queue: mine.q, after: there(mine.after) };
-  return { reroll: false, queue: pendingItemUse(chat.scriptstate, userKey), after: there(mine?.from) };
+  return { reroll: false, queue: usePending(chat, userKey), after: there(mine?.from) };
 }
 /** 이 유저 턴의 다른 살아 있는 응답에 그 물건의 사용 기록이 있나 (after 가 있으면 그 응답 뒤 것만. skip = 지금 정리하는 응답) */
 const usedThisTurn = (chat: Chat, it: Items, id: string, userKey: string, alive: Set<string>, after: string, skip = ''): boolean =>
@@ -1309,10 +1431,12 @@ export function withInventory<M extends PromptMessage>(messages: M[], chat: Chat
 export function settleItemUse(chat: Chat, responseIndex: number, sent?: ReadonlySet<string> | null, asked?: boolean | null): Record<string, string> | null {
   const vars = chat.scriptstate ?? {};
   const queue = readItemUse(vars);
-  const at = typeof vars[ITEM_USE_AT_VAR] === 'string' ? (vars[ITEM_USE_AT_VAR] as string) : '';
+  const at0 = typeof vars[ITEM_USE_AT_VAR] === 'string' ? (vars[ITEM_USE_AT_VAR] as string) : '';
   const prev = readUsePrev(vars);
-  if (!queue.length && !at && !prev) return null;
+  if (!queue.length && !at0 && !prev) return null;
   const userKey = useTurnKey(chat);
+  // 지난 턴에 보냈지만 그 답이 지워져 쓰이지 않은 자리는 아직 안 보낸 자리로 본다 (이 응답 앞까지만 본다: 이 응답이 그 자리를 쓴 첫 답이다)
+  const at = at0 && at0 !== userKey && !useSentAt(chat, responseIndex) ? '' : at0;
   const m = chat.message?.[responseIndex];
   const anchor = m && m.role === 'char' ? messageKey(m, responseIndex) : '';
   const turn = useTurn(chat, userKey, anchor, sent ? asked ?? undefined : undefined);
@@ -1400,7 +1524,7 @@ export function itemsAwayOf(chat: Chat, asOf?: string): { name: string; place?: 
   const turns = itemAwayTurns(chat.scriptstate);
   const after = turnsAfter(chat, asOf);
   return outItems(it, alive)
-    .filter((e) => outItemOf(it, alive, e.name) === e && awayKept(e, after, turns))
+    .filter((e) => outItemOf(it, alive, e.name)?.id === e.id && awayKept(e, after, turns))
     .map((e) => ({ name: e.name, ...(e.place ? { place: e.place } : {}) }));
 }
 
@@ -1427,13 +1551,16 @@ function unEmptyName(it: Items, alive: Set<string>, id: string, icon: string | u
  *  equip 지닌 것을 장착 칸에(빈 칸이 없으면 그대로) · unequip 장착만 풂 · left 두고 옴(자리) · gone 없어짐 · destroyed 파괴 — 모두 숨기기만 하고 지우지 않는다 (removeItem)
  * 안전망: update 의 설명에 「두고 옴」 말이 있으면 left 로, 「벗음」 말만 있으면 unequip 으로 처리한다 (설정의 말 표).
  * opts.order = 채팅의 메시지 키 차례: 사용자가 「버리기」로 치운 물건은 버린 뒤의 메시지를 근거로 한 new 일 때만 되살린다
+ * opts.keep = 바꾼 칸의 되돌림 기록을 남겨 두는 채팅 뒤쪽 메시지 수 (인물 기록 설정과 같은 값)
  */
-export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemChange[], opts: { state?: boolean; order?: string[]; skipKinds?: string[] } = {}): Items {
-  let it = it0;
+export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemChange[], opts: { state?: boolean; order?: string[]; skipKinds?: string[]; keep?: number } = {}): Items {
+  // 사라진 응답이 바꾼 칸은 먼저 옛 값으로 굳힌다: 새 응답의 변화는 다시 굴리기 전 상태 위에 얹힌다
+  let it = settleEdits(it0, alive);
   // 설정 「상태 바꾸기」가 꺼져 있으면 손상·고장은 받지 않고, 파괴는 「없어짐」으로 (목록에서는 빠지되 상태 단계는 쓰지 않는다)
   const stateOn = opts.state !== false;
   const order = opts.order ?? [];
-  for (const c0 of changes) {
+  // 한 줄 처리. 있던 물건의 설명·상태·그림·이름·장착 칸을 바꾼 것은 그 응답에 묶는다 (noteEdits): 그 응답을 다시 굴리거나 지우면 돌아온다
+  const one = (it: Items, c0: ItemChange): Items => {
     let c: ItemChange = stateOn ? c0 : { ...c0, state: undefined, ...(c0.action === 'destroyed' ? { action: 'gone' as const } : {}) };
     const live = liveItems(it, alive);
     const cur = live.find((e) => e.name === c.name);
@@ -1465,23 +1592,23 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
     } else if (c.action === 'new') {
       // 사용자가 버린 물건: 버린 때보다 뒤의 메시지가 근거일 때만 되살린다 (같은 응답·앞 응답을 근거로 도로 생기지 않게)
       const back = outItemOf(it, alive, c.name);
-      if (back?.outHow === 'drop' && !(order.indexOf(c.anchor) > (back.outKey ? order.indexOf(back.outKey) : -1) && order.includes(c.anchor))) continue;
+      if (back?.outHow === 'drop' && !(order.indexOf(c.anchor) > (back.outKey ? order.indexOf(back.outKey) : -1) && order.includes(c.anchor))) return it;
       // 잊은 물건(설정 「치운 물건 기억」이 지나 줄을 지운 것): 버리거나 부서지기 전의 응답을 근거로 도로 생기지 않게 기록으로 본다
-      if (!back && !cur && forgottenBefore(it, alive, order, c)) continue;
+      if (!back && !cur && forgottenBefore(it, alive, order, c)) return it;
       // 범위 설정에서 뺀 종류는 새로 만들지 않는다 (갖고 있던 것을 되찾는 것은 받는다)
-      if (!back && !cur && opts.skipKinds?.length && opts.skipKinds.includes(kindOfIcon(c.icon))) continue;
+      if (!back && !cur && opts.skipKinds?.length && opts.skipKinds.includes(kindOfIcon(c.icon))) return it;
       // 「빈 X」를 지닌 채 「… X」를 새로 얻었다고 오면(찬 수집기) 같은 물건이 찬 것 — 줄을 둘로 두지 않고 그 줄을 바꾼다
       const empty = !back && !cur ? live.find((e) => e.name.startsWith(`${FORM_EMPTY} `) && nameFilled(e.name) !== e.name && normName(c.name).endsWith(normName(nameFilled(e.name))) && !c.name.trim().startsWith(`${FORM_EMPTY} `)) : undefined;
       // 「빈」만 뗀 같은 이름에 그림 말도 물건 이름뿐이면 이미 지닌 그 물건을 다시 적은 것 (찬 것이라는 말이 없다): 이름·그림은 두고 설명·효과·상태만
       if (empty && !live.some((e) => sameItemName(e.name, c.name)) && sameItemName(c.name, nameFilled(empty.name)) && !iconSaysMore(splitIconWord(c.icon).word, nameFilled(empty.name))) {
         it = updateItem(it, empty.id, { desc: c.desc || empty.desc, effect: c.effect || empty.effect, ...(c.state ? { state: c.state } : {}) });
-        continue;
+        return it;
       }
       if (empty && !live.some((e) => sameItemName(e.name, c.name))) {
         it = updateItem(it, empty.id, { name: c.name, desc: c.desc || empty.desc, effect: c.effect || empty.effect, ...(c.state ? { state: c.state } : {}), ...(c.icon ? { icon: c.icon } : {}) });
         it = { ...it, list: it.list.map((x) => (x.id === empty.id && c.quote ? { ...x, quote: clean(c.quote, 120) } : x)) };
         it = addItemLog(it, { name: clean(c.name, 30), item: empty.id, ...(empty.icon ? { icon: empty.icon } : {}), what: 'get', by: 'story', anchor: c.anchor, ...(c.quote ? { quote: c.quote } : {}), note: `${empty.name}에서 바뀜` }, alive);
-        continue;
+        return it;
       }
       it = addItem(it, alive, { name: c.name, desc: c.desc, effect: c.effect, use: c.use, uses: c.uses, equip: c.equip ?? undefined, state: c.state, icon: c.icon, weight: c.weight, from: 'story', anchor: c.anchor, quote: c.quote });
       // 얻자마자 입었거나 손에 든 것은 장착 칸에 (되찾은 것도 같다)
@@ -1491,8 +1618,10 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
         if (got && !isEquipped(got, now)) it = equipItem(it, alive, got.id);
       }
     }
-  }
-  return it;
+    return it;
+  };
+  for (const c0 of changes) it = noteEdits(it, one(it, c0), c0.anchor);
+  return order.length ? foldEdits(it, order, opts.keep ?? FOLD_KEEP_MSGS) : it;
 }
 /**
  * 포인트몰 수령 대기를 본문이 먼저 받아 버렸을 때 (2026-11-16 사용자: 받는 것은 회사에서): 갱신기가 수령 대기 중인 물건과 같은 이름을 「얻음」(new)으로 올리면

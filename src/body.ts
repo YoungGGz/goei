@@ -36,7 +36,7 @@ import { BOARD_NAME } from './core/boards';
 import { prefetchFactions } from './ui/images';
 import { SEED_CLOSE, SEED_OPEN, seedBody } from './core/seed';
 import type { Chat, LoreEntry } from './core/types';
-import { cleanOutput, hasWorldTags, parseCatalog, processOutput, readDirectory, rerollRequestVars, worldOn } from './core/world';
+import { cleanOutput, hasWorldTags, parseCatalog, processOutput, readDirectory, requestWorldVars, worldOn } from './core/world';
 import { basicSettings, missingBasicVars, worldSettings } from './core/settings';
 import { staleFactionVars } from './core/factions';
 import { supplementAssets } from './host/asset';
@@ -83,7 +83,7 @@ import { peopleStore } from './core/people/store';
 import { peopleSettings } from './core/people/settings';
 import { identityText } from './core/people/identity';
 import { extraNames, temperOf } from './core/people/base';
-import { requestPeopleUpdate, directorNoteText, factionNamesOf, rosterOf, routerPeople } from './host/people';
+import { requestPeopleUpdate, directorNoteText, factionNamesOf, ownNames, rosterOf, routerPeople } from './host/people';
 import { traceBegin, traceEnd, traceMain, traceReply, traceTurnId } from './host/trace';
 import { progressAbort, progressEnd, progressPlan, progressTurn, progressWatch } from './core/progress';
 import { turnPlan } from './core/progplan';
@@ -308,10 +308,10 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   return out;
 }
 
-/** 다시 굴린 요청이면 상황판·소속 변수를 버린 응답 전으로 되감은 문맥, 아니면 그대로 (core/world/output.ts rerollRequestVars) */
+/** 다시 굴린(또는 앞 응답을 지운) 요청이면 상황판·소속 변수를 버린 응답 전으로 되감은 문맥, 아니면 지금 상태·카드로 브리핑을 다시 만든 문맥 (core/world/output.ts requestWorldVars) */
 function rerollContext(ctx: ChatContext): ChatContext {
   if (!worldOn(ctx.chat)) return ctx;
-  const vars = rerollRequestVars(ctx.chat, parseCatalog(ctx.char.globalLore), worldSettings(ctx.char.globalLore, ctx.chat.scriptstate));
+  const vars = requestWorldVars(ctx.chat, parseCatalog(ctx.char.globalLore), worldSettings(ctx.char.globalLore, ctx.chat.scriptstate));
   return vars ? { ...ctx, chat: { ...ctx.chat, scriptstate: { ...ctx.chat.scriptstate, ...vars } } } : ctx;
 }
 
@@ -494,7 +494,7 @@ async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }
   // 모델 Router (선택): 보조 모델이 장면 인물을 고른다. 실패·지연이면 코드 Router (이름이 나온 사람)
   // 이름 표는 명부(요원 줄)에서도 받는다: 명부에만 있는 인물의 영문 표기·초상 태그로도 장면 인물을 고른다
   const roster = rosterOf(char.globalLore);
-  const routed = await routerPeople(chat, store, input, settings, me?.name ? [me.name] : [], sheetOf, roster).catch(() => null);
+  const routed = await routerPeople(chat, store, input, settings, ownNames(char.globalLore, chat.scriptstate), sheetOf, roster).catch(() => null);
   const opts = { settings, store, sheetOf, temperOf, extraNames: extraNames(roster), input, user, factionNames: factionNamesOf(char.globalLore), ...(routed ? { people: routed } : {}) };
   let out = withPeopleBlock(messages, chat, opts);
   // 연출형 Director (선택): 장면 인물에 대해 본편 앞 보조 1회. 실패·지연이면 메모 없이 진행
@@ -1031,6 +1031,8 @@ function startWatcher(fab: Fab | null): () => void {
       shownChat = chatKey;
       // 접속 효과는 버튼 자리에서 버튼이 나타나며 (v0.16.22)
       if (next.changed) await fab?.setVisible(next.fabVisible, next.intro);
+      // 떠 있으면 매 초 화면 안에 있는지 다시 맞춘다 (진행 창과 같이, 2차 점검 20-1)
+      else if (next.fabVisible) await fab?.setVisible(true).catch(() => {});
       // 호출 진행 창 (11-09): 유령 단추와 같은 화면에서만, 설정 「화면 → 호출 진행 창」이 켜져 있을 때
       // PC 는 상황판이 떠 있어도 그 위에 보인다 (11-11 사용자: 보조 기능은 대부분 상황판을 연 채로 쓰니 숨기면 의미가 없다). 닫기 X 를 덮지 않게 기본 자리를 내렸고 단추를 끌어 옮길 수 있다 (host/progwin.ts)
       // 상황판이 떠 있는 동안에는 유령 단추 판정(fabVisible)이 꺼져 있어도 보이게 한다

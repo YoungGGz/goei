@@ -323,6 +323,30 @@ export interface PeopleStore {
   /** 장면에 남아 있는 인물 (설정 「장면 인물 유지」): 응답 열쇠(messageKey) → 갱신기가 그 응답 끝에 장면에 있다고 본 기록 이름.
    *  그 응답의 읽음 해시(read)가 지금 내용과 같을 때만 쓴다 (select.ts carriedScene) */
   scene?: Record<string, string[]>;
+  /** 응답이 한 이름 옮기기의 되돌림 (store.ts renamePerson·undoGoneRenames): 그 응답이 다시 굴리기·지우기로 사라지면 옮기기 전으로 */
+  renames?: RenameUndo[];
+}
+
+/** 이름 옮기기 전의 모습: 옮긴 응답(anchor), 옛 호칭 기록(src), 받는 쪽 기록(before, 없었으면 null)과 옛 호칭을 가리키던 곳들 */
+export interface RenameUndo {
+  anchor: string;
+  from: string;
+  to: string;
+  src: Person;
+  before: Person | null;
+  /** 옛 호칭의 변경 줄 id */
+  log: string[];
+  /** 옮길 때 받는 쪽에 이미 있던 변경 줄 id·항목 id, 그때 사용자가 손댄 기록이었나: 옮긴 뒤 다른 응답·사용자가 더한 것을 가린다 (undoGoneRenames) */
+  had?: string[];
+  touched?: boolean;
+  folded?: number;
+  /** 다른 인물 항목 가운데 대상이 옛 호칭이던 것 */
+  targets: { who: string; slot: string; id: string }[];
+  /** 등장 인물에 옛 호칭이 있던 문서 줄과 그때의 등장 인물 */
+  docs: { key: string; id: string; who: string[] }[];
+  /** 옛 호칭이 있던 장면 인물 목록 */
+  scene: Record<string, string[]>;
+  pending: PeopleStore['pending'];
 }
 
 export const emptyStore = (): PeopleStore => ({ schema: 1, people: {}, factions: {}, docs: {}, log: [], folded: {}, read: {}, pending: {}, ignored: [] });

@@ -426,7 +426,7 @@ export function peopleSettingsPane(ctx: ChatContext, canChat = true): string {
   const affinity = [
     ppRow('speed', String(s.speed)),
     ppRow('speed_down', v('speed_down') === 'same' || v('speed_down') === '' ? 'same' : String(s.speedDown)),
-    ppRow('cap', '', { ctl: `<label class="st-range pp-range"><input type="range" min="0" max="100" step="1" value="${s.turnCap}" data-input="pp-cap" data-change="pp-cap" aria-label="메시지당 변화 상한"><output>${s.turnCap === 0 ? '한도 없음' : `±${s.turnCap}`}</output></label>` }),
+    ppRow('cap', '', { ctl: `<label class="st-range pp-range"><input type="range" min="0" max="100" step="1" value="${s.turnCap}" data-input="pp-cap" data-change="pp-cap" data-zero="한도 없음" aria-label="메시지당 변화 상한"><output>${s.turnCap === 0 ? '한도 없음' : `±${s.turnCap}`}</output></label>` }),
   ].join('');
   // 세력 평판은 설정 「기록 → 세력」 페이지로 (2026-11-05 사용자)
   // 수치 끄기 = 정성 모드 (리수폿 E): 점수 없이 전용 칸의 글로만

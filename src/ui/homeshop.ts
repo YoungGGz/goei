@@ -409,11 +409,13 @@ function hangUp(ctx: ChatContext, env: HsEnv, show: HsShow, pid: string, line: s
 const walletOn = (ctx: ChatContext): boolean => { const b = shopBlocked(ctx.chat.scriptstate); return b !== 'wallet' && b !== 'both'; };
 const itemsOn = (ctx: ChatContext): boolean => { const b = shopBlocked(ctx.chat.scriptstate); return b !== 'items' && b !== 'both'; };
 const balance = (ctx: ChatContext): number => walletBalance(readWallet(ctx.chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT), aliveAnchors(ctx.chat));
-/** 이 상품에 이 결제 방법이 있나 (원 값 0 = 돈으로 안 팖, 출연 0 = 출연으로 안 팖, 맞교환·흥정은 설정) */
-function payOk(ctx: ChatContext, part: HsPart, s: HsSettings, pay: HsPay): boolean {
+/** 이 상품에 이 결제 방법이 있나 (원 값 0 = 돈으로 안 팖, 출연 0 = 출연으로 안 팖, 맞교환·흥정은 설정).
+ *  어느 방법이든 주문하면 택배 상자가 소지품에 오므로(사용자 11-16) 소지품이 꺼져 있으면 주문할 수 없다 — 상점·몰이 소지품에 딸린 것과 같다 */
+export function payOk(ctx: ChatContext, part: HsPart, s: HsSettings, pay: HsPay): boolean {
+  if (!itemsOn(ctx)) return false;
   if (pay === 'won') return part.item.price > 0 && walletOn(ctx);
   if (pay === 'appear') return (part.inst ?? 0) > 0;
-  if (pay === 'barter') return s.barter && itemsOn(ctx);
+  if (pay === 'barter') return s.barter;
   return s.talk;
 }
 const PAYS: HsPay[] = ['won', 'barter', 'talk', 'appear'];
@@ -426,6 +428,7 @@ function termsFor(part: HsPart, pay: HsPay): HsTerms | null {
 }
 /** 조건으로 지금 주문할 수 없는 까닭 (없으면 빈 글): 잔고 · 가계부 꺼짐 · 내민 물건이 없어짐 */
 function termsBlock(ctx: ChatContext, t: HsTerms): string {
+  if (!itemsOn(ctx)) return '소지품이 꺼져 있어 상자를 받을 수 없습니다.';
   if (t.money > 0 && !walletOn(ctx)) return '가계부가 꺼져 있어 돈으로 낼 수 없습니다.';
   if (t.money > 0 && balance(ctx) < t.money) return '잔고가 모자랍니다.';
   const mine = new Set(barterItems(ctx).map((x) => x.id));
@@ -579,6 +582,9 @@ async function order(ctx: ChatContext, env: HsEnv, said?: HsLogEntry[]): Promise
     const show = readShow(chat.scriptstate);
     const part = show.loaded ? show.parts[show.at] : null;
     if (!part || part.out || part.hung || part.item.id !== pre.part!.item.id) return null;
+    // 그사이 소지품을 껐으면 상자를 둘 데가 없다: 돈만 빠지지 않게 주문하지 않는다
+    const off = shopBlocked(chat.scriptstate);
+    if (off === 'items' || off === 'both') return null;
     const alive = aliveAnchors(chat);
     if (liveOrders(chat.scriptstate, alive).some((o) => o.id === `ho_${part.item.id}`)) return null;
     let items = readItems(chat.scriptstate);
@@ -849,11 +855,12 @@ function callPop(ctx: ChatContext, s: HsSettings): string {
   const call = ui.call?.pid === part.item.id ? ui.call : null;
   const pay = payOk(ctx, part, s, ui.pay) ? ui.pay : firstPay(ctx, part, s);
   // 꺼진 까닭: 설정·소지품·가계부 탓이면 그 말로, 상품에 그 결제가 없을 때만 「이 상품은 안 됨」 (전수점검 보통-40)
+  const noItems = !itemsOn(ctx);
   const payWhy = (p: HsPay) =>
-    p === 'won' ? (part.item.price > 0 ? '가계부가 꺼져 있음' : '이 상품은 안 됨')
+    p === 'won' ? (part.item.price > 0 ? (noItems ? '소지품이 꺼져 있음' : '가계부가 꺼져 있음') : '이 상품은 안 됨')
       : p === 'barter' ? (!s.barter ? '설정에서 꺼 둠' : '소지품이 꺼져 있음')
-        : p === 'talk' ? '설정에서 꺼 둠'
-          : '이 상품은 안 됨';
+        : p === 'talk' ? (!s.talk ? '설정에서 꺼 둠' : '소지품이 꺼져 있음')
+          : (part.inst ?? 0) > 0 ? '소지품이 꺼져 있음' : '이 상품은 안 됨';
   const btn = (p: HsPay) => {
     const ok = payOk(ctx, part, s, p);
     const i = payInfo(part, p);

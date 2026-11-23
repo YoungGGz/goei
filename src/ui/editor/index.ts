@@ -161,8 +161,9 @@ export function closeEditor(): void {
 }
 
 export const editorOpen = () => edUi.open;
-/** 설정 페이지가 떠 있나 (패널이 다시 그려질 때 같이 그린다) */
-export const editorOnSettings = () => edUi.open && isSetNode(edUi.node);
+/** 설정 페이지가 떠 있나 (패널이 다시 그려질 때 같이 그린다). 관제(호출 흐름)도 설정값을 그대로 보이는 화면이라 같이 그린다:
+ *  범위 밖 수를 치면 저장은 끝값인데 칸에는 친 수가 남았다 (2차 점검 16-문제2) */
+export const editorOnSettings = () => edUi.open && (isSetNode(edUi.node) || edUi.node === 'manage:flow');
 
 function ensureRoot(): HTMLElement {
   if (root) {

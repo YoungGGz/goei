@@ -98,12 +98,13 @@ function idleLimit<T>(run: (tick: () => void) => Promise<T>): Promise<T> {
   });
 }
 
-/** staticModel: 기능별 전용 모델 ID (있으면 메인·보조 대신 그 모델) */
-export async function runModel(messages: LlmMessage[], model: ModelChoice, staticModel?: string, label = '기타'): Promise<string> {
+/** staticModel: 기능별 전용 모델 ID (있으면 메인·보조 대신 그 모델).
+ *  limitSec: 시간 제한(초, Router·Director 설정). 넘으면 그때 실패로 적고 던진다. 늦게 온 답은 버린다 (2차 점검 14-1: 늦게 와도 「완료」로 적혔다) */
+export async function runModel(messages: LlmMessage[], model: ModelChoice, staticModel?: string, label = '기타', limitSec?: number): Promise<string> {
   // 호출 흐름 기록 (host/trace.ts): 성공·실패 모두 한 건으로 남긴다
   const at = new Date().toISOString();
   const t0 = Date.now();
-  const mark = traceMark(); // 시작할 때의 턴에 적는다 (전수점검 보통-7)
+  const mark = traceMark(label); // 시작할 때의 턴에 적는다 (전수점검 보통-7)
   const req = requestText(messages);
   // 진행 창 (core/progress.ts): 시작할 때 모델을 알리고, 끝나면 응답 토큰·시간을
   const pid = progressCallStart(label, staticModel || model, 0);
@@ -117,7 +118,10 @@ export async function runModel(messages: LlmMessage[], model: ModelChoice, stati
     return reqTokens;
   };
   setTimeout(countReq, 0);
+  let finished = false;
   const done = (ok: boolean, response: string, error?: string) => {
+    if (finished) return;
+    finished = true;
     const ms = Date.now() - t0;
     countReq();
     const responseTokens = tokens(response);
@@ -125,10 +129,14 @@ export async function runModel(messages: LlmMessage[], model: ModelChoice, stati
     void traceCall({ label, at, ms, model: staticModel || model, ok, ...(error ? { error } : {}), request: clip(req), requestChars: req.length, requestTokens: countReq(), response: clip(response), responseChars: response.length, responseTokens }, mark).catch(() => {});
   };
   try {
-    const text = await idleLimit((tick) => runModelRaw(messages, model, staticModel, (n) => {
+    const run = idleLimit((tick) => runModelRaw(messages, model, staticModel, (n) => {
       tick();
       progressCallChunk(pid, n);
     }));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const text = limitSec !== undefined && limitSec > 0
+      ? await Promise.race([run, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`시간 제한 ${limitSec}초`)), limitSec * 1000); })]).finally(() => clearTimeout(timer))
+      : await run;
     done(true, text);
     return text;
   } catch (error) {

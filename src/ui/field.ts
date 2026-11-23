@@ -8,7 +8,7 @@ import type { Chat } from '../core/types';
 import { basicSettings, worldSettings } from '../core/settings';
 import {
   activeEvents, agentLocked, endedShown, factionNames, cancelMission, type Catalog, endEvent, type EventKind, locName, MAP_CODES,
-  type MissionKind, NATION_PINS, parseCatalog, readWorld, REGION_PINS, regionName, requestMission, rosterFor, SEALED_LOC,
+  type MissionKind, NATION_PINS, endUpcoming, parseCatalog, readWorld, REGION_PINS, regionName, requestMission, rosterFor, SEALED_LOC,
   SIGUN, type WorldEvent, worldOn, worldVars, type WorldSettings, type WorldState, codesToNames, landmarkLoc, landmarksOf, placeWhere, prevWorldVars,
 } from '../core/world';
 import { buildClosures, journalSettings, recordVars } from '../core/journal';
@@ -18,6 +18,7 @@ import { nudgeMessages, updateChat, type CharacterSnapshot, type ChatContext } f
 import { noticeClass, sendNow } from '../host/send';
 import { markUnsent, withdrawUnsentAt } from '../host/unsent';
 import { isWaiting } from '../host/waiting';
+import { freeUseLock } from '../host/usebox';
 import { ICONS } from './icons';
 import { aimFlash, elapsedText, endedCard, evCard, peopleChips, aimMark, } from './evcard';
 import { agentInner, stLabel } from './images';
@@ -616,12 +617,23 @@ function partyLabel(names: string[], support: number): string {
   return ['나', ...names, ...(support > 0 ? [`지원 ×${support}`] : [])].join(', ');
 }
 
+/** 본편 응답을 기다리는 동안에는 채팅에 카드를 놓거나 바꾸지 않는다 (요청 도중 채팅을 저장하면 응답이 사라지거나, 늦게 온 답이 카드 뒤에 붙어 지시가 모델에 안 간다) */
+export const WAIT_SEND_NOTE = '답을 기다리는 중이라 지금은 보낼 수 없어요. 답이 온 뒤에 해 주세요.';
+
 async function compose(ctx: ChatContext, env: FieldEnv, build: (latest: Chat, x: Ctx) => { chat: Chat }): Promise<void> {
+  // 중지·실패로 끝난 요청이 「메인 응답 대기」 시간 동안 계속 막지 않게, 막기 전에 리수 화면을 한 번 본다 (host/usebox.ts freeUseLock)
+  if (isWaiting()) await freeUseLock();
+  if (isWaiting()) {
+    env.setNotice(WAIT_SEND_NOTE);
+    env.render();
+    return;
+  }
   env.setBusy(true);
   env.setNotice('');
   env.render();
   try {
     await updateChat(ctx.charIndex, ctx.chatIndex, (latest) => {
+      if (isWaiting()) throw new DirectiveError(WAIT_SEND_NOTE);
       const x = ctxOf(ctx, latest);
       return build(latest, x).chat;
     });
@@ -712,11 +724,13 @@ export function sendMission(ctx: ChatContext, env: FieldEnv, opening: boolean): 
 }
 
 /**
- * 임무 창 「요청 취소」: 그 요청의 카드가 아직 안 보낸 채 채팅 끝에 있으면 채팅 속 카드의 「취소」와 같이 카드째 물린다 (host/unsent.ts withdrawUnsentAt).
- * 카드가 이미 보내졌거나(응답을 기다리는 중 포함 — 요청 도중 채팅을 저장하면 응답이 사라질 수 있다) 없으면 상황판 대기만 지운다.
+ * 임무 창 「요청 취소」: 그 요청의 카드가 답 없이 채팅 끝에 있으면(안 보냈거나, 보냈지만 답 없이 끝남) 채팅 속 카드의 「취소」와 같이 카드째 물린다 (host/unsent.ts withdrawUnsentAt).
+ * 응답을 기다리는 중이거나(요청 도중 채팅을 저장하면 응답이 사라질 수 있다) 카드에 이미 답이 붙었으면 상황판 대기만 지운다.
  */
 async function cancelRequest(ctx: ChatContext, env: FieldEnv, kind: EventKind): Promise<void> {
   const target = readWorld(ctx.chat).pending[kind];
+  // 요청이 답 없이 끝났는지 리수 화면으로 먼저 본다 (실패 직후의 취소도 카드째 물리게)
+  if (target) await freeUseLock();
   if (target && !isWaiting()) {
     env.setBusy(true);
     env.setNotice('');
@@ -745,7 +759,8 @@ function closeIndexOf(chat: Chat): number {
   return Math.max(0, list.length - 1);
 }
 
-async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState, x: Ctx) => string | null): Promise<void> {
+/** onPrev: 리롤 기준 상태에 반영할 변경이 지금 상태의 것과 다를 때 (없으면 change 를 그대로) */
+async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState, x: Ctx) => string | null, onPrev?: (p: WorldState) => void): Promise<void> {
   env.setBusy(true);
   env.setNotice('');
   try {
@@ -755,8 +770,7 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
       const w = structuredClone(x.world);
       const err = change(w, x);
       if (err) throw new Error(err);
-      const prev = prevWorldVars(latest.scriptstate, (p) => change(p, x));
-      const next: Chat = { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...worldVars(w, x.catalog, x.settings, x.faction), ...prev } };
+      const next: Chat = { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...worldVars(w, x.catalog, x.settings, x.faction) } };
       // 손으로 끝낸 상황도 일지·보고서에 (core/journal). 기준은 마지막 봇 응답 (마지막이 유저 메시지면 상태창이 없어 카드 열쇠·위치가 비었다)
       if (w.closed?.length) {
         const index = closeIndexOf(latest);
@@ -766,6 +780,8 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
           closedAt = index;
         }
       }
+      // 리롤 기준 상태에도 같은 손 변경을 (core/world/output.ts prevWorldVars)
+      next.scriptstate = { ...next.scriptstate, ...prevWorldVars(latest.scriptstate, (p) => (onPrev ? onPrev(p) : change(p, x))) };
       return next;
     });
     // 손 종료로 보고서가 생겼으면 채팅 카드 열쇠 표를 다시 모으고, 카드가 붙을 응답이 있으면 채팅을 그대로 한 번 저장해 다시 그리게 한다
@@ -882,7 +898,8 @@ export async function handleField(action: string, value: string | undefined, ctx
       }
       field.confirmEnd = null;
       if (field.target?.type === 'event' && field.target.key === v) field.target = null;
-      await saveWorld(ctx, env, (w) => (endEvent(w, v) ? null : '이미 끝났거나 바뀐 상황이에요.'));
+      // 기준 상태에서는 그 상황이 아직 발생 예정이거나 없을 수 있다 (마지막 응답이 처음 띄운 것) — 그때는 예정을 거두고 이름을 막아, 다시 굴려도 끝낸 채로 둔다
+      await saveWorld(ctx, env, (w) => (endEvent(w, v) ? null : '이미 끝났거나 바뀐 상황이에요.'), (p) => void (endEvent(p, v) || endUpcoming(p, v)));
       return true;
     case 'team-toggle': {
       // 임무 탭 카드는 button이 아니라서(안에 톡·위키 버튼) 못 고르는 요원도 눌린다

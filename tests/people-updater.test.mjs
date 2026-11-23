@@ -234,7 +234,7 @@ test('유저가 연기하는 요원은 장면 인물·새 인물에서 빠진다
   delete store.people.이도형;
   const rep = U.applyUpdate(store, c, input, r, { settings: settings({ twoTurn: false }), exclude: ['이도형'] });
   assert.equal(rep.applied.newPeople.length, 0);
-  assert.ok(rep.dropped.some((d) => d.reason === '유저가 연기하는 요원'));
+  assert.ok(rep.dropped.some((d) => d.reason === '주인공'));
 });
 
 test('기본값: 인물끼리 감정 켬, 기록 상한 2000, 접기 상한 20000, 말투 5종', () => {

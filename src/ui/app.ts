@@ -13,6 +13,8 @@ import {
   activeEvents, type Catalog, endedShown, codesToNames, factionNames, lastStatusFields, locName, parseCatalog, readWorld, rosterFor, startWorldVars, agentLocked, readDirectory, worldOn,
 } from '../core/world';
 import { loadContext, updateChat, type ChatContext } from '../host/risu';
+import { isWaiting, onWaiting } from '../host/waiting';
+import { freeUseLock } from '../host/usebox';
 import { prepareBaseDocs } from '../core/wiki';
 import { facePic, loadModuleAssets, mainPic } from '../host/assets';
 import { playableAgents, playerAgent } from '../core/player';
@@ -45,7 +47,7 @@ import { bmDeskWinSpec, mallWinSpec, mallAction, mallAskOpen, mallInput, mallOpe
 import { isMallSite } from '../core/malls';
 import { homeshopAction, homeshopClosed, homeshopInput, homeshopMounted, homeshopOpenCheck, homeshopTab, resetHomeshop } from './homeshop';
 import { hsSettings } from '../core/homeshop';
-import { boardChrome, gnet, gnetDmOpen, gnetDmWinSpec, gnetOpenCheck, gnetTab, handleGnet, resetGnet, useBoardSite, type GnetEnv } from './gnet';
+import { boardChrome, gnet, gnetDmOpen, gnetHome, gnetDmWinSpec, gnetOpenCheck, gnetTab, handleGnet, resetGnet, useBoardSite, type GnetEnv } from './gnet';
 import { bindPopWins } from './popwin';
 import { bindMouseGesture, type Gesture } from './gesture';
 import { isBoardSite, type BoardSite } from '../core/boards';
@@ -53,7 +55,7 @@ import { addPhoto, attachInput, hydratePhotos, zoomPhoto } from './attach';
 import { ATTACH_MAX } from '../core/attach';
 import { readPhone } from '../core/phone';
 import { GN_NICK } from '../core/gnet';
-import { br, BR_TABS_VAR, chromeHtml, closeTab, curTab, focusSite, openSite, reopenTab, restoreTabs, tabsJson, homeHtml, isSite, loginHtml, newTab, recordTab, siteLogo, SITES, soonHtml, tabCan, tabGo, tabListHtml, tabState, type ChromeOpts, type SiteId } from './browser';
+import { br, BR_TABS_VAR, chromeHtml, closeTab, curTab, focusSite, openSite, putTabs, reopenTab, restoreTabs, snapTabs, tabsJson, homeHtml, isSite, loginHtml, newTab, recordTab, siteLogo, SITES, soonHtml, tabCan, tabGo, tabListHtml, tabSeek, tabState, type ChromeOpts, type SiteId, type TabsSnap } from './browser';
 import { savePhoto } from '../host/photo';
 import { readPersona, readUser, userInfo } from '../host/user';
 import { applyAdvanced } from '../core/advanced';
@@ -63,7 +65,7 @@ import { startCctvFx, stopCctvFx } from './cctvfx';
 import { declutterOps, elapsedText, markCapOverflow, evPopup, evSeenReset, evUi, opsBoard, opsUi, peopleChips, type EvCard, type EvKind, type OpsCard } from './evcard';
 import { evArt } from './evpic';
 import { agentContact, handlePhone, openAgentDm, openCheck, phone, phoneContent, phoneInput, phonePickList, phoneTab, phoneUnread, resetPhone, type PhoneEnv } from './phone';
-import { boardMapUrl, field, handleField, mapTab, mapSuggestFor, missionList, missionTab, newMessage, resetField, showOnMap, type FieldEnv } from './field';
+import { boardMapUrl, field, handleField, mapTab, mapSuggestFor, missionList, missionTab, newMessage, resetField, showOnMap, WAIT_SEND_NOTE, type FieldEnv } from './field';
 import { noticeClass, sendNow } from '../host/send';
 import { markUnsent } from '../host/unsent';
 import { startRecord } from '../core/dispatch';
@@ -174,12 +176,14 @@ let lastForm: HTMLFormElement | null = null;
 let tab: Tab = 'board';
 /** 카드에서 고유 상점 사이트로 접속: 인터넷 창만 (닫으면 풀린다) */
 let netSolo = false;
-/** 단독 창을 열기 전의 인터넷 탭·화면 탭. 단독 창이 끝나면 그대로 되돌린다 (11-20 사용자: 카드로 본 망상홈쇼핑이 상황판 인터넷 창에 남아 있다) */
-let soloBack: { tabs: string; tab: Tab } | null = null;
+/** 단독 창을 열기 전의 인터넷 탭·화면 탭·앞뒤 기록. 단독 창이 끝나면 그대로 되돌린다 (11-20 사용자: 카드로 본 망상홈쇼핑이 상황판 인터넷 창에 남아 있다).
+ *  탭은 id 까지 그대로 되돌리고, 단독 창에서 지나온 화면은 앞뒤 기록에 남기지 않는다 (2차 점검 B1: 닫은 뒤 ‹ 를 누를 때마다 단독 창 사이트 탭이 새로 생겼다) */
+let soloBack: { tabs: TabsSnap; tab: Tab; nav: ReturnType<NavHistory<NavState>['snapshot']> } | null = null;
 function endSolo(): void {
   if (netSolo && soloBack) {
-    restoreTabs(soloBack.tabs);
+    putTabs(soloBack.tabs);
     tab = soloBack.tab;
+    navHist.restore(soloBack.nav);
   }
   netSolo = false;
   soloBack = null;
@@ -232,6 +236,10 @@ function setShown(v: boolean): void {
   shown = v;
   shownListener?.(v);
 }
+// 첫 장면 답을 기다리는 동안 띄운 창: 답 없이 기다림이 끝나면(요청 실패) 다시 고를 수 있게 화면을 다시 정한다 (core/start.ts unsentOpening)
+onWaiting((w) => {
+  if (!w && shown && view.kind === 'started' && (view.ctx.chat.message ?? []).length === 1) void refresh();
+});
 const phoneEnv: PhoneEnv = {
   render: () => render(),
   refresh: () => refresh(),
@@ -856,7 +864,11 @@ export async function openShop(site = ''): Promise<void> {
   await openApp({ quietIfNotLite: true, check: false });
   // 고유 상점에 인터넷으로 접속한 카드(11-09 사용자): 상황판 없이 인터넷 창만 그 사이트로. 사고판 것은 상황판 인터넷 탭과 같은 저장소
   if (site && view.kind === 'started' && isSite(site)) {
-    if (!netSolo) soloBack = { tabs: tabsJson(), tab };
+    if (!netSolo) {
+      soloBack = { tabs: snapTabs(), tab, nav: navHist.snapshot() };
+      // 단독 창은 제 기록만 쓴다: 뒤로 가도 열기 전에 보던 화면(상황판·다른 사이트)이 단독 창 틀에 뜨지 않는다
+      navHist.clear();
+    }
     netSolo = true;
     tab = 'net';
     openSite(site);
@@ -884,7 +896,9 @@ async function refresh(): Promise<void> {
       view = { kind: 'error', message: `선택된 채팅이 없어요. ${BRAND.name} 채팅을 연 뒤 다시 눌러 주세요.` };
     } else {
       const manifest = readManifest(ctx.char.globalLore);
-      const phase = chatPhase(ctx.chat);
+      // 첫 카드 하나뿐인 채팅: 요청이 답 없이 끝났으면(중지·실패) 기다림 시간이 남아 있어도 다시 고를 수 있게 리수 화면을 먼저 본다 (host/usebox.ts freeUseLock)
+      if (isWaiting() && (ctx.chat.message ?? []).length === 1) await freeUseLock();
+      const phase = chatPhase(ctx.chat, isWaiting());
       if (manifest) {
         applyAdvanced(ctx.chat.scriptstate);
         void readPersona();
@@ -961,7 +975,7 @@ async function stagedTheme(ctx: ChatContext, value: string | undefined): Promise
   if (value !== 'light' && value !== 'dark' && value !== 'paper') return;
   try {
     const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) =>
-      chatPhase(chat) === 'started' || chat.scriptstate?.['$st_fixed_theme'] === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), $st_fixed_theme: value } },
+      chatPhase(chat, isWaiting()) === 'started' || chat.scriptstate?.['$st_fixed_theme'] === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), $st_fixed_theme: value } },
     );
     if (saved) ctx.chat = saved;
   } catch (error) {
@@ -1162,7 +1176,11 @@ async function handle(action: string, value?: string): Promise<void> {
     // 설정 창의 업데이트 페이지로
     return handle('ed-open', 'set:update');
   }
-  if (action.startsWith('upd-') && (view.kind === 'started' || view.kind === 'picker') && (await handleUpdate(action, view.ctx, settingsEnv))) return;
+  // 업데이트 단추: 설치 창이 그리는 화면이면 어디서나 (커스텀 임무 첫 장면 전 'opening', 다른 봇의 설치 화면도. 2차 점검 17-2·17-3). ctx 는 설치 창과 같은 것
+  if (action.startsWith('upd-')) {
+    const updCtx = view.kind === 'started' || view.kind === 'picker' || view.kind === 'opening' ? view.ctx : installCtx;
+    if (updCtx && (await handleUpdate(action, updCtx, settingsEnv))) return;
+  }
   // 상황판(CCTV·일지·상세 창)에서 「선택」: 목표로 고르고 바로 임무 지도로, 그 자리를 고른 채로 (2026-10-21 사용자)
   if (action === 'pick-event' && view.kind === 'started' && tab !== 'map') {
     await handleField(action, value, view.ctx, env, false);
@@ -1493,8 +1511,8 @@ async function start(): Promise<void> {
     // 시작 메시지: 자동 전송 없이 첫 장면 아래에 「적고 전송」 안내 (Risu가 첫 장면을 다시 그리기 전에 켠다)
     setOpeningHint(plan.kind === 'opening' ? (plan.scene ?? null) : null);
     const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-      if (chatPhase(chat) === 'started') throw new StartError('그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
-      const next = applyStart(chat, plan);
+      if (chatPhase(chat, isWaiting()) === 'started') throw new StartError(isWaiting() ? WAIT_SEND_NOTE : '그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
+      const next = applyStart(chat, plan, '', isWaiting());
       if (situation) next.message = [...(next.message ?? []), newMessage(startRecord(situation))];
       // 새 채팅 기본값(설정 창)을 이 채팅에 적어 둔다. 나중에 기본값을 바꿔도 이 채팅은 그대로 (원본 ensureDefaults) 시작 잔고도 지금 기본값으로 적는다 (전수점검 보통-84)
       const theme = getPrefs().theme ?? 'dark';
@@ -1817,6 +1835,8 @@ function render(): void {
   if (view.kind === 'started' && inBrowser()) {
     const { bt: _bt, ...ts } = navState();
     recordTab(ts);
+    // 주소줄 ‹ › 도 적은 뒤의 기록으로 맞춘다 (그릴 때는 아직 이 화면이 안 적혀 있어, 새 탭에서 사이트를 열면 ‹ 가 꺼져 있고 뒤로 갔다가 다른 곳을 열면 › 가 켜져 있었다)
+    root.querySelectorAll<HTMLButtonElement>('.br-tool [data-action="br-back"], .br-tool [data-action="br-fwd"]').forEach((b) => (b.disabled = !tabCan(b.dataset.action === 'br-back' ? -1 : 1)));
   }
   saveTabsSoon();
   // PC ‹ › : 기록은 그린 뒤에 적으니 단추 상태는 여기서
@@ -1932,6 +1952,9 @@ function navStep(dir: -1 | 1): (() => void) | null {
       const i = br.tabs.findIndex((t) => t.id === s.bt);
       if (i >= 0) br.cur = i;
       else newTab();
+      // 그 탭 기록에 이미 있는 화면이면 탭 기록도 그 칸으로 (새로 붙이면 주소줄 ‹ › 와 어긋났다, 2차 점검 Q1)
+      const { bt: _bt, ...ts } = s;
+      tabSeek(ts, dir);
     }
     applyNav(s);
   };
@@ -2241,6 +2264,10 @@ function goSite(site: SiteId | ''): void {
   br.login = false;
   notice = '';
   if (site === 'wk') resetWiki();
+  if (isBoardSite(site)) {
+    useBoardSite(site);
+    gnetHome();
+  }
   tab = siteTab(site);
   render();
   siteOpened();

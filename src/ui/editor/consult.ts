@@ -324,6 +324,9 @@ async function ask(d: ConsultDeps, ctx: ChatContext): Promise<void> {
         // 처음 값을 적어 두고 차례로 바꾼 뒤, 끝난 화면을 다시 읽어 줄마다 판정한다.
         // (한 줄을 바꾸면 다른 줄이 같이 바뀌는 설정이 있다 — 「모든 칸」 등. 이미 그 값이 된 줄은 다시 누르지 않고, 끝에 그 값이면 바뀐 것으로 적는다)
         const first = new Map(pending.map((p) => [p.id, rowAt(pageOf(p.id), p.id)]));
+        // 같이 바뀐 짝 줄(최소를 올리면 최대도 미는 설정 등)도 판에 적어 되돌릴 수 있게: 바꾸는 메뉴의 줄을 다 적어 둔다 (2차 점검 AI3)
+        const pages = [...new Set(pending.map((p) => pageOf(p.id)).filter(Boolean))];
+        const before = pages.flatMap((pg) => catalogPage(pg));
         for (const p of pending) {
           if (rowAt(pageOf(p.id), p.id)?.cur === p.value) continue;
           await setOne(d, pageOf(p.id), p.id, p.value);
@@ -333,6 +336,11 @@ async function ask(d: ConsultDeps, ctx: ChatContext): Promise<void> {
           const now = rowAt(pageOf(p.id), p.id);
           if (e && now && now.cur !== e.cur && (e.kind === 'text' || now.cur === p.value)) rows.push(cardOf(e, now));
           else failed.push(e?.name ?? all.find((x) => x.id === p.id)?.name ?? p.id);
+        }
+        for (const e of before) {
+          if (!consultCan(e) || pending.some((p) => p.id === e.id) || rows.some((r) => r.id === e.id)) continue;
+          const now = rowAt(e.page, e.id);
+          if (now && now.cur !== e.cur) rows.push(cardOf(e, now));
         }
         if (rows.length) me.lines.push({ who: 'card', rows });
         if (failed.length) me.lines.push({ who: 'sys', text: `바꾸지 못했어요: ${failed.join(', ')}` });

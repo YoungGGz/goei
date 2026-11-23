@@ -5,7 +5,7 @@ import type { Chat, ChatMessage } from '../types';
 import { messageText } from '../refs';
 import { PP_DEFAULTS, ppNum } from './settings';
 import { findStatusTags } from '../world/status';
-import { AXES, PEOPLE_KEY, SLOTS, SLOT_META, DOC_TYPES, REGISTERS, DEFAULT_AXES, EXPRESS_TO_AXIS, emptyStore, expressOf, type Candidate, type Change, type Doc, type Entry, type LastRun, type Observation, type PeopleStore, type Person, type Register, type SexualProfile, type SexualRecord, type SlotId, SEXUAL_CHARS } from './types';
+import { AXES, PEOPLE_KEY, SLOTS, SLOT_META, DOC_TYPES, REGISTERS, DEFAULT_AXES, EXPRESS_TO_AXIS, emptyStore, expressOf, type Candidate, type Change, type Doc, type Entry, type LastRun, type Observation, type PeopleStore, type Person, type Register, type RenameUndo, type SexualProfile, type SexualRecord, type SlotId, SEXUAL_CHARS } from './types';
 
 /** 채팅 마지막 메시지 chatId (없으면 #순번): 기록의 기준 자리 */
 export function anchorOf(chat: Chat): string {
@@ -81,6 +81,10 @@ export function peopleStore(chat: Chat): PeopleStore {
   out.ignored = Array.isArray(raw.ignored) ? raw.ignored.filter((n): n is string => typeof n === 'string') : [];
   if (raw.identity && typeof raw.identity === 'object') out.identity = raw.identity;
   if (Array.isArray(raw.migrated)) out.migrated = raw.migrated.filter((m): m is string => typeof m === 'string');
+  if (Array.isArray(raw.renames)) {
+    const renames = raw.renames.filter((r): r is RenameUndo => !!r && typeof r.anchor === 'string' && typeof r.from === 'string' && typeof r.to === 'string' && !!r.src && typeof r.src === 'object');
+    if (renames.length) out.renames = renames;
+  }
   if (raw.scene && typeof raw.scene === 'object') {
     const scene = Object.fromEntries(Object.entries(raw.scene).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).filter((n): n is string => typeof n === 'string')]));
     if (Object.keys(scene).length) out.scene = scene;
@@ -304,10 +308,33 @@ export function undoLastRun(store: PeopleStore): number {
  *  같은 말로 적힌 다른 사람의 글에 이 기록이 골라지고 그 사람 항목이 이 기록에 적힌다. to 도 호칭 기록이면(호칭끼리 합침) 받는다: 호칭 기록은 갱신기가 한 사람의 것으로 알고 읽는다.
  *  글 속에 적힌 옛 호칭(다른 항목 본문·인용)은 바꾸지 않는다.
  *  호칭 표시(provisional)는 from 과 함께 없어진다 (to 가 원래 호칭 기록이면 to 것은 남는다) */
-export function renamePerson(store: PeopleStore, from: string, to: string, seed: Person | null, patternsCap = Number(PP_DEFAULTS.patterns_cap)): boolean {
+export function renamePerson(store: PeopleStore, from: string, to: string, seed: Person | null, patternsCap = Number(PP_DEFAULTS.patterns_cap), anchor = ''): boolean {
   const src = store.people[from];
   const target = store.people[to] ?? seed;
   if (!src || !target || from === to) return false;
+  // 응답이 한 옮기기는 옮기기 전 모습을 그 응답에 묶어 둔다: 그 응답이 사라지면 undoGoneRenames 가 되돌린다 (사용자 2026-11-22: 다시 굴리면 그 응답이 만든 것은 다 되돌아간다)
+  if (anchor) {
+    const copy = <T>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+    const targets: RenameUndo['targets'] = [];
+    for (const p of Object.values(store.people)) {
+      if (p === src || p === target) continue;
+      for (const slot of SLOTS) for (const e of p.slots[slot] ?? []) if (e.target === from) targets.push({ who: p.name, slot, id: e.id });
+    }
+    const docs: RenameUndo['docs'] = [];
+    for (const [key, d] of Object.entries(store.docs)) for (const e of d.entries) if (e.who?.includes(from)) docs.push({ key, id: e.id, who: [...e.who] });
+    const pending: PeopleStore['pending'] = {};
+    for (const k of [from, to]) if (store.pending[k]) pending[k] = copy(store.pending[k]);
+    (store.renames ??= []).push({
+      anchor, from, to, src: copy(src), before: store.people[to] ? copy(store.people[to]) : null,
+      log: store.log.filter((c) => c.who === from).map((c) => c.id),
+      had: [...store.log.filter((c) => c.who === to).map((c) => c.id), ...[src, store.people[to]].flatMap((p) => (p ? SLOTS.flatMap((slot) => (p.slots[slot] ?? []).map((e) => e.id)) : []))],
+      touched: userTouched(store, from) || userTouched(store, to),
+      ...(store.folded[from] !== undefined ? { folded: store.folded[from] } : {}),
+      targets, docs,
+      scene: Object.fromEntries(Object.entries(store.scene ?? {}).filter(([, list]) => list.includes(from)).map(([k, list]) => [k, [...list]])),
+      pending,
+    });
+  }
   store.people[to] = target;
   // 칸 항목. 시트로 시작한 기록에는 이야기에서 적은 신원 항목을 옮기지 않는다 (새 인물 등록과 같다: 시트가 있으면 신원은 시트 것).
   // 한 번만 쓰는 칸(첫인상)은 같은 대상에 이미 있으면 옮기지 않고, 옮기면 자기 자신이 대상이 되는 항목도 옮기지 않는다
@@ -362,6 +389,61 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
     delete store.pending[k];
   }
   return true;
+}
+
+/** 다시 굴리거나 지워서 채팅에서 사라진 응답이 한 이름 옮기기를 되돌린다 (늦게 한 것부터). 되돌린 옮기기 {from: 새 이름, to: 옛 호칭} — 부르는 쪽이 설정 「항상 포함할 인물」도 되돌린다.
+ *  채팅 뒤쪽 keepMsgs 개 메시지 밖의 살아 있는 응답이 한 것은 되돌릴 일이 없어 기록을 지운다. '#N' 기준은 사라졌는지 가릴 수 없어 그대로 둔다.
+ *  되돌리지 않고 새 이름으로 두는 것 (사라진 응답이 만든 인물을 없앨 때 dropGonePeople 이 남기는 것과 같은 기준): appears(이름들) 가 돌려준 이름(살아 있는 메시지에도 나옴),
+ *  옮긴 뒤 살아 있는 다른 응답이 항목·변경을 더한 기록, 옮긴 뒤 사용자가 손댄 기록 — 되돌리면 그 뒤에 쌓인 것이 옮기기 전 모습에 덮여 사라진다 */
+export function undoGoneRenames(store: PeopleStore, chat: Chat, keepMsgs = FOLD_KEEP_MSGS, appears?: (names: string[]) => Set<string>): { from: string; to: string }[] {
+  if (!store.renames?.length) return [];
+  const at = anchorPositions(chat);
+  const cut = msgs(chat).length - keepMsgs;
+  const out: { from: string; to: string }[] = [];
+  for (let i = store.renames.length - 1; i >= 0; i--) {
+    const r = store.renames[i];
+    if (r.anchor.startsWith('#')) continue;
+    const pos = at.get(r.anchor);
+    if (pos !== undefined) {
+      if (pos < cut) store.renames.splice(i, 1);
+      continue;
+    }
+    store.renames.splice(i, 1);
+    if (store.people[r.from]) continue; // 옛 호칭으로 이미 다시 기록됨: 손대지 않는다
+    const now = store.people[r.to];
+    if (now) {
+      const had = new Set([...(r.had ?? []), ...r.log]);
+      const liveNew = (id: string, anchor: string, src: string) => !had.has(id) && src !== 'seed' && anchor !== r.anchor && anchor !== '#0' && at.has(anchor);
+      if (SLOTS.some((s) => (now.slots[s] ?? []).some((e) => liveNew(e.id, e.anchor, e.src)))) continue;
+      if (store.log.some((c) => c.who === r.to && liveNew(c.id, c.anchor, c.src))) continue;
+      if (!r.touched && userTouched(store, r.to)) continue;
+      if (appears?.([r.to]).has(r.to)) continue;
+    }
+    if (r.before) store.people[r.to] = r.before;
+    else delete store.people[r.to];
+    store.people[r.from] = r.src;
+    const logIds = new Set(r.log);
+    for (const c of store.log) if (logIds.has(c.id)) c.who = r.from;
+    if (r.folded !== undefined) {
+      store.folded[r.from] = r.folded;
+      const rest = (store.folded[r.to] ?? 0) - r.folded;
+      if (r.before && rest) store.folded[r.to] = rest;
+      else delete store.folded[r.to];
+    }
+    for (const x of r.targets) {
+      const e = store.people[x.who]?.slots[x.slot as SlotId]?.find((e) => e.id === x.id);
+      if (e && e.target === r.to) e.target = r.from;
+    }
+    for (const x of r.docs) {
+      const e = store.docs[x.key]?.entries.find((e) => e.id === x.id);
+      if (e) e.who = x.who;
+    }
+    for (const [k, list] of Object.entries(r.scene)) if (store.scene?.[k]) store.scene[k] = list;
+    for (const [k, row] of Object.entries(r.pending)) if (!store.people[k] && !store.pending[k]) store.pending[k] = row;
+    out.push({ from: r.to, to: r.from });
+  }
+  if (!store.renames.length) delete store.renames;
+  return out;
 }
 
 /** 등록 대기 줄(pending)에서 근거 응답이 채팅에 없는 것을 버린다 (다시 굴리거나 지운 응답에서만 나온 이름).

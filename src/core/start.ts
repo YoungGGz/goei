@@ -26,21 +26,23 @@ export function readManifest(lore: LoreEntry[] | undefined): Manifest | null {
 
 export type ChatPhase = 'fresh' | 'staged' | 'started';
 
-/** 커스텀 임무 첫 장면 지시문이나 보내지 못한 직접 입력, 또는 플러그인이 넣은 첫 장면만 놓인 채팅 (다시 고를 수 있다) */
-export function unsentOpening(chat: Chat): boolean {
+/** 커스텀 임무 첫 장면 지시문이나 보내지 못한 직접 입력, 또는 플러그인이 넣은 첫 장면만 놓인 채팅 (다시 고를 수 있다).
+ *  waiting: 본편 응답을 기다리는 중. 그때 놓인 유저 글은 이미 보낸 것이라 다시 고르지 않는다 (요청 도중 채팅을 저장하면 응답이 사라지거나 엉뚱한 곳에 붙는다).
+ *  기다림이 끝났는데 답이 없으면(요청 실패) 다시 고를 수 있다 */
+export function unsentOpening(chat: Chat, waiting = false): boolean {
   const m = chat.message ?? [];
   const text = String(m[0]?.data ?? '');
   if (m.length !== 1) return false;
   if (m[0]?.role === 'char') return isSceneMessage(text);
-  return m[0]?.role === 'user' && (hasSceneCard(text) || text.includes(UNSENT_MARK));
+  return m[0]?.role === 'user' && !waiting && (hasSceneCard(text) || text.includes(UNSENT_MARK));
 }
 
 /** 플러그인이 넣은 첫 장면 메시지가 맨 앞에 있는 채팅인지 (첫 전송 전) */
 export const sceneStaged = (chat: Chat): boolean => (chat.message ?? []).length === 1 && chat.message[0]?.role === 'char' && isSceneMessage(chat.message[0].data);
 
-/** fresh: 아직 선택 없음, staged: 선택했지만 첫 전송 전 (다시 고를 수 있음), started: 대화 진행 중 */
-export function chatPhase(chat: Chat): ChatPhase {
-  if ((chat.message ?? []).length > 0 && !unsentOpening(chat)) return 'started';
+/** fresh: 아직 선택 없음, staged: 선택했지만 첫 전송 전 (다시 고를 수 있음), started: 대화 진행 중 (waiting: unsentOpening) */
+export function chatPhase(chat: Chat, waiting = false): ChatPhase {
+  if ((chat.message ?? []).length > 0 && !unsentOpening(chat, waiting)) return 'started';
   return isFaction(chat.scriptstate?.['$st_faction']) ? 'staged' : 'fresh';
 }
 
@@ -149,6 +151,8 @@ export function planStart(
       $seed_lore: seed.text,
       $seed_inputs: '0',
       $goei_last: '',
+      // 리롤 기준 상태도 비운다: 메시지를 다 지우고 같은 채팅에서 다시 시작하면, 남은 옛 기준(지운 응답의 것)으로 첫 요청·첫 응답이 옛 상황판에서 시작됐다 (core/world/output.ts rerollBase)
+      $goei_prev: '',
       // 고유 인물로 시작하면 명부의 「시작 소지품」을 넣고 손에 드는 것은 손 칸, 장비는 장착 (모델 호출 없음, 11-07 사용자; 손 칸은 사용자 2026-11-14). 페르소나는 빈 소지품
       ...startItemsVars(startItems && choice.player ? readDirectory(lore).agents.find((x) => x.id === choice.player)?.startItems ?? [] : []),
       // 소지 한도 (2026-11-08 사용자): 고유 인물은 명부 「소지 한도」, 페르소나·값 없는 인물은 설정 값
@@ -175,9 +179,9 @@ export function sceneChatMessage(text: string, id: string): ChatMessage {
   return { role: 'char', data: sceneMessage(text), time: Date.now(), chatId: id };
 }
 
-export function applyStart(chat: Chat, plan: StartPlan, sceneId = ''): Chat {
+export function applyStart(chat: Chat, plan: StartPlan, sceneId = '', waiting = false): Chat {
   // 보내지 않은 커스텀 임무 지시문·앞서 넣은 첫 장면은 새 선택으로 바꾼다
-  const message = unsentOpening(chat) ? [] : [...(chat.message ?? [])];
+  const message = unsentOpening(chat, waiting) ? [] : [...(chat.message ?? [])];
   if (plan.scene) message.push(sceneChatMessage(plan.scene, sceneId || `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`));
   return {
     ...chat,

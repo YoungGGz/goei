@@ -218,6 +218,9 @@ async function generate(ctx: ChatContext, env: WikiEnv, title: string, regenerat
   wiki.failure = null;
   wiki.notice = '';
   env.render();
+  // 실패 안내·원문은 창이 아직 이 채팅을 보고 있을 때만 적는다: 다른 채팅으로 옮겼으면 그 채팅 위키에 앞 채팅 실패가 뜨지 않게 (성공 쪽과 같은 확인)
+  const here = () => { const cur = env.current(); return !!cur && chatKey(cur) === key; };
+  let failure: WikiState['failure'] = null;
   try {
     const prompt = articlePrompt(ctx, title, { inherited, previousDoc, writingRequest, docRequest, direct });
     let body: string;
@@ -225,7 +228,7 @@ async function generate(ctx: ChatContext, env: WikiEnv, title: string, regenerat
       body = (await askModel(prompt.messages, s.model, (raw) => acceptArticle(raw, title, canon(ctx)), { ...genSettings(ctx.chat.scriptstate), reiterate: craftSettings(ctx.chat.scriptstate, 'nw').reiterate, staticModel: featureModel(ctx.chat.scriptstate, 'nw'), state: ctx.chat.scriptstate, label: '위키 글' })).value;
     } catch (error) {
       const raw = (error as { raw?: string }).raw;
-      if (raw) wiki.failure = { title, reason: error instanceof Error ? error.message : String(error), raw };
+      if (raw) failure = { title, reason: error instanceof Error ? error.message : String(error), raw };
       throw error;
     }
     const meta: WikiMeta = {
@@ -235,12 +238,13 @@ async function generate(ctx: ChatContext, env: WikiEnv, title: string, regenerat
     };
     await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => saveDoc(chat, meta, body));
     // 아직 그 작성 화면을 보고 있으면 문서로 넘어간다
-    const cur = env.current();
-    if (cur && chatKey(cur) === key && (wiki.view === 'compose' || wiki.view === 'doc') && wiki.title === title) Object.assign(wiki, { view: 'doc', rewrite: null, docReq: '' });
+    if (here() && (wiki.view === 'compose' || wiki.view === 'doc') && wiki.title === title) Object.assign(wiki, { view: 'doc', rewrite: null, docReq: '' });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
-    wiki.notice = `「${title}」 문서를 만들지 못했어요. ${msg}${old ? ' 기존 문서는 그대로 두었어요.' : ''}`;
-    if (!wiki.failure && !(error instanceof WikiError)) wiki.failure = { title, reason: msg, raw: (error as { raw?: string }).raw ?? '' };
+    if (here()) {
+      wiki.notice = `「${title}」 문서를 만들지 못했어요. ${msg}${old ? ' 기존 문서는 그대로 두었어요.' : ''}`;
+      wiki.failure = failure ?? (error instanceof WikiError ? null : { title, reason: msg, raw: (error as { raw?: string }).raw ?? '' });
+    }
   } finally {
     jobs.delete(key);
     await env.refresh();
@@ -280,7 +284,9 @@ export async function autoWriteWiki(ctx: ChatContext, messageIndex: number, open
       title = await pickTitle(cur);
     } catch (error) {
       // 제목 고르기 요청이 요청 토큰 상한을 넘는 경우 등: 문서 작성 실패와 같이 위키 화면에 까닭을 남긴다
-      if (target !== quietEnv) {
+      // 그사이 다른 채팅으로 옮겼으면 그 채팅 위키에 띄우지 않는다 (generate 의 실패 안내와 같은 확인)
+      const now = target.current();
+      if (target !== quietEnv && now && chatKey(now) === chatKey(cur)) {
         wiki.notice = `자동 작성 제목을 고르지 못했어요. ${error instanceof Error ? error.message : String(error)}`;
         target.render();
       }

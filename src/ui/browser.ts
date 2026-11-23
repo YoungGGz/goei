@@ -97,6 +97,15 @@ export function recordTab(state: unknown): void {
   if (t.hist.length > HIST_MAX) t.hist.shift();
   t.at = t.hist.length - 1;
 }
+/** 창 전체 기록(메뉴 ‹ ›·쓸기)으로 지금 탭에 이미 있는 화면에 닿으면 새로 붙이지 않고 그 칸으로 옮긴다 (2차 점검 Q1: 탭 기록이 겹쳐 쌓여 주소줄 › 가 꺼졌다).
+ *  가는 쪽에서 가까운 칸부터 찾는다. 없으면 그대로 (그린 뒤 recordTab 이 붙인다) */
+export function tabSeek(state: unknown, dir: -1 | 1): void {
+  const t = curTab();
+  const key = JSON.stringify(state);
+  if (t.hist[t.at] === key) return;
+  for (let i = t.at + dir; i >= 0 && i < t.hist.length; i += dir) if (t.hist[i] === key) return void (t.at = i);
+  for (let i = t.at - dir; i >= 0 && i < t.hist.length; i -= dir) if (t.hist[i] === key) return void (t.at = i);
+}
 export const tabCan = (dir: -1 | 1): boolean => {
   const t = curTab();
   return t.at + dir >= 0 && t.at + dir < t.hist.length;
@@ -158,7 +167,12 @@ export const focusSite = (site: SiteId): void => void openSite(site);
 /* 새로고침해도 탭이 남게 (2026-11-08 사용자): 열린 사이트·보던 탭·탭마다 최근 기록을 이 채팅에 */
 export const BR_TABS_VAR = '$br_tabs';
 const SAVE_HIST = 10;
-const packTab = (t: BrTab) => ({ s: t.site, h: t.hist.slice(-SAVE_HIST), a: Math.max(-1, t.at - Math.max(0, t.hist.length - SAVE_HIST)) });
+/** 최근 기록 SAVE_HIST 칸만 남기되, 보던 칸이 그보다 앞이면 보던 칸을 둘레째 남긴다 (2차 점검 B4: 한참 뒤로 간 탭을 새로고침하면 사이트 첫 화면이 떴다) */
+function packTab(t: BrTab) {
+  let from = Math.max(0, t.hist.length - SAVE_HIST);
+  if (t.at >= 0 && t.at < from) from = Math.max(0, t.at - Math.floor(SAVE_HIST / 2));
+  return { s: t.site, h: t.hist.slice(from, from + SAVE_HIST), a: t.at < 0 ? -1 : t.at - from };
+}
 function unpackTab(t: { s?: unknown; h?: unknown; a?: unknown } | null | undefined): BrTab {
   const site: SiteId | '' = isSite(String(t?.s)) ? (t!.s as SiteId) : '';
   const hist = Array.isArray(t?.h) ? t!.h.filter((x: unknown) => typeof x === 'string').slice(-SAVE_HIST) : [];
@@ -168,6 +182,13 @@ function unpackTab(t: { s?: unknown; h?: unknown; a?: unknown } | null | undefin
 /** x = 닫은 탭 (2026-11-12 사용자: 닫은 탭 다시 열기가 안 됨 — 새로고침하면 닫은 탭 목록만 비던 것도 같이 남긴다). 없으면 넣지 않는다 */
 export function tabsJson(): string {
   return JSON.stringify({ c: br.cur, t: br.tabs.map(packTab), ...(br.closed.length ? { x: br.closed.map(packTab) } : {}) });
+}
+/** 탭을 통째로 떠 둔다: 탭 id 까지 그대로 (카드 단독 창이 끝나면 되돌린다. 저장 꼴로 되살리면 id 가 새로 매겨져 창 전체 기록이 탭을 못 찾았다, 2차 점검 B1) */
+export interface TabsSnap { tabs: BrTab[]; cur: number; closed: BrTab[] }
+const copyTab = (t: BrTab): BrTab => ({ ...t, hist: [...t.hist] });
+export const snapTabs = (): TabsSnap => ({ tabs: br.tabs.map(copyTab), cur: br.cur, closed: br.closed.map(copyTab) });
+export function putTabs(s: TabsSnap): void {
+  Object.assign(br, { tabs: s.tabs.map(copyTab), cur: s.cur, closed: s.closed.map(copyTab), login: false, list: false });
 }
 /** 채팅에 적힌 탭으로 (없거나 깨졌으면 빈 새 탭 하나) */
 export function restoreTabs(raw: unknown): void {
@@ -218,7 +239,7 @@ export function chromeHtml(o: ChromeOpts): string {
     .map((x, i) => `<div class="br-tab${i === br.cur ? ' on' : ''}" role="tab" aria-selected="${i === br.cur}"><button class="br-tabb" data-action="br-tab" data-value="${i}">${siteLogo(x.site)}<span class="br-tt">${esc(tabTitle(x, i, o))}</span></button><button class="br-tx" data-action="br-close" data-value="${i}" aria-label="탭 닫기">${ic(IC.x, 'br-i s')}</button></div>`)
     .join('');
   const omni = s
-    ? `<span class="br-ti">${ic(IC.tune)}</span><span class="br-u"><b>${esc(s.host)}</b>${esc(o.path || s.path)}</span>`
+    ? `<span class="br-ti">${ic(IC.tune)}</span><span class="br-u"><b>${esc(s.host)}</b>${esc(o.path || s.path)}</span><button class="br-orel" data-action="br-reload" aria-label="새로고침">${ic(IC.rel)}</button>`
     : `<span class="br-ti">${ic(IC.srch)}</span><span class="br-u">검색어 또는 URL 입력</span>`;
   const prof = o.nick ? (o.photo ? `<img src="${esc(o.photo)}" alt="">` : `<b>${esc([...o.nick][0] ?? '')}</b>`) : ic(IC.acct);
   const bms = o.bookmarks
