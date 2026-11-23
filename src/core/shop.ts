@@ -20,6 +20,7 @@ import { genSettings } from './advanced';
 import { fillGuide, guideDefault, guideSections, guideTxt, type GuideName } from './guides';
 import { peopleSettings } from './people/settings';
 import { capLines, shopMain, shopMainLines } from './shopctx';
+import { stripThoughts } from './thoughts';
 
 export const SHOP_VAR = '$st_shop';
 /** 응답이 붙어 방문 상태가 다음 응답으로 넘어가기 직전의 사본 — 그 응답을 다시 굴려도 지난 턴 대화·쫓겨남이 본편에 간다 (전수검사 11-13) */
@@ -247,11 +248,12 @@ export interface ShopTag {
 
 export const hasShopTag = (text: string): boolean => typeof text === 'string' && /\[\s*shop\s*[:：]/iu.test(text);
 
-/** 글 속 마지막 표식 (가게 이름이 비면 없음) */
+/** 글 속 마지막 표식 (가게 이름이 비면 없음). 생각 블록(<Thoughts>·<think>)은 본문이 아니라 그 안의 표식은 보지 않는다 */
 export function findShopTag(text: string): ShopTag | null {
   if (!hasShopTag(text)) return null;
+  const body = stripThoughts(text);
   let out: ShopTag | null = null;
-  for (const m of text.matchAll(TAG)) {
+  for (const m of body.matchAll(TAG)) {
     const shop = clean(m[1], 30);
     if (shop) out = { raw: m[0], shop, owner: clean(m[2], 30) };
   }
@@ -684,8 +686,9 @@ export interface ShelfReply {
   items: Omit<ShopItem, 'id'>[];
 }
 
-/** 첫 호출·새로고침 응답. 정체 블록은 첫 호출에만 (이미 있으면 known 을 그대로) */
-export function parseShelf(raw: string, known: ShopIdentity | null): ShelfReply {
+/** 첫 호출·새로고침 응답. 정체 블록은 첫 호출에만 (이미 있으면 known 을 그대로).
+ *  points: 포인트 가게가 될 수 있나 — 백일몽 소속일 때만 (2026-11-08 사용자 「포인트는 백일몽 소속일 때만」). 아니면 정체가 포인트라 해도 원 가게로 읽는다 */
+export function parseShelf(raw: string, known: ShopIdentity | null, points = true): ShelfReply {
   const shelf = block(raw, 'shelf');
   if (!shelf) throw new ShopError(guideTxt('Shop', 'ERROR_NO_SHELF'));
   const items = shelf.split('\n').map(parseLine).filter((x): x is Omit<ShopItem, 'id'> => !!x);
@@ -697,7 +700,7 @@ export function parseShelf(raw: string, known: ShopIdentity | null): ShelfReply 
     const get = (k: string) => (new RegExp(`^\\s*${k}\\s*[:：]\\s*(.*)$`, 'im').exec(idText)?.[1] ?? '').trim();
     // 「won (not points)」처럼 원으로 시작하면 원 가게 (전수검사 11-13)
     const cur = get('currency');
-    const pts = /point|포인트/i.test(cur) && !/^[\s\W]*(won|krw|원|₩)/i.test(cur);
+    const pts = points && /point|포인트/i.test(cur) && !/^[\s\W]*(won|krw|원|₩)/i.test(cur);
     identity = { sells: clean(get('sells'), 120), never: clean(get('never'), 120), prices: clean(get('prices'), 120), ...(pts ? { points: true } : {}) };
     if (!identity.sells) throw new ShopError(guideTxt('Shop', 'ERROR_NO_SELLS'));
   }
@@ -880,8 +883,10 @@ export function applyTalk(st: ShopState, r1: TalkReply, kick = true, stock = tru
       // 흥정 (2026-11-08 사용자): 깎은 원 값, 또는 주인이 받아들인 다른 대가(pay). 대가가 붙으면 잔고가 모자라도 원 몫만 내고 산다
       items = items.map((x) => {
         if (x.sold || !sameShopName(x.name, p.name) || (p.price === x.price && (p.pay ?? '') === (x.pay ?? ''))) return x;
-        const { pay: _p, ...rest } = x;
-        return { ...rest, price: p.price, ...(p.pay ? { pay: p.pay } : {}), ...(x.pay ? {} : { orig: x.orig ?? x.price }) };
+        // 특가 표시는 깎은 원 값일 때만 남긴다: 다른 대가로 바꿨거나 원래 값 이상이 되면 특가가 아니다 (공짜처럼 「-100%」로 보이지 않게)
+        const { pay: _p, tag, was, ...rest } = x;
+        const sale = tag === 'sale' && !p.pay && was !== undefined && was > p.price;
+        return { ...rest, ...(tag === 'rare' ? { tag } : sale ? { tag, was } : {}), price: p.price, ...(p.pay ? { pay: p.pay } : {}), ...(x.pay ? {} : { orig: x.orig ?? x.price }) };
       });
     }
     items = [...items, ...withIds(st, r.add, items.filter((x) => !x.sold), items.filter((x) => x.sold))];
@@ -949,6 +954,32 @@ const keyOf = (st: ShopState): { k?: string } => (st.key ? { k: st.key } : {});
 export function stampLastLine(st: ShopState, key: string): ShopState {
   if (!key || !st.talk.length) return st;
   return { ...st, talk: st.talk.map((l, i) => (i === st.talk.length - 1 ? { ...l, k: key } : l)) };
+}
+
+/** 대화 끝에 답 없이 남은 내 말 수 (답을 기다리는 중이거나, 기다리다 새로고침으로 끊긴 말) */
+export function pendingMe(talk: readonly { who: string }[]): number {
+  let n = 0;
+  for (let i = talk.length - 1; i >= 0 && talk[i].who === 'me'; i--) n++;
+  return n;
+}
+/** 답이 붙은 대화만 (끝의 답 없는 내 말을 뗀다): 본편에는 답이 온 말만 넘긴다. 기다리던 말은 답이 오면 그 답과 같이 넘어간다 (stampReply) */
+export const answeredTalk = <T extends { who: string }>(talk: readonly T[]): T[] => talk.slice(0, talk.length - pendingMe(talk));
+
+/** 답을 저장할 때: 기다리던 내 말(pending 일 때)과 답으로 붙은 줄에 지금 본편 응답 키를 적는다.
+ *  답을 기다리는 사이 본편이 한 턴 넘어가도 그 말과 답이 다음 본편에 같이 넘어가게 (요청 때 키로 두면 지난 턴 것으로 걸러져 끝내 안 갔다) */
+export function stampReply(st0: ShopState, next: ShopState, key: string, pending = true): ShopState {
+  if (!key || !next.talk.length) return next;
+  const added = next.talk[next.talk.length - 1] !== st0.talk[st0.talk.length - 1] ? 1 : 0;
+  const n = Math.min(next.talk.length, (pending ? pendingMe(st0.talk) : 0) + added);
+  if (!n) return next;
+  return { ...next, talk: next.talk.map((l, i) => (i >= next.talk.length - n ? { ...l, k: key } : l)) };
+}
+
+/** 창을 다시 열 때: 답 없이 남은 내 말을 뗀다 (기다리던 요청이 새로고침 등으로 끊긴 것). 뗀 글은 입력칸에 돌려준다. 뗄 것이 없으면 null */
+export function dropPending<T extends { who: string; text: string }>(talk: readonly T[]): { talk: T[]; text: string } | null {
+  const n = pendingMe(talk);
+  if (!n) return null;
+  return { talk: talk.slice(0, -n), text: talk.slice(-n).map((l) => l.text).join('\n') };
 }
 
 export const cancelSell = (st: ShopState): ShopState => ({ ...st, sell: null });
@@ -1024,7 +1055,8 @@ export function shopEvents(chat: Chat): string[] {
   const out: string[] = [];
   // 이 턴(기준 응답 키가 지금 것)에 한 말·판 것만. 키 없는 줄은 옛 저장분이라 그대로 (같은 가게에 머물러도 지난 턴 것이 되풀이되지 않게, 전수검사 11-13)
   const now = (x: { k?: string }) => !x.k || x.k === st.key;
-  const turn = st.talk.filter(now);
+  // 답 없는 내 말은 넘기지 않는다: 답을 기다리는 중이면 답이 올 때 지금 키로 다시 적혀 다음 턴에 같이 간다 (stampReply)
+  const turn = answeredTalk(st.talk).filter(now);
   // 다시 굴려 사본을 읽을 때는 판 것을 소지품 쪽(core/items.ts soldNow)이 넘긴다 — 지금 상점이 없으면 거기서 거르지 않으므로
   const sales = live ? st.sales.filter(now) : [];
   const lastOwner = [...turn].reverse().find((l) => l.who === 'owner');

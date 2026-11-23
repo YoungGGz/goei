@@ -135,8 +135,8 @@ export const mallPaidLabel = (p: MallPaid): string => {
   const amount = p.by === 'points' ? `${p.amount.toLocaleString('en-US')} P` : `₩ ${p.amount.toLocaleString('en-US')}`;
   return `${amount} · ${[MALL_NAME[p.mall], MALL_PAID_HOW[p.by]].filter(Boolean).join(' ')}${p.pay ? ` + ${p.pay}` : ''}`;
 };
-const paidLine = (it: Item) => it.mallPaid ? mallPaidLabel(it.mallPaid) : [Number.isSafeInteger(it.price) && (it.price! > 0 || !it.paidWith) ? `₩ ${it.price!.toLocaleString('en-US')}` : '', it.paidWith ?? ''].filter(Boolean).join(' + ');
-const sourceLine = (it: Item, w: When) => [FROM_NAME[it.from], whenLabel(w, it.anchor, it.at), paidLine(it)].filter(Boolean).join(' · ');
+export const itemPaidLine = (it: Item): string => it.mallPaid ? mallPaidLabel(it.mallPaid) : [Number.isSafeInteger(it.price) && (it.price! > 0 || !it.paidWith) ? `₩ ${it.price!.toLocaleString('en-US')}` : '', it.paidWith ?? ''].filter(Boolean).join(' + ');
+const sourceLine = (it: Item, w: When) => [FROM_NAME[it.from], whenLabel(w, it.anchor, it.at), itemPaidLine(it)].filter(Boolean).join(' · ');
 
 /** 이 채팅의 「사용」 자리 (이미 보낸 턴의 것은 비어 보인다) */
 export function useQueue(ctx: ChatContext): ItemUse[] {

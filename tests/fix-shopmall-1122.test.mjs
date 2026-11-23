@@ -99,10 +99,10 @@ test('2: 망상홈쇼핑 편성 요청에도 상태창 줄이 없다', () => {
   assert.ok(!text.includes('1234567'), text.slice(Math.max(0, text.indexOf('1234567') - 300), text.indexOf('1234567') + 50));
 });
 
-test('2: 포인트몰 1:1 상담은 바꾸지 않는다 (상태창 줄이 든 본문 그대로)', () => {
+test('2: 포인트몰 1:1 상담도 [최근 본문]에서 상태창 줄을 뺀다 (잔고 숨김, 재확인 BM2-1)', () => {
   const ctx = ctxOf();
   const src = M.deskSource(ctx);
-  assert.ok(src.story.includes('▣'), src.story);
+  assert.ok(src.story.includes('상점에 들어섰다') && !src.story.includes('▣') && !src.story.includes('1234567'), src.story);
 });
 
 // ── 3. 이번 턴에 산 것은 「Recently: got」에 다시 적지 않는다 (모든 가게) ──

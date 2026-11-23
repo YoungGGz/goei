@@ -77,7 +77,8 @@ export interface DeskAgent {
   voice: string;
   dice: DeskDice;
 }
-export interface DeskLine { who: 'me' | 'op' | 'sys'; text: string }
+/** k: 그 말을 한(답이 저장된) 때의 마지막 본편 응답 키 — 다음 본편에 넘길 줄을 고른다 (core/malls.ts mallEvents) */
+export interface DeskLine { who: 'me' | 'op' | 'sys'; text: string; k?: string }
 export interface DeskState {
   agent: DeskAgent | null;
   talk: DeskLine[];
@@ -86,24 +87,34 @@ export interface DeskState {
   past: DeskAgent[];
   /** 상담원이 이 상담을 끝냄 (더 말할 수 없다. 다시 열면 새 상담) */
   ended?: boolean;
+  /** 끝난 상담에서 나눈 말 (가장 최근 응답 키의 것만): 「상담 종료」·「다른 상담사 연결」·상담원이 끊은 뒤에도 그 턴 상담이 다음 본편에 넘어가게 */
+  done?: DeskLine[];
 }
 export const emptyDesk = (): DeskState => ({ agent: null, talk: [], anchor: '', past: [] });
 export function readDesk(vars: Vars): DeskState {
   try {
     const o = JSON.parse(String(vars?.[DESK_VAR] ?? ''));
     if (!o || typeof o !== 'object') return emptyDesk();
-    return { agent: o.agent && typeof o.agent.name === 'string' ? o.agent : null, talk: Array.isArray(o.talk) ? o.talk : [], anchor: String(o.anchor ?? ''), past: Array.isArray(o.past) ? o.past : [], ...(o.ended === true ? { ended: true } : {}) };
+    const done = Array.isArray(o.done) ? o.done.filter((l: unknown): l is DeskLine => !!l && typeof (l as DeskLine).text === 'string' && ((l as DeskLine).who === 'me' || (l as DeskLine).who === 'op')) : [];
+    return { agent: o.agent && typeof o.agent.name === 'string' ? o.agent : null, talk: Array.isArray(o.talk) ? o.talk : [], anchor: String(o.anchor ?? ''), past: Array.isArray(o.past) ? o.past : [], ...(o.ended === true ? { ended: true } : {}), ...(done.length ? { done } : {}) };
   } catch {
     return emptyDesk();
   }
 }
 export const deskVars = (st: DeskState): Record<string, string> => ({ [DESK_VAR]: JSON.stringify(st) });
 
-/** 상담을 끝낸다: 상담사를 지난 목록에 넣고 대화를 비운다. keep: 기억해 둘 지난 상담사 수 (deskSettings().keep) */
+/** 상담을 끝낸다: 상담사를 지난 목록에 넣고 대화를 비운다. 나눈 말은 done 으로 옮겨 그 턴 본편에 넘긴다 (끝의 답 없는 내 말은 버린다 — 기다리다 끊긴 말).
+ *  keep: 기억해 둘 지난 상담사 수 (deskSettings().keep) */
 export function endDesk(st: DeskState, keep = DESK_KEEP_DEFAULT): DeskState {
-  if (!st.agent) return { ...st, talk: [] };
+  const said = st.talk.filter((l) => l.who !== 'sys').map((l) => ({ who: l.who, text: l.text, k: l.k ?? st.anchor }));
+  while (said.length && said[said.length - 1].who === 'me') said.pop();
+  // 지난 응답 키의 끝난 상담은 다시 넘기지 않으니 가장 최근 키의 것만 둔다
+  const last = said.length ? said[said.length - 1].k : '';
+  const done = said.length ? [...(st.done ?? []).filter((l) => l.k === last), ...said] : st.done ?? [];
+  const keepDone = done.length ? { done } : {};
+  if (!st.agent) return { ...st, talk: [], ...keepDone };
   const past = [st.agent, ...st.past.filter((p) => p.id !== st.agent!.id)].slice(0, keep);
-  return { agent: null, talk: [], anchor: '', past };
+  return { agent: null, talk: [], anchor: '', past, ...keepDone };
 }
 
 /** 새 상담사를 만들지, 지난 상담사를 다시 부를지 (다시 만나기 켬일 때 1/4) */

@@ -14,11 +14,11 @@ import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
 import { pointsMember, pointsVars, readPoints } from '../core/points';
-import { addItem, bmOrderPaid, type MallPaid, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, readItemUse, readItems, sellItem, type Item } from '../core/items';
+import { addItem, bmOrderPaid, type MallPaid, bmPickupConfirm, dropUse, ITEM_USE_AT_VAR, itemLeft, itemUseVars, itemsVars, liveItemsOf, paidWon, readItemUse, readItems, sellItem, type Item } from '../core/items';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
 import { bmGoing, bmOrdersKeep, bmOrdersVars, cosOrdersKeep, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
-import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, lastBot, markSold, storyStamp, parseShelf, parseTalk, pointShelf, sayToOwner, shelfItems, shelfPrompt, stampLastLine, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
+import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, dropPending, lastBot, pendingMe, markSold, storyStamp, parseShelf, parseTalk, pointShelf, sayToOwner, shelfItems, shelfPrompt, stampLastLine, stampReply, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
@@ -36,7 +36,6 @@ import { ICONS } from './icons';
 import { josa } from '../core/josa';
 
 /** 상담 줄 + 그 줄을 쓴 때의 마지막 응답 키 (core/malls.ts mallEvents 가 이 키로 거른다) */
-type DeskLineK = DeskLine & { k?: string };
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
@@ -109,6 +108,15 @@ const balanceOf = (ctx: ChatContext, site: MallSite): number => {
   return site === 'bm' ? walletBalance(readPoints(ctx.chat.scriptstate), alive) : walletBalance(readWallet(ctx.chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT), alive);
 };
 const loggedNick = (ctx: ChatContext): string => (String(ctx.chat.scriptstate?.['$br_login'] ?? '') === '1' ? String(ctx.chat.scriptstate?.['$br_nick'] ?? '').trim() : '');
+/** 포인트몰을 쓸 수 있나: 로그인했고 백일몽 소속 (2026-11-08 사용자 「백일몽 포인트몰(백일몽만)」 — 백일몽을 나온 뒤 남은 탭에서도 진열·상담을 부르지 않는다) */
+const bmUsable = (ctx: ChatContext): boolean => !!loggedNick(ctx) && pointsMember(ctx.chat);
+/** 백일몽 소속이 아닐 때 포인트몰 동작: 부르지 않고 까닭을 알린다 */
+function bmBlocked(ctx: ChatContext, env: MallEnv): true {
+  if (loggedNick(ctx) && !pointsMember(ctx.chat)) ui.bm.info = BM_NOT_MEMBER;
+  env.render();
+  return true;
+}
+const BM_NOT_MEMBER = '백일몽 임직원만 이용할 수 있습니다.';
 /** 자동 호출 「창을 열 때」: 마지막으로 짠 응답 */
 const atKey = mallAtKey;
 
@@ -177,7 +185,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
     let shut = false;
     if (kind === 'shelf') {
       // 진열대에 얹는 것(applyShelf)까지 읽기 안에서: 받은 줄이 모두 겹쳐 버려지면 형식 오류처럼 다시 묻는다 (기본 상점 ask 와 같게, 11-22)
-      const { value: got } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => { const r0 = parseShelf(raw, st0.loaded ? st0.identity : null); const r = site === 'bm' ? pointShelf(r0) : r0; return { r, applied: applyShelf(st0, r, s) }; }, opts);
+      const { value: got } = await generate(shelfPrompt(src, s, MALL_GUIDE[site]), s.model, (raw) => { const r0 = parseShelf(raw, st0.loaded ? st0.identity : null, site === 'bm'); const r = site === 'bm' ? pointShelf(r0) : r0; return { r, applied: applyShelf(st0, r, s) }; }, opts);
       const value = got.r;
       let applied = got.applied;
       // 우주몰: 새 진열에 진실 칸이 비었으면 「?」 (문의로 들어온 물건과 같게 — 광고 문구가 사실이 되지 않게, 11-15)
@@ -194,7 +202,8 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
     } else {
       const { value } = await generate(talkPrompt(src, s, MALL_GUIDE[site]), s.model, parseTalk, opts);
       // 운영자가 문의를 끊으면(설정 「문의 끊음」) 상태의 closed 가 선다. 쇼핑몰에서는 문의 창만 막는다 (카탈로그 구매는 그대로). 진열을 새로 받으면 풀린다
-      next = stampLastLine(applyTalk(st0, value, s.kick, s.talkStock, s.shelf, s.keep), lastBot(ctx.chat)?.key ?? '');
+      // 응답 키는 저장할 때 적는다 (stampReply: 기다리는 사이 본편이 넘어갔으면 지금 키로)
+      next = applyTalk(st0, value, s.kick, s.talkStock, s.shelf, s.keep);
       shut = next.closed && !st0.closed;
       // 우주몰: 문의로 새로 들어온 물건에 진실 칸이 비었으면 「?」 (시그니처 상품 fixedItem 과 같게 — 광고 문구가 사실이 되지 않게, 전수검사 11-13)
       if (site === 'cos') { const had = new Set(st0.items.map((x) => x.id)); next = { ...next, items: next.items.map((x) => (!x.sold && !had.has(x.id) && !x.truth ? { ...x, truth: '?' } : x)) }; }
@@ -213,6 +222,8 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       // 요청 전 상태(st0)와 같은 기준(살아 있는 응답)으로 읽는다: 산 응답이 지워진 물건을 「기다리는 동안 산 것」으로 잘못 보지 않게 (재검토 11-14)
       const now = lateNow(chat, site);
       merged = mergeLate(now, next, st0, s.shelf);
+      // 문의 답: 기다리던 내 말과 운영자 말에 지금 본편 응답 키를 적는다 — 기다리는 사이 본편이 한 턴 넘어가도 다음 본편에 같이 간다 (보낼 때 키로 두면 끝내 안 갔다)
+      if (kind === 'talk') merged = stampReply(st0, merged, lastBot(chat)?.key ?? '');
       if (st0.sell && !now.sell) deal = '';
       const saved = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, { ...merged, key }), ...(note !== null ? { [mallNoteKey(site)]: note, [atKey(site)]: turnKey(chat) } : {}) } };
       const done = deal ? saleDone(saved, site, deal) : null;
@@ -264,7 +275,7 @@ export function mallOpenCheck(ctx: ChatContext, env: MallEnv, site: MallSite): v
   sync(ctx);
   const s = mallSettings(ctx.chat.scriptstate, site);
   if (!s.on || s.auto === 'manual' || ui[site].loading) return;
-  if (site === 'bm' && !loggedNick(ctx)) return;
+  if (site === 'bm' && !bmUsable(ctx)) return;
   const st = readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat));
   if (st.loaded && String(ctx.chat.scriptstate?.[atKey(site)] ?? '') === turnKey(ctx.chat)) return;
   if (st.loaded && s.auto === 'turn') return;
@@ -364,7 +375,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
   switch (action) {
     case 'mall-refresh':
       if (!s.on || v.loading) return true;
-      if (site === 'bm' && !loggedNick(ctx)) return true;
+      if (site === 'bm' && !bmUsable(ctx)) return bmBlocked(ctx, env);
       await ask(ctx, env, site, 'shelf', st);
       return true;
     case 'mall-page':
@@ -401,6 +412,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
     case 'mall-buy': {
       // 포인트몰: 정가로 바로 구매 (로그인해야)
       if (site !== 'bm' || !loggedNick(ctx) || v.loading) return true;
+      if (!pointsMember(ctx.chat)) return bmBlocked(ctx, env);
       const it = st.items.find((x) => x.id === value && !x.sold);
       if (!it) return true;
       const got = await buy(ctx, site, [it.id]);
@@ -409,12 +421,26 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       return true;
     }
     case 'mall-ask':
-      if (site === 'bm') return deskOpen(ctx, env);
+      if (site === 'bm') return pointsMember(ctx.chat) ? deskOpen(ctx, env) : bmBlocked(ctx, env);
       // 상품에서 열면 그 물건을 붙인다
       if (site !== 'cos') return true;
       v.ask = true;
       v.picking = false;
       if (value && !st.closed) v.chip = value;
+      // 답을 기다리던 말이 새로고침 등으로 끊겨 답 없이 남았으면 떼고 입력칸에 돌려준다 (실패했을 때와 같게)
+      if (!jobs.has(`${chatKey(ctx)}:${site}`) && dropPending(st.talk)) {
+        let back = '';
+        await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+          const now = readMall(chat.scriptstate, site, aliveAnchors(chat));
+          const d = dropPending(now.talk);
+          if (!d) return null;
+          back = d.text;
+          return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, { ...now, talk: d.talk }) } };
+        }).catch(() => null);
+        if (back && !v.input) v.input = back;
+        await env.refresh();
+        return true;
+      }
       break;
     case 'mall-ask-close':
       v.ask = false;
@@ -436,7 +462,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       const mine = liveItemsOf(readItems(ctx.chat.scriptstate), ctx.chat).find((x) => x.id === value);
       if (!mine) return true;
       const left = itemLeft(readItems(ctx.chat.scriptstate), mine, aliveAnchors(ctx.chat));
-      const next = startSell(st, { itemId: mine.id, name: mine.name, desc: mine.desc, effect: mine.effect, ...(mine.truth ? { truth: mine.truth } : {}), use: mine.use, ...(left !== undefined ? { uses: left } : {}), ...(mine.equip ? { equip: mine.equip } : {}), ...(mine.icon ? { icon: mine.icon } : {}), ...(Number.isSafeInteger(mine.price) ? { paid: mine.price } : {}) });
+      const next = startSell(st, { itemId: mine.id, name: mine.name, desc: mine.desc, effect: mine.effect, ...(mine.truth ? { truth: mine.truth } : {}), use: mine.use, ...(left !== undefined ? { uses: left } : {}), ...(mine.equip ? { equip: mine.equip } : {}), ...(mine.icon ? { icon: mine.icon } : {}), ...(paidWon(mine) !== undefined ? { paid: paidWon(mine) } : {}) });
       v.selling = false;
       v.chip = '';
       await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, next) } }));
@@ -598,6 +624,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       return true;
     case 'mall-desk-next': {
       if (site !== 'bm' || v.dl) return true;
+      if (!pointsMember(ctx.chat)) return bmBlocked(ctx, env);
       const saved = await saveDesk(ctx, endDesk(readDesk(ctx.chat.scriptstate), deskSettings(ctx.chat.scriptstate).keep));
       v.input = '';
       if (saved) await deskRun({ ...ctx, chat: saved }, env, 'make', endDesk(readDesk(saved.scriptstate), deskSettings(saved.scriptstate).keep));
@@ -608,8 +635,9 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       if (site === 'bm') {
         const d = readDesk(ctx.chat.scriptstate);
         if (!said || v.dl || !d.agent || d.ended) return true;
+        if (!pointsMember(ctx.chat)) return bmBlocked(ctx, env);
         // 줄마다 그때의 마지막 응답 키를 적는다: 창을 열어 둔 채 다음 턴에 이어 말해도 메인 요청에 넘어가게 (전수검사 11-13)
-        const me: DeskLineK = { who: 'me', text: said.slice(0, 600), k: lastBot(ctx.chat)?.key ?? '' };
+        const me: DeskLine = { who: 'me', text: said.slice(0, 600), k: lastBot(ctx.chat)?.key ?? '' };
         // 상담 대화도 「보관하는 양」의 문의 대화 줄 수까지만 둔다: 한 턴 안에서 길게 이어 가도 모델에 끝없이 쌓여 가지 않게 (전수점검 사소-34)
         const next: DeskState = { ...d, talk: [...d.talk, me].slice(-shopLimits(ctx.chat.scriptstate).talk) };
         v.input = '';
@@ -643,7 +671,7 @@ export function deskSource(ctx: ChatContext): DeskSource {
   const vars = ctx.chat.scriptstate;
   const s = mallSettings(vars, 'bm');
   const st = readMall(vars, 'bm', aliveAnchors(ctx.chat));
-  const src = shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: mallVars(vars, 'bm') as typeof ctx.chat.scriptstate } }, { ...st, shop: guideTxt('BmDesk', 'SHOP_NAME'), owner: '' }, s, shopGive(vars, 'bm', 'desk'), true);
+  const src = shopSource({ ...ctx, chat: { ...ctx.chat, scriptstate: mallVars(vars, 'bm') as typeof ctx.chat.scriptstate } }, { ...st, shop: guideTxt('BmDesk', 'SHOP_NAME'), owner: '' }, s, shopGive(vars, 'bm', 'desk'));
   return { refs: src.refs, shelf: onShelf(st).map((x) => guideTxt('BmDesk', 'SHELF_LINE', { name: x.name, price: x.price, desc: x.desc })).join('\n'), points: balanceOf(ctx, 'bm'), nick: loggedNick(ctx), language: src.language, identity: src.identity, status: src.status, situation: src.situation, story: src.story };
 }
 
@@ -674,23 +702,27 @@ async function deskRun(ctx: ChatContext, env: MallEnv, kind: 'make' | 'talk', st
     const src = deskSource(ctx);
     const g = genSettings(vars);
     const opts = { retries: g.retries, retryModel: g.retryModel, concurrent: g.concurrent, state: vars, label: `${MALL_NAME.bm} 1:1 상담${kind === 'make' ? ' 연결' : ''}` };
-    let next: DeskState;
-    const key = lastBot(ctx.chat)?.key ?? '';
+    // 상담 줄의 응답 키는 답을 저장할 때의 마지막 응답으로 적는다: 기다리는 사이 본편이 한 턴 넘어가도 기다리던 내 말과 상담원 답이 다음 본편에 같이 간다
+    let build: (key: string) => DeskState;
     if (kind === 'make') {
       const dice = rollDice(ds.axes);
       const no = newDeskNo();
       const p = makePrompt(src, dice, st0.past.slice(0, ds.avoid), no);
       const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, (raw) => parseCard(raw, dice, no), opts);
-      next = { ...st0, agent: value.agent, anchor: key, talk: [{ who: 'sys', text: deskHello(value.agent) }, ...value.say.map((t): DeskLineK => ({ who: 'op', text: t, k: key }))] };
+      build = (key) => ({ ...st0, agent: value.agent, anchor: key, talk: [{ who: 'sys', text: deskHello(value.agent) }, ...value.say.map((t): DeskLine => ({ who: 'op', text: t, k: key }))] });
     } else {
       const p = deskTalkPrompt(src, st0, ds.end);
       const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, (raw) => parseDeskTalk(raw, ds.end), opts);
       // 상담원이 끝냈으면 마지막 말 아래에 안내 줄을 남기고 더 말할 수 없게 한다 (다시 열면 새 상담)
-      next = { ...st0, talk: [...st0.talk, ...value.say.map((t): DeskLineK => ({ who: 'op', text: t, k: key })), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
+      build = (key) => {
+        const wait = pendingMe(st0.talk);
+        const said = st0.talk.map((l, i) => (i >= st0.talk.length - wait ? { ...l, k: key } : l));
+        return { ...st0, talk: [...said, ...value.say.map((t): DeskLine => ({ who: 'op', text: t, k: key })), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
+      };
     }
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
-    await saveDesk(cur, next);
+    await saveDesk(cur, build(lastBot(cur.chat)?.key ?? ''));
   } catch (error) {
     v.notice = error instanceof Error ? error.message : String(error);
     v.failRaw = deskRawSafe(String((error as { raw?: string }).raw ?? ''));
@@ -723,7 +755,17 @@ async function deskOpen(ctx: ChatContext, env: MallEnv): Promise<boolean> {
   let st = readDesk(ctx.chat.scriptstate);
   const key = lastBot(ctx.chat)?.key ?? '';
   // 상담원이 끝낸 상담은 이어 가지 않는다: 끝내고 새로
-  if (st.agent && st.anchor === key && !st.ended) return env.render(), true;
+  if (st.agent && st.anchor === key && !st.ended) {
+    // 답을 기다리던 말이 새로고침 등으로 끊겨 답 없이 남았으면 떼고 입력칸에 돌려준다 (실패했을 때와 같게)
+    const d = dropPending(st.talk);
+    if (d) {
+      if (!v.input) v.input = d.text;
+      await saveDesk(ctx, { ...st, talk: d.talk });
+      await env.refresh();
+      return true;
+    }
+    return env.render(), true;
+  }
   // 방금 상담을 끊은 상담원은 바로 다시 연결하지 않는다
   const gone = st.ended ? st.agent?.id : undefined;
   if (st.agent) st = endDesk(st, ds.keep);
