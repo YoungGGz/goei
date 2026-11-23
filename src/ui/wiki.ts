@@ -284,7 +284,9 @@ export async function autoWriteWiki(ctx: ChatContext, messageIndex: number, open
       title = await pickTitle(cur);
     } catch (error) {
       // 제목 고르기 요청이 요청 토큰 상한을 넘는 경우 등: 문서 작성 실패와 같이 위키 화면에 까닭을 남긴다
-      if (target !== quietEnv) {
+      // 그사이 다른 채팅으로 옮겼으면 그 채팅 위키에 띄우지 않는다 (generate 의 실패 안내와 같은 확인)
+      const now = target.current();
+      if (target !== quietEnv && now && chatKey(now) === chatKey(cur)) {
         wiki.notice = `자동 작성 제목을 고르지 못했어요. ${error instanceof Error ? error.message : String(error)}`;
         target.render();
       }

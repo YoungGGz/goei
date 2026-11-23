@@ -78,7 +78,8 @@ export interface DeskAgent {
   dice: DeskDice;
 }
 /** k: 그 말을 한(답이 저장된) 때의 마지막 본편 응답 키 — 다음 본편에 넘길 줄을 고른다 (core/malls.ts mallEvents) */
-export interface DeskLine { who: 'me' | 'op' | 'sys'; text: string; k?: string }
+/** w: 본편 요청이 나간 뒤 그 답을 기다리는 사이에 저장된 줄 (core/shop.ts lineNow) */
+export interface DeskLine { who: 'me' | 'op' | 'sys'; text: string; k?: string; w?: true }
 export interface DeskState {
   agent: DeskAgent | null;
   talk: DeskLine[];
@@ -106,7 +107,7 @@ export const deskVars = (st: DeskState): Record<string, string> => ({ [DESK_VAR]
 /** 상담을 끝낸다: 상담사를 지난 목록에 넣고 대화를 비운다. 나눈 말은 done 으로 옮겨 그 턴 본편에 넘긴다 (끝의 답 없는 내 말은 버린다 — 기다리다 끊긴 말).
  *  keep: 기억해 둘 지난 상담사 수 (deskSettings().keep) */
 export function endDesk(st: DeskState, keep = DESK_KEEP_DEFAULT): DeskState {
-  const said = st.talk.filter((l) => l.who !== 'sys').map((l) => ({ who: l.who, text: l.text, k: l.k ?? st.anchor }));
+  const said = st.talk.filter((l) => l.who !== 'sys').map((l): DeskLine => ({ who: l.who, text: l.text, k: l.k ?? st.anchor, ...(l.w ? { w: true } : {}) }));
   while (said.length && said[said.length - 1].who === 'me') said.pop();
   // 지난 응답 키의 끝난 상담은 다시 넘기지 않으니 가장 최근 키의 것만 둔다
   const last = said.length ? said[said.length - 1].k : '';

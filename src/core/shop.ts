@@ -320,6 +320,8 @@ export interface ShopLine {
   quote?: string;
   /** 이 말을 한 때의 마지막 본편 응답 키 (쇼핑몰: 그 턴에 나눈 말만 본편에 넘긴다, core/malls.ts mallEvents) */
   k?: string;
+  /** 본편 요청이 이미 나간 뒤(그 답을 기다리는 사이)에 저장된 줄: 그 요청에는 실리지 못했으니 그 응답 다음 요청에 넘긴다 (lineNow) */
+  w?: true;
 }
 
 /** 맞춤 주문 견적 (우주몰 상담원, 11-09): 선납하면 core/orders.ts 의 주문이 된다. item 의 설명·효과·진실은 받을 때까지 숨긴다 */
@@ -451,7 +453,7 @@ export function readShop(vars: Vars, shelf = shelfCap(vars), keep = shopLimits(v
         // 모델이 낸 물건은 읽을 때(parseLine) 이미 120·60자로 잘린다. 여기서 또 자르면 설정에서 200자까지 적는 시그니처 상품 글이 중간에 끊긴다 (전수점검 눌러-보통-11)
         return { ...rest, ...traitsOf(x), desc: clean(x.desc, 200), effect: clean(x.effect, 200) };
       }), shelf),
-      talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}) })).slice(-keep.talk),
+      talk: (Array.isArray(o.talk) ? o.talk : []).filter((l): l is ShopLine => !!l && (l.who === 'me' || l.who === 'owner') && typeof l.text === 'string').map((l) => ({ who: l.who, text: l.text, ...(typeof l.note === 'string' && l.note ? { note: l.note } : {}), ...(typeof l.quote === 'string' && l.quote ? { quote: l.quote } : {}), ...(typeof l.k === 'string' && l.k ? { k: l.k } : {}), ...(l.w === true ? { w: true as const } : {}) })).slice(-keep.talk),
       closed: !!o.closed,
       prev: Array.isArray(o.prev) ? o.prev.filter((x): x is string => typeof x === 'string').slice(-keep.prev) : [],
       sell: readOffer(o.sell),
@@ -967,13 +969,33 @@ export const answeredTalk = <T extends { who: string }>(talk: readonly T[]): T[]
 
 /** 답을 저장할 때: 기다리던 내 말(pending 일 때)과 답으로 붙은 줄에 지금 본편 응답 키를 적는다.
  *  답을 기다리는 사이 본편이 한 턴 넘어가도 그 말과 답이 다음 본편에 같이 넘어가게 (요청 때 키로 두면 지난 턴 것으로 걸러져 끝내 안 갔다) */
-export function stampReply(st0: ShopState, next: ShopState, key: string, pending = true): ShopState {
+export function stampReply(st0: ShopState, next: ShopState, key: string, pending = true, late = false): ShopState {
   if (!key || !next.talk.length) return next;
   const added = next.talk[next.talk.length - 1] !== st0.talk[st0.talk.length - 1] ? 1 : 0;
   const n = Math.min(next.talk.length, (pending ? pendingMe(st0.talk) : 0) + added);
   if (!n) return next;
-  return { ...next, talk: next.talk.map((l, i) => (i >= next.talk.length - n ? { ...l, k: key } : l)) };
+  return { ...next, talk: next.talk.map((l, i) => (i >= next.talk.length - n ? lateLine({ ...l, k: key }, late) : l)) };
 }
+/** late: 본편 요청이 이미 나가 그 답을 기다리는 사이에 저장하는 줄인가 (host/usebox.ts useLocked). 그러면 w 를 적는다 */
+export const lateLine = <T extends { w?: true }>(l: T, late: boolean): T => {
+  const { w: _w, ...rest } = l;
+  return (late ? { ...rest, w: true } : rest) as T;
+};
+/** 마지막 응답 바로 앞 응답의 키 (없으면 '') */
+export function prevBotKey(chat: Chat): string {
+  const list = chat.message ?? [];
+  const last = lastBot(chat);
+  if (!last) return '';
+  for (let i = last.index - 1; i >= 0; i--) if (list[i].role === 'char') return messageKey(list[i], i);
+  return '';
+}
+/** 이 줄을 지금 본편 요청에 넘기나: 마지막 응답 뒤에 한 말(k 가 그 키), 또는 앞 요청이 나간 뒤 그 답을 기다리는 사이에 저장된 말(w, k 가 그 앞 응답 키).
+ *  뒤쪽이 없으면 본편이 답을 만드는 사이에 온 주인·운영자·상담원 답은 어느 요청에도 실리지 않았다 (요청은 이미 나갔고, 응답이 붙으면 지난 턴 것으로 걸러졌다).
+ *  앞 요청이 실패해 다시 보낸 때에는 그 줄이 두 턴에 실릴 수 있다 (실패는 알 수 없다) */
+export const lineNow = (chat: Chat, key: string): ((l: { k?: string; w?: true }) => boolean) => {
+  const prev = key && key === lastBot(chat)?.key ? prevBotKey(chat) : '';
+  return (l) => l.k === key || (!!l.w && !!prev && l.k === prev);
+};
 
 /** 창을 다시 열 때: 답 없이 남은 내 말을 뗀다 (기다리던 요청이 새로고침 등으로 끊긴 것). 뗀 글은 입력칸에 돌려준다. 뗄 것이 없으면 null */
 export function dropPending<T extends { who: string; text: string }>(talk: readonly T[]): { talk: T[]; text: string } | null {
@@ -1055,8 +1077,10 @@ export function shopEvents(chat: Chat): string[] {
   const out: string[] = [];
   // 이 턴(기준 응답 키가 지금 것)에 한 말·판 것만. 키 없는 줄은 옛 저장분이라 그대로 (같은 가게에 머물러도 지난 턴 것이 되풀이되지 않게, 전수검사 11-13)
   const now = (x: { k?: string }) => !x.k || x.k === st.key;
-  // 답 없는 내 말은 넘기지 않는다: 답을 기다리는 중이면 답이 올 때 지금 키로 다시 적혀 다음 턴에 같이 간다 (stampReply)
-  const turn = answeredTalk(st.talk).filter(now);
+  // 답 없는 내 말은 넘기지 않는다: 답을 기다리는 중이면 답이 올 때 지금 키로 다시 적혀 다음 턴에 같이 간다 (stampReply).
+  // 본편이 답을 만드는 사이에 온 답(w)은 그 응답 다음 요청에 (lineNow)
+  const mine = lineNow(chat, st.key);
+  const turn = answeredTalk(st.talk).filter((l) => !l.k || mine(l));
   // 다시 굴려 사본을 읽을 때는 판 것을 소지품 쪽(core/items.ts soldNow)이 넘긴다 — 지금 상점이 없으면 거기서 거르지 않으므로
   const sales = live ? st.sales.filter(now) : [];
   const lastOwner = [...turn].reverse().find((l) => l.who === 'owner');

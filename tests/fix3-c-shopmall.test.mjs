@@ -275,3 +275,38 @@ test('위키 문제1: 다른 채팅으로 옮긴 뒤 앞 채팅의 문서 작성
   assert.equal(UI.wiki.notice, '');
   assert.equal(UI.wiki.failure, null);
 });
+
+// ── 검토에서 찾은 것: 본편이 답을 만드는 사이(요청은 이미 나감)에 온 답 ──
+// 그 요청에는 못 실렸고 응답이 붙으면 지난 턴 것으로 걸러져, 어느 본편에도 가지 않았다. 저장할 때 w 를 적어 그 응답 다음 요청에 넘긴다
+const msgs = (...ids) => ids.map((id) => ({ role: id.startsWith('u') ? 'user' : 'char', data: id.startsWith('u') ? '말' : `글.\n${ST}`, chatId: id }));
+const TALK_REPLY = '<owner>\n그럼 백오십에 드리지요.\n</owner>\n<change mode="none">\n</change>';
+
+test('늦은 답(본편이 답을 만드는 사이): 상점 주인 답이 그 응답 다음 본편에 한 번 간다', () => {
+  const st0 = M.sayToOwner(loadedShop('c1'), '송연먹 백오십에 안 될까요?');
+  const late = M.stampReply(st0, M.applyTalk(st0, M.parseTalk(TALK_REPLY)), 'c1', true, true);
+  const plain = M.stampReply(st0, M.applyTalk(st0, M.parseTalk(TALK_REPLY)), 'c1', true, false);
+  const at = (st, key, ...ids) => M.shopEvents({ message: msgs(...ids), scriptstate: M.shopVars({ ...M.readShop(M.shopVars(st)), key }) }).join('\n');
+  // 응답 c2 가 붙은 뒤 다음 요청: 간다. 표시가 없으면(요청 전에 온 답 — 이미 실려 나감) 다시 가지 않는다
+  assert.match(at(late, 'c2', 'u1', 'c1', 'u2', 'c2'), /백오십에 드리지요/);
+  assert.match(at(late, 'c2', 'u1', 'c1', 'u2', 'c2'), /송연먹 백오십에 안 될까요/);
+  assert.doesNotMatch(at(plain, 'c2', 'u1', 'c1', 'u2', 'c2'), /백오십/);
+  // 그다음 턴에는 다시 가지 않는다
+  assert.doesNotMatch(at(late, 'c3', 'u1', 'c1', 'u2', 'c2', 'u3', 'c3'), /백오십/);
+});
+
+test('늦은 답(본편이 답을 만드는 사이): 우주몰 운영자 답·1:1 상담 답이 그 응답 다음 본편에 한 번 간다', () => {
+  const st0 = { ...cosBase(), talk: [{ who: 'me', text: '우산은 어때?', k: 'c1' }] };
+  const stamped = M.stampReply(st0, M.applyTalk(st0, M.parseTalk('<owner>\n우산 있다.\n</owner>\n<change mode="none">\n</change>')), 'c1', true, true);
+  const desk = { agent, anchor: 'c1', past: [], talk: [{ who: 'me', text: '환불도 되나요?', k: 'c1', w: true }, { who: 'op', text: '환불은 어렵습니다.', k: 'c1', w: true }] };
+  const vars = { ...M.mallVarsOf('cos', stamped), ...M.deskVars(desk) };
+  const ev = (...ids) => M.mallEvents({ message: msgs(...ids), scriptstate: vars }).join('\n');
+  const next = ev('u1', 'c1', 'u2', 'c2');
+  assert.match(next, /우산 있다/);
+  assert.match(next, /환불은 어렵습니다/);
+  const after = ev('u1', 'c1', 'u2', 'c2', 'u3', 'c3');
+  assert.doesNotMatch(after, /우산 있다/);
+  assert.doesNotMatch(after, /환불은 어렵습니다/);
+  // 끝난 상담(done)으로 옮겨져도 표시가 남는다
+  const ended = M.deskVars(M.endDesk(M.readDesk(M.deskVars(desk))));
+  assert.match(M.mallEvents({ message: msgs('u1', 'c1', 'u2', 'c2'), scriptstate: ended }).join('\n'), /환불은 어렵습니다/);
+});

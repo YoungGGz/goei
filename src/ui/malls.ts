@@ -18,7 +18,7 @@ import { addItem, bmOrderPaid, type MallPaid, bmPickupConfirm, dropUse, ITEM_USE
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { getPrefs } from '../core/settings';
 import { bmGoing, bmOrdersKeep, bmOrdersVars, cosOrdersKeep, liveBmOrders, requestBmOrders, liveOrders, minuteText, orderDue, orderReady, ordersText, ordersVars, settleReady, takeBmOrders, worldMinute, type BmOrder, type CosOrder } from '../core/orders';
-import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, dropPending, lastBot, pendingMe, markSold, storyStamp, parseShelf, parseTalk, pointShelf, sayToOwner, shelfItems, shelfPrompt, stampLastLine, stampReply, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
+import { turnKey, acceptQuote, appendItems, applyShelf, applyTalk, buyNote, cancelSell, closeSale, dropItemsNamed, dropPending, lastBot, lateLine, pendingMe, markSold, storyStamp, parseShelf, parseTalk, pointShelf, sayToOwner, shelfItems, shelfPrompt, stampLastLine, stampReply, startSell, talkPrompt, type ShopItem, type ShopState } from '../core/shop';
 import { winStyle, type PopSpec } from './popwin';
 import { craftMessages } from '../core/craft';
 import { defChanged, defStored } from '../core/deftext';
@@ -223,7 +223,8 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       const now = lateNow(chat, site);
       merged = mergeLate(now, next, st0, s.shelf);
       // 문의 답: 기다리던 내 말과 운영자 말에 지금 본편 응답 키를 적는다 — 기다리는 사이 본편이 한 턴 넘어가도 다음 본편에 같이 간다 (보낼 때 키로 두면 끝내 안 갔다)
-      if (kind === 'talk') merged = stampReply(st0, merged, lastBot(chat)?.key ?? '');
+      // 본편 요청이 이미 나가 그 답을 기다리는 사이면(useLocked) 그 요청에는 못 실렸다는 표시도 같이 (core/shop.ts lineNow)
+      if (kind === 'talk') merged = stampReply(st0, merged, lastBot(chat)?.key ?? '', true, useLocked(ctx.charIndex, ctx.chatIndex));
       if (st0.sell && !now.sell) deal = '';
       const saved = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, { ...merged, key }), ...(note !== null ? { [mallNoteKey(site)]: note, [atKey(site)]: turnKey(chat) } : {}) } };
       const done = deal ? saleDone(saved, site, deal) : null;
@@ -703,26 +704,27 @@ async function deskRun(ctx: ChatContext, env: MallEnv, kind: 'make' | 'talk', st
     const g = genSettings(vars);
     const opts = { retries: g.retries, retryModel: g.retryModel, concurrent: g.concurrent, state: vars, label: `${MALL_NAME.bm} 1:1 상담${kind === 'make' ? ' 연결' : ''}` };
     // 상담 줄의 응답 키는 답을 저장할 때의 마지막 응답으로 적는다: 기다리는 사이 본편이 한 턴 넘어가도 기다리던 내 말과 상담원 답이 다음 본편에 같이 간다
-    let build: (key: string) => DeskState;
+    // late: 본편 요청이 이미 나가 그 답을 기다리는 사이에 저장한다 — 그 요청에는 못 실렸다는 표시 (core/shop.ts lineNow)
+    let build: (key: string, late: boolean) => DeskState;
     if (kind === 'make') {
       const dice = rollDice(ds.axes);
       const no = newDeskNo();
       const p = makePrompt(src, dice, st0.past.slice(0, ds.avoid), no);
       const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, (raw) => parseCard(raw, dice, no), opts);
-      build = (key) => ({ ...st0, agent: value.agent, anchor: key, talk: [{ who: 'sys', text: deskHello(value.agent) }, ...value.say.map((t): DeskLine => ({ who: 'op', text: t, k: key }))] });
+      build = (key, late) => ({ ...st0, agent: value.agent, anchor: key, talk: [{ who: 'sys', text: deskHello(value.agent) }, ...value.say.map((t) => lateLine<DeskLine>({ who: 'op', text: t, k: key }, late))] });
     } else {
       const p = deskTalkPrompt(src, st0, ds.end);
       const { value } = await generate(craftMessages(p.messages, { thoughts: s.thoughts, memo: false, reiterate: 0 }, { thoughts: p.thoughts }), s.model, (raw) => parseDeskTalk(raw, ds.end), opts);
       // 상담원이 끝냈으면 마지막 말 아래에 안내 줄을 남기고 더 말할 수 없게 한다 (다시 열면 새 상담)
-      build = (key) => {
+      build = (key, late) => {
         const wait = pendingMe(st0.talk);
-        const said = st0.talk.map((l, i) => (i >= st0.talk.length - wait ? { ...l, k: key } : l));
-        return { ...st0, talk: [...said, ...value.say.map((t): DeskLine => ({ who: 'op', text: t, k: key })), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
+        const said = st0.talk.map((l, i) => (i >= st0.talk.length - wait ? lateLine({ ...l, k: key }, late) : l));
+        return { ...st0, talk: [...said, ...value.say.map((t) => lateLine<DeskLine>({ who: 'op', text: t, k: key }, late)), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
       };
     }
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
-    await saveDesk(cur, build(lastBot(cur.chat)?.key ?? ''));
+    await saveDesk(cur, build(lastBot(cur.chat)?.key ?? '', useLocked(cur.charIndex, cur.chatIndex)));
   } catch (error) {
     v.notice = error instanceof Error ? error.message : String(error);
     v.failRaw = deskRawSafe(String((error as { raw?: string }).raw ?? ''));
@@ -751,7 +753,8 @@ async function deskOpen(ctx: ChatContext, env: MallEnv): Promise<boolean> {
   if (!ds.on || !loggedNick(ctx)) return true;
   v.ask = true;
   v.notice = '';
-  if (v.dl) return env.render(), true;
+  // 채팅을 옮겼다 돌아오면 v.dl 은 비어 있어도 이 채팅의 상담 요청이 아직 돌고 있을 수 있다: 그때는 기다리던 말을 떼지 않는다
+  if (v.dl || jobs.has(`${chatKey(ctx)}:bm-desk`)) return env.render(), true;
   let st = readDesk(ctx.chat.scriptstate);
   const key = lastBot(ctx.chat)?.key ?? '';
   // 상담원이 끝낸 상담은 이어 가지 않는다: 끝내고 새로

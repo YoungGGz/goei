@@ -4,7 +4,7 @@
 import type { Chat } from './types';
 import { type TruthMode, emptyShop, readShop, reviveShop, shelfCap, SHOP_VAR, shopBlocked, shopLimits, shopSettings, type ShopSettings, type ShopState } from './shop';
 import { guideTxt, type GuideName } from './guides';
-import { answeredTalk, lastBot, shelfMainText, SHOP_CTX_VAR, SHOP_KICK_VAR, SHOP_SHARED_VARS, turnKey } from './shop';
+import { answeredTalk, lastBot, lineNow, shelfMainText, SHOP_CTX_VAR, SHOP_KICK_VAR, SHOP_SHARED_VARS, turnKey } from './shop';
 import { liveOrders, readyNotes } from './orders';
 import { readDesk } from './bmdesk';
 import { aliveAnchors } from './wallet';
@@ -260,7 +260,8 @@ export function mallEvents(chat: Chat): string[] {
   const cosMain = shopMain(vars, 'cos');
   const lines = shopMainLines(vars);
   // 답 없는 내 말은 넘기지 않는다: 기다리는 중이면 답이 올 때 지금 키로 다시 적혀 같이 간다 (core/shop.ts stampReply), 끊겼으면 창을 열 때 입력칸으로 돌아간다
-  const cos = answeredTalk(readMall(vars, 'cos').talk).filter((l) => l.k === key);
+  const mine = lineNow(chat, key);
+  const cos = answeredTalk(readMall(vars, 'cos').talk).filter(mine);
   // 글은 지침 「메인 요청에 붙는 글」의 MALL.* 절 (2026-11-14 사용자: 코드에 글을 두지 않는다)
   const said = (l: { who: string; text: string }, other: string) => guideTxt('Main', 'MALL.LINE', { who: guideTxt('Main', l.who === 'me' ? 'MALL.WHO.ME' : other), text: l.text });
   if (cosMain.has('ask') && cos.some((l) => l.who === 'me')) out.push(guideTxt('Main', 'MALL.ASK', { mall: MALL_NAME.cos, lines: capLines(cos, lines).map((l) => said(l, 'MALL.WHO.OPERATOR')).join(' / ') }));
@@ -288,7 +289,7 @@ export function mallEvents(chat: Chat): string[] {
   const desk = readDesk(vars);
   // 상담 줄마다 적힌 응답 키로 거른다 (키 없는 옛 줄은 상담 키): 창을 열어 둔 채 다음 턴에 이어 한 말도 넘어가고, 지난 턴 줄은 다시 안 간다 (전수검사 11-13).
   // 이 턴에 끝난 상담(done)도 같이, 답 없는 끝의 내 말은 빼고
-  const dl = [...(desk.done ?? []), ...answeredTalk(desk.talk.filter((l) => l.who !== 'sys')).map((l) => ({ ...l, k: l.k ?? desk.anchor }))].filter((l) => l.k === key);
+  const dl = [...(desk.done ?? []), ...answeredTalk(desk.talk.filter((l) => l.who !== 'sys')).map((l) => ({ ...l, k: l.k ?? desk.anchor }))].filter(mine);
   if (shopMain(vars, 'bm').has('desk') && dl.some((l) => l.who === 'me')) out.push(guideTxt('Main', 'MALL.DESK', { mall: MALL_NAME.bm, lines: capLines(dl, lines).map((l) => said(l, 'MALL.WHO.COUNSELOR')).join(' / ') }));
   return out;
 }

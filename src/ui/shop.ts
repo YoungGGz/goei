@@ -467,7 +467,8 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
       merged = mergeLate(now, next, st0, s.shelf);
       if (st0.sell && !now.sell) deal = '';
       // 기다리던 내 말과 받은 답은 지금 본편 응답 키로: 기다리는 사이 본편이 넘어가도 다음 본편에 같이 간다
-      merged = stampReply(st0, merged, now0.key, kind === 'talk');
+      // 본편 요청이 이미 나가 그 답을 기다리는 사이면(useLocked) 그 요청에는 못 실렸다는 표시도 같이 (core/shop.ts lineNow)
+      merged = stampReply(st0, merged, now0.key, kind === 'talk', useLocked(cur.charIndex, cur.chatIndex));
       const saved = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...shopVars({ ...merged, key: now0.key }) } };
       const done = deal ? saleDone(saved, next.shop, deal) : null;
       if (done) sold = true;
