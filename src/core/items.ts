@@ -523,6 +523,12 @@ export function mallPaidText(p: MallPaid): string {
 /** 포인트몰 수령 대기 줄이 물건에 넘길 치른 사실 (살 때 적은 것, 없으면 그 값만큼 포인트) */
 export const bmOrderPaid = (o: BmOrder): MallPaid => o.mallPaid ?? { mall: 'bm', by: 'points', amount: o.price };
 
+/** 원으로만 치른 값 (상점에 팔 때 「산 값」으로 넘기는 것). 다른 대가·포인트로 치렀으면 원 값을 모르니 undefined (「0원에 샀다」가 되지 않게) */
+export function paidWon(it: { price?: number; paidWith?: string; mallPaid?: MallPaid }): number | undefined {
+  if (it.mallPaid) return it.mallPaid.by !== 'points' && !it.mallPaid.pay && Number.isSafeInteger(it.mallPaid.amount) ? it.mallPaid.amount : undefined;
+  return Number.isSafeInteger(it.price) && !it.paidWith ? it.price : undefined;
+}
+
 /** 획득 기록의 값: 원 · 원이 아닌 대가 */
 const paidNote = (e: ItemInput): string =>
   [Number.isSafeInteger(e.price) && (e.price! > 0 || !e.paidWith) ? `₩ ${e.price!.toLocaleString('en-US')}` : '', e.paidWith ? clean(e.paidWith, 60) : ''].filter(Boolean).join(' + ');
