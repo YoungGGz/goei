@@ -40,6 +40,8 @@ test('B1: 카드 단독 창이 끝나면 탭이 id 까지 그대로, 단독 창�
   assert.equal(B.br.tabs.length, 1);
   // 단독 창 쪽은 저장 꼴(JSON)로 되살리지 않는다
   assert.match(app, /soloBack = \{ tabs: snapTabs\(\), tab, nav: navHist\.snapshot\(\) \}/);
+  // 단독 창은 제 기록만 쓴다 (열기 전 화면으로 뒤로 가지 않는다)
+  assert.match(app, /soloBack = \{ tabs: snapTabs\(\), tab, nav: navHist\.snapshot\(\) \};\s*\/\/[^\n]*\n\s*navHist\.clear\(\);/);
   assert.match(app, /putTabs\(soloBack\.tabs\);\s*tab = soloBack\.tab;\s*navHist\.restore\(soloBack\.nav\);/);
 });
 
@@ -83,4 +85,16 @@ test('B4: 한참 뒤로 간 탭을 저장해도 보던 화면과 앞뒤 기록�
 test('B3: 게시판 즐겨찾기는 그 게시판 첫 화면부터 (로고와 같은 길)', () => {
   const go = app.slice(app.indexOf('function goSite('), app.indexOf('/** 설정 창(폰)에 주는 하단 바'));
   assert.match(go, /if \(isBoardSite\(site\)\) \{\s*useBoardSite\(site\);\s*gnetHome\(\);\s*\}/);
+});
+
+test('주소줄 ‹ › 단추는 이 화면을 탭 기록에 적은 뒤의 상태로 맞춘다', () => {
+  assert.match(app, /recordTab\(ts\);\s*\/\/[^\n]*\n\s*root\.querySelectorAll<HTMLButtonElement>\('\.br-tool \[data-action="br-back"\], \.br-tool \[data-action="br-fwd"\]'\)\.forEach\(\(b\) => \(b\.disabled = !tabCan\(/);
+  // 새 탭에서 사이트를 열면 뒤로 갈 수 있고, 뒤로 간 뒤 다른 곳을 열면 앞으로는 없다
+  B.restoreTabs('');
+  B.recordTab({ tab: 'net', b: '' });
+  B.recordTab({ tab: 'gnet', b: 'gn' });
+  assert.equal(B.tabCan(-1), true);
+  B.tabGo(-1);
+  B.recordTab({ tab: 'wiki', b: 'wk' });
+  assert.equal(B.tabCan(1), false);
 });

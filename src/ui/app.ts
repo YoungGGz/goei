@@ -858,7 +858,11 @@ export async function openShop(site = ''): Promise<void> {
   await openApp({ quietIfNotLite: true, check: false });
   // 고유 상점에 인터넷으로 접속한 카드(11-09 사용자): 상황판 없이 인터넷 창만 그 사이트로. 사고판 것은 상황판 인터넷 탭과 같은 저장소
   if (site && view.kind === 'started' && isSite(site)) {
-    if (!netSolo) soloBack = { tabs: snapTabs(), tab, nav: navHist.snapshot() };
+    if (!netSolo) {
+      soloBack = { tabs: snapTabs(), tab, nav: navHist.snapshot() };
+      // 단독 창은 제 기록만 쓴다: 뒤로 가도 열기 전에 보던 화면(상황판·다른 사이트)이 단독 창 틀에 뜨지 않는다
+      navHist.clear();
+    }
     netSolo = true;
     tab = 'net';
     openSite(site);
@@ -1819,6 +1823,8 @@ function render(): void {
   if (view.kind === 'started' && inBrowser()) {
     const { bt: _bt, ...ts } = navState();
     recordTab(ts);
+    // 주소줄 ‹ › 도 적은 뒤의 기록으로 맞춘다 (그릴 때는 아직 이 화면이 안 적혀 있어, 새 탭에서 사이트를 열면 ‹ 가 꺼져 있고 뒤로 갔다가 다른 곳을 열면 › 가 켜져 있었다)
+    root.querySelectorAll<HTMLButtonElement>('.br-tool [data-action="br-back"], .br-tool [data-action="br-fwd"]').forEach((b) => (b.disabled = !tabCan(b.dataset.action === 'br-back' ? -1 : 1)));
   }
   saveTabsSoon();
   // PC ‹ › : 기록은 그린 뒤에 적으니 단추 상태는 여기서
