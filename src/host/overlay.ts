@@ -354,7 +354,18 @@ export async function createFab(onOpen: () => void): Promise<Fab> {
 
   return {
     async setVisible(next, intro = false) {
-      if (shown === next && !intro) return;
+      if (shown === next && !intro) {
+        // 떠 있는 동안 창 크기가 바뀌면 화면 안으로 다시 당긴다 (2차 점검 20-1: 폴드를 펴거나 폰을 돌리면 단추가 화면 밖으로 나갔다)
+        if (next && !drag) {
+          const { vw, vh } = await viewport();
+          const fit = clampPos(pos, vw, vh);
+          if (fit.right !== pos.right || fit.bottom !== pos.bottom) {
+            pos = fit;
+            await applyPos();
+          }
+        }
+        return;
+      }
       const reappear = next && !shown;
       shown = next;
       if (reappear) await bind().catch(() => {});
