@@ -28,7 +28,7 @@ import { findStatusTags } from '../core/world/status';
 import { colConfig } from '../core/world/statuscols';
 import { mentionsPoints, pointsOn, pointsVars, readPoints, syncPointsToStatus } from '../core/points';
 import { addWalletEntry, aliveAnchors, mentionsAmount, readWallet, recordedPaid, syncWalletToStatus, walletBalance, walletLoose, walletSyncOn, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
-import { applyItemChanges, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
+import { applyItemChanges, settleEdits, forgetAway, settleBmPickups, confirmBmPickups, bmPickupConfirm, ITEM_SCOPE_SKIP, itemScope, itemAutoOn, itemStateOn, itemsAwayOf, itemsNowOf, itemsVars, readItems, setItemRules, usedItemsAt } from '../core/items';
 import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/orders';
 import { ensureItemIcons, itemPictures } from './itemicons';
 import { DIAG_KEEP_DEFAULT, getPrefs } from '../core/settings';
@@ -559,7 +559,8 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
         // 턴은 요청의 items_away 와 같이 이번에 읽은 마지막 응답에서 센다 (밀린 응답·지난 응답을 읽을 때 채팅 끝에서 세지 않게)
         if (itemsOn) {
           const it0 = readItems(next.scriptstate);
-          const it1 = forgetAway(it0, next, asOfKey);
+          // 다시 굴리거나 지운 응답이 바꾼 칸(설명·상태·장착 등)은 옛 값으로 굳혀 저장한다 (core/items.ts settleEdits: 화면·요청은 이미 옛 값으로 본다)
+          const it1 = forgetAway(settleEdits(it0, aliveAnchors(next)), next, asOfKey);
           if (it1 !== it0) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it1) } };
         }
         // 상점 판단 (11-09): 판단한 응답 끝의 표식을 갱신기 판단대로 바꾸고(있으면 붙이고 없으면 지움) 본편과 같은 정리(settleShop)를 돌린다.
