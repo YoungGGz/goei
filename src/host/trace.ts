@@ -4,7 +4,7 @@
 import type { LlmMessage } from './llm';
 import { tokens } from '../core/gnet';
 import { getPrefs, TRACE_KEEP_DEFAULT } from '../core/settings';
-import { progressWatchdog, progressBegin, progressMain, progressMainTokens, progressReply, progressTurn } from '../core/progress';
+import { callOwner, progressWatchdog, progressBegin, progressMain, progressMainTokens, progressReply, progressTurn } from '../core/progress';
 
 export interface TraceCall {
   /** 호출 종류 (라우터·디렉터·갱신기·괴담넷·괴담톡·위키·소지품·상점·…) */
@@ -80,6 +80,8 @@ let open: TraceTurn | null = null;
 let replied = false;
 /** 열린 턴의 응답 뒤 작업이 다 끝났는지 (그 뒤 손으로 누른 호출은 manual. 전수검사 11-13: 지난 턴 합계에 섞였다) */
 let ended = false;
+/** 새 턴이 열릴 때 뒤 작업이 아직 돌던 앞 턴 (core/progress.ts prev 와 짝, 2차 점검 14-2) */
+let prevOpen: TraceTurn | null = null;
 
 export const clip = (s: string, max = TRACE_TEXT): string => {
   if (s.length <= max) return s;
@@ -192,6 +194,7 @@ export async function clearTrace(): Promise<void> {
   turns = [];
   swept = true;
   open = null;
+  prevOpen = null;
   replied = false;
   ended = false;
   dirty.clear();
@@ -216,6 +219,7 @@ async function push(t: TraceTurn): Promise<void> {
 /** 본편 요청 조립 시작: 새 턴을 연다 (이전 턴은 닫힌다) */
 export async function traceBegin(): Promise<void> {
   const t: TraceTurn = { id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`, at: new Date().toISOString(), calls: [] };
+  prevOpen = open && replied && !ended ? open : null;
   open = t;
   replied = false;
   ended = false;
@@ -266,6 +270,7 @@ export const traceTurnId = (): string | null => open?.id ?? null;
 /** 턴의 응답 뒤 작업이 다 끝났다. 앞 턴의 뒤 작업이 늦게 끝나도 새 턴은 닫지 않는다 */
 export function traceEnd(id: string | null): void {
   if (open && id && open.id === id) ended = true;
+  if (prevOpen && id && prevOpen.id === id) prevOpen = null;
 }
 
 /** 호출이 시작될 때의 턴·단계. runModel 이 시작할 때 쥐고 끝날 때 traceCall 에 넘긴다 (전수점검 보통-7: 끝나는 때의 턴으로 적어,
@@ -274,8 +279,12 @@ export interface TraceMark {
   id: string | null;
   phase: TraceCall['phase'];
 }
-export function traceMark(): TraceMark {
+export function traceMark(label?: string): TraceMark {
   const t = open;
+  // 호출의 주인은 진행 창과 같은 판정 (core/progress.ts callOwner): 앞 턴의 뒤 작업은 앞 턴에, 채팅 턴 중에 단추로 부른 호출은 manual (2차 점검 14-2·14-3)
+  const who = label === undefined ? 'turn' : callOwner(label);
+  if (who === 'prev' && prevOpen) return { id: prevOpen.id, phase: 'after' };
+  if (who === 'manual' && t) return { id: t.id, phase: 'manual' };
   // 본편이 실패·중지되면 응답 훅이 안 와 traceEnd 가 안 불린다. 진행 창(core/progress.ts)과 같은 시간만큼 응답이 없으면 끝난 턴으로 본다 (재검토 11-14). 늦게라도 응답이 붙으면 그 뒤 호출은 다시 after
   const dead = !!t && !replied && Date.now() - new Date(t.at).getTime() >= progressWatchdog();
   return { id: t?.id ?? null, phase: !t || ended || dead ? 'manual' : replied ? 'after' : 'before' };
