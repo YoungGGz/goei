@@ -115,8 +115,8 @@ export function pinReport(r: ReportStore, id: string, on: boolean): ReportStore 
 /**
  * 리롤·지운 응답 되감기: 그 응답을 다시 굴리거나 지우고 다음 응답이 반영될 때, **바로 그 응답이 만들었던** 일지 줄·보고서를 지운다 (고정한 보고서도).
  * 대상은 `$goei_prev` 가 적어 둔 그 응답의 일지 줄 id 목록(`made`)이다 — 메시지 번호(idx)로 지우면 앞 메시지를 지운 뒤 같은 번호에 온 무관한
- * 리롤이 옛 기록을 지운다(일지는 영구 보관). 목록에는 그 응답이 만든 대상을 손으로 끝낸 줄도 들어 있다 (world/output.ts prevWorldVars).
- * 그 밖의 수동 종료는 리롤 기준 상태에도 반영돼 있어 되살아나지 않으므로 목록에 없다. id 목록이 없는 옛 `$goei_prev` 만 번호로 자동 종료를 지운다.
+ * 리롤이 옛 기록을 지운다(일지는 영구 보관). 수동 종료는 리롤 기준 상태에도 반영돼 있어 되살아나지 않으므로(world/output.ts prevWorldVars) 목록에 없고 남는다.
+ * id 목록이 없는 옛 `$goei_prev` 만 번호로 자동 종료를 지운다.
  */
 export function rewindClosures(j: JournalStore, r: ReportStore, target: number | string[]): { journal: JournalStore; reports: ReportStore; changed: boolean } {
   const auto = (cause: string) => cause === 'model' || cause === 'ttl';

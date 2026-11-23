@@ -15,7 +15,7 @@ import { hasSceneCard, isUnsent, readScene } from '../dispatch';
 export const WORLD_KEY = '$goei_world';
 const LAST_KEY = '$goei_last';
 /** 마지막으로 반영한 응답 직전의 상태. 같은 자리에 다른 응답이 오면(리롤) 여기서 다시 시작한다 */
-const PREV_KEY = '$goei_prev';
+export const PREV_KEY = '$goei_prev';
 
 interface PrevState {
   i: number;
@@ -109,7 +109,8 @@ function prevKey(messages: Chat['message'], index: number): string {
  * index 자리에 오는 응답이 마지막으로 반영한 응답을 되돌려야 하는 자리면 그 응답이 반영되기 전 상태, 아니면 null.
  * - 리롤: 같은 자리의 이전 응답을 갈아 끼움. 「같은 자리」 = 같은 번호 + 바로 앞 메시지가 같은 것(열쇠).
  * - 지움: 마지막으로 반영한 응답이 채팅에 없다 (지우고 새로 보냄). 소지품·가계부·인물 기록처럼 지운 응답이 만든 것도 되돌아간다.
- *   앞 메시지만 지우고 그 응답은 남았으면 되돌리지 않는다.
+ *   앞 메시지만 지우고 그 응답은 남았으면 되돌리지 않는다. 되돌아가는 것은 마지막으로 반영한 응답 하나다 (기준 상태를 하나만 둔다).
+ *   그 응답 뒤에 손으로 끝낸 상황은 기준 상태에도 같이 적혀 있어 남고 (prevWorldVars), 걸어 둔 임무 요청도 남긴다.
  * 응답 처리(processOutput)와 다시 굴린 요청 조립(rerollRequestVars)이 같이 쓴다.
  */
 function rerollBase(chat: Chat, index: number): PrevState | null {
@@ -117,8 +118,16 @@ function rerollBase(chat: Chat, index: number): PrevState | null {
   if (!prev) return null;
   const messages = chat.message ?? [];
   if (prev.i === index && (prev.pk === undefined || prev.pk === prevKey(messages, index))) return prev;
-  if (prev.k && !messages.some((m, i) => i !== index && messageKey(m, i) === prev.k)) return prev;
-  return null;
+  // 번호 열쇠(#n, chatId 없는 옛 메시지)는 앞 메시지를 지우면 바뀌어 「지워졌다」고 잘못 볼 수 있으니 chatId 열쇠만 본다
+  if (!prev.k || prev.k.startsWith('#') || messages.some((m, i) => i !== index && messageKey(m, i) === prev.k)) return null;
+  // 응답을 지운 뒤 임무 창에서 건 요청(요청 대기)은 지금 상태에만 있다 — 기준 상태로 돌아가도 그 요청은 남긴다 (안 그러면 요청의 NEW 줄과 대기가 사라진다)
+  const now = readWorld(chat).pending;
+  const kinds = (['an', 'ms', 'in'] as const).filter((k) => now?.[k]);
+  if (!kinds.length) return prev;
+  const base = parseWorld(prev.world);
+  for (const k of kinds) base.pending[k] = now[k];
+  base.notice = readWorld(chat).notice;
+  return { ...prev, world: serializeWorld(base) };
 }
 
 /**
@@ -269,19 +278,16 @@ function markStart(before: WorldState, after: WorldState, key: string) {
 /**
  * 상황판에서 손으로 바꾼 것(사건 종료 등)을 리롤 기준 상태에도 똑같이 반영한다.
  * 안 그러면 그 응답을 리롤할 때 손으로 바꾼 것이 사라진다. 바꿀 기준 상태가 없으면 빈 값.
- * change 가 기준 상태에서 안 됐다고 하면(참 값을 돌려주거나 던짐) 그 대상은 마지막 응답이 만든 것이다 — 손으로 바꾸며 생긴 일지 줄(made)을
- * 그 응답이 만든 줄로 적어, 그 응답을 다시 굴리거나 지우면 대상과 함께 되돌아가게 한다 (상황판과 일지가 서로 다른 말을 하지 않게).
+ * 마지막 응답이 처음 띄운 상황을 끝낼 때는 기준 상태에 그 상황이 아직 없으니, 부르는 쪽이 기준 상태용 변경을 따로 준다 (ui/field.ts, engine.ts endUpcoming).
  */
-export function prevWorldVars(state: ScriptState | undefined, change: (w: WorldState) => unknown, made: string[] = []): ScriptState {
+export function prevWorldVars(state: ScriptState | undefined, change: (w: WorldState) => unknown): ScriptState {
   const prev = readPrev(state?.[PREV_KEY]);
   if (!prev) return {};
   const w = parseWorld(prev.world);
-  let missed = false;
   try {
-    missed = !!change(w);
+    change(w);
   } catch {
-    missed = true;
+    return {};
   }
-  if (missed) return made.length ? { [PREV_KEY]: JSON.stringify({ ...prev, made: [...(prev.made ?? []), ...made] }) } : {};
   return { [PREV_KEY]: JSON.stringify({ ...prev, world: serializeWorld(w) }) };
 }

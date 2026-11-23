@@ -23,7 +23,7 @@ import { activeBooksRow, advSections } from './advanced';
 import { ASSET_NOTE } from '../core/asset';
 import { IMG_FOLD, IMG_RECENT, IMG_SIZE, imgFold, imgRecent, imgSize, setImgHidden } from '../core/imgtag';
 import type { Chat, ScriptState } from '../core/types';
-import { parseCatalog, readWorld, startWorldVars, WORLD_KEY, worldOn, worldVars } from '../core/world';
+import { parseCatalog, PREV_KEY, readWorld, startWorldVars, WORLD_KEY, worldOn, worldVars } from '../core/world';
 import { AUTO, AUTO_HIDE, COL_LOG_VAR, colConfig, colVar, isPointsOrg, POINTS_ON_VAR, pointsAuto, STATUS_COLS, usedCols, withColLog, type ColConfig, type ColId, type ColMode } from '../core/world/statuscols';
 import { pointsFlagFor } from '../core/points';
 import { readIconMisses } from '../core/iconmatch';
@@ -222,7 +222,8 @@ const wonInput = (n: number, busy: boolean, locked = false) =>
 
 /** 상황판을 끈다: 상태와 보고를 비운다 (원본 clearIntegratedControlState. 다시 켜도 복원하지 않음) */
 function worldOffVars(): ScriptState {
-  return { $st_anomaly_on: '0', [WORLD_KEY]: '', $an_report: '', $in_report: '', $ms_report: '', $ag_report: '' };
+  // 리롤 기준 상태도 비운다 (다시 켠 뒤 응답을 다시 굴리거나 지워도 끄기 전 상황판이 되살아나지 않게)
+  return { $st_anomaly_on: '0', [WORLD_KEY]: '', [PREV_KEY]: '', $an_report: '', $in_report: '', $ms_report: '', $ag_report: '' };
 }
 
 export type SettingsScope = 'chat' | 'defaults' | 'card';

@@ -14,6 +14,7 @@ import {
 } from '../core/world';
 import { loadContext, updateChat, type ChatContext } from '../host/risu';
 import { isWaiting, onWaiting } from '../host/waiting';
+import { freeUseLock } from '../host/usebox';
 import { prepareBaseDocs } from '../core/wiki';
 import { facePic, loadModuleAssets, mainPic } from '../host/assets';
 import { playableAgents, playerAgent } from '../core/player';
@@ -889,6 +890,8 @@ async function refresh(): Promise<void> {
       view = { kind: 'error', message: `선택된 채팅이 없어요. ${BRAND.name} 채팅을 연 뒤 다시 눌러 주세요.` };
     } else {
       const manifest = readManifest(ctx.char.globalLore);
+      // 첫 카드 하나뿐인 채팅: 요청이 답 없이 끝났으면(중지·실패) 기다림 시간이 남아 있어도 다시 고를 수 있게 리수 화면을 먼저 본다 (host/usebox.ts freeUseLock)
+      if (isWaiting() && (ctx.chat.message ?? []).length === 1) await freeUseLock();
       const phase = chatPhase(ctx.chat, isWaiting());
       if (manifest) {
         applyAdvanced(ctx.chat.scriptstate);

@@ -151,6 +151,8 @@ export function planStart(
       $seed_lore: seed.text,
       $seed_inputs: '0',
       $goei_last: '',
+      // 리롤 기준 상태도 비운다: 메시지를 다 지우고 같은 채팅에서 다시 시작하면, 남은 옛 기준(지운 응답의 것)으로 첫 요청·첫 응답이 옛 상황판에서 시작됐다 (core/world/output.ts rerollBase)
+      $goei_prev: '',
       // 고유 인물로 시작하면 명부의 「시작 소지품」을 넣고 손에 드는 것은 손 칸, 장비는 장착 (모델 호출 없음, 11-07 사용자; 손 칸은 사용자 2026-11-14). 페르소나는 빈 소지품
       ...startItemsVars(startItems && choice.player ? readDirectory(lore).agents.find((x) => x.id === choice.player)?.startItems ?? [] : []),
       // 소지 한도 (2026-11-08 사용자): 고유 인물은 명부 「소지 한도」, 페르소나·값 없는 인물은 설정 값

@@ -1,7 +1,7 @@
 // 전수점검 2차 재확인 고침 (상황판·시작·임무·일지): 06-1~4, 15-1~3, 15-Q2, 18-B1
 // - 답을 기다리는 동안에는 시작·임무 카드를 채팅에 놓거나 바꾸지 않는다 (요청 도중 채팅 저장 금지)
 // - 창 「요청 취소」는 답 없이 끝난 카드도 물린다
-// - 응답을 다시 굴리거나 지우면 그 응답이 만든 것(상황판·요원·일지·고정 보고서, 그 응답이 띄운 것을 손으로 끝낸 줄)이 같이 되돌아간다
+// - 응답을 다시 굴리거나 지우면 그 응답이 만든 것(상황판·요원·일지·고정 보고서)이 같이 되돌아간다. 손으로 끝낸 상황은 그 응답이 띄운 것이어도 끝난 채 남는다
 // - 손으로 끝낸 괴이·특수는 모델이 다시 적어도 되살아나지 않는다
 // - 요청의 상황판·요원 브리핑은 지금 카드(명부)로 다시 만든다
 import { test } from 'node:test';
@@ -16,11 +16,11 @@ const bundle = async (contents) => {
 
 const m = await bundle(`
   export { parseCatalog } from './src/core/world/catalog';
-  export { DEFAULT_SETTINGS, requestMission, parseWorld, endEvent, activeEvents, endedShown } from './src/core/world/engine';
+  export { DEFAULT_SETTINGS, requestMission, parseWorld, endEvent, endUpcoming, activeEvents, endedShown } from './src/core/world/engine';
   export { processOutput, rerollRequestVars, requestWorldVars, prevWorldVars, withdrawUnsent, startWorldVars, worldVars, readWorld } from './src/core/world/output';
   export { readJournal, readReports, pinReport, recordVars, buildClosures, journalSettings } from './src/core/journal';
   export { sceneRecord, setUnsent } from './src/core/dispatch';
-  export { unsentOpening, chatPhase, applyStart } from './src/core/start';
+  export { unsentOpening, chatPhase, applyStart, planStart } from './src/core/start';
   export { applyWorldPack } from './src/core/datapack';
 `);
 m.applyWorldPack(worldPackText());
@@ -61,7 +61,7 @@ function closeByHand(chat, key) {
   const index = chat.message.length - 1;
   const built = m.buildClosures({ chat: next, index, world: w, closed: w.closed, catalog, faction: 'A00', settings: m.journalSettings(chat.scriptstate) });
   next.scriptstate = { ...next.scriptstate, ...m.recordVars(built.journal, built.reports) };
-  next.scriptstate = { ...next.scriptstate, ...m.prevWorldVars(chat.scriptstate, (p) => (m.endEvent(p, key) ? null : '이미 끝났거나 바뀐 상황이에요.'), built.rows.map((r) => r.id)) };
+  next.scriptstate = { ...next.scriptstate, ...m.prevWorldVars(chat.scriptstate, (p) => void (m.endEvent(p, key) || m.endUpcoming(p, key))) };
   return next;
 }
 const msNames = (chat) => m.readWorld(chat).ms.map((e) => `${e.name}|${e.state}`);
@@ -133,21 +133,39 @@ test('06-4: 창 「요청 취소」는 보냈지만 답 없이 끝난 카드도 
 
 // ── 15-1: 응답이 띄운 것을 손으로 끝낸 뒤 그 응답을 다시 굴림 ──
 
-test('15-1: 응답이 처음 띄운 특수를 손으로 끝낸 뒤 그 응답을 다시 굴리면 손 종료 일지도 같이 되돌아가 상황판과 맞는다', () => {
+test('15-1: 응답이 처음 띄운 특수·괴이를 손으로 끝낸 뒤 그 응답을 다시 굴리면 끝난 채 남고(새 답이 다시 적어도), 손 종료 일지 줄도 남아 상황판과 맞는다', () => {
   const u1 = { role: 'user', data: '나간다', chatId: 'u1' };
-  let chat = reply(startChat([u1]), `본문\n[MS|서울특별시 종로구|달빛 서점|출현|없음|문이 열렸다]\n${ST('10:00 AM')}`, 'c1');
+  const first = `본문\n[MS|서울특별시 종로구|달빛 서점|출현|없음|문이 열렸다]\n[AN|부산광역시 연제구|어두운 정원|활성|C|없음|정원]\n${ST('10:00 AM')}`;
+  let chat = reply(startChat([u1]), first, 'c1');
   assert.deepEqual(msNames(chat), ['달빛 서점|출현']);
-  const key = m.activeEvents(m.readWorld(chat)).find((e) => e.name === '달빛 서점').key;
-  chat = closeByHand(chat, key);
-  assert.equal(m.readJournal(chat.scriptstate).rows.filter((r) => r.cause === 'manual').length, 1);
+  assert.ok(anNames(chat).includes('어두운 정원|활성'));
+  for (const name of ['달빛 서점', '어두운 정원']) chat = closeByHand(chat, m.activeEvents(m.readWorld(chat)).find((e) => e.name === name).key);
+  assert.equal(m.readJournal(chat.scriptstate).rows.filter((r) => r.cause === 'manual').length, 2);
+  const locOf = m.readWorld(reply(startChat([u1]), first, 'cx')).ms[0].loc;
+  // 자동 발생 예정이던 특수를 응답이 띄운 경우 (기준 상태에는 발생 시각이 빈 발생 예정으로 있다): 손으로 끝내면 기준 상태의 예정도 거둔다
+  {
+    const st0 = startChat([u1]);
+    const w0 = m.readWorld(st0);
+    w0.ms.push({ loc: locOf, name: '달빛 서점', state: '발생대기', visitors: '', origin: 'auto', since: null, born: null });
+    let c = reply({ ...st0, scriptstate: { ...st0.scriptstate, ...m.worldVars(w0, catalog, S, 'A00') } }, `본문\n[MS|서울특별시 종로구|달빛 서점|출현|없음|문]\n${ST('10:00 AM')}`, 'c1');
+    assert.deepEqual(msNames(c), ['달빛 서점|출현']);
+    c = closeByHand(c, m.activeEvents(m.readWorld(c))[0].key);
+    const rq = m.rerollRequestVars({ ...c, message: [u1] }, catalog, S);
+    assert.ok(!rq.$ms_report.includes('달빛 서점'), rq.$ms_report);
+  }
+  // 다시 굴린 요청: 끝낸 것이 다시 발생 예정(NEW)으로 가지 않는다
+  const req = m.rerollRequestVars({ ...chat, message: [u1] }, catalog, S);
+  assert.ok(req && !req.$ms_report.includes('달빛 서점') && !req.$an_report.includes('어두운 정원'), `${req?.$ms_report}\n${req?.$an_report}`);
   // 다시 굴림: 같은 꼴의 새 답 (새 chatId)
-  const again = `본문 다시\n[MS|서울특별시 종로구|달빛 서점|출현|없음|다시 열렸다]\n${ST('10:00 AM')}`;
+  const again = first.replace('본문', '본문 다시');
   const re = m.processOutput({ ...chat, message: [u1, { role: 'char', data: again, chatId: 'c1b' }] }, 1, again, catalog, S, never);
-  assert.deepEqual(msNames(re), ['달빛 서점|출현'], '새 답이 띄웠으니 출현');
-  assert.equal(m.readJournal(re.scriptstate).rows.length, 0, '버린 응답이 띄운 것의 손 종료 줄은 없다');
+  assert.deepEqual(msNames(re), [], '손으로 끝낸 특수는 다시 굴려도 끝난 채');
+  assert.ok(!anNames(re).some((n) => n.startsWith('어두운 정원')), anNames(re).join());
+  assert.equal(m.readJournal(re.scriptstate).rows.filter((r) => r.cause === 'manual').length, 2, '손 종료 일지 줄은 남는다 (상황판과 같은 말)');
   // 이미 있던 것을 손으로 끝냈으면 다시 굴려도 끝난 채 (기존 동작)
+  let c0 = reply(startChat([u1]), `본문\n[MS|서울특별시 종로구|달빛 서점|출현|없음|문]\n${ST('10:00 AM')}`, 'c1');
   const u2 = { role: 'user', data: '다음', chatId: 'u2' };
-  let c2 = reply({ ...re, message: [...re.message, u2] }, `본문2\n${ST('10:30 AM')}`, 'c2');
+  let c2 = reply({ ...c0, message: [...c0.message, u2] }, `본문2\n${ST('10:30 AM')}`, 'c2');
   const key2 = m.activeEvents(m.readWorld(c2)).find((e) => e.name === '달빛 서점').key;
   c2 = closeByHand(c2, key2);
   const r2 = `본문2 다시\n${ST('10:30 AM')}`;
@@ -236,4 +254,50 @@ test('18-B1: 보고서를 고정해도 그 응답을 다시 굴리면 보고서�
   chat = reply({ ...chat, message: [...chat.message, u3] }, `본문3\n[AN|부산광역시 연제구|어두운 정원|격리|C|없음|끝]\n${ST('11:00 AM')}`, 'c3');
   assert.equal(m.readJournal(chat.scriptstate).rows.length, 1);
   assert.equal(m.readReports(chat.scriptstate).items.length, 1);
+});
+
+// ── 검토에서 찾은 것: 지운 응답 되돌리기의 빈틈 ──
+
+test('응답을 지운 뒤 임무 창에서 건 요청은 되돌아간 상태에도 남는다 (요청의 NEW 줄·대기)', () => {
+  const u1 = { role: 'user', data: '간다', chatId: 'u1' };
+  let chat = reply(startChat([u1]), `본문1\n${ST('10:00 AM')}`, 'c1');
+  const u2 = { role: 'user', data: '다음', chatId: 'u2' };
+  chat = reply({ ...chat, message: [...chat.message, u2] }, `본문2\n[AN|부산광역시 연제구|어두운 정원|활성|C|없음|정원]\n${ST('10:30 AM')}`, 'c2');
+  // 응답2 를 지우고 임무 창에서 소라 랜드를 요청 (ui/field.ts sendMission 과 같은 길: 지금 상태에 대기를 걸고 카드를 붙임)
+  const w = m.readWorld(chat);
+  assert.equal(m.requestMission(w, catalog, S, 'an', '소라 랜드'), null);
+  const card = { role: 'user', data: m.sceneRecord({ target: '소라 랜드', party: '나' }, '지시문'), chatId: 'u3' };
+  const del = { ...chat, message: [...chat.message.slice(0, 3), card], scriptstate: { ...chat.scriptstate, ...m.worldVars(w, catalog, S, 'A00') } };
+  const vars = m.rerollRequestVars(del, catalog, S);
+  assert.ok(vars, '지운 응답 전 상태로');
+  assert.ok(!m.parseWorld(vars.$goei_world).an.some((e) => e.name === '어두운 정원'), '지운 응답이 띄운 괴이는 없다');
+  assert.equal(m.parseWorld(vars.$goei_world).pending.an, '소라 랜드', '방금 건 요청은 남는다');
+  assert.match(vars.$an_report, /소라 랜드/);
+  const r3 = `본문3\n[AN|서울특별시 종로구|소라 랜드|활성|C|없음|입구]\n${ST('10:40 AM')}`;
+  const after = m.processOutput({ ...del, message: [...del.message, { role: 'char', data: r3, chatId: 'c3' }] }, 4, r3, catalog, S, never);
+  const sora = m.readWorld(after).an.find((e) => e.presetName === '소라 랜드');
+  assert.equal(sora?.origin, 'manual', '요청한 임무로 등록된다');
+  assert.equal(m.readWorld(after).pending.an, undefined);
+});
+
+test('메시지를 다 지우고 같은 채팅에서 다시 시작하면 옛 기준 상태가 남지 않는다 (첫 요청이 옛 상황판으로 가지 않음)', () => {
+  const u1 = { role: 'user', data: '간다', chatId: 'u1' };
+  const old = reply(startChat([u1]), `본문1\n[AN|부산광역시 연제구|어두운 정원|활성|C|없음|정원]\n${ST('10:00 AM')}`, 'c1');
+  assert.ok(old.scriptstate.$goei_prev);
+  // 다시 시작: applyStart 가 시작 변수를 덮어쓴다 (planStart 의 scriptstate 에 빈 기준 상태가 들어 있다)
+  const fresh = m.startWorldVars(catalog, S, 'A00', never);
+  const plan = { fmIndex: -1, scriptstate: { $goei_last: '', $goei_prev: '', ...fresh }, seedMissing: [], kind: 'direct' };
+  const again = m.applyStart({ ...old, message: [] }, plan);
+  const first = { ...again, message: [{ role: 'user', data: '새 시작', chatId: 'n1' }] };
+  assert.equal(m.rerollRequestVars(first, catalog, S), null, '옛 응답이 없다고 옛 상태로 되감지 않는다');
+  assert.equal(m.requestWorldVars(first, catalog, S).$goei_world, fresh.$goei_world);
+});
+
+test('chatId 없는 옛 메시지(번호 열쇠)는 「지워졌다」고 보지 않는다 (앞 메시지를 지워 번호가 밀려도 되감지 않음)', () => {
+  const u1 = { role: 'user', data: '간다' };
+  const old = [{ role: 'user', data: '처음' }, { role: 'char', data: '앞 응답' }, { role: 'user', data: '둘째' }, { role: 'char', data: '둘째 응답' }];
+  const chat = reply(startChat([...old, u1]), `본문\n[AN|부산광역시 연제구|어두운 정원|활성|C|없음|정원]\n${ST('10:00 AM')}`, undefined);
+  // 앞 메시지 셋을 지우고 다음 말을 보냄: 마지막 응답은 그대로 있다 (번호 열쇠만 밀렸다)
+  const next = { ...chat, message: [...chat.message.slice(3), { role: 'user', data: '다음' }] };
+  assert.equal(m.rerollRequestVars(next, catalog, S), null);
 });
