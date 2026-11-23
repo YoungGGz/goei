@@ -336,6 +336,9 @@ export interface RenameUndo {
   before: Person | null;
   /** 옛 호칭의 변경 줄 id */
   log: string[];
+  /** 옮길 때 받는 쪽에 이미 있던 변경 줄 id·항목 id, 그때 사용자가 손댄 기록이었나: 옮긴 뒤 다른 응답·사용자가 더한 것을 가린다 (undoGoneRenames) */
+  had?: string[];
+  touched?: boolean;
   folded?: number;
   /** 다른 인물 항목 가운데 대상이 옛 호칭이던 것 */
   targets: { who: string; slot: string; id: string }[];

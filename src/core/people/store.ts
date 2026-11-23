@@ -327,6 +327,8 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
     (store.renames ??= []).push({
       anchor, from, to, src: copy(src), before: store.people[to] ? copy(store.people[to]) : null,
       log: store.log.filter((c) => c.who === from).map((c) => c.id),
+      had: [...store.log.filter((c) => c.who === to).map((c) => c.id), ...[src, store.people[to]].flatMap((p) => (p ? SLOTS.flatMap((slot) => (p.slots[slot] ?? []).map((e) => e.id)) : []))],
+      touched: userTouched(store, from) || userTouched(store, to),
       ...(store.folded[from] !== undefined ? { folded: store.folded[from] } : {}),
       targets, docs,
       scene: Object.fromEntries(Object.entries(store.scene ?? {}).filter(([, list]) => list.includes(from)).map(([k, list]) => [k, [...list]])),
@@ -390,8 +392,10 @@ export function renamePerson(store: PeopleStore, from: string, to: string, seed:
 }
 
 /** 다시 굴리거나 지워서 채팅에서 사라진 응답이 한 이름 옮기기를 되돌린다 (늦게 한 것부터). 되돌린 옮기기 {from: 새 이름, to: 옛 호칭} — 부르는 쪽이 설정 「항상 포함할 인물」도 되돌린다.
- *  채팅 뒤쪽 keepMsgs 개 메시지 밖의 살아 있는 응답이 한 것은 되돌릴 일이 없어 기록을 지운다. '#N' 기준은 사라졌는지 가릴 수 없어 그대로 둔다 */
-export function undoGoneRenames(store: PeopleStore, chat: Chat, keepMsgs = FOLD_KEEP_MSGS): { from: string; to: string }[] {
+ *  채팅 뒤쪽 keepMsgs 개 메시지 밖의 살아 있는 응답이 한 것은 되돌릴 일이 없어 기록을 지운다. '#N' 기준은 사라졌는지 가릴 수 없어 그대로 둔다.
+ *  되돌리지 않고 새 이름으로 두는 것 (사라진 응답이 만든 인물을 없앨 때 dropGonePeople 이 남기는 것과 같은 기준): appears(이름들) 가 돌려준 이름(살아 있는 메시지에도 나옴),
+ *  옮긴 뒤 살아 있는 다른 응답이 항목·변경을 더한 기록, 옮긴 뒤 사용자가 손댄 기록 — 되돌리면 그 뒤에 쌓인 것이 옮기기 전 모습에 덮여 사라진다 */
+export function undoGoneRenames(store: PeopleStore, chat: Chat, keepMsgs = FOLD_KEEP_MSGS, appears?: (names: string[]) => Set<string>): { from: string; to: string }[] {
   if (!store.renames?.length) return [];
   const at = anchorPositions(chat);
   const cut = msgs(chat).length - keepMsgs;
@@ -406,6 +410,15 @@ export function undoGoneRenames(store: PeopleStore, chat: Chat, keepMsgs = FOLD_
     }
     store.renames.splice(i, 1);
     if (store.people[r.from]) continue; // 옛 호칭으로 이미 다시 기록됨: 손대지 않는다
+    const now = store.people[r.to];
+    if (now) {
+      const had = new Set([...(r.had ?? []), ...r.log]);
+      const liveNew = (id: string, anchor: string, src: string) => !had.has(id) && src !== 'seed' && anchor !== r.anchor && anchor !== '#0' && at.has(anchor);
+      if (SLOTS.some((s) => (now.slots[s] ?? []).some((e) => liveNew(e.id, e.anchor, e.src)))) continue;
+      if (store.log.some((c) => c.who === r.to && liveNew(c.id, c.anchor, c.src))) continue;
+      if (!r.touched && userTouched(store, r.to)) continue;
+      if (appears?.([r.to]).has(r.to)) continue;
+    }
     if (r.before) store.people[r.to] = r.before;
     else delete store.people[r.to];
     store.people[r.from] = r.src;

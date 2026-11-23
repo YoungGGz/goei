@@ -55,12 +55,15 @@ let busy = false;
 /** 이번 요청에 실려 나간 것: 어느 채팅의 어느 유저 메시지 턴에 어떤 물건이 나갔나. 그 턴이 끝날 때까지 이름표는 「보내는 중」 */
 let sent: { charIndex: number; chatIndex: number; userKey: string; ids: Set<string> } | null = null;
 
-/** 칩을 숨기는 「보낸 자리」: 이 유저 턴에 보낸 것(다시 굴리는 중 포함)이거나, 지난 턴에 보내 답이 남아 있는 것.
- *  지난 턴에 보냈는데 그 답이 지워진 자리는 아직 안 쓴 것이라 칩에 다시 보이고 다음 메시지에 실린다 (core/items.ts useSentAt) */
-const sentTurn = (chat: Chat): boolean => {
-  const at = chat.scriptstate?.[ITEM_USE_AT_VAR];
-  return typeof at === 'string' && !!at && (at === lastUserKey(chat) || !!useSentAt(chat));
+/** 칩·소지품 창에서 숨기는 「보낸 자리」: 지난 턴에 보내 답이 남아 있는 것, 또는 이 유저 턴에 보낸 것을 다시 굴리는 중(답을 기다리거나 정리하는 동안).
+ *  보냈는데 그 답이 지워진 자리는 아직 안 쓴 것이라 칩·창에 다시 보이고 다음 요청(새 메시지든 다시 보내기든)에 실린다 (core/items.ts useSentAt) —
+ *  창에는 보이고 칩에는 안 보이거나, 다시 굴리는 동안 창에 「사용 예정」으로 뜨지 않게 두 곳이 이 판정을 같이 쓴다 */
+export const useSentTurn = (chat: Chat | null | undefined): boolean => {
+  const at = chat?.scriptstate?.[ITEM_USE_AT_VAR];
+  if (!chat || typeof at !== 'string' || !at) return false;
+  return !!useSentAt(chat) || (at === lastUserKey(chat) && useLocked());
 };
+const sentTurn = useSentTurn;
 
 /** 「보내는 중」인 물건 id: 같은 채팅·같은 유저 턴이고 아직 응답이 정리하지 않았을 때만 (다른 턴이면 지난 일이니 잊는다) */
 export function sentUseIds(chat: Chat | null, charIndex: number, chatIndex: number): Set<string> | null {

@@ -8,7 +8,7 @@
 import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
-import { freeUseLock, refreshUseBox, useLocked, useSending } from '../host/usebox';
+import { freeUseLock, refreshUseBox, useLocked, useSending, useSentTurn } from '../host/usebox';
 import { itemIconStatus, itemIconUrl, itemPictures } from '../host/itemicons';
 import { aliveAnchors } from '../core/wallet';
 import {
@@ -140,7 +140,7 @@ const sourceLine = (it: Item, w: When) => [FROM_NAME[it.from], whenLabel(w, it.a
 
 /** 이 채팅의 「사용」 자리 (이미 보낸 턴의 것은 비어 보인다) */
 export function useQueue(ctx: ChatContext): ItemUse[] {
-  return useSentAt(ctx.chat) ? [] : readItemUse(ctx.chat.scriptstate);
+  return useSentTurn(ctx.chat) ? [] : readItemUse(ctx.chat.scriptstate);
 }
 const leftOf = (ctx: ChatContext, it: Item) => itemLeft(itemsOf(ctx), it, aliveAnchors(ctx.chat));
 

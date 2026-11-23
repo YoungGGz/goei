@@ -102,6 +102,33 @@ test('P5-2-2: 이미 있던 기록으로 옮긴 것도 되돌리면 그 기록�
   assert.ok(store.people[h].slots.state.some((e) => e.id === 'e-st'));
 });
 
+// ── 반박 검토 (11-23): 되돌리면 옮긴 뒤에 쌓인 것이 사라지는 경우는 새 이름으로 둔다 (사라진 응답이 만든 인물을 남기는 기준과 같다) ──
+test('P5-2-2: 이름을 밝힌 응답만 지웠는데 뒤의 살아 있는 응답이 그 이름으로 기록을 더했으면 되돌리지 않는다', () => {
+  const { c, store, h, s, input, m } = setup();
+  U.applyUpdate(store, c, input, { renames: [{ from: h, to: '대식', m, quote: '제 이름은 대식입니다' }] }, { settings: s });
+  S.putEntry(store, '대식', 'state', { id: 'e-late', text: '불을 끄는 중', src: 'story', anchor: 'c3', seq: 9, quote: '불을 껐다' });
+  // c2 만 지움, c3 는 살아 있음
+  const c3 = chat(...c.message.slice(0, 3).map((x) => [x.role, x.data, x.chatId]), ['char', '그가 불을 껐다.', 'c3']);
+  assert.deepEqual(S.undoGoneRenames(store, c3), []);
+  assert.ok(store.people.대식?.slots.state.some((e) => e.id === 'e-late'), '뒤 응답이 적은 항목이 남는다');
+  assert.ok(!store.people[h]);
+  assert.equal(store.renames, undefined, '되돌림 기록은 치운다');
+});
+
+test('P5-2-2: 옮긴 뒤 사용자가 손댄 기록, 살아 있는 글에 새 이름이 나오는 기록은 되돌리지 않는다', () => {
+  const c2 = (text) => chat(['user', '노점에 갔다', 'u1'], ['char', '노점 주인이 꼬치를 굽고 있었다. 김철수는 졸고 있었다.', 'c1'], ['user', '이름을 물었다', 'u2'], ['char', text, 'c2b']);
+  const a = setup();
+  U.applyUpdate(a.store, a.c, a.input, { renames: [{ from: a.h, to: '대식', m: a.m, quote: '제 이름은 대식입니다' }] }, { settings: a.s });
+  S.putEntry(a.store, '대식', 'state', { id: 'e-man', text: '손으로 적음', src: 'manual', anchor: '#0', seq: 9 });
+  assert.deepEqual(S.undoGoneRenames(a.store, c2('조용했다.')), []);
+  assert.ok(a.store.people.대식 && !a.store.people[a.h]);
+  const b = setup();
+  U.applyUpdate(b.store, b.c, b.input, { renames: [{ from: b.h, to: '대식', m: b.m, quote: '제 이름은 대식입니다' }] }, { settings: b.s });
+  const appears = (names) => new Set(names.filter((n) => n === '대식'));
+  assert.deepEqual(S.undoGoneRenames(b.store, c2('"대식이라고 합니다." 그가 다시 말했다.'), undefined, appears), []);
+  assert.ok(b.store.people.대식 && !b.store.people[b.h]);
+});
+
 test('P5-2-3: 주인공 이름은 페르소나 이름 (캐릭터로 플레이하지 않을 때), 새 인물·이름 힌트·Router 힌트에서 빠진다', () => {
   assert.deepEqual(H.ownNames([], {}, '한서준'), ['한서준']);
   assert.deepEqual(H.ownNames([], {}, ''), []);

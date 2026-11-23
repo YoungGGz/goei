@@ -127,3 +127,46 @@ test('Q2: 사용을 건 응답을 지우고 새 메시지를 보내면 그 사�
   const next = queueUseVars({ message: [...c5.message], scriptstate: v5 }, (q) => [...q, { id: 'other', n: 1 }]);
   assert.deepEqual(readItemUse(next), [{ id: 'other', n: 1 }]);
 });
+
+// ── 반박 검토 (11-23) ──
+test('B1: 가운데 응답을 지운 뒤 뒤 응답을 다시 굴리면, 지운 응답이 적은 값이 아니라 둘 다 바꾸기 전 값으로 돌아온다', () => {
+  let it = addItem(empty(), new Set(), { name: '검은 우산', desc: '접힌 검은 우산', use: true, from: 'manual', anchor: '' });
+  it = applyItemChanges(it, new Set(['c1']), [ch('c1', '검은 우산', 'update', { desc: '살이 부러진 우산', state: 'broken' })]);
+  it = applyItemChanges(it, new Set(['c1', 'c2']), [ch('c2', '검은 우산', 'update', { desc: '천이 찢어진 우산' })]);
+  // c1 만 지움 (c2 는 살아 있음): c2 가 적은 설명은 그대로, c1 만 바꾼 고장은 풀린다
+  const a = new Set(['c2']);
+  assert.equal(liveItems(it, a)[0].desc, '천이 찢어진 우산');
+  assert.equal(liveItems(it, a)[0].state, 'ok');
+  // 그사이 저장이 한 번 지나가 사라진 기록이 굳는다
+  it = settleEdits(it, a);
+  assert.equal(liveItems(it, a)[0].desc, '천이 찢어진 우산');
+  // c2 를 다시 굴림: c1 이 적은 「살이 부러진」이 되살지 않는다
+  const e = liveItems(it, new Set(['c2b']))[0];
+  assert.equal(e.desc, '접힌 검은 우산');
+  assert.equal(e.state, 'ok');
+});
+
+test('B1: 다시 굴린 뒤 늦게 온 갱신(사라진 응답 근거)은 보이지 않고, 새 응답의 변화에도 섞이지 않는다', () => {
+  let it = addItem(empty(), new Set(), { name: '검은 우산', desc: '접힌 검은 우산', use: true, from: 'manual', anchor: '' });
+  const a2 = new Set(['c1b']);
+  it = applyItemChanges(it, a2, [ch('c1', '검은 우산', 'update', { desc: '살이 부러진 우산', state: 'broken' })]);
+  assert.equal(liveItems(it, a2)[0].state, 'ok');
+  assert.equal(liveItems(it, a2)[0].desc, '접힌 검은 우산');
+  it = applyItemChanges(it, a2, [ch('c1b', '검은 우산', 'update', { desc: '젖은 우산' })]);
+  assert.equal(liveItems(it, a2)[0].desc, '젖은 우산');
+  assert.equal(liveItems(it, a2)[0].state, 'ok');
+  assert.equal(liveItems(it, new Set(['c1c']))[0].desc, '접힌 검은 우산');
+});
+
+test('B2: 본문이 든 물건이 그 칸의 다른 물건을 밀어냈으면, 다시 굴릴 때 밀려난 물건도 제 칸으로 돌아온다', () => {
+  let it = addItem(empty(), new Set(), { name: '단검', desc: '칼', equip: 'weapon', wear: true, from: 'manual', anchor: '' });
+  it = addItem(it, new Set(), { name: '권총', desc: '총', equip: 'weapon', wear: true, from: 'manual', anchor: '' });
+  it = addItem(it, new Set(), { name: '야구 방망이', desc: '방망이', equip: 'weapon', from: 'manual', anchor: '' });
+  const idOf = (n) => it.list.find((x) => x.name === n).id;
+  const before = Object.fromEntries(liveItems(it, new Set()).map((x) => [x.name, x.slot]));
+  const a1 = new Set(['c1']);
+  it = applyItemChanges(it, a1, [ch('c1', '단검', 'unequip'), ch('c1', '야구 방망이', 'equip')]);
+  assert.equal(liveItems(it, a1).find((x) => x.id === idOf('야구 방망이')).slot, before.단검);
+  const back = Object.fromEntries(liveItems(it, new Set(['c1b'])).map((x) => [x.name, x.slot]));
+  assert.deepEqual(back, before);
+});

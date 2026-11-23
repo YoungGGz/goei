@@ -268,7 +268,9 @@ export function viewItem(e: Item, alive: Set<string>): Item {
   return out ? (out as unknown as Item) : e;
 }
 const deadEdit = (e: Item, alive: Set<string>): boolean => !!e.edits?.some((d) => !alive.has(d.at));
-/** 사라진 응답이 바꾼 칸을 옛 값으로 굳히고 그 기록을 뺀다. 저장된 줄을 고치기 전에 부른다 (고친 값이 사라진 응답의 옛 값에 덮이지 않게) */
+/** 사라진 응답이 바꾼 칸을 옛 값으로 굳히고 그 기록을 뺀다. 저장된 줄을 고치기 전에 부른다 (고친 값이 사라진 응답의 옛 값에 덮이지 않게).
+ *  그 칸을 뒤의 응답이 또 바꿨으면 값은 두고, 사라진 응답의 옛 값을 그 뒤 기록에 넘긴다: 뒤 응답까지 사라지면 사라진 응답들이 바꾸기 전 값으로 돌아간다
+ *  (가운데 응답을 지운 뒤 뒤 응답을 다시 굴리면 지운 응답이 적은 값이 되살았다) */
 export function settleEdits(it: Items, alive: Set<string>): Items {
   if (!it.list.some((e) => deadEdit(e, alive))) return it;
   return {
@@ -276,7 +278,15 @@ export function settleEdits(it: Items, alive: Set<string>): Items {
     list: it.list.map((e) => {
       if (!deadEdit(e, alive)) return e;
       const { edits: _d, ...rest } = viewItem(e, alive);
-      const edits = (e.edits ?? []).filter((d) => alive.has(d.at));
+      const all = (e.edits ?? []).map((d) => ({ at: d.at, was: { ...d.was } }));
+      all.forEach((d, i) => {
+        if (alive.has(d.at)) return;
+        for (const k of Object.keys(d.was) as EditKey[]) {
+          const next = all.slice(i + 1).find((x) => k in x.was);
+          if (next) next.was[k] = d.was[k];
+        }
+      });
+      const edits = all.filter((d) => alive.has(d.at));
       return edits.length ? { ...rest, edits } : (rest as Item);
     }),
   };
@@ -1535,8 +1545,9 @@ function unEmptyName(it: Items, alive: Set<string>, id: string, icon: string | u
  *  equip 지닌 것을 장착 칸에(빈 칸이 없으면 그대로) · unequip 장착만 풂 · left 두고 옴(자리) · gone 없어짐 · destroyed 파괴 — 모두 숨기기만 하고 지우지 않는다 (removeItem)
  * 안전망: update 의 설명에 「두고 옴」 말이 있으면 left 로, 「벗음」 말만 있으면 unequip 으로 처리한다 (설정의 말 표).
  * opts.order = 채팅의 메시지 키 차례: 사용자가 「버리기」로 치운 물건은 버린 뒤의 메시지를 근거로 한 new 일 때만 되살린다
+ * opts.keep = 바꾼 칸의 되돌림 기록을 남겨 두는 채팅 뒤쪽 메시지 수 (인물 기록 설정과 같은 값)
  */
-export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemChange[], opts: { state?: boolean; order?: string[]; skipKinds?: string[] } = {}): Items {
+export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemChange[], opts: { state?: boolean; order?: string[]; skipKinds?: string[]; keep?: number } = {}): Items {
   // 사라진 응답이 바꾼 칸은 먼저 옛 값으로 굳힌다: 새 응답의 변화는 다시 굴리기 전 상태 위에 얹힌다
   let it = settleEdits(it0, alive);
   // 설정 「상태 바꾸기」가 꺼져 있으면 손상·고장은 받지 않고, 파괴는 「없어짐」으로 (목록에서는 빠지되 상태 단계는 쓰지 않는다)
@@ -1604,7 +1615,7 @@ export function applyItemChanges(it0: Items, alive: Set<string>, changes: ItemCh
     return it;
   };
   for (const c0 of changes) it = noteEdits(it, one(it, c0), c0.anchor);
-  return order.length ? foldEdits(it, order, FOLD_KEEP_MSGS) : it;
+  return order.length ? foldEdits(it, order, opts.keep ?? FOLD_KEEP_MSGS) : it;
 }
 /**
  * 포인트몰 수령 대기를 본문이 먼저 받아 버렸을 때 (2026-11-16 사용자: 받는 것은 회사에서): 갱신기가 수령 대기 중인 물건과 같은 이름을 「얻음」(new)으로 올리면

@@ -386,7 +386,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       }
       const curStore = peopleStore(fresh.chat);
       // 사라진 응답이 한 이름 옮기기는 자료에서도 되돌린 모습으로 (저장은 아래 쓰기에서 같이)
-      undoGoneRenames(curStore, fresh.chat, settings.keepMsgs);
+      undoGoneRenames(curStore, fresh.chat, settings.keepMsgs, (names) => liveAppearing(curStore, fresh.chat, names, factionNamesOf(fresh.char.globalLore)));
       if (pendingClear) clearStoryRecords(curStore, pendingClear);
       // 가계부: 상태창 잔고 칸을 쓰는 채팅이면 장부 잔고를 자료에 넣고 거래 절을 켠다 (core/wallet.ts)
       const walletOn = colConfig(fresh.chat.scriptstate).wallet !== 'off';
@@ -479,7 +479,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           clearedNow = clearStoryRecords(s, pendingClear);
         }
         // 다시 굴려(지워서) 사라진 응답이 한 이름 옮기기를 먼저 되돌린다: 새 응답은 옮기기 전 기록 위에 읽힌다 (core/people/store.ts undoGoneRenames)
-        const unrenamed = undoGoneRenames(s, cur, settings.keepMsgs);
+        const unrenamed = undoGoneRenames(s, cur, settings.keepMsgs, (names) => liveAppearing(s, cur, names, factionNamesOf(fresh.char.globalLore)));
         const before = snapshotRun(s);
         const report = applyUpdate(s, cur, input, value, {
           settings,
@@ -552,7 +552,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           // 포인트몰 수령 대기 중인 물건을 본문이 먼저 받았으면 새로 만들지 않고 그 대기 줄을 받은 것으로 (core/items.ts settleBmPickups)
           const bm = settleBmPickups(readItems(next.scriptstate), liveBmOrders(next.scriptstate, aliveAnchors(next)), aliveAnchors(next), itemChanges);
           if (bm.settled) next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...bmOrdersVars(bm.orders, bmOrdersKeep(next.scriptstate)) } };
-          const it = applyItemChanges(bm.it, aliveAnchors(next), bm.changes, { state: itemStateOn(next.scriptstate), skipKinds: ITEM_SCOPE_SKIP[itemScope(next.scriptstate)], order: (next.message ?? []).map((m, i) => messageKey(m, i)) });
+          const it = applyItemChanges(bm.it, aliveAnchors(next), bm.changes, { state: itemStateOn(next.scriptstate), skipKinds: ITEM_SCOPE_SKIP[itemScope(next.scriptstate)], order: (next.message ?? []).map((m, i) => messageKey(m, i)), keep: settings.keepMsgs });
           next = { ...next, scriptstate: { ...(next.scriptstate ?? {}), ...itemsVars(it) } };
         }
         // 치운 지 오래된 물건 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway). 변화를 적용한 뒤에 (이번에 되찾은 줄은 남게),
