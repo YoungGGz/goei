@@ -28,6 +28,15 @@ export class NavHistory<T> {
     return JSON.parse(this.list[this.at]) as T;
   }
 
+  /** 지금 기록을 떠 둔다 / 떠 둔 기록으로 되돌린다 (카드 단독 창이 끝나면 그 창에서 지나온 화면은 남기지 않는다, 2차 점검 B1) */
+  snapshot(): { list: string[]; at: number } {
+    return { list: [...this.list], at: this.at };
+  }
+  restore(s: { list: string[]; at: number }): void {
+    this.list = [...s.list];
+    this.at = s.at;
+  }
+
   clear(): void {
     this.list = [];
     this.at = -1;

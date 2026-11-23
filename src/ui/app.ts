@@ -45,7 +45,7 @@ import { bmDeskWinSpec, mallWinSpec, mallAction, mallAskOpen, mallInput, mallOpe
 import { isMallSite } from '../core/malls';
 import { homeshopAction, homeshopClosed, homeshopInput, homeshopMounted, homeshopOpenCheck, homeshopTab, resetHomeshop } from './homeshop';
 import { hsSettings } from '../core/homeshop';
-import { boardChrome, gnet, gnetDmOpen, gnetDmWinSpec, gnetOpenCheck, gnetTab, handleGnet, resetGnet, useBoardSite, type GnetEnv } from './gnet';
+import { boardChrome, gnet, gnetDmOpen, gnetHome, gnetDmWinSpec, gnetOpenCheck, gnetTab, handleGnet, resetGnet, useBoardSite, type GnetEnv } from './gnet';
 import { bindPopWins } from './popwin';
 import { bindMouseGesture, type Gesture } from './gesture';
 import { isBoardSite, type BoardSite } from '../core/boards';
@@ -53,7 +53,7 @@ import { addPhoto, attachInput, hydratePhotos, zoomPhoto } from './attach';
 import { ATTACH_MAX } from '../core/attach';
 import { readPhone } from '../core/phone';
 import { GN_NICK } from '../core/gnet';
-import { br, BR_TABS_VAR, chromeHtml, closeTab, curTab, focusSite, openSite, reopenTab, restoreTabs, tabsJson, homeHtml, isSite, loginHtml, newTab, recordTab, siteLogo, SITES, soonHtml, tabCan, tabGo, tabListHtml, tabState, type ChromeOpts, type SiteId } from './browser';
+import { br, BR_TABS_VAR, chromeHtml, closeTab, curTab, focusSite, openSite, putTabs, reopenTab, restoreTabs, snapTabs, tabsJson, homeHtml, isSite, loginHtml, newTab, recordTab, siteLogo, SITES, soonHtml, tabCan, tabGo, tabListHtml, tabSeek, tabState, type ChromeOpts, type SiteId, type TabsSnap } from './browser';
 import { savePhoto } from '../host/photo';
 import { readPersona, readUser, userInfo } from '../host/user';
 import { applyAdvanced } from '../core/advanced';
@@ -174,12 +174,14 @@ let lastForm: HTMLFormElement | null = null;
 let tab: Tab = 'board';
 /** 카드에서 고유 상점 사이트로 접속: 인터넷 창만 (닫으면 풀린다) */
 let netSolo = false;
-/** 단독 창을 열기 전의 인터넷 탭·화면 탭. 단독 창이 끝나면 그대로 되돌린다 (11-20 사용자: 카드로 본 망상홈쇼핑이 상황판 인터넷 창에 남아 있다) */
-let soloBack: { tabs: string; tab: Tab } | null = null;
+/** 단독 창을 열기 전의 인터넷 탭·화면 탭·앞뒤 기록. 단독 창이 끝나면 그대로 되돌린다 (11-20 사용자: 카드로 본 망상홈쇼핑이 상황판 인터넷 창에 남아 있다).
+ *  탭은 id 까지 그대로 되돌리고, 단독 창에서 지나온 화면은 앞뒤 기록에 남기지 않는다 (2차 점검 B1: 닫은 뒤 ‹ 를 누를 때마다 단독 창 사이트 탭이 새로 생겼다) */
+let soloBack: { tabs: TabsSnap; tab: Tab; nav: ReturnType<NavHistory<NavState>['snapshot']> } | null = null;
 function endSolo(): void {
   if (netSolo && soloBack) {
-    restoreTabs(soloBack.tabs);
+    putTabs(soloBack.tabs);
     tab = soloBack.tab;
+    navHist.restore(soloBack.nav);
   }
   netSolo = false;
   soloBack = null;
@@ -856,7 +858,7 @@ export async function openShop(site = ''): Promise<void> {
   await openApp({ quietIfNotLite: true, check: false });
   // 고유 상점에 인터넷으로 접속한 카드(11-09 사용자): 상황판 없이 인터넷 창만 그 사이트로. 사고판 것은 상황판 인터넷 탭과 같은 저장소
   if (site && view.kind === 'started' && isSite(site)) {
-    if (!netSolo) soloBack = { tabs: tabsJson(), tab };
+    if (!netSolo) soloBack = { tabs: snapTabs(), tab, nav: navHist.snapshot() };
     netSolo = true;
     tab = 'net';
     openSite(site);
@@ -1932,6 +1934,9 @@ function navStep(dir: -1 | 1): (() => void) | null {
       const i = br.tabs.findIndex((t) => t.id === s.bt);
       if (i >= 0) br.cur = i;
       else newTab();
+      // 그 탭 기록에 이미 있는 화면이면 탭 기록도 그 칸으로 (새로 붙이면 주소줄 ‹ › 와 어긋났다, 2차 점검 Q1)
+      const { bt: _bt, ...ts } = s;
+      tabSeek(ts, dir);
     }
     applyNav(s);
   };
@@ -2241,6 +2246,10 @@ function goSite(site: SiteId | ''): void {
   br.login = false;
   notice = '';
   if (site === 'wk') resetWiki();
+  if (isBoardSite(site)) {
+    useBoardSite(site);
+    gnetHome();
+  }
   tab = siteTab(site);
   render();
   siteOpened();
