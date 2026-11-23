@@ -117,6 +117,19 @@ export function parseConsult(raw: string): ConsultReply {
 }
 
 const norm = (s: string) => s.replace(/[「」『』"'`()\s]/g, '').toLowerCase();
+/** 수 읽기: 「20000」「20,000」「2만」「1.5천」「20k」, 뒤에 그 줄의 단위가 붙어도 된다(「2만 토큰」「30초」). 단위가 있는 줄에 다른 글이 붙으면 못 읽는다 (NaN).
+ *  2차 점검 AI2: 「2만」을 2로 읽어 요청 토큰 상한이 2가 됐다 */
+const MUL: Record<string, number> = { '': 1, 만: 10000, 천: 1000, 백: 100, k: 1000 };
+function consultNum(raw: string, unit?: string): number {
+  let t = raw.trim().replace(/(\d),(?=\d{3})/g, '$1').replace(/\s+/g, '');
+  const u = (unit ?? '').replace(/\s+/g, '');
+  if (u && t.endsWith(u)) t = t.slice(0, -u.length);
+  // 단위가 없는 줄(돈 칸 등)은 뒤에 붙은 짧은 글(「원」)을 단위로 보고 뗀다 (전과 같다)
+  const m = (u ? /^(-?\d+(?:\.\d+)?)(만|천|백|k)?$/i : /^(-?\d+(?:\.\d+)?)(만|천|백|k)?(?:[^\d.]{1,3})?$/i).exec(t);
+  if (!m) return NaN;
+  const n = Number(m[1]) * MUL[(m[2] ?? '').toLowerCase()];
+  return Math.abs(n - Math.round(n)) < 1e-9 ? Math.round(n) : NaN;
+}
 /** 모델이 적은 값을 그 설정이 받는 값으로. 고를 수 없으면 null (까닭은 consultWhy) */
 export function consultValue(item: ConsultItem, raw: string): string | null {
   if (item.kind === 'info') return null;
@@ -129,8 +142,7 @@ export function consultValue(item: ConsultItem, raw: string): string | null {
     return text;
   }
   if (item.kind === 'num' || item.kind === 'step') {
-    const t = raw.trim().replace(/(\d),(?=\d{3})/g, '$1');
-    const n = item.zero && norm(t) === norm(item.zero) ? 0 : /^-?\d+/.test(t) && /^-?\d+\s*\D{0,3}$/.test(t) ? Number.parseInt(t, 10) : NaN;
+    const n = item.zero && norm(raw) === norm(item.zero) ? 0 : consultNum(raw, item.unit);
     if (!Number.isInteger(n)) return null;
     if (item.kind === 'step') return (item.lo === undefined || n >= item.lo) && (item.hi === undefined || n <= item.hi) && (!item.stride || (n - Number(item.cur)) % item.stride === 0) ? String(n) : null;
     return n >= (item.lo ?? 0) && n <= (item.hi ?? 0) ? String(n) : null;
