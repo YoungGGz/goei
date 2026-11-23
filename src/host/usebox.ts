@@ -8,7 +8,7 @@
 //    Risu 는 글이 그대로면 메시지를 다시 그리지 않으니(Chats.svelte 글 해시), 이름은 글이 아니라 CSS(::before content)로 넣는다.
 //  · 마지막 메시지 = .chat-message-container:first-child (Risu 는 새 메시지를 맨 앞에 넣고 flex-col-reverse 로 뒤집어 보인다).
 import { aliveAnchors } from '../core/wallet';
-import { dropUse, invOn, useSentAt, itemUseVars, lastUserKey, liveItems, readItemUse, readItems, useRerolling, usesToSend } from '../core/items';
+import { dropUse, invOn, ITEM_USE_AT_VAR, useSentAt, itemUseVars, lastUserKey, liveItems, readItemUse, readItems, useRerolling, usesToSend } from '../core/items';
 import type { Chat } from '../core/types';
 import { armChatClick, elements, hit, onChatClick } from './chatclicks';
 import { body } from './overlay';
@@ -55,10 +55,17 @@ let busy = false;
 /** 이번 요청에 실려 나간 것: 어느 채팅의 어느 유저 메시지 턴에 어떤 물건이 나갔나. 그 턴이 끝날 때까지 이름표는 「보내는 중」 */
 let sent: { charIndex: number; chatIndex: number; userKey: string; ids: Set<string> } | null = null;
 
+/** 칩을 숨기는 「보낸 자리」: 이 유저 턴에 보낸 것(다시 굴리는 중 포함)이거나, 지난 턴에 보내 답이 남아 있는 것.
+ *  지난 턴에 보냈는데 그 답이 지워진 자리는 아직 안 쓴 것이라 칩에 다시 보이고 다음 메시지에 실린다 (core/items.ts useSentAt) */
+const sentTurn = (chat: Chat): boolean => {
+  const at = chat.scriptstate?.[ITEM_USE_AT_VAR];
+  return typeof at === 'string' && !!at && (at === lastUserKey(chat) || !!useSentAt(chat));
+};
+
 /** 「보내는 중」인 물건 id: 같은 채팅·같은 유저 턴이고 아직 응답이 정리하지 않았을 때만 (다른 턴이면 지난 일이니 잊는다) */
 export function sentUseIds(chat: Chat | null, charIndex: number, chatIndex: number): Set<string> | null {
   if (!sent || !chat || sent.charIndex !== charIndex || sent.chatIndex !== chatIndex) return null;
-  if (useSentAt(chat) || lastUserKey(chat) !== sent.userKey) { sent = null; return null; }
+  if (sentTurn(chat) || lastUserKey(chat) !== sent.userKey) { sent = null; return null; }
   return sent.ids;
 }
 
@@ -66,7 +73,7 @@ export function sentUseIds(chat: Chat | null, charIndex: number, chatIndex: numb
  *  sentUseIds 와 달리 적어 둔 것을 지우지 않는다: 소지품 창이 든 채팅이 조금 옛것이어도 보낸 표시를 잃지 않게 */
 export function useSending(chat: Chat | null | undefined, charIndex: number, chatIndex: number, id: string): boolean {
   if (!sent || !chat || sent.charIndex !== charIndex || sent.chatIndex !== chatIndex) return false;
-  return !useSentAt(chat) && lastUserKey(chat) === sent.userKey && sent.ids.has(id);
+  return !sentTurn(chat) && lastUserKey(chat) === sent.userKey && sent.ids.has(id);
 }
 
 /** 답이 붙은 뒤 사용 정리(body.ts onOutput → settleItemUse)가 끝날 때까지도 잠근다: 기다림이 꺼진 뒤 정리 전에 넣은 것이 쓴 것으로 적히지 않게 (11-14 사용자) */
@@ -149,7 +156,7 @@ export async function markUseSent(charIndex: number, chatIndex: number, chat: Ch
   // 요청에 실제로 실린 것만 (core/items.ts usesToSend: [Inventory] 의 「uses」 줄과 같은 셈)
   const ids = usesToSend(chat).map((u) => u.id);
   out = { charIndex, chatIndex, userKey, ids: new Set(ids), reroll: useRerolling(chat) };
-  if (!ids.length || useSentAt(chat)) return;
+  if (!ids.length || sentTurn(chat)) return;
   sent = { charIndex, chatIndex, userKey, ids: new Set(ids) };
   await refreshUseBox(charIndex, chatIndex, chat);
 }
@@ -166,7 +173,7 @@ onWaiting((w, late) => {
 /** 상자에 보일 것: 아직 보내지 않은 것만 (보낸 턴은 다시 굴리기용으로 변수에 남지만 칩은 숨긴다). 이름 ×n */
 export function useBoxNames(chat: Chat | null): { id: string; label: string }[] {
   // 소지품이 꺼져 있으면 상자도 없다 (2026-11-07 사용자: 켜고 끄기)
-  if (!chat || useSentAt(chat) || !invOn(chat.scriptstate)) return [];
+  if (!chat || sentTurn(chat) || !invOn(chat.scriptstate)) return [];
   const live = liveItems(readItems(chat.scriptstate), aliveAnchors(chat));
   return readItemUse(chat.scriptstate).flatMap((u) => {
     const e = live.find((x) => x.id === u.id);
