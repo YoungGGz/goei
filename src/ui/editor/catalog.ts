@@ -146,9 +146,16 @@ export function pageRows(html: string, page: string, menu: string): CatRow[] {
         const lo = nk?.lo ?? 0;
         const hi = nk?.hi ?? 0;
         const digits = !!nk?.digits;
-        const unit = (lone ? co : '') || txt(e.closest('.st-step')?.querySelector(':scope > span')) || txt(e.parentElement?.querySelector(':scope > output')).replace(/^-?[\d,.\s]+/, '') || undefined;
+        // 막대(range) 옆 <output>: 수로 시작하면 뒤가 단위(「30%」). 수로 시작하지 않는 글(「±10」「한도 없음」)은 단위가 아니다 (2차 점검 AI6)
+        const out = txt(e.parentElement?.querySelector(':scope > output'));
+        const outUnit = /^-?[\d,.]+\s*(\D*)$/.exec(out)?.[1].trim() ?? '';
+        const unit = (lone ? co : '') || txt(e.closest('.st-step')?.querySelector(':scope > span')) || outUnit || undefined;
         const max = Number(input.getAttribute('maxlength')) || undefined;
-        push({ id: key ? `${action}.${key}` : action, name: sub, kind: isNum ? 'num' : 'text', cur: digits && isNum ? value.replace(/,/g, '').trim() : value.trim(), ...(isNum ? { lo, hi, unit } : { max, multi: e.tagName === 'TEXTAREA' }), locked, colGroup: cg || undefined, ctl: { t: 'input', action, key } });
+        // 0의 뜻: 수 상자는 0일 때 칸을 비우고 자리 글(「안 함」「제한 없음」)을 보인다. 그런 칸과 막대는 data-zero 에 그 말을 적는다. 그 칸이 비었으면 0으로 읽는다 (2차 점검 AI1).
+        // 자리 글만으로는 판단하지 않는다: 「비우면 할인 없음」「25」 같은 자리 글은 0의 뜻이 아니다 (우주 쇼핑몰 시그니처 상품)
+        const zero = isNum ? input.dataset.zero || undefined : undefined;
+        const raw = digits && isNum ? value.replace(/,/g, '').trim() : value.trim();
+        push({ id: key ? `${action}.${key}` : action, name: sub, kind: isNum ? 'num' : 'text', cur: isNum && raw === '' && zero ? '0' : raw, ...(isNum ? { lo, hi, unit, zero } : { max, multi: e.tagName === 'TEXTAREA' }), locked, colGroup: cg || undefined, ctl: { t: 'input', action, key } });
         continue;
       }
       const action = e.dataset.action ?? '';

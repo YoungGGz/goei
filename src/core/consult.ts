@@ -117,6 +117,68 @@ export function parseConsult(raw: string): ConsultReply {
 }
 
 const norm = (s: string) => s.replace(/[「」『』"'`()\s]/g, '').toLowerCase();
+/** 수 읽기: 「20000」「20,000」「2만」「1.5천」「20k」「5천만」「2억」「1억 5천만」「2만 5천」, 뒤에 그 줄의 단위가 붙어도 된다(「2만 토큰」「30초」).
+ *  읽지 못하면 NaN: 단위가 있는 줄에 다른 글이 붙었거나, 큰 수 낱말이 차례에 안 맞거나, 정수가 아닐 때.
+ *  2차 점검 AI2: 「2만」을 2로 읽어 요청 토큰 상한이 2가 됐다. 뒤 글자를 단위로 보고 떼는 것은 큰 수 낱말을 다 읽은 뒤에만 한다 (「2억」을 2로 읽지 않게) */
+const BIG: [string, number][] = [['억', 1e8], ['만', 1e4]];
+const SMALL: [string, number][] = [['천', 1000], ['백', 100], ['십', 10]];
+function consultNum(raw: string, unit?: string): number {
+  let t = raw.trim().replace(/(\d),(?=\d{3})/g, '$1');
+  if (/\d\s+\d/.test(t)) return NaN; // 「12 34」는 수 하나가 아니다
+  t = t.replace(/\s+/g, '');
+  const u = (unit ?? '').replace(/\s+/g, '');
+  if (u && t.endsWith(u)) t = t.slice(0, -u.length);
+  const neg = t.startsWith('-');
+  if (neg) t = t.slice(1);
+  const k = /^(\d+(?:\.\d+)?)k$/i.exec(t);
+  let n = 0;
+  if (k) {
+    n = Number(k[1]) * 1000;
+    t = '';
+  } else {
+    // 「억」「만」 마디마다 그 안의 「천·백·십」을 더한다. 마디는 큰 것에서 작은 것으로만
+    let any = false;
+    const part = (): number | null => {
+      let sum = 0;
+      let got = false;
+      let from = 0;
+      for (;;) {
+        const m = /^(\d+(?:\.\d+)?)/.exec(t);
+        if (!m) break;
+        const i = SMALL.findIndex(([w], at) => at >= from && t.startsWith(w, m[1].length));
+        if (i < 0) {
+          sum += Number(m[1]);
+          t = t.slice(m[1].length);
+          got = true;
+          break;
+        }
+        sum += Number(m[1]) * SMALL[i][1];
+        t = t.slice(m[1].length + 1);
+        from = i + 1;
+        got = true;
+      }
+      return got ? sum : null;
+    };
+    let from = 0;
+    for (;;) {
+      const v = part();
+      if (v === null) break;
+      any = true;
+      const i = BIG.findIndex(([w], at) => at >= from && t.startsWith(w));
+      if (i < 0) {
+        n += v;
+        break;
+      }
+      n += v * BIG[i][1];
+      t = t.slice(1);
+      from = i + 1;
+    }
+    if (!any) return NaN;
+  }
+  // 남은 글: 단위가 있는 줄은 남으면 안 된다. 단위가 없는 줄(돈 칸 등)은 짧은 글(「원」)을 단위로 보고 뗀다. 수나 큰 수 낱말이 남으면 못 읽은 것
+  if (t && (u || t.length > 3 || /[\d.억만천백십]/.test(t))) return NaN;
+  return Math.abs(n - Math.round(n)) < 1e-6 ? (neg ? -1 : 1) * Math.round(n) : NaN;
+}
 /** 모델이 적은 값을 그 설정이 받는 값으로. 고를 수 없으면 null (까닭은 consultWhy) */
 export function consultValue(item: ConsultItem, raw: string): string | null {
   if (item.kind === 'info') return null;
@@ -129,8 +191,7 @@ export function consultValue(item: ConsultItem, raw: string): string | null {
     return text;
   }
   if (item.kind === 'num' || item.kind === 'step') {
-    const t = raw.trim().replace(/(\d),(?=\d{3})/g, '$1');
-    const n = item.zero && norm(t) === norm(item.zero) ? 0 : /^-?\d+/.test(t) && /^-?\d+\s*\D{0,3}$/.test(t) ? Number.parseInt(t, 10) : NaN;
+    const n = item.zero && norm(raw) === norm(item.zero) ? 0 : consultNum(raw, item.unit);
     if (!Number.isInteger(n)) return null;
     if (item.kind === 'step') return (item.lo === undefined || n >= item.lo) && (item.hi === undefined || n <= item.hi) && (!item.stride || (n - Number(item.cur)) % item.stride === 0) ? String(n) : null;
     return n >= (item.lo ?? 0) && n <= (item.hi ?? 0) ? String(n) : null;

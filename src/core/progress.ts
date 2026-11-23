@@ -62,6 +62,8 @@ export const progressWatchdog = (): number => timeMs('progWatch');
 export type StageState = 'wait' | 'run' | 'done' | 'fail' | 'skip';
 
 let turn: Turn | null = null;
+/** 새 턴이 열릴 때 아직 뒤 작업(갱신기·인터넷)이 도는 앞 턴. 그 뒤 작업의 호출은 새 턴이 아니라 이 턴에 붙는다 (2차 점검 14-2) */
+let prev: Turn | null = null;
 let seq = 0;
 let endWanted = false;
 const listeners = new Set<() => void>();
@@ -87,6 +89,7 @@ export function resetProgress(): void {
   if (graceTimer !== undefined) clearTimeout(graceTimer);
   graceTimer = undefined;
   turn = null;
+  prev = null;
   endWanted = false;
   seq = 0;
 }
@@ -95,6 +98,7 @@ export const MAIN_STAGE: Stage = { id: 'main', label: '메인', group: 'main', m
 
 /** 본편 요청 조립 시작: 새 턴 (계획은 progressPlan 으로 뒤에) */
 export function progressBegin(): Turn {
+  prev = turn && !turn.manual && turn.replyAt && !turn.endAt ? turn : null;
   turn = { at: Date.now(), plan: [MAIN_STAGE], calls: [], manual: false };
   endWanted = false;
   notify();
@@ -116,6 +120,7 @@ export function progressWatch(chat: string, now = Date.now()): void {
   if (turn.chat === undefined) turn.chat = chat;
   else if (turn.chat !== chat) {
     turn = null;
+    prev = null;
     endWanted = false;
     notify();
     return;
@@ -163,24 +168,52 @@ export function groupOf(label: string): StageGroup {
   return 'net';
 }
 
-/** 호출 이름이 속하는 단계. 계획에 없으면 그 이름으로 단계를 만들어 끼운다 */
-function stageFor(t: Turn, label: string): Stage {
+/** 계획에서 이 호출 이름의 단계 (이름이 계획 이름과 같을 때만, 꼬리 「다시 묻기 1」 등은 뗀다). 앞부분만 같은 단추 호출(「괴담톡 답장」 ↔ 자동 「괴담톡 확인」)은 따로 (릴리스 점검 11-09) */
+function planned(t: Turn, label: string): Stage | null {
   let best: Stage | null = null;
   let len = 0;
-  // 이름이 계획 이름과 같을 때만 (꼬리 「다시 묻기 1」 등은 뗀다). 앞부분만 같은 단추 호출(「괴담톡 답장」 ↔ 자동 「괴담톡 확인」)은 따로 (릴리스 점검 11-09)
   const base = baseLabel(label);
   for (const s of t.plan) for (const m of s.match) if (m && (label === m || base === m) && m.length > len) (best = s), (len = m.length);
+  return best;
+}
+
+/** 이 호출이 채팅 턴의 것인가: 계획에 있는 단계이거나 라우터·디렉터(계획을 깔기 전에 부르기도 한다) */
+const turnCall = (t: Turn, label: string): boolean => !!planned(t, label) || ['router', 'director'].includes(groupOf(label));
+
+/** 호출 이름이 속하는 단계. 계획에 없으면 그 이름으로 단계를 만들어 끼운다.
+ *  수동 턴의 호출과, 채팅 턴 중에 단추로 부른 호출(계획에 없는 호출)은 「기타」: 폰 막대 점을 켜지 않고 턴 합계에 들지 않는다 (2차 점검 14-3·14-4) */
+function stageFor(t: Turn, label: string): Stage {
+  const best = planned(t, label);
   if (best) return best;
   const b = baseLabel(label);
-  const s: Stage = { id: `x:${b}`, label: b, group: groupOf(label), match: [b] };
+  const s: Stage = { id: `x:${b}`, label: b, group: t.manual || !turnCall(t, label) ? 'other' : groupOf(label), match: [b] };
   t.plan = sortPlan([...t.plan, s]);
   return s;
 }
+
+/** 지금 시작하는 호출의 주인: 'turn' = 열린 턴(또는 새 수동 턴), 'prev' = 뒤 작업이 아직 도는 앞 턴, 'manual' = 열린 채팅 턴 중에 단추로 부른 호출.
+ *  앞 턴의 뒤 작업(응답 뒤 단계)은 새 턴이 아직 응답을 받기 전이면 새 턴의 것일 수 없다 (그 턴의 응답 뒤 단계는 응답이 붙은 뒤에 돈다). host/trace.ts traceMark 도 같은 판정을 쓴다 */
+export function callOwner(label: string): 'turn' | 'prev' | 'manual' {
+  if (!turn || turn.manual || turn.endAt) return 'turn';
+  if (prev && !prev.endAt && !turn.replyAt) {
+    const s = planned(prev, label);
+    if (s && s.group !== 'router' && s.group !== 'director' && s.group !== 'main') return 'prev';
+  }
+  return turnCall(turn, label) ? 'turn' : 'manual';
+}
+
+const findCall = (id: number): Call | undefined => turn?.calls.find((x) => x.id === id) ?? prev?.calls.find((x) => x.id === id);
 
 /** 모델 호출 시작 (host/llm.ts runModel). 열린 턴이 없거나 끝났으면 수동 턴을 연다 */
 export function progressCallStart(label: string, model: string, reqTokens: number): number {
   // 본편을 너무 오래 기다린 턴(죽은 턴)에는 붙이지 않는다
   if (turn && !turn.manual && !turn.replyAt && !turn.endAt && Date.now() - turn.at >= progressWatchdog()) progressAbort(turn);
+  if (prev && callOwner(label) === 'prev') {
+    // 앞 턴의 뒤 작업: 그 턴에 붙인다 (지금 진행 창의 턴에는 안 보인다)
+    const id = ++seq;
+    prev.calls.push({ id, label, model, reqTokens, at: Date.now(), stage: stageFor(prev, label).id });
+    return id;
+  }
   if (!turn || turn.endAt) {
     turn = { at: Date.now(), plan: [], calls: [], manual: true };
     endWanted = true; // 수동 턴은 도는 호출이 없어지면 바로 끝
@@ -193,7 +226,7 @@ export function progressCallStart(label: string, model: string, reqTokens: numbe
 
 /** 요청을 보낸 뒤에 센 요청 토큰을 호출 줄에 채운다 (host/llm.ts, 전수검사 11-13) */
 export function progressCallTokens(id: number, reqTokens: number): void {
-  const c = turn?.calls.find((x) => x.id === id);
+  const c = findCall(id);
   if (!c) return;
   c.reqTokens = reqTokens;
   notify();
@@ -207,14 +240,14 @@ export function progressMainTokens(tokens: number, t?: Turn | null): void {
 }
 
 export function progressCallChunk(id: number, chars: number): void {
-  const c = turn?.calls.find((x) => x.id === id);
+  const c = findCall(id);
   if (!c || c.ms !== undefined) return;
   c.chars = chars;
   notify();
 }
 
 export function progressCallEnd(id: number, r: { ok: boolean; ms: number; respTokens?: number; error?: string }): void {
-  const c = turn?.calls.find((x) => x.id === id);
+  const c = findCall(id);
   if (!c) return;
   c.ok = r.ok;
   c.ms = r.ms;
@@ -226,6 +259,12 @@ export function progressCallEnd(id: number, r: { ok: boolean; ms: number; respTo
 
 /** 턴의 뒤 작업이 다 끝났다 (body.ts). 아직 도는 호출이 있으면 그것이 끝날 때 닫힌다 */
 export function progressEnd(t?: Turn | null): void {
+  // 뒤 작업이 돌던 앞 턴이 끝났다: 그 턴만 닫는다
+  if (t && t === prev) {
+    prev.endAt ??= Date.now();
+    prev = null;
+    return;
+  }
   // 앞 턴의 뒤 작업이 늦게 끝나도 새 턴을 닫지 않는다 (릴리스 점검 11-09)
   if (!turn || turn.endAt || (t !== undefined && t !== turn)) return;
   endWanted = true;
@@ -294,13 +333,16 @@ export function stageCount(t: Turn): { done: number; total: number } {
 
 /** 턴 합계: 호출 수·보낸/받은 토큰·총 시간·실패 수. 본편도 한 번의 호출로 같이 센다 (2026-11-11 사용자: 합계가 안 맞는다) */
 export function turnSummary(t: Turn): { calls: number; req: number; resp: number; ms: number; failed: number } {
-  const done = t.calls.filter((c) => c.ms !== undefined);
+  // 채팅 턴 중에 단추로 부른 호출(「기타」)은 그 턴의 합계에 넣지 않는다 (2차 점검 14-3). 수동 턴은 전부 단추 호출이라 다 센다
+  const mine = (s?: Stage) => t.manual || s?.group !== 'other';
+  const other = new Set(t.plan.filter((s) => !mine(s)).map((s) => s.id));
+  const done = t.calls.filter((c) => c.ms !== undefined && !other.has(c.stage));
   const main = t.replyAt ? 1 : 0;
   return {
     calls: done.length + main,
     req: done.reduce((n, c) => n + c.reqTokens, 0) + (main ? t.mainTokens ?? 0 : 0),
     resp: done.reduce((n, c) => n + (c.respTokens ?? 0), 0) + (main ? t.replyTokens ?? 0 : 0),
     ms: (t.endAt ?? Date.now()) - t.at,
-    failed: t.plan.filter((s) => stageState(t, s) === 'fail').length,
+    failed: t.plan.filter((s) => mine(s) && stageState(t, s) === 'fail').length,
   };
 }

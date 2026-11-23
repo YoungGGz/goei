@@ -68,7 +68,7 @@ function ctlHtml(c: Ctl, aria: string): string {
     const hi = c.hi ?? n;
     const b = (to: number, sign: string, word: string, off: boolean) => `<button class="gx-step" data-action="${FLOW_DO}" data-value="${esc(c.act(String(to))[0] ?? '')}" ${off ? 'disabled' : ''} aria-label="${esc(aria)} ${word}">${sign}</button>`;
     const mid = c.inp
-      ? `<input class="adv-val" ${numType(hi)} min="${c.lo ?? 0}" max="${hi}" step="${stepOf(hi)}" data-change="${FLOW_DO}" data-key="${esc(c.inp)}" value="${n === 0 && c.zero ? '' : numTxt(n, hi)}"${c.zero ? ` placeholder="${esc(c.zero)}"` : ''} aria-label="${esc(aria)}">${c.unit && !(n === 0 && c.zero) ? `<span>${esc(c.unit)}</span>` : ''}`
+      ? `<input class="adv-val" ${numType(hi)} min="${c.lo ?? 0}" max="${hi}" step="${stepOf(hi)}" data-change="${FLOW_DO}" data-key="${esc(c.inp)}" value="${n === 0 && c.zero ? '' : numTxt(n, hi)}"${c.zero ? ` placeholder="${esc(c.zero)}" data-zero="${esc(c.zero)}"` : ''} aria-label="${esc(aria)}">${c.unit && !(n === 0 && c.zero) ? `<span>${esc(c.unit)}</span>` : ''}`
       : `<b>${esc(n === 0 && c.zero ? c.zero : `${n}${c.unit ?? ''}`)}</b>`;
     return `<div class="st-step${c.inp ? ` adv-step${stepSize(hi, c.unit ?? '', c.zero ?? '')}` : stepSizeText(`${hi}${c.unit ?? ''}`, c.zero ?? '')}">${b(Math.max(c.lo ?? 0, n - stepOf(hi)), '−', '줄이기', n <= (c.lo ?? 0))}${mid}${b(Math.min(hi, n + stepOf(hi)), '+', '늘리기', n >= hi)}</div>`;
   }

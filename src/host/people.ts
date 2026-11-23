@@ -803,10 +803,8 @@ export async function routerPeople(chat: Chat, store: PeopleStore, input: string
   const t0 = Date.now();
   const diag: DiagRun = { at: new Date().toISOString(), chat: '', reason: 'router', model: settings.stageModel.router, people: [], indexes: [], sizes: { system: built.system.length, data: JSON.stringify(built.data).length, span: 0 }, outChars: 0, ms: 0, ok: false };
   try {
-    const raw = await Promise.race([
-      runModel([{ role: 'system', content: built.system }, { role: 'user', content: JSON.stringify(built.data) }], settings.stageModel.router, settings.stageModelId.router || undefined, '라우터'),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`시간 제한 ${settings.routerTimeout}초`)), settings.routerTimeout * 1000)),
-    ]);
+    // 시간 제한은 runModel 이 건다: 넘으면 그 호출을 실패로 적고, 늦게 온 답은 버린다 (2차 점검 14-1)
+    const raw = await runModel([{ role: 'system', content: built.system }, { role: 'user', content: JSON.stringify(built.data) }], settings.stageModel.router, settings.stageModelId.router || undefined, '라우터', settings.routerTimeout);
     diag.raw = raw;
     diag.outChars = raw.length;
     const r = parseRouter(raw, store, names, built.max, exclude);
@@ -845,10 +843,7 @@ export async function directorNoteText(chat: Chat, store: PeopleStore, people: s
     const t0 = Date.now();
     const diag: DiagRun = { at: new Date().toISOString(), chat: '', reason, model: settings.stageModel.director, people, indexes: [], sizes: { system: b.system.length, data: JSON.stringify(b.data).length, span: 0 }, outChars: 0, ms: 0, ok: false };
     try {
-      const raw = await Promise.race([
-        runModel([{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }], settings.stageModel.director, settings.stageModelId.director || undefined, '디렉터'),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`시간 제한 ${settings.directorTimeout}초`)), settings.directorTimeout * 1000)),
-      ]);
+      const raw = await runModel([{ role: 'system', content: b.system }, { role: 'user', content: JSON.stringify(b.data) }], settings.stageModel.director, settings.stageModelId.director || undefined, '디렉터', settings.directorTimeout);
       diag.raw = raw;
       diag.outChars = raw.length;
       const r = parseDirectorAny(raw, people, settings.director === 'scene', allowSearch);
