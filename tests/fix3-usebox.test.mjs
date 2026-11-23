@@ -11,7 +11,7 @@ mkdirSync(dir, { recursive: true });
 await build({
   stdin: {
     contents: `
-      export { useBoxCss, markUseSent, sentUseIds, sentOut, sentReroll, dropUseUnlessSent, useLocked, holdUseSettle, setUseLockAt, setUseBlind, useBlind, freeUseLock } from './src/host/usebox';
+      export { useBoxCss, useBoxNames, useSentTurn, markUseSent, sentUseIds, sentOut, sentReroll, dropUseUnlessSent, useLocked, holdUseSettle, setUseLockAt, setUseBlind, useBlind, freeUseLock } from './src/host/usebox';
       export { setWaiting, isWaiting, setWaitingProbe } from './src/host/waiting';
       export { timeMs } from './src/core/timing';
       export { readItemUse, ITEM_USE_VAR, ITEM_USE_AT_VAR, ITEM_USE_PREV_VAR, readUsePrev, mergeUse, addItem, itemsVars, readItems, liveItems, lastUserKey, settleItemUse, itemLeft, usesToSend, inventoryText } from './src/core/items';
@@ -743,4 +743,29 @@ test('이 봇 판정이 늦어 손대지 못하고 보낸 요청: 기다리는 �
   reply(t, 'r2');
   assert.deepEqual(usedLog(t), ['붕대×2']);
   assert.equal(leftOf(t), left - n);
+});
+
+// ── 반박 검토 11-23 (Q2): 보낸 답이 지워진 사용은 칩과 소지품 창에 같이 다시 보이고, 다시 굴리는 동안에는 둘 다 숨는다 ──
+test('보낸 턴의 답이 지워진 사용: 칩·창에 다시 보이고 뺄 수 있다. 다시 굴리는 동안은 숨는다. 답이 남아 있으면 숨는다', async () => {
+  const t = seed(11);
+  U.setWaiting(false);
+  const sentAt = { ...t.store.chat.scriptstate, [U.ITEM_USE_AT_VAR]: '#2' };
+  // 답이 지워져 유저 메시지가 끝 (기다리는 중 아님)
+  t.store.chat = { ...t.store.chat, scriptstate: sentAt };
+  assert.equal(U.useSentTurn(t.store.chat), false);
+  assert.deepEqual(U.useBoxNames(t.store.chat).map((n) => n.id), [t.id], '칩에 보인다');
+  assert.match(popupHtml(t), /data-action="items-unuse"/, '창에도 사용 예정으로 보인다');
+  // 그 답을 다시 굴리는 중: 둘 다 숨는다
+  U.setWaiting(true);
+  assert.equal(U.useSentTurn(t.store.chat), true);
+  assert.deepEqual(U.useBoxNames(t.store.chat), []);
+  assert.doesNotMatch(popupHtml(t), /data-action="items-unuse"/);
+  U.setWaiting(false);
+  // 답이 남아 있는 지난 턴: 숨는다
+  const answered = { message: [...t.store.chat.message, { role: 'char', data: '감았다' }], scriptstate: sentAt };
+  assert.equal(U.useSentTurn(answered), true);
+  assert.deepEqual(U.useBoxNames(answered), []);
+  // 지워진 상태에서 창의 「사용 취소」가 듣는다
+  await U.itemsAction('items-unuse', t.id, t.ctx(), t.env);
+  assert.deepEqual(t.queue(), []);
 });

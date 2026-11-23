@@ -205,7 +205,7 @@ export interface BuildOpts {
   /** 인물별 가치관(relations-base values) */
   values: Record<string, string>;
   names: NameEntry[];
-  /** 기록하지 않는 이름 (유저가 연기하는 요원) */
+  /** 기록하지 않는 이름 (주인공: 캐릭터로 플레이하는 요원 또는 페르소나) */
   exclude?: string[];
   /** 세력 코드 → 이름 (명부). 세력 평판 자료용 */
   factionNames?: Record<string, string>;
@@ -380,6 +380,8 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
   });
   const shopM = o.shop && !o.only?.length && confirmedIdx.has(o.shop.at) ? [...tags].find(([, i]) => i === o.shop!.at)?.[0] ?? '' : '';
   const pickM = o.pickup?.items.length && !o.only?.length && confirmedIdx.has(o.pickup.at) ? [...tags].find(([, i]) => i === o.pickup!.at)?.[0] ?? '' : '';
+  // 모델 Router 의 미등록 이름 힌트: 이미 기록된 이름과 주인공(exclude)은 빼고
+  const hints = (o.hints ?? []).filter((h) => !store.people[h.name] && !(o.exclude ?? []).some((x) => norm(x) === norm(h.name))).slice(0, 12);
   const data = {
     request_ref: `pp_${Date.now().toString(36)}`,
     // 세력 평판 수치도 같은 계기 이름을 쓴다: 호감이 글로만·꺼짐이어도 세력 수치가 켜져 있으면 넣는다 (전수검사 11-13)
@@ -396,7 +398,7 @@ export function buildUpdate(chat: Chat, store: PeopleStore, batch: number[], o: 
     ...(portraits.length ? { portraits } : {}),
     ...(roster.length ? { roster } : {}),
     ...(sceneBefore.length ? { scene_before: sceneBefore } : {}),
-    ...(o.hints?.length ? { name_hints: o.hints.filter((h) => !store.people[h.name]).slice(0, 12) } : {}),
+    ...(hints.length ? { name_hints: hints } : {}),
     ...(o.memory?.length ? { memory: o.memory } : {}),
     docs_now: DOC_TYPES.some((t) => o.settings.features.has(docFeature(t) as Feature)) ? docsNow(store, live, o.settings, texts, chosen) : undefined,
     suspicion_now: o.settings.features.has('suspicion') && !o.settings.qualitative.has('suspicion') ? chosen.flatMap((n) => suspicionCases(store.people[n], live)) : undefined,
@@ -621,7 +623,7 @@ export interface ApplyCtx {
   /** 새 인물의 시작값 */
   baseOf?: (name: string) => { faction?: string; affinityBase?: number; express?: 0 | 1 | 2 | 3; aliases?: string[] };
   now?: string;
-  /** 기록하지 않는 이름 (유저가 연기하는 요원): 새 인물로도 받지 않는다 */
+  /** 기록하지 않는 이름 (주인공: 캐릭터로 플레이하는 요원 또는 페르소나): 새 인물로도 받지 않는다 */
   exclude?: string[];
   /** 이 인물들만 반영 (인물별 「다시 읽기」): 다른 인물 항목·계기·호칭·새 인물·문서·의심·세력은 버린다 */
   only?: string[];
@@ -779,7 +781,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     }
     const name = tableName(given);
     if (ctx.exclude?.some((x) => norm(x) === norm(name) || (Array.isArray(n.aliases) && n.aliases.some((a) => norm(String(a)) === norm(x))))) {
-      drop('new_people', n, '유저가 연기하는 요원', name);
+      drop('new_people', n, '주인공', name);
       continue;
     }
     if (store.ignored.includes(name)) {
@@ -848,7 +850,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
       continue;
     }
     if (ctx.exclude?.some((e) => norm(e) === norm(to))) {
-      drop('rename', x, '유저가 연기하는 요원', fromRaw);
+      drop('rename', x, '주인공', fromRaw);
       continue;
     }
     if (store.ignored.includes(to)) {
@@ -858,7 +860,7 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     if (from) {
       const old = [from, ...store.people[from].aliases];
       const seed = store.people[to] ? null : seedPerson(to, ctx.sheetOf?.(to) ?? null, ctx.baseOf?.(to) ?? {}, ctx.now);
-      renamePerson(store, from, to, seed, ctx.settings.patternsCap);
+      renamePerson(store, from, to, seed, ctx.settings.patternsCap, ev.anchor);
       for (const k of old) moved.set(norm(k), to);
       report.applied.renamed.push({ from, to });
       continue;

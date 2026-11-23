@@ -361,7 +361,7 @@ test('사용: 답이 온 뒤 같은 물건을 새로 넣으면 이어 받는 응
 });
 
 // 11-08 전수점검: 상점에 판 물건은 판 응답에 묶여 숨고, 그 응답이 사라지면 돌아온다
-test('팔기: 판 응답이 살아 있는 동안만 숨고 장착 칸에서 빠진다', async () => {
+test('팔기: 판 응답이 살아 있는 동안만 숨고 장착 칸에서 빠진다 (다시 굴리면 제 칸으로)', async () => {
   const { sellItem } = await import('../dist-test/core.mjs');
   let it = addItem(empty, alive, { name: '단검', equip: 'weapon', from: 'manual', anchor: '', wear: true });
   const id = it.list[0].id;
@@ -371,7 +371,8 @@ test('팔기: 판 응답이 살아 있는 동안만 숨고 장착 칸에서 빠�
   assert.equal(it.log.at(-1).what, 'sell');
   const back = liveItems(it, new Set(['c1']));
   assert.deepEqual(back.map((e) => e.name), ['단검']);
-  assert.equal(back[0].slot, undefined);
+  // 판 응답을 다시 굴리면 그 응답이 만든 것은 다 돌아온다 (사용자 2026-11-22): 장착 칸도 제자리
+  assert.equal(back[0].slot, 0);
 });
 
 // 2026-11-13: 삭제(기록까지 지움), 물건으로 만드는 범위, 만들지 않을 것

@@ -8,11 +8,11 @@
 import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
 import { updateChat } from '../host/risu';
-import { freeUseLock, refreshUseBox, useLocked, useSending } from '../host/usebox';
+import { freeUseLock, refreshUseBox, useLocked, useSending, useSentTurn } from '../host/usebox';
 import { itemIconStatus, itemIconUrl, itemPictures } from '../host/itemicons';
 import { aliveAnchors } from '../core/wallet';
 import {
-  addItem, addUse, canMerge, canUse, invOn, dropUse, EQUIP_LABEL, EQUIP_SLOTS, equipItem, equippedOf, gridItems, isEquipped, ITEM_SPENT_VAR, ITEM_USE_AT_VAR, ITEMS_VAR, itemCarry, itemEditOn, itemLeft, itemSlots, itemUseVars, itemWeight, itemsVars, lastBotKey, liveItems, mergeItems, mergeUse, queueUseVars, usesToSend, seatLost, useNeedsSeat,
+  addItem, addUse, noteEdits, settleEdits, canMerge, canUse, invOn, dropUse, EQUIP_LABEL, EQUIP_SLOTS, equipItem, equippedOf, gridItems, isEquipped, ITEM_SPENT_VAR, ITEMS_VAR, useSentAt, itemCarry, itemEditOn, itemLeft, itemSlots, itemUseVars, itemWeight, itemsVars, lastBotKey, liveItems, mergeItems, mergeUse, queueUseVars, usesToSend, seatLost, useNeedsSeat,
   forgetAway, itemAutoOn, purgeItem, readItemUse, readItems, removeItem, searchItems, setItemLeft, slotKind, STATE_LABEL, lineWeight, totalWeight, unequipItem, updateItem, weightText,
   type Item, type ItemEquip, type ItemLog, type Items, type ItemUse, type MallPaid,
 } from '../core/items';
@@ -140,7 +140,7 @@ const sourceLine = (it: Item, w: When) => [FROM_NAME[it.from], whenLabel(w, it.a
 
 /** 이 채팅의 「사용」 자리 (이미 보낸 턴의 것은 비어 보인다) */
 export function useQueue(ctx: ChatContext): ItemUse[] {
-  return ctx.chat.scriptstate?.[ITEM_USE_AT_VAR] ? [] : readItemUse(ctx.chat.scriptstate);
+  return useSentTurn(ctx.chat) ? [] : readItemUse(ctx.chat.scriptstate);
 }
 const leftOf = (ctx: ChatContext, it: Item) => itemLeft(itemsOf(ctx), it, aliveAnchors(ctx.chat));
 
@@ -458,10 +458,12 @@ export interface ItemsEnv {
 /** 소지품 메뉴의 data-action. 처리했으면 true. form 은 폼 요소를 넘긴다 (items-save) */
 export async function itemsAction(action: string, value: string | undefined, ctx: ChatContext, env: ItemsEnv, formEl?: HTMLElement | null): Promise<boolean> {
   const write = (fn: (it: Items, alive: Set<string>) => Items) => updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-    const cur = readItems(chat.scriptstate);
+    const alive = aliveAnchors(chat);
+    // 사라진 응답이 바꾼 칸은 옛 값으로 굳힌 뒤 고친다. 손으로 바꾼 칸은 본문이 바꾼 기록에서 빼어, 그 응답을 다시 굴려도 손으로 정한 값이 남는다 (core/items.ts noteEdits)
+    const cur = settleEdits(readItems(chat.scriptstate), alive);
     // 갱신기가 물건을 읽지 않는 채팅은 여기서 치운 지 오래된 줄을 지운다 (설정 「치운 물건 기억」, core/items.ts forgetAway).
     // 갱신기가 읽는 채팅은 갱신기가 읽은 응답 기준으로 지운다 (host/people.ts): 밀린 응답이 있을 때 채팅 끝에서 세어 먼저 지우지 않게
-    const done = fn(cur, aliveAnchors(chat));
+    const done = noteEdits(cur, fn(cur, alive), '');
     const next = itemAutoOn(chat.scriptstate) ? done : forgetAway(done, chat);
     if (next === cur) return null;
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...itemsVars(next) } };
@@ -561,7 +563,7 @@ export async function itemsAction(action: string, value: string | undefined, ctx
         const next = mergeItems(cur, aliveAnchors(chat), keep, value, lastBotKey(chat));
         if (next === cur) return null;
         // 아직 안 보낸 사용은 남는 줄로 옮긴다 (빠진 줄의 칩이 말없이 사라지지 않게)
-        const use = vars?.[ITEM_USE_AT_VAR] ? {} : itemUseVars(mergeUse(q, keep, value));
+        const use = useSentAt(chat) ? {} : itemUseVars(mergeUse(q, keep, value));
         return { ...chat, scriptstate: { ...(vars ?? {}), ...itemsVars(next), ...use } };
       });
       if (held) {
@@ -818,7 +820,7 @@ async function queueUse(ctx: ChatContext, fn: (q: ItemUse[]) => ItemUse[], id: s
 export async function dropFromUse(ctx: { charIndex: number; chatIndex: number }, id: string): Promise<boolean> {
   let held = false;
   await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
-    if (chat.scriptstate?.[ITEM_USE_AT_VAR]) return null;
+    if (useSentAt(chat)) return null;
     // 답을 기다리는 중·정리 중에도 남긴다: 보낸 표시가 붙기 전(요청 조립 중)에 빼면 모델은 쓴 것으로 받았는데 기록이 안 남았다 (11-14 재검토)
     if (useSending(chat, ctx.charIndex, ctx.chatIndex, id) || (lockedHere(ctx) && readItemUse(chat.scriptstate).some((u) => u.id === id))) {
       held = true;
