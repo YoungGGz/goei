@@ -1162,7 +1162,11 @@ async function handle(action: string, value?: string): Promise<void> {
     // 설정 창의 업데이트 페이지로
     return handle('ed-open', 'set:update');
   }
-  if (action.startsWith('upd-') && (view.kind === 'started' || view.kind === 'picker') && (await handleUpdate(action, view.ctx, settingsEnv))) return;
+  // 업데이트 단추: 설치 창이 그리는 화면이면 어디서나 (커스텀 임무 첫 장면 전 'opening', 다른 봇의 설치 화면도. 2차 점검 17-2·17-3). ctx 는 설치 창과 같은 것
+  if (action.startsWith('upd-')) {
+    const updCtx = view.kind === 'started' || view.kind === 'picker' || view.kind === 'opening' ? view.ctx : installCtx;
+    if (updCtx && (await handleUpdate(action, updCtx, settingsEnv))) return;
+  }
   // 상황판(CCTV·일지·상세 창)에서 「선택」: 목표로 고르고 바로 임무 지도로, 그 자리를 고른 채로 (2026-10-21 사용자)
   if (action === 'pick-event' && view.kind === 'started' && tab !== 'map') {
     await handleField(action, value, view.ctx, env, false);
