@@ -1,0 +1,217 @@
+{
+ "type": "risuChat",
+ "ver": 2,
+ "data": {
+  "message": [
+   {
+    "role": "user",
+    "data": "%%SCENE_CARD:7b22746172676574223a22eba3a9ed82a4eba788ed8ab8222c227061727479223a22eb8298227d%%\nThe user picked a subject and companions in a menu outside the story. The characters do not know about the menu.\n\nGo by what is established about the subject: what it is, where it is, how people run into it, and what it does to them. Write an encounter that fits that. Go by the protagonist's organization, rank, and duties, and by who each companion is, for why these people would be there and what each of them knows. A different subject or different companions should give a different encounter.\n\nShow the subject the way a person on the spot would notice it: something that looks wrong, something it does, something it left. Information comes from characters saying it, each in their own way. Give each companion something to do that comes from this place and this moment, and let them talk to each other too.\n\nIf a Situation is given, follow it first.\n\nThis is the first message of a new story. Start with the protagonist's ordinary day, before the subject is involved: where they are, what they are doing, what this world is like. Then move step by step, one event after another, until the protagonist first meets the subject. Write it long enough to cover all of that; more people in the scene need more space. Companions may already be there or may arrive for their own reasons. End on a line of dialogue or an object that requires the protagonist to respond, and write nothing after it.\n\nSubject: 룩키마트\nCompanions: No additional companions selected; retain established companions.\n%%/SCENE_CARD%%",
+    "time": 1795491058889,
+    "chatId": "98a4cb15-f3df-4204-8160-938cdde9e857"
+   },
+   {
+    "role": "char",
+    "data": "협회 의뢰서에 적힌 주소에는 2000년대 중반에 멈춘 듯한 할인마트가 서 있었다. 간판의 LOOKYMART 철자가 형광등 아래에서 흐릿하게 깜빡였다.\n\n자동문은 손님을 기다렸다는 듯 열려 있었다. 안쪽에서 오래된 안내 방송 음악이 끊어질 듯 이어졌다.\n\n의뢰 조건은 하나였다. 실종자의 흔적을 찾고, 해가 지기 전에 나올 것.\n[▣|2025.03.14|03:10 PM|☀️|12°C|룩키마트 정문 앞|룩키마트|없음|없음|프리랜서/5급|140000]",
+    "saying": "b7077892-0194-410b-ad81-f450359ffc5e",
+    "time": 1795491059348,
+    "generationInfo": {
+     "model": "custom-t2-main",
+     "generationId": "da44cd01-214c-4806-897a-d5c683c45a0e",
+     "inputTokens": 578,
+     "outputTokens": 500,
+     "maxContext": 4000,
+     "stageTiming": {
+      "stage1": 38,
+      "stage2": 0,
+      "stage3": 1092,
+      "stage4": 0
+     }
+    },
+    "promptInfo": {},
+    "chatId": "da44cd01-214c-4806-897a-d5c683c45a0e"
+   },
+   {
+    "role": "user",
+    "data": "마트 안으로 들어가 1층 진열대를 하나씩 살핀다.",
+    "time": 1795491065581,
+    "name": null,
+    "chatId": "62d4a229-f129-4683-a515-59521420ef55"
+   },
+   {
+    "role": "char",
+    "data": "진열대의 상품은 모두 유통기한이 같은 날짜였다. 카트 한 대가 아무도 밀지 않았는데 천천히 통로 끝으로 굴러갔다.\n\n천장의 층 안내판에는 지하 1층부터 3층까지 적혀 있었고, 그 위에 누군가 매직으로 4라는 숫자를 덧그려 놓았다.\n[▣|2025.03.14|03:30 PM|☀️|12°C|룩키마트 1층 식품 코너|룩키마트|없음|투입|프리랜서/5급|140000]",
+    "saying": "b7077892-0194-410b-ad81-f450359ffc5e",
+    "time": 1795491065944,
+    "generationInfo": {
+     "model": "custom-t2-main",
+     "generationId": "2de84fe0-3c65-4e79-b75f-37b919f32084",
+     "inputTokens": 761,
+     "outputTokens": 500,
+     "maxContext": 4000,
+     "stageTiming": {
+      "stage1": 71,
+      "stage2": 0,
+      "stage3": 745,
+      "stage4": 0
+     }
+    },
+    "promptInfo": {},
+    "chatId": "2de84fe0-3c65-4e79-b75f-37b919f32084"
+   },
+   {
+    "role": "user",
+    "data": "계산대 쪽에서 들려오는 안내 방송에 귀를 기울인다.",
+    "time": 1795491071536,
+    "name": null,
+    "chatId": "268ad7aa-6d66-4c96-8fae-8dc66fde097b"
+   },
+   {
+    "role": "char",
+    "data": "\"고객 여러분께 알려 드립니다. 4층 특별 할인 행사가 곧 시작됩니다.\"\n\n방송은 같은 문장을 세 번 되풀이하고 뚝 끊겼다. 계산대에는 아무도 없었지만, 영수증 한 장이 막 뽑혀 나온 듯 말려 올라가 있었다.\n\n영수증 맨 아래에는 오늘 날짜와 함께 실종자의 이름이 찍혀 있었다.\n[▣|2025.03.14|03:50 PM|☀️|12°C|룩키마트 1층 계산대|룩키마트|없음|투입|프리랜서/5급|140000]",
+    "saying": "b7077892-0194-410b-ad81-f450359ffc5e",
+    "time": 1795491071896,
+    "generationInfo": {
+     "model": "custom-t2-main",
+     "generationId": "a620b0ba-223c-46b8-a59f-db0ab148bf38",
+     "inputTokens": 925,
+     "outputTokens": 500,
+     "maxContext": 4000,
+     "stageTiming": {
+      "stage1": 46,
+      "stage2": 0,
+      "stage3": 903,
+      "stage4": 0
+     }
+    },
+    "promptInfo": {},
+    "chatId": "a620b0ba-223c-46b8-a59f-db0ab148bf38"
+   }
+  ],
+  "note": "",
+  "name": "S-프리랜서-임무",
+  "localLore": [],
+  "fmIndex": 0,
+  "id": "cb8c6e95-ec05-4458-ad70-99a23c597476",
+  "scriptstate": {
+   "$st_asset_on": "1",
+   "$st_asset_model": "main",
+   "$st_asset_player": "0",
+   "$st_asset_limit": "2",
+   "$st_agent_limit": "12",
+   "$st_support_on": "1",
+   "$wg_extra_cap": "3",
+   "$wg_extra_ms_cap": "3",
+   "$wg_extra_in_cap": "3",
+   "$wg_preset_cap": "2",
+   "$wg_preset_p": "100",
+   "$wg_random_cap": "1",
+   "$wg_random_p": "100",
+   "$wg_incident_cap": "1",
+   "$wg_incident_p": "50",
+   "$wg_mystic_cap": "1",
+   "$wg_mystic_p": "100",
+   "$wg_preset_expire": "1",
+   "$wg_random_expire": "1",
+   "$wg_incident_expire": "1",
+   "$wg_mystic_expire": "1",
+   "$wg_preset_ttl": "48",
+   "$wg_random_ttl": "48",
+   "$wg_incident_ttl": "12",
+   "$wg_mystic_ttl": "24",
+   "$wg_landmark_share": "50",
+   "$wg_cleared_cap": "200",
+   "$st_fixed_theme": "dark",
+   "$st_faction": "E00",
+   "$st_player": "",
+   "$st_lang": "ko",
+   "$st_fm": "4",
+   "$st_pick": "E00",
+   "$st_lang_pick": "ko",
+   "$st_fm_pick": "4",
+   "$ib_affiliation": "프리랜서",
+   "$st_points_on": "0",
+   "$st_anomaly_on": "1",
+   "$an_report": "[AN|경기도 과천시|소라 랜드|활성|D|없음|이상 징후 신고가 들어왔지만 아직 대응 인원은 없다] {0시간 40분 전} {유지 기한 03.16 15:10}\n[AN|인천광역시 석모도|뮤지컬 붉은 숙녀|활성|D|없음|이상 징후 신고가 들어왔지만 아직 대응 인원은 없다] {0시간 40분 전} {유지 기한 03.16 15:10}\n[AN|서울특별시 강서구|룩키마트|활성|D|없음|이상 징후 신고가 들어왔지만 아직 대응 인원은 없다] {0시간 40분 전} {유지 기한 03.16 15:10}\n[AN|인천광역시 동구|반짝반짝 용궁|활성|D|없음|이상 징후 신고가 들어왔지만 아직 대응 인원은 없다] {0시간 20분 전} {유지 기한 03.16 15:10}",
+   "$in_report": "NEW [IN|인천광역시 교동도|<발생지점>|진행|<배치>|<상황>]",
+   "$ms_report": "[MS|강원특별자치도 철원군|얼굴 없는 장터 맨홀|출현|없음|문을 열어 둔 채 조용히 손님을 기다리고 있다] {0시간 40분 전} {유지 기한 03.15 15:10}",
+   "$ag_report": "- code: none",
+   "$seed_lore": "%%SEED%%\n@@dont_activate\n### Special Disaster Response Association (특수재난대응협회) / SDRA\n\n#### Identity\n- The Special Disaster Response Association is a private civilian organization that manages independent freelancers engaged in anomaly response.\n\n#### Core Assets and Traits\n##### Characteristic\n- The Association is nominally a support body for registered freelancers, but in practice it is a bureaucratic institution that prioritizes organizational continuity and revenue over freelancer welfare.\n- The Association serves as the intermediary between clients and freelancers, extracting substantial commissions throughout the process. Its rates are widely considered exploitative, but operating without an Association license is illegal, leaving freelancers with little practical choice.\n- Its large freelancer network also functions as an extensive information network. Routine field activity produces a continuous flow of incidental intelligence across different regions and anomaly types.\n\n#### Structure\n##### HQ Structure\n- The Association headquarters is located in Yeongdeungpo-gu, Seoul. The B4–10F mid-rise building is publicly presented as the office of a disaster consulting firm.\n- The upper floors contain executive offices and the chairman's office.\n- The middle floors house mission operations, licensing, and general administration.\n- The basement contains equipment storage, secure briefing rooms, and a small clinic for registered freelancers.\n\n##### Division\n- Mission Coordination Office: The Association's core revenue unit. It receives client requests, posts missions for freelancer assignment, processes payment, and extracts commission.\n- Licensing Office: Issues, renews, suspends, and revokes freelancer licenses while maintaining the active registry.\n- Support Office: Handles insurance, equipment channels, medical referrals, and liaison work with the Bureau. It is nominally responsible for freelancer protection, but its assistance is slow and limited in practice.\n\n#### Personnel\n##### Freelancers (프리랜서)\n- Independent operators registered with the Association who receive missions through its brokering system. They are not employees, but contractors who pay the Association for the legal right to operate.\n- Grade 5 Provisional: Entry-level freelancers charged the highest commission rate.\n- Grade 4 Standard: Fully registered freelancers, uses the standard commission rate.\n- Grade 3 Experienced: Freelancers qualified for specialized missions. They receive slightly reduced commissions.\n- Grade 2 Senior: Veteran freelancers who receive lower commission rates.\n- Grade 1 Elite: The highest standard grade, granting minimal commissions.\n- Special Grade: An honorary classification granting near-total operational autonomy.\n\n---\n\n@@dont_activate\n### Jungnim Underground Shopping Center (중림 지하상가)\n\n#### Identity\n- The Jungnim Underground Shopping Center is an informal underground economy dealing in goods and services that cannot be obtained through legal or semi-legal channels.\n- It is not a faction or unified organization, but a loose network of self-interested operators held together by profit, necessity, and mutual distrust.\n- It located beneath Jungnim-dong, Seoul. At street level, it appears to be little more than a failing basement mall filled with aging shops and low-traffic vendors.\n\n#### Core Assets and Traits\n##### Characteristic\n- Business within the Shopping Center is openly predatory. Prices are inflated, information is treated as a commodity, and trust is both scarce and expensive. There is no expectation of loyalty, and refunds are effectively nonexistent.\n- Disputes are settled privately between the parties involved or submitted to a broker for arbitration, with no recognized process for appeal.\n- Cash remains the standard form of payment, but anomalous materials, Bureau equipment, favors, services, and personal collateral are also accepted.\n- Debt is enforced without exception. Default usually results in exclusion from the market, followed by recovery through hired intermediaries.\n\n#### Personnel\n##### Core Participants\n- Fixers connect buyers with sellers, contractors with clients, and available personnel with jobs.\n- Fence Operations distribute stolen, confiscated, or unregistered anomalous items, including Bureau equipment and unauthorized Baekilmong products.\n- Backalley Doctors provide unlicensed treatment for ordinary injuries and anomalous conditions.\n- Loan Sharks provide high-risk loans to people without access to legitimate financial institutions. Their interest rates are extreme, and accepted collateral may include abilities, or body parts.\n\n---\n%%/SEED%%",
+   "$seed_inputs": "0",
+   "$goei_last": "5:225:1r4kkxj",
+   "$goei_prev": "{\"i\":5,\"world\":\"{\\\"v\\\":1,\\\"epoch\\\":3,\\\"minute\\\":29032770,\\\"an\\\":[{\\\"loc\\\":\\\"10-8\\\",\\\"name\\\":\\\"소라 랜드\\\",\\\"state\\\":\\\"활성\\\",\\\"grade\\\":\\\"D\\\",\\\"deploy\\\":\\\"없음\\\",\\\"kind\\\":\\\"random\\\",\\\"origin\\\":\\\"auto\\\",\\\"presetName\\\":\\\"\\\",\\\"since\\\":29032750,\\\"born\\\":29032750,\\\"exploring\\\":false,\\\"situation\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\",\\\"trail\\\":[{\\\"m\\\":29032750,\\\"e\\\":1,\\\"text\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"소라 랜드\\\",\\\"pics\\\":[\\\"Situation Anomaly Amusement 1\\\",\\\"Situation Anomaly Amusement 2\\\",\\\"Situation Anomaly Generic City Skyline\\\",\\\"Situation Anomaly Generic City SideStreet\\\",\\\"Situation Anomaly\\\",\\\"Situation Anomaly\\\"]},\\\"startKey\\\":\\\"da44cd01-214c-4806-897a-d5c683c45a0e\\\"},{\\\"loc\\\":\\\"03-2\\\",\\\"name\\\":\\\"뮤지컬 붉은 숙녀\\\",\\\"state\\\":\\\"활성\\\",\\\"grade\\\":\\\"D\\\",\\\"deploy\\\":\\\"없음\\\",\\\"kind\\\":\\\"preset\\\",\\\"origin\\\":\\\"auto\\\",\\\"presetName\\\":\\\"뮤지컬 붉은 숙녀\\\",\\\"since\\\":29032750,\\\"born\\\":29032750,\\\"exploring\\\":false,\\\"situation\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\",\\\"trail\\\":[{\\\"m\\\":29032750,\\\"e\\\":1,\\\"text\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"뮤지컬 붉은 숙녀\\\",\\\"pics\\\":[\\\"Situation Anomaly Generic City Skyline\\\",\\\"Situation Anomaly Generic City SideStreet\\\",\\\"Situation Anomaly\\\",\\\"Situation Anomaly\\\"]},\\\"startKey\\\":\\\"da44cd01-214c-4806-897a-d5c683c45a0e\\\"},{\\\"loc\\\":\\\"02-9\\\",\\\"name\\\":\\\"룩키마트\\\",\\\"state\\\":\\\"활성\\\",\\\"grade\\\":\\\"D\\\",\\\"deploy\\\":\\\"없음\\\",\\\"kind\\\":\\\"preset\\\",\\\"origin\\\":\\\"manual\\\",\\\"presetName\\\":\\\"룩키마트\\\",\\\"since\\\":29032750,\\\"born\\\":29032750,\\\"exploring\\\":true,\\\"situation\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\",\\\"trail\\\":[{\\\"m\\\":29032750,\\\"e\\\":1,\\\"text\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\"}],\\\"touched\\\":true,\\\"art\\\":{\\\"for\\\":\\\"룩키마트\\\",\\\"pics\\\":[\\\"Situation Anomaly Mall 1\\\",\\\"Situation Anomaly Mall 2\\\",\\\"Situation Anomaly Generic City SideStreet\\\",\\\"Situation Anomaly Generic City Skyline\\\",\\\"Situation Anomaly\\\",\\\"Situation Anomaly\\\"]},\\\"startKey\\\":\\\"da44cd01-214c-4806-897a-d5c683c45a0e\\\"},{\\\"loc\\\":\\\"03-17\\\",\\\"name\\\":\\\"반짝반짝 용궁\\\",\\\"state\\\":\\\"활성\\\",\\\"grade\\\":\\\"D\\\",\\\"deploy\\\":\\\"없음\\\",\\\"kind\\\":\\\"preset\\\",\\\"origin\\\":\\\"auto\\\",\\\"presetName\\\":\\\"반짝반짝 용궁\\\",\\\"since\\\":29032770,\\\"born\\\":29032750,\\\"exploring\\\":false,\\\"situation\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\",\\\"trail\\\":[{\\\"m\\\":29032770,\\\"e\\\":2,\\\"text\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"반짝반짝 용궁\\\",\\\"pics\\\":[\\\"Situation Anomaly Generic City Skyline\\\",\\\"Situation Anomaly Generic City SideStreet\\\",\\\"Situation Anomaly\\\",\\\"Situation Anomaly\\\"]},\\\"startKey\\\":\\\"2de84fe0-3c65-4e79-b75f-37b919f32084\\\"}],\\\"inc\\\":[{\\\"loc\\\":\\\"03-0\\\",\\\"name\\\":\\\"\\\",\\\"state\\\":\\\"발생대기\\\",\\\"situation\\\":\\\"\\\",\\\"kind\\\":\\\"random\\\",\\\"origin\\\":\\\"auto\\\",\\\"since\\\":null,\\\"born\\\":29032750}],\\\"ms\\\":[{\\\"loc\\\":\\\"11-1\\\",\\\"name\\\":\\\"얼굴 없는 장터 맨홀\\\",\\\"state\\\":\\\"출현\\\",\\\"visitors\\\":\\\"없음\\\",\\\"origin\\\":\\\"auto\\\",\\\"since\\\":29032750,\\\"born\\\":29032750,\\\"situation\\\":\\\"문을 열어 둔 채 조용히 손님을 기다리고 있다\\\",\\\"trail\\\":[{\\\"m\\\":29032750,\\\"e\\\":1,\\\"text\\\":\\\"문을 열어 둔 채 조용히 손님을 기다리고 있다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"얼굴 없는 장터 맨홀\\\",\\\"pics\\\":[\\\"Situation Mystic Market\\\",\\\"Situation Mystic Room\\\",\\\"Situation Mystic Object\\\",\\\"Situation Mystic Shop\\\",\\\"Situation Mystic Bookshop\\\",\\\"Situation Mystic Workshop\\\",\\\"Situation Mystic Vending\\\",\\\"Situation Mystic Door\\\",\\\"Situation Mystic\\\",\\\"Situation Mystic\\\"]},\\\"startKey\\\":\\\"da44cd01-214c-4806-897a-d5c683c45a0e\\\"}],\\\"agents\\\":{},\\\"retired\\\":[],\\\"promoted\\\":[],\\\"blocks\\\":{},\\\"skip\\\":{},\\\"pending\\\":{},\\\"notice\\\":\\\"\\\",\\\"ended\\\":[]}\",\"faction\":\"E00\",\"pick\":\"E00\",\"aff\":\"프리랜서\",\"pk\":\"268ad7aa-6d66-4c96-8fae-8dc66fde097b\",\"k\":\"a620b0ba-223c-46b8-a59f-db0ab148bf38\",\"made\":[]}",
+   "$st_items": "",
+   "$it_carry_pc": "",
+   "$fac_codes": "",
+   "$fac_ac": "",
+   "$fac_pool": "",
+   "$fac_extra": "",
+   "$goei_world": "{\"v\":1,\"epoch\":4,\"minute\":29032790,\"an\":[{\"loc\":\"10-8\",\"name\":\"소라 랜드\",\"state\":\"활성\",\"grade\":\"D\",\"deploy\":\"없음\",\"kind\":\"random\",\"origin\":\"auto\",\"presetName\":\"\",\"since\":29032750,\"born\":29032750,\"exploring\":false,\"situation\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\",\"trail\":[{\"m\":29032750,\"e\":1,\"text\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\"}],\"art\":{\"for\":\"소라 랜드\",\"pics\":[\"Situation Anomaly Amusement 1\",\"Situation Anomaly Amusement 2\",\"Situation Anomaly Generic City Skyline\",\"Situation Anomaly Generic City SideStreet\",\"Situation Anomaly\",\"Situation Anomaly\"]},\"startKey\":\"da44cd01-214c-4806-897a-d5c683c45a0e\"},{\"loc\":\"03-2\",\"name\":\"뮤지컬 붉은 숙녀\",\"state\":\"활성\",\"grade\":\"D\",\"deploy\":\"없음\",\"kind\":\"preset\",\"origin\":\"auto\",\"presetName\":\"뮤지컬 붉은 숙녀\",\"since\":29032750,\"born\":29032750,\"exploring\":false,\"situation\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\",\"trail\":[{\"m\":29032750,\"e\":1,\"text\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\"}],\"art\":{\"for\":\"뮤지컬 붉은 숙녀\",\"pics\":[\"Situation Anomaly Generic City Skyline\",\"Situation Anomaly Generic City SideStreet\",\"Situation Anomaly\",\"Situation Anomaly\"]},\"startKey\":\"da44cd01-214c-4806-897a-d5c683c45a0e\"},{\"loc\":\"02-9\",\"name\":\"룩키마트\",\"state\":\"활성\",\"grade\":\"D\",\"deploy\":\"없음\",\"kind\":\"preset\",\"origin\":\"manual\",\"presetName\":\"룩키마트\",\"since\":29032750,\"born\":29032750,\"exploring\":true,\"situation\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\",\"trail\":[{\"m\":29032750,\"e\":1,\"text\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\"}],\"touched\":true,\"art\":{\"for\":\"룩키마트\",\"pics\":[\"Situation Anomaly Mall 1\",\"Situation Anomaly Mall 2\",\"Situation Anomaly Generic City SideStreet\",\"Situation Anomaly Generic City Skyline\",\"Situation Anomaly\",\"Situation Anomaly\"]},\"startKey\":\"da44cd01-214c-4806-897a-d5c683c45a0e\"},{\"loc\":\"03-17\",\"name\":\"반짝반짝 용궁\",\"state\":\"활성\",\"grade\":\"D\",\"deploy\":\"없음\",\"kind\":\"preset\",\"origin\":\"auto\",\"presetName\":\"반짝반짝 용궁\",\"since\":29032770,\"born\":29032750,\"exploring\":false,\"situation\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\",\"trail\":[{\"m\":29032770,\"e\":2,\"text\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\"}],\"art\":{\"for\":\"반짝반짝 용궁\",\"pics\":[\"Situation Anomaly Generic City Skyline\",\"Situation Anomaly Generic City SideStreet\",\"Situation Anomaly\",\"Situation Anomaly\"]},\"startKey\":\"2de84fe0-3c65-4e79-b75f-37b919f32084\"}],\"inc\":[{\"loc\":\"03-0\",\"name\":\"\",\"state\":\"발생대기\",\"situation\":\"\",\"kind\":\"random\",\"origin\":\"auto\",\"since\":null,\"born\":29032750}],\"ms\":[{\"loc\":\"11-1\",\"name\":\"얼굴 없는 장터 맨홀\",\"state\":\"출현\",\"visitors\":\"없음\",\"origin\":\"auto\",\"since\":29032750,\"born\":29032750,\"situation\":\"문을 열어 둔 채 조용히 손님을 기다리고 있다\",\"trail\":[{\"m\":29032750,\"e\":1,\"text\":\"문을 열어 둔 채 조용히 손님을 기다리고 있다\"}],\"art\":{\"for\":\"얼굴 없는 장터 맨홀\",\"pics\":[\"Situation Mystic Market\",\"Situation Mystic Room\",\"Situation Mystic Object\",\"Situation Mystic Shop\",\"Situation Mystic Bookshop\",\"Situation Mystic Workshop\",\"Situation Mystic Vending\",\"Situation Mystic Door\",\"Situation Mystic\",\"Situation Mystic\"]},\"startKey\":\"da44cd01-214c-4806-897a-d5c683c45a0e\"}],\"agents\":{},\"retired\":[],\"promoted\":[],\"blocks\":{},\"skip\":{},\"pending\":{},\"notice\":\"\",\"ended\":[]}",
+   "$st_look": "7.1",
+   "$st_wallet": "{\"start\":140000,\"log\":[]}"
+  },
+  "lastMemory": "NewChat",
+  "goeiPeopleV1": {
+   "schema": 1,
+   "people": {},
+   "factions": {},
+   "docs": {},
+   "log": [],
+   "folded": {},
+   "read": {
+    "da44cd01-214c-4806-897a-d5c683c45a0e": "1ma0zrh",
+    "2de84fe0-3c65-4e79-b75f-37b919f32084": "12wjj8r",
+    "a620b0ba-223c-46b8-a59f-db0ab148bf38": "q6101f"
+   },
+   "pending": {},
+   "ignored": [],
+   "identity": {
+    "faction": "E00",
+    "rank": "5급",
+    "level": 0,
+    "from": "status",
+    "anchor": "da44cd01-214c-4806-897a-d5c683c45a0e"
+   }
+  }
+ },
+ "folders": [],
+ "t2": {
+  "name": "S-프리랜서-임무",
+  "plugin": "0.21.34",
+  "goeiCommit": "5279cff",
+  "risuCommit": "996a5535fdb4629258331955982693a74ea209de",
+  "order": 5,
+  "flow": "프리랜서 · 커스텀 임무(룩키마트)",
+  "made": "새 채팅 → 시작 패널 {\"fac\":\"E00\",\"player\":\"\",\"scene\":\"커스텀 임무\",\"mission\":\"an:룩키마트\"} → 본편 3턴 (대본 답, 보조는 Router·Director 빈 목록·그 밖 '{}')",
+  "contents": {
+   "faction": "E00",
+   "player": "",
+   "pointsOn": "0",
+   "wallet": "{\"start\":140000,\"log\":[]}",
+   "lastStatus": "[▣|2025.03.14|03:50 PM|☀️|12°C|룩키마트 1층 계산대|룩키마트|없음|투입|프리랜서/5급|140000]",
+   "messages": 6,
+   "people": 0,
+   "turns": 3,
+   "statusFields": [
+    "날짜",
+    "시각",
+    "날씨",
+    "기온",
+    "위치",
+    "목표",
+    "동행",
+    "투입",
+    "신분",
+    "잔고"
+   ]
+  },
+  "exportedAt": "2026-11-24T03:31:17.502Z",
+  "fromChatPage": 0,
+  "nChatsAtExport": 3,
+  "charName": "괴이 ː ANOMALY",
+  "cardLoreHash": -224935923,
+  "cardLoreLen": 229605,
+  "pluginStorage": {
+   "goei:prefs": "{\"basic\":{},\"world\":{},\"look\":\"7.1\"}"
+  }
+ }
+}

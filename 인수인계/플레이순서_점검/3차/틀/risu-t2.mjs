@@ -3,6 +3,8 @@
 //   node risu-t2.mjs check [--stream both|on|off] [--via plain|proxy2] [--w 1280 --h 800 | --w 344 --h 882]   0단계 확인 (a)~(e) 를 돌려 out/check-<via>-<WxH>-*.json·png 에 적는다 (폭 600 미만이면 터치)
 //   node risu-t2.mjs serve [--port 7101] [--via plain|proxy2]            브라우저를 띄워 둔 채 HTTP 로 조종 (POST /op {op, ...args})
 //   다른 점검 스크립트에서:  import { openT2 } from './risu-t2.mjs'; const t = await openT2({...}); await t.setup(); await t.start(); await t.send('…');
+//   시작 상태 파일(states/*.json, 0번 몫):  await t.setup(); await t.loadState('states/S-관리국-3턴.json');  (리스AI 「가져오기」와 같은 importChat — 채팅을 0번에 끼움, states/README.md)
+//   시작 패널 고르기: t.startPanel({ fac, player, fm|scene, situation, mission })   상태 만들기: make-states.mjs, 넣어 보기: verify-states.mjs
 // 환경: RISU_URL (기본 http://127.0.0.1:5180), FAKE_URL (기본 http://<컨테이너IP>:8790), GOEI_REL (기본 /home/user/goei/release/)
 // 모델 길 (리스AI 소스 996a553 로 확인, T2_사용법.md 참고):
 //   본편 aiModel=reverse_proxy, forceReplaceUrl=FAKE_URL/main/v1/chat/completions
@@ -279,7 +281,12 @@ export async function openT2(o = {}) {
     await waitRisu();
     await ensureSw();
     // DB 를 다 읽을 때까지 (캐릭터가 다시 보일 때까지)
-    await page.waitForFunction(async (i) => { const st = await import('/src/ts/stores.svelte.ts'); return (st.DBState.db?.characters?.length ?? 0) > i; }, idx ?? 0, { timeout: 120000, polling: 500 });
+    // (page.waitForFunction 에 async 함수를 주면 Promise 가 참으로 보여 바로 끝난다 — 0번 상태 일에서 확인, 직접 돈다)
+    for (let end = Date.now() + 120000; ; await sleep(500)) {
+      const ok = await R(async (i) => { const st = await import('/src/ts/stores.svelte.ts'); return (st.DBState.db?.characters?.length ?? 0) > i; }, idx ?? 0).catch(() => false);
+      if (ok) break;
+      if (Date.now() > end) throw new Error('새로고침 뒤 캐릭터가 안 보임');
+    }
     await applyModelSettings(cfg.streaming); // 모델 설정은 DB 에 저장돼 있지만 같은 값으로 다시 넣어 둔다
     if (reselect && idx != null && idx >= 0) await selectChar(idx);
   };
@@ -342,13 +349,95 @@ export async function openT2(o = {}) {
     }
     throw new Error('start did not write $goei_world');
   };
+  /** 시작 패널 고르기 (실제 단추): 소속 → 주인공(player '' = 내 페르소나, 'P004' = 그 요원) → 첫 장면(fm 번호 또는 scene 글) → 직접 입력 글 → 출발.
+   *  mission('an:룩키마트' 꼴)을 주면 출발 뒤 커스텀 임무 창에서 목표 열기 → 선택 → 작전 개시까지 누른다.
+   *  직접 입력·커스텀 임무는 출발/작전 개시가 곧 첫 본편 전송이다(답은 기다리지 않음 — waitIdle 은 부르는 쪽이). */
+  const startPanel = async ({ fac = 'A00', player, fm, scene, situation, mission } = {}) => {
+    await openWindow('.gx-fac');
+    await F.click(`.gx-fac[data-value="${fac}"]`); await sleep(400);
+    if (player !== undefined) { await F.click(`[data-action="player"][data-value="${player}"]`); await sleep(400); }
+    if (scene) fm = await F.evaluate((s) => [...document.querySelectorAll('[data-action="fm"]')].find((b) => b.innerText.replace(/\s+/g, ' ').includes(s))?.dataset.value ?? null, scene);
+    if (fm != null) { await F.click(`[data-action="fm"][data-value="${fm}"]`); await sleep(400); }
+    if (situation != null) { await F.fill('[data-input="start-note"]', situation); await sleep(300); }
+    const picked = await F.evaluate(() => ({ foot: document.querySelector('.gx-foot-sum')?.innerText ?? '', disabled: !!document.querySelector('.gx-foot .gx-start')?.disabled }));
+    if (picked.disabled) throw new Error('출발 단추가 꺼져 있음: ' + picked.foot);
+    await F.click('.gx-foot .gx-start');
+    if (mission) {
+      await F.waitForSelector(`[data-action="mission-open"][data-value="${mission}"]`, { timeout: 30000 });
+      await F.click(`[data-action="mission-open"][data-value="${mission}"]`); await sleep(600);
+      await F.click(`[data-action="mission-pick"][data-value="${mission}"]`);
+      await F.waitForSelector('[data-action="mission-send"]:not([disabled])', { timeout: 15000 });
+      await sleep(400);
+      await F.click('[data-action="mission-send"]');
+    }
+    return { ...picked, fm };
+  };
+
+  // ── 상태 파일 (0번 몫 「구간별 시작 상태」, 2026-11-24) ─────────
+  // 꼴: 리스AI 채팅 내보내기(JSON, type 'risuChat' ver 2 — 리스AI 「가져오기」 단추로도 그대로 들어감) + 덧붙인 칸 t2(만든 판·안에 든 것·기기 저장소 일부).
+  // 리스AI importChat 은 t2 칸을 보지 않는다.
+  /** 상태에 같이 담는 기기 저장소(pluginStorage) 열쇠: 설정·이름 같은 작은 것만. 받은 자료(goei:body·goei:data-*)·호출 기록·진단은 새 컨테이너에서 다시 생기므로 뺀다 */
+  const STORAGE_KEEP = /^goei:(prefs|user-name|user-src|update-skip|consult|look-acts)$/;
+  const storageSnapshot = () => R(async (keep) => {
+    const cs = await import('/src/ts/process/coldstorage.svelte.ts');
+    const re = new RegExp(keep);
+    const out = {};
+    for (const k of await cs.pluginStorage.keys()) if (re.test(k)) out[k] = await cs.pluginStorage.getItem(k);
+    return out;
+  }, STORAGE_KEEP.source);
+  /** 지금 캐릭터의 지금 채팅(또는 chatPage 번호)을 상태 파일로. info 는 t2 칸에 그대로 들어간다 */
+  const exportState = async (file, info = {}, chatPage) => {
+    const snap = await R(async (page) => {
+      const st = await import('/src/ts/stores.svelte.ts');
+      const db = st.DBState.db;
+      const ci = await new Promise((r) => { const u = st.selectedCharID.subscribe((v) => r(v)); u?.(); });
+      const char = db.characters[ci];
+      const p = page ?? char.chatPage;
+      const chat = JSON.parse(JSON.stringify(char.chats[p]));
+      let h = 0; const lore = JSON.stringify(char.globalLore ?? []); for (let i = 0; i < lore.length; i++) h = (h * 31 + lore.charCodeAt(i)) | 0;
+      return { chat, chatPage: p, nChats: char.chats.length, charName: char.name, loreHash: h, loreLen: lore.length };
+    }, chatPage ?? null);
+    const storage = await storageSnapshot();
+    // 채팅 이름을 상태 이름으로 (리스AI 채팅 목록에서 가려 보이게. 이름 말고는 그대로)
+    if (info.name) snap.chat.name = info.name;
+    const body = { type: 'risuChat', ver: 2, data: snap.chat, folders: [], t2: { ...info, exportedAt: new Date().toISOString(), fromChatPage: snap.chatPage, nChatsAtExport: snap.nChats, charName: snap.charName, cardLoreHash: snap.loreHash, cardLoreLen: snap.loreLen, pluginStorage: storage } };
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(body, null, 1));
+    return { file, bytes: readFileSync(file).length, messages: snap.chat.message.length, chatPage: snap.chatPage };
+  };
+  /** 상태 파일을 리스AI 에 넣는다. 리스AI 채팅 목록 「가져오기」 단추와 같은 importChat 을 부르고 파일 고르기 창에 그 파일을 넣는다.
+   *  리스AI 동작(characters.ts importChat, json ver 2): 채팅을 **맨 앞(0번)에 끼우고**(기존 채팅 번호가 모두 +1 밀림) chat.id 를 새로 만든다. 고른 채팅(chatPage)은 바꾸지 않는다.
+   *  select=true(기본)면 이어서 changeChatTo(0) — 채팅 목록에서 그 채팅을 누른 것과 같은 길. storage=true(기본)면 t2.pluginStorage 를 기기 저장소에 되돌린다(채팅을 고르기 전에).
+   *  setup() 을 먼저 해 둔 페이지에서 부른다. 돌려주는 값: 넣은 뒤 채팅 수·chatPage·새 chatId */
+  const loadState = async (file, { select = true, storage = true } = {}) => {
+    const body = JSON.parse(readFileSync(file, 'utf8'));
+    const before = await R(async () => { const db = await import('/src/ts/storage/database.svelte.ts'); return db.getCurrentCharacter().chats.length; });
+    const [fc] = await Promise.all([
+      page.waitForEvent('filechooser', { timeout: 15000 }),
+      R(async () => { const ch = await import('/src/ts/characters.ts'); ch.importChat(); }),
+    ]);
+    // 경로로 넣으면(setFiles(path)) 한글 경로에서 change 가 안 일어나 가져오기가 안 됐다(2026-11-24 확인) → 내용을 버퍼로, 이름은 .json 으로 넣는다
+    await fc.setFiles({ name: 'goei-state.json', mimeType: 'application/json', buffer: readFileSync(file) });
+    // page.waitForFunction 에 async 함수를 주면 Promise 가 참으로 보여 바로 끝나므로 여기서 직접 돈다
+    for (let end = Date.now() + 30000; ; await sleep(300)) {
+      const n = await R(async () => { const db = await import('/src/ts/storage/database.svelte.ts'); return db.getCurrentCharacter().chats.length; });
+      if (n > before) break;
+      if (Date.now() > end) throw new Error('상태 가져오기 실패: 채팅 수가 늘지 않음 ' + file);
+    }
+    if (storage && body.t2?.pluginStorage) await R(async (kv) => { const cs = await import('/src/ts/process/coldstorage.svelte.ts'); for (const [k, v] of Object.entries(kv)) await cs.pluginStorage.setItem(k, v); }, body.t2.pluginStorage);
+    if (select) await switchChat(0);
+    await sleep(1500); // 리스AI 저장 모음 + 플러그인이 채팅 바뀜을 보는 틈
+    const after = await R(async () => { const db = await import('/src/ts/storage/database.svelte.ts'); const c = db.getCurrentCharacter(); return { nChats: c.chats.length, chatPage: c.chatPage, chatId: c.chats[c.chatPage]?.id ?? null, messages: c.chats[c.chatPage]?.message?.length ?? null }; });
+    return { ...after, before, importedId: (await R(async () => { const db = await import('/src/ts/storage/database.svelte.ts'); return db.getCurrentCharacter().chats[0]?.id ?? null; })), originalId: body.data?.id ?? null, name: body.t2?.name ?? null };
+  };
+
   const shot = (name) => page.screenshot({ path: `${cfg.out}/${name}.png` });
   const alerts = () => R(() => window.__t2Alerts ?? []);
   const setAnswer = (a) => R((a) => { window.__t2Answer = a; }, a);
   const close = async () => { await browser.close(); cardSrv.close(); };
 
   return { cfg, page, ctx, browser, log, errors, served, R, F: () => F, frame, fclick, feval, openWindow, closeWindow, fabReady,
-    setup, start, applyModelSettings, setStreaming, setReleaseDirect, selectChar, charIndex, chatState, screenMessages, waitScreenText, ensureSw, isBusy, isIdle, waitBusy, waitIdle, progText,
+    setup, start, startPanel, exportState, loadState, storageSnapshot, applyModelSettings, setStreaming, setReleaseDirect, selectChar, charIndex, chatState, screenMessages, waitScreenText, ensureSw, isBusy, isIdle, waitBusy, waitIdle, progText,
     send, reroll, swipeNext, swipePrev, continueReply, editMessage, deleteMessage, stop, newChat, switchChat, reload, lastIdx,
     fake, fakeLog, fakeSeq, shot, alerts, setAnswer, close };
 }
@@ -544,7 +633,7 @@ async function serve(argv) {
     setup: () => t.setup(), start: (a) => t.start(a.fac), state: (a) => t.chatState(!!a.full), screen: () => t.screenMessages(), send: (a) => t.send(a.text, { wait: a.wait !== false }),
     reroll: (a) => t.reroll({ wait: a.wait !== false }), prev: () => t.swipePrev(), next: (a) => t.swipeNext({ wait: a.wait !== false }), cont: (a) => t.continueReply({ wait: a.wait !== false }),
     edit: (a) => t.editMessage(a.idx, a.text), del: (a) => t.deleteMessage(a.idx), stop: () => t.stop(), newChat: () => t.newChat(), switchChat: (a) => t.switchChat(a.to),
-    reload: (a) => t.reload({ settle: a.settle !== false }), stream: (a) => t.setStreaming(!!a.on), busy: () => t.isBusy(), idle: (a) => t.waitIdle(a.ms), prog: () => t.progText(),
+    reload: (a) => t.reload({ settle: a.settle !== false }), startPanel: (a) => t.startPanel(a), exportState: (a) => t.exportState(a.file, a.info ?? {}, a.chatPage), loadState: (a) => t.loadState(a.file, { select: a.select !== false, storage: a.storage !== false }), stream: (a) => t.setStreaming(!!a.on), busy: () => t.isBusy(), idle: (a) => t.waitIdle(a.ms), prog: () => t.progText(),
     open: (a) => t.openWindow(a.sel).then(() => true), closeWin: () => t.closeWindow(), fclick: (a) => t.fclick(a.sel, a.i), feval: (a) => t.feval(new Function('return (' + a.js + ')')()),
     eval: (a) => t.R(new Function('return (' + a.js + ')')()), shot: (a) => t.shot(a.name).then(() => a.name), errors: () => t.errors.splice(0), served: () => t.served, alerts: () => t.alerts(), answer: (a) => t.setAnswer(a.v), releaseDirect: (a) => t.setReleaseDirect(a.v), fake: (a) => t.fake(a.path, a.body),
   };

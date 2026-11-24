@@ -27,7 +27,7 @@
 //     chunkChars:n (스트리밍 조각 크기, 기본 40), chunkDelayMs:n (조각 사이, 기본 15),
 //     stallAfterChars:n — 스트리밍에서 n 글자 보낸 뒤 멈춤(연결은 열어 둠, release 로 끊음),
 //     cutAfterChars:n — 스트리밍에서 n 글자 보낸 뒤 연결 끊기 }
-//   답 글 안의 {{seq}}·{{route}}·{{hash}} 는 바꿔 넣는다.
+//   답 글 안의 {{seq}}·{{route}}·{{hash}} 는 바꿔 넣는다. hold 와 replyFile 을 같이 주면 release 때 파일을 다시 읽는다(요청을 본 뒤 답을 짓는 대본).
 // 기록(JSONL) 한 줄: {seq,t,route,path,method,stream,model,hash,dupOf,ruleId,action,headers,body,lastUser,response:{status,content,reasoning,ms}}
 //   같은 내용이 두 번 오면 dupOf 에 앞 seq. 답은 규칙과 내용으로만 정해져 두 번 와도 같다(failFirst 만 횟수를 본다).
 import http from 'node:http';
@@ -120,6 +120,8 @@ async function handleCompletion(q, s, route, raw) {
   // 붙잡기·늦게
   pending.set(my, { rec: { seq: my, route, ruleId: rule.id, t: rec.t }, release: null });
   if (rule.hold) { rec.action = 'hold'; await new Promise((r) => { pending.get(my).release = r; s.on('close', r); }); }
+  // hold + replyFile: 풀 때 파일을 다시 읽는다 (요청 글을 본 뒤 답을 지어 넣는 대본용, 0번 상태 만들기 2026-11-24)
+  if (rule.hold && rule.replyFile) content = sub(readFileSync(rule.replyFile, 'utf8'));
   if (rule.delayMs) { const end = Date.now() + rule.delayMs; while (Date.now() < end && !closed) await sleep(Math.min(200, end - Date.now())); }
   if (closed) { rec.action = 'client-closed-before-reply'; return finish(0); }
 
