@@ -1,0 +1,83 @@
+{
+  "results": [
+    {
+      "part": "S_",
+      "step": "11 S_상점_위키참고",
+      "what": "카드로 상점을 열어 첫 진열 요청이 감",
+      "ok": true,
+      "expect": "요청",
+      "actual": {
+        "btn": true,
+        "n": 2
+      },
+      "why": ""
+    },
+    {
+      "part": "S_",
+      "step": "11 S_상점_위키참고",
+      "what": "참고 자료에 「위키: 이정 책방」 출처와 기본 문서 본문",
+      "ok": true,
+      "expect": "위키: 이정 책방",
+      "actual": "[활성 로어북: 위키: 이정 책방]",
+      "why": "ui/shop.ts shopSource extra(가게 위키 문서)"
+    },
+    {
+      "part": "S_",
+      "step": "11 S_상점_위키참고",
+      "what": "위키 문서의 저장 표식이 새지 않음",
+      "ok": true,
+      "expect": "없음",
+      "why": ""
+    },
+    {
+      "part": "S_",
+      "step": "12 S_상태창링크_위키열기",
+      "what": "상태창의 장소 「소라 랜드」가 위키 링크",
+      "ok": true,
+      "expect": "소라 랜드",
+      "actual": [
+        "소라 랜드"
+      ],
+      "why": ""
+    },
+    {
+      "part": "S_",
+      "step": "12 S_상태창링크_위키열기",
+      "what": "누르면 창이 열리고 그 문서",
+      "ok": true,
+      "expect": "소라 랜드 문서",
+      "actual": "괴이위키\n최근 변경\n소라 랜드\n✎ 다시 쓰기\n분류: 괴이 · Sora Land\n소라 랜드\n\n\n분류\t장소형 괴담\n외관\t최근 개장한 테마파크\n영업시간\t낮에는 정상 영업 밤에도 영업은 한다\n구역\t어드벤처 랜드, 판타지 랜",
+      "why": "host/statusview.ts onChatClick wiki"
+    },
+    {
+      "part": "S_",
+      "step": "12 S_상태창링크_위키열기",
+      "what": "모델 호출 없음",
+      "ok": true,
+      "expect": 0,
+      "actual": 0,
+      "why": ""
+    }
+  ],
+  "notes": [
+    {
+      "part": "S_",
+      "step": "11 S_상점_위키참고",
+      "what": "$st_shop",
+      "actual": "{\"shop\":\"이정 책방\",\"owner\":\"\",\"key\":\"c5\",\"loaded\":false,\"identity\":{\"sells\":\"\",\"never\":\"\",\"prices\":\"\"},\"items\":[],\"talk\":[],\"closed\":false,\"prev\":[],\"sell\":null,\"sales\":[]}"
+    },
+    {
+      "part": "S_",
+      "step": "11 S_상점_위키참고",
+      "what": "상점 창",
+      "actual": "이정 책방\n₩ 100,000\n판매\n새로고침\n송연먹\n200\n주인\n이정 책방\n\n「어서 오십시오.」\n\n↵"
+    },
+    {
+      "part": "S_",
+      "step": "11 S_상점_위키참고",
+      "what": "상점 요청 속 위키 글 길이(상한 $sh_wiki_chars 기본 3000자)",
+      "actual": 3002
+    }
+  ],
+  "errors": []
+}

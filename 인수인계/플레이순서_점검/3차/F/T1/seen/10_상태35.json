@@ -1,0 +1,110 @@
+{
+  "scriptstate": {
+    "$ph_auto": "1",
+    "$ph_announcements": "0",
+    "$ph_group_invites": "0",
+    "$ph_state": {
+      "version": 2,
+      "seq": 0,
+      "mid": 3,
+      "rooms": {
+        "dm_c_50303034": {
+          "id": "dm_c_50303034",
+          "kind": "dm",
+          "members": [
+            "c_50303034"
+          ],
+          "people": {
+            "c_50303034": {
+              "id": "c_50303034",
+              "name": "에일린",
+              "agentId": "P004"
+            }
+          },
+          "messages": [
+            {
+              "id": 1,
+              "sender": "me",
+              "text": "선배?",
+              "time": "2025.03.14 22:00",
+              "kind": "message",
+              "audience": [
+                "c_50303034"
+              ]
+            },
+            {
+              "id": 2,
+              "sender": "me",
+              "text": "지금 어디세요?",
+              "time": "2025.03.14 23:20",
+              "kind": "message",
+              "audience": [
+                "c_50303034"
+              ]
+            },
+            {
+              "id": 3,
+              "sender": "c_50303034",
+              "text": "사무실.",
+              "time": "2025.03.14 23:50",
+              "kind": "message",
+              "audience": [
+                "c_50303034"
+              ]
+            }
+          ],
+          "draft": "",
+          "unread": 0,
+          "readThrough": 3,
+          "silent": false,
+          "followupSent": false
+        }
+      },
+      "order": [
+        "dm_c_50303034"
+      ]
+    },
+    "$ph_adv_check_contacts": "1",
+    "$st_unread_phone": "0",
+    "$ph_auto_last": "t:u3",
+    "$ph_bulletins": {
+      "version": 2,
+      "seq": 0,
+      "items": [],
+      "checks": {},
+      "seen": {}
+    }
+  },
+  "messages": [
+    {
+      "role": "user",
+      "chatId": "u1",
+      "data": "지하상가 앞을 지나간다."
+    },
+    {
+      "role": "char",
+      "chatId": "c1",
+      "data": "퇴근길, 중림 지하상가 셔터가 반쯤 내려와 있었다. 휴대폰을 꺼내 들었다.\n[▣|2025.03.14|11:20 PM|🌙|6°C|중림 지하상가|없음|없음|없음|관리국/신입|100000]"
+    },
+    {
+      "role": "user",
+      "chatId": "u2",
+      "data": "지하상가로 간다."
+    },
+    {
+      "role": "char",
+      "chatId": "c2",
+      "data": "숙소로 돌아와 불을 켰다. 지하상가 쪽 하늘이 아직 붉었다.\n[▣|2025.03.14|11:50 PM|🌙|6°C|관리국|없음|없음|없음|관리국/신입|100000]"
+    },
+    {
+      "role": "user",
+      "chatId": "u3",
+      "data": "잠깐 쉰다."
+    },
+    {
+      "role": "char",
+      "chatId": "c3",
+      "data": "아침, 출근 준비를 하며 휴대폰을 다시 열었다.\n[▣|2025.03.15|07:30 AM|🌙|6°C|관리국|없음|없음|없음|관리국/신입|100000]"
+    }
+  ]
+}

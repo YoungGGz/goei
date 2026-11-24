@@ -1,0 +1,197 @@
+{
+  "run": 152,
+  "pass": 151,
+  "fails": [
+    {
+      "part": "A2_",
+      "step": "35 A2_매턴_손작업과겹침",
+      "what": "이 응답의 자동 확인이 손 작업이 끝난 뒤라도 한 번은 나감(설정 「매 턴: 메인 응답이 끝날 때마다」)",
+      "ok": false,
+      "expect": "≥1",
+      "actual": {
+        "calls": 0,
+        "auto_last": null
+      },
+      "why": ""
+    }
+  ],
+  "notes": [
+    {
+      "part": "PC_",
+      "step": "03 PC_보내기_답장",
+      "what": "요청 길이(글자)",
+      "actual": 41598
+    },
+    {
+      "part": "PC_",
+      "step": "10 PC_새메시지확인",
+      "what": "알림 문구",
+      "actual": "메시지 2개 · 단톡 초대 1개 · 공지 1개를 받았어요"
+    },
+    {
+      "part": "PC_",
+      "step": "12 PC_본편_다음턴",
+      "what": "「장면에 나온 것만」(기본 켬): 장면에 이름이 안 나온 1:1(에일린) 말은 최근 8개 밖이라 빠짐 — 설계대로",
+      "actual": false
+    },
+    {
+      "part": "PC_",
+      "step": "12 PC_본편_다음턴",
+      "what": "방 이름표(rooms)",
+      "actual": {
+        "g_1": {
+          "title": "지하상가 건",
+          "recipients": [
+            "에일린",
+            "큐라스"
+          ]
+        },
+        "g_2": {
+          "title": "야간 순찰조",
+          "recipients": [
+            "고르고디오",
+            "데드폴"
+          ]
+        }
+      }
+    },
+    {
+      "part": "PC_",
+      "step": "12 PC_본편_다음턴",
+      "what": "사진 기록이 본편에 실린 꼴"
+    },
+    {
+      "part": "PC_",
+      "step": "13 PC_본편_그다음턴",
+      "what": "실린 기록 수",
+      "actual": 9
+    },
+    {
+      "part": "PC_",
+      "step": "14 PC_전화걸기",
+      "what": "{{user}} 가 요청에 남는지",
+      "actual": true
+    },
+    {
+      "part": "B_",
+      "step": "15 B_응답실패",
+      "what": "호출 수(실패 + 일시 오류 재시도 포함)",
+      "actual": 2
+    },
+    {
+      "part": "B_",
+      "step": "18 B_빈답",
+      "what": "silent",
+      "actual": true
+    },
+    {
+      "part": "B_",
+      "step": "23 B_페이지새로고침",
+      "what": "목록 미리보기 문구",
+      "actual": "에일린\n23:20\n답장을 기다리는 중…"
+    },
+    {
+      "part": "B_",
+      "step": "26 B_설정끔",
+      "what": "선톡·초대·공지 모두 끔에서 새 메시지 확인 호출 수",
+      "actual": 1
+    },
+    {
+      "part": "B_",
+      "step": "26 B_설정끔",
+      "what": "이때 실린 방",
+      "actual": [
+        [
+          "g_9",
+          true
+        ]
+      ]
+    },
+    {
+      "part": "C_",
+      "step": "43 C_일대일에서_초대",
+      "what": "1:1 방이 그대로 단톡으로 바뀌는가(옛 1:1 은 사라짐)",
+      "actual": {
+        "dmLeft": false,
+        "group": "g_2",
+        "members": [
+          "c_50303034",
+          "c_50303036"
+        ]
+      }
+    },
+    {
+      "part": "J_",
+      "step": "51 J_한번에요청",
+      "what": "통합 요청 안에 「출력 뒤 <ph-habits> 덧붙이기 허용」(HABITS)과 「JSON 객체 하나만, 군말 없이」(ENVELOPE)가 같이 있음",
+      "actual": {
+        "habitsRule": true,
+        "envelopeOnly": true
+      }
+    },
+    {
+      "part": "A_",
+      "step": "28 A_다시굴리기",
+      "what": "버린 응답(C2: 하늘이 붉었다)에 맞춰 받은 톡이 남는가",
+      "actual": [
+        "선배 퇴근하셨어요?",
+        "퇴근했어? 셔터 쪽 가지 마."
+      ]
+    },
+    {
+      "part": "A_",
+      "step": "28 A_다시굴리기",
+      "what": "다시 굴린 뒤 다음 본편 요청에 그 톡이 실리는가",
+      "actual": true
+    },
+    {
+      "part": "A_",
+      "step": "29 A_응답지우고_새응답",
+      "what": "지우고 다른 user 로 새 응답 → 자동 확인 호출 수",
+      "actual": 1
+    },
+    {
+      "part": "A_",
+      "step": "33 A_관전",
+      "what": "viewpoint",
+      "actual": {
+        "name": "주인공",
+        "isPhoneOwner": true
+      }
+    },
+    {
+      "part": "A_",
+      "step": "33 A_관전",
+      "what": "기본(붙일 것: 보기 전용 방 끔)에서 본편에 관전이 실리나",
+      "actual": false
+    },
+    {
+      "part": "A2_",
+      "step": "35 A2_매턴_손작업과겹침",
+      "what": "손 답장을 기다리는 사이 본편 응답이 끝남 → 그때 나간 자동 확인 수",
+      "actual": 0
+    },
+    {
+      "part": "A2_",
+      "step": "35 A2_매턴_손작업과겹침",
+      "what": "창을 다시 연 뒤 호출 수",
+      "actual": 0
+    },
+    {
+      "part": "A2_",
+      "step": "35 A2_매턴_손작업과겹침",
+      "what": "다음 턴 자동 확인 수",
+      "actual": 1
+    },
+    {
+      "part": "M_",
+      "step": "34 M_폰_보내기",
+      "what": "보내기 단추 위에 겹친 것(가장 위 요소)",
+      "actual": {
+        "top": {},
+        "isSend": true
+      }
+    }
+  ],
+  "errors": []
+}
