@@ -1,0 +1,110 @@
+{
+  "run": 6,
+  "pass": 3,
+  "fails": [
+    {
+      "part": "ATT_",
+      "step": "02 ATT_사진올리기_보내기",
+      "what": "보조 요청에 실제 사진(multimodals) 3장",
+      "ok": false,
+      "expect": 3,
+      "actual": 4,
+      "why": ""
+    },
+    {
+      "part": "ATT_",
+      "step": "03 ATT_사진못읽음",
+      "what": "저장소에서 못 읽은 사진은 「Image n could not be loaded」 줄로",
+      "ok": false,
+      "expect": "Image 1, 2, 3",
+      "actual": "Image 1, 2, 3, 4 could not be loaded; do not describe it.",
+      "why": ""
+    },
+    {
+      "part": "ATT_",
+      "step": "03 ATT_사진못읽음",
+      "what": "창에는 「사진을 불러오지 못했어요」 틀",
+      "ok": false,
+      "expect": "깨진 틀",
+      "actual": "",
+      "why": ""
+    }
+  ],
+  "notes": [
+    {
+      "part": "ATT_",
+      "step": "01 ATT_빈방_사진올리기",
+      "what": "고르기 change·파일·createImageBitmap",
+      "actual": {
+        "chg": 0,
+        "cib": 0
+      }
+    },
+    {
+      "part": "ATT_",
+      "step": "01 ATT_빈방_사진올리기",
+      "what": "빈 1:1 방(대화 0)에서 사진 고른 뒤 첨부 수",
+      "actual": 0
+    },
+    {
+      "part": "ATT_",
+      "step": "01 ATT_빈방_사진올리기",
+      "what": "화면 글(사진·첨부 줄)",
+      "actual": [
+        "사진 올리기",
+        "사진 묘사"
+      ]
+    },
+    {
+      "part": "ATT_",
+      "step": "01 ATT_빈방_사진올리기",
+      "what": "view 상태",
+      "actual": {
+        "room": {
+          "dm_c_50303034": {
+            "id": "dm_c_50303034",
+            "kind": "dm",
+            "members": [
+              "c_50303034"
+            ],
+            "people": {
+              "c_50303034": {
+                "id": "c_50303034",
+                "name": "에일린",
+                "agentId": "P004",
+                "english": "Aileen",
+                "lore": "에일린",
+                "group": "A00",
+                "rank": "선임 요원",
+                "department": "종합대응팀"
+              }
+            },
+            "messages": [],
+            "draft": "",
+            "unread": 0,
+            "readThrough": 0
+          }
+        }
+      }
+    },
+    {
+      "part": "ATT_",
+      "step": "01 ATT_빈방_사진올리기",
+      "what": "붙여넣기 뒤 첨부 수·createImageBitmap 호출·저장된 에셋",
+      "actual": {
+        "items": 1,
+        "cib": 2,
+        "assets": [
+          "assets/aaaaaaa0.png"
+        ]
+      }
+    },
+    {
+      "part": "ATT_",
+      "step": "03 ATT_사진못읽음",
+      "what": "못 읽음 줄",
+      "actual": "Image 1, 2, 3, 4 could not be loaded; do not describe it."
+    }
+  ],
+  "errors": []
+}

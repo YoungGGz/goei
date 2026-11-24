@@ -1,0 +1,645 @@
+{
+  "results": [
+    {
+      "part": "PC_",
+      "step": "01 PC_인터넷_첫화면",
+      "what": "빈 새 탭 하나",
+      "ok": true,
+      "expect": "탭 1·새 탭",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 0,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": false,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "1"
+      },
+      "why": "사용자 11-08 「사이트당 탭 하나·빈 새 탭 하나」"
+    },
+    {
+      "part": "PC_",
+      "step": "01 PC_인터넷_첫화면",
+      "what": "관리국: 즐겨찾기·새 탭 바로가기에 포인트몰(bm) 없음",
+      "ok": true,
+      "expect": "bm 없음",
+      "actual": {
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ]
+      },
+      "why": "사용자 11-08 「백일몽 포인트몰(백일몽만)」"
+    },
+    {
+      "part": "PC_",
+      "step": "01 PC_인터넷_첫화면",
+      "what": "즐겨찾기 = 새 탭 바로가기",
+      "ok": true,
+      "expect": [
+        "gn",
+        "gal",
+        "wpf",
+        "sm",
+        "cos",
+        "wk"
+      ],
+      "actual": [
+        "gn",
+        "gal",
+        "wpf",
+        "sm",
+        "cos",
+        "wk"
+      ],
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "01 PC_인터넷_첫화면",
+      "what": "게시판 넷·우주몰·위키는 있음",
+      "ok": true,
+      "expect": "6개",
+      "actual": [
+        "gn",
+        "gal",
+        "wpf",
+        "sm",
+        "cos",
+        "wk"
+      ],
+      "why": "사용자 11-08 북마크 목록"
+    },
+    {
+      "part": "PC_",
+      "step": "02 PC_괴담넷_열기_글열기",
+      "what": "탭 제목·주소가 괴담넷",
+      "ok": true,
+      "expect": "괴담넷",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "괴담넷 - 자유게시판"
+          }
+        ],
+        "cur": 0,
+        "url": "goedam.net/board/free",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": false,
+        "page": "br-page br-p-gn",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "1"
+      },
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "02 PC_괴담넷_열기_글열기",
+      "what": "글을 열면 주소가 글 주소로",
+      "ok": true,
+      "expect": "/board/free/1846003",
+      "actual": "goedam.net/board/free/1846003",
+      "why": "사용자 11-08 「게시글은 새 화면으로 열기(같은 탭, 주소 바뀜)」"
+    },
+    {
+      "part": "PC_",
+      "step": "02 PC_괴담넷_열기_글열기",
+      "what": "탭 뒤로 단추가 켜짐",
+      "ok": true,
+      "expect": true,
+      "actual": true,
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "03 PC_새탭_위키_문서",
+      "what": "+ 누르면 탭 2개, 둘째 탭이 새 탭",
+      "ok": true,
+      "expect": "2·cur1",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 1,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": false,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "03 PC_새탭_위키_문서",
+      "what": "새 탭은 뒤로 못 감",
+      "ok": true,
+      "expect": false,
+      "actual": false,
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "03 PC_새탭_위키_문서",
+      "what": "위키 문서 주소",
+      "ok": true,
+      "expect": "/w/중림 지하상가",
+      "actual": "goei.wiki/w/중림 지하상가",
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "04 PC_뒤로_앞으로_단추",
+      "what": "뒤로 1: 위키 대문",
+      "ok": true,
+      "expect": "대문",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "괴이위키:대문 - 괴이위키"
+          }
+        ],
+        "cur": 1,
+        "url": "goei.wiki/w/괴이위키:대문",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": true,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "04 PC_뒤로_앞으로_단추",
+      "what": "뒤로 2: 이 탭의 새 탭 화면 (괴담넷 탭으로 안 건너감)",
+      "ok": true,
+      "expect": "cur1·새 탭",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 1,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": true,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": "사용자 11-10 「탭별로 움직여야 한다」(app.ts 346 주석)"
+    },
+    {
+      "part": "PC_",
+      "step": "04 PC_뒤로_앞으로_단추",
+      "what": "앞으로 두 번: 위키 문서로",
+      "ok": true,
+      "expect": "/w/…",
+      "actual": "goei.wiki/w/중림 지하상가",
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "05 PC_같은탭_다른사이트_뒤로",
+      "what": "세정게로 바꾼 뒤 뒤로 → 같은 탭 위키 문서",
+      "ok": true,
+      "expect": "/w/…",
+      "actual": {
+        "wpf": "www.wpf.or.kr/zboard/zboard.php?id=politics",
+        "back": "goei.wiki/w/중림 지하상가"
+      },
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "06 PC_첫탭으로_돌아가기",
+      "what": "괴담넷 탭은 보던 글 그대로",
+      "ok": true,
+      "expect": "/board/free/1846003",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "중림 지하상가 B구역 또 셔터 내림"
+          },
+          {
+            "on": false,
+            "title": "괴이위키"
+          }
+        ],
+        "cur": 0,
+        "url": "goedam.net/board/free/1846003",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": false,
+        "page": "br-page br-p-gn",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "07 PC_같은사이트_즐겨찾기",
+      "what": "보던 사이트의 즐겨찾기를 누르면 그 사이트 첫 화면(목록)",
+      "ok": true,
+      "expect": "goedam.net/board/free",
+      "actual": "goedam.net/board/free",
+      "why": "app.ts goSite 주석 「지금 탭에서 사이트를 연다 (그 사이트 첫 화면부터)」, 위키는 resetWiki 로 대문"
+    },
+    {
+      "part": "PC_",
+      "step": "08 PC_다른사이트_갔다가_즐겨찾기",
+      "what": "괴담갤 갔다가 괴담넷 즐겨찾기 → 첫 화면",
+      "ok": true,
+      "expect": "goedam.net/board/free",
+      "actual": "goedam.net/board/free",
+      "why": "같은 근거"
+    },
+    {
+      "part": "PC_",
+      "step": "09 PC_탭닫기_되살리기",
+      "what": "둘째 탭 × → 탭 1개",
+      "ok": true,
+      "expect": 1,
+      "actual": 1,
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "09 PC_탭닫기_되살리기",
+      "what": "ㄱ 제스처(br-reopen) → 닫은 탭이 위키 문서로 되살아나고 뒤로 가능",
+      "ok": true,
+      "expect": "탭2·/w/·뒤로",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "중림 지하상가 - 괴이위키"
+          }
+        ],
+        "cur": 1,
+        "url": "goei.wiki/w/중림 지하상가",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": true,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": "11-09 사용자 마우스 제스처 ㄱ"
+    },
+    {
+      "part": "PC_",
+      "step": "10 PC_로그인_로그아웃",
+      "what": "로그인: $br_login 1, $br_nick·$gn_nick 토끼, 프로필 표시",
+      "ok": true,
+      "expect": "토끼",
+      "actual": {
+        "login": "1",
+        "nick": "토끼",
+        "gn": "토끼",
+        "prof": "토끼로 로그인됨"
+      },
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "10 PC_로그인_로그아웃",
+      "what": "로그아웃: $br_login 0, $br_nick 남김(다음에 미리 채움), 게시판 닉 비움",
+      "ok": true,
+      "expect": "0·토끼·빈",
+      "actual": {
+        "login": "0",
+        "nick": "토끼",
+        "gn": ""
+      },
+      "why": "11-09 사용자 「로그아웃하면 닉네임이 날아갔다」"
+    },
+    {
+      "part": "PC_",
+      "step": "10 PC_로그인_로그아웃",
+      "what": "다시 열면 지난 닉네임이 미리 들어 있음",
+      "ok": true,
+      "expect": "토끼",
+      "actual": "토끼",
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "10 PC_로그인_로그아웃",
+      "what": "빈 닉네임 엔터는 로그인 안 됨",
+      "ok": true,
+      "expect": "0",
+      "actual": "0",
+      "why": "2026-11-09 사용자"
+    },
+    {
+      "part": "PC_",
+      "step": "11 PC_저장_새로고침_되살림",
+      "what": "$br_tabs 에 탭 2개·지금 탭 1 저장",
+      "ok": true,
+      "expect": "2·c1",
+      "actual": {
+        "c": 1,
+        "t": [
+          {
+            "s": "gn",
+            "h": [
+              "{\"tab\":\"net\",\"b\":\"\"}",
+              "{\"tab\":\"gnet\",\"b\":\"gn\",\"g\":{\"sub\":\"board\",\"open\":null,\"dm\":null,\"s\":false,\"c\":null}}",
+              "{\"tab\":\"gnet\",\"b\":\"gn\",\"g\":{\"sub\":\"board\",\"open\":1846003,\"dm\":null,\"s\":false,\"c\":null}}",
+              "{\"tab\":\"gnet\",\"b\":\"gn\",\"g\":{\"sub\":\"board\",\"open\":null,\"dm\":null,\"s\":false,\"c\":null}}",
+              "{\"tab\":\"gnet\",\"b\":\"gn\",\"g\":{\"sub\":\"board\",\"open\":1846003,\"dm\":null,\"s\":false,\"c\":null}}",
+              "{\"tab\":\"gnet\",\"b\":\"gal\",\"g\":{\"sub\":\"board\",\"open\":null,\"dm\":null,\"s\":false,\"c\":null}}",
+              "{\"tab\":\"gnet\",\"b\":\"gn\",\"g\":{\"sub\":\"board\",\"open\":null,\"dm\":null,\"s\":false,\"c\":null}}"
+            ],
+            "a": 6
+          },
+          {
+            "s": "wk",
+            "h": [
+              "{\"tab\":\"net\",\"b\":\"\"}",
+              "{\"tab\":\"wiki\",\"b\":\"wk\",\"w\":{\"view\":\"home\",\"title\":\"\",\"list\":false}}",
+              "{\"tab\":\"wiki\",\"b\":\"wk\",\"w\":{\"view\":\"compose\",\"title\":\"중림 지하상가\",\"list\":false}}",
+              "{\"tab\":\"gnet\",\"b\":\"wpf\",\"g\":{\"sub\":\"board\",\"open\":null,\"dm\":null,\"s\":false,\"c\":null}}"
+            ],
+            "a": 2
+          }
+        ]
+      },
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "11 PC_저장_새로고침_되살림",
+      "what": "새로고침 뒤 인터넷: 같은 탭 수·같은 지금 탭·같은 주소",
+      "ok": true,
+      "expect": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "중림 지하상가 - 괴이위키"
+          }
+        ],
+        "cur": 1,
+        "url": "goei.wiki/w/중림 지하상가",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": true,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "중림 지하상가 - 괴이위키"
+          }
+        ],
+        "cur": 1,
+        "url": "goei.wiki/w/중림 지하상가",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": true,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": "사용자 11-08 「새로고침해도 탭이 남게」"
+    },
+    {
+      "part": "PC_",
+      "step": "11 PC_저장_새로고침_되살림",
+      "what": "새로고침 뒤에도 탭 뒤로 가능",
+      "ok": true,
+      "expect": true,
+      "actual": true,
+      "why": ""
+    },
+    {
+      "part": "PC_",
+      "step": "12 PC_본편요청_내부값",
+      "what": "본편 요청에 브라우저 내부 값($br_tabs·탭 상태 JSON·로그인 표식) 없음",
+      "ok": true,
+      "expect": "없음",
+      "actual": "",
+      "why": ""
+    }
+  ],
+  "notes": [
+    {
+      "part": "PC_",
+      "step": "01 PC_인터넷_첫화면",
+      "what": "망상홈쇼핑(hs) 즐겨찾기 (기본값 $hs_net)",
+      "actual": {
+        "has": false
+      }
+    },
+    {
+      "part": "PC_",
+      "step": "02 PC_괴담넷_열기_글열기",
+      "what": "괴담넷을 열 때 보조 호출 수(기본 설정)",
+      "actual": 0
+    },
+    {
+      "part": "PC_",
+      "step": "10 PC_로그인_로그아웃",
+      "what": "로그인 칸 미리 든 값(지난 닉네임 없으면 페르소나 이름)",
+      "actual": ""
+    },
+    {
+      "part": "PC_",
+      "step": "11 PC_저장_새로고침_되살림",
+      "what": "새로고침 뒤 뒤로 한 번",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "괴이위키:대문 - 괴이위키"
+          }
+        ],
+        "cur": 1,
+        "url": "goei.wiki/w/괴이위키:대문",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": true,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      }
+    }
+  ]
+}

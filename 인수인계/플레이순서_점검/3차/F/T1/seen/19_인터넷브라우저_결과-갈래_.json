@@ -1,0 +1,456 @@
+{
+  "results": [
+    {
+      "part": "갈래_",
+      "step": "61 갈래_카드단독창_뒤_전역뒤로",
+      "what": "카드 「접속하기」 → 탭·주소줄 없는 우주몰 단독 창",
+      "ok": true,
+      "expect": "br-solo·cos",
+      "actual": {
+        "card": true,
+        "solo": true,
+        "page": "br-page br-p-cos"
+      },
+      "why": "11-20 사용자 「인터넷 창을 통째로 띄우지 않는다」"
+    },
+    {
+      "part": "갈래_",
+      "step": "61 갈래_카드단독창_뒤_전역뒤로",
+      "what": "단독 창을 닫고 상황판 인터넷: 전과 같은 탭(우주몰 탭 없음)",
+      "ok": true,
+      "expect": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "괴이위키:대문 - 괴이위키"
+          }
+        ],
+        "cur": 0,
+        "url": "goei.wiki/w/괴이위키:대문",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": false,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "1"
+      },
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "괴이위키:대문 - 괴이위키"
+          }
+        ],
+        "cur": 0,
+        "url": "goei.wiki/w/괴이위키:대문",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": false,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "1"
+      },
+      "why": "11-20 사용자 「카드로 본 망상홈쇼핑이 상황판 인터넷 창에 남아 있다」"
+    },
+    {
+      "part": "갈래_",
+      "step": "61 갈래_카드단독창_뒤_전역뒤로",
+      "what": "PC 메뉴 ‹ 를 눌러도 탭이 새로 생기지 않고 우주몰(단독 창에서 본 것)이 상황판 인터넷에 안 나옴",
+      "ok": true,
+      "expect": "탭 ≤ 1, cos 없음",
+      "actual": [
+        {
+          "n": 1,
+          "page": "br-page br-p-gn",
+          "titles": [
+            "괴담넷 - 자유게시판"
+          ]
+        },
+        {
+          "n": 1,
+          "page": "br-page br-p-home",
+          "titles": [
+            "새 탭"
+          ]
+        },
+        {
+          "n": 0,
+          "page": "",
+          "titles": []
+        }
+      ],
+      "why": "11-20 사용자(위와 같음) · app.ts navStep 「닫힌 탭이면 새 탭에」"
+    },
+    {
+      "part": "갈래_",
+      "step": "62 갈래_PC메뉴뒤로_뒤_탭기록",
+      "what": "PC 메뉴 ‹ 뒤 주소줄 › 로 위키에 다시 갈 수 있음 (두 기록이 어긋나지 않음)",
+      "ok": true,
+      "expect": "br-fwd 켜짐",
+      "actual": {
+        "back": false,
+        "fwd": true,
+        "page": "br-page br-p-home"
+      },
+      "why": "실제 브라우저처럼 탭 기록(사용자 11-10). 근거 약함 — 물을 것 후보"
+    },
+    {
+      "part": "갈래_",
+      "step": "63 갈래_백일몽_즐겨찾기",
+      "what": "백일몽 소속: 즐겨찾기·새 탭에 포인트몰",
+      "ok": true,
+      "expect": "bm 있음",
+      "actual": {
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk",
+          "bm"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk",
+          "bm"
+        ]
+      },
+      "why": ""
+    },
+    {
+      "part": "갈래_",
+      "step": "64 갈래_관리국으로_바뀐뒤_닫은탭되살림",
+      "what": "관리국: 즐겨찾기에 bm 없음",
+      "ok": true,
+      "expect": "없음",
+      "actual": [
+        "gn",
+        "gal",
+        "wpf",
+        "sm",
+        "cos",
+        "wk"
+      ],
+      "why": ""
+    },
+    {
+      "part": "갈래_",
+      "step": "65 갈래_망상홈쇼핑_노출",
+      "what": "「인터넷에 상시 노출」 켬 → 즐겨찾기에 있음, 끔 → 없음",
+      "ok": true,
+      "expect": "있음→없음",
+      "actual": {
+        "hsOn": true,
+        "hsOff": false
+      },
+      "why": "app.ts browserSites 주석"
+    },
+    {
+      "part": "갈래_",
+      "step": "66 갈래_채팅바꾸기",
+      "what": "채팅 B 는 빈 새 탭(채팅 A 의 우주몰이 안 옴)",
+      "ok": true,
+      "expect": "새 탭",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 0,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": false,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": false,
+        "tabN": "1"
+      },
+      "why": ""
+    },
+    {
+      "part": "갈래_",
+      "step": "66 갈래_채팅바꾸기",
+      "what": "채팅 A 로 돌아오면 A 의 우주몰 탭",
+      "ok": true,
+      "expect": "cos",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "★우주 쇼핑몰★에 오는 것을 환영하는 것이다"
+          }
+        ],
+        "cur": 0,
+        "url": "cosmic-mall.alien/~shop/index.html",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": false,
+        "page": "br-page br-p-cos",
+        "prof": "로그인",
+        "pcNavBack": false,
+        "tabN": "1"
+      },
+      "why": ""
+    },
+    {
+      "part": "갈래_",
+      "step": "67 갈래_깨진_탭저장값",
+      "what": "깨진 JSON → 빈 새 탭 하나, 오류 없음",
+      "ok": true,
+      "expect": "새 탭 1",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 0,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": false,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "1"
+      },
+      "why": ""
+    },
+    {
+      "part": "갈래_",
+      "step": "70 갈래_폰_서랍_이미있는탭",
+      "what": "인터넷 밖에서 서랍 괴담넷 → 있던 괴담넷 탭으로 (탭 수 그대로)",
+      "ok": true,
+      "expect": "gn·2",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": false,
+            "title": "괴이위키"
+          }
+        ],
+        "cur": 0,
+        "url": "goedam.net/board/free",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": false,
+        "fwd": false,
+        "page": "br-page br-p-gn",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": "app.ts br-site 주석"
+    }
+  ],
+  "notes": [
+    {
+      "part": "갈래_",
+      "step": "61 갈래_카드단독창_뒤_전역뒤로",
+      "what": "2초 뒤 $br_tabs 에 남은 탭 수(사이트)",
+      "actual": [
+        ""
+      ]
+    },
+    {
+      "part": "갈래_",
+      "step": "62 갈래_PC메뉴뒤로_뒤_탭기록",
+      "what": "PC 메뉴 ‹ 뒤",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 1,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": true,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      }
+    },
+    {
+      "part": "갈래_",
+      "step": "64 갈래_관리국으로_바뀐뒤_닫은탭되살림",
+      "what": "ㄱ(닫은 탭 다시 열기)로 포인트몰 탭이 되살아나는가 — 03 문제3 과 같은 뿌리(bmHtml 소속 확인 없음)",
+      "actual": {
+        "page": "br-page br-p-bm",
+        "titles": [
+          "괴담넷 - 자유게시판",
+          "백일몽 포인트몰"
+        ],
+        "calls": 0
+      }
+    },
+    {
+      "part": "갈래_",
+      "step": "66 갈래_채팅바꾸기",
+      "what": "채팅 B 화면",
+      "actual": {
+        "b1": {
+          "tabs": [
+            {
+              "on": true,
+              "title": "새 탭"
+            }
+          ],
+          "cur": 0,
+          "url": "검색어 또는 URL 입력",
+          "bms": [
+            "gn",
+            "gal",
+            "wpf",
+            "sm",
+            "cos",
+            "wk"
+          ],
+          "ntp": [
+            "gn",
+            "gal",
+            "wpf",
+            "sm",
+            "cos",
+            "wk"
+          ],
+          "back": false,
+          "fwd": false,
+          "page": "br-page br-p-home",
+          "prof": "로그인",
+          "pcNavBack": false,
+          "tabN": "1"
+        },
+        "txt": "나\n관리국\n잔고\n₩ 100,000\n위치\n중림 지하상가\n2025.03.14 11:20 PM\n🌙 6°C\n상황판\n임무\n괴담톡\n인터넷\n소지품\n기록\n설정\n닫기\n인터넷\n새 탭\n검색어 또는 URL 입력\n괴담넷\n괴담갤\n세정게\n연어 마켓\n우주 쇼핑몰\n괴이위키\nGoei\n검색어 또는 URL 입력\n괴담넷\n괴담갤\n세정게\n연어 마켓\n우주 쇼핑몰\n괴이위키"
+      }
+    },
+    {
+      "part": "갈래_",
+      "step": "68 갈래_남의소속_사이트가_든_탭저장값",
+      "what": "관리국 채팅에 bm 탭이 저장돼 있으면 (03 문제3 과 같은 뿌리)",
+      "actual": {
+        "page": "br-page br-p-bm",
+        "titles": [
+          "백일몽 포인트몰"
+        ],
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ]
+      }
+    },
+    {
+      "part": "갈래_",
+      "step": "69 갈래_뒤로많이간_탭_새로고침",
+      "what": "13칸 기록에서 11번 뒤로 간 탭을 새로고침 (저장은 최근 10칸만)",
+      "actual": {
+        "before": "goei.wiki/w/중림 지하상가",
+        "after": "goei.wiki/w/중림 지하상가",
+        "back": true,
+        "fwd": true
+      }
+    }
+  ]
+}

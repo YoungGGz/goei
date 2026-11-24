@@ -1,0 +1,298 @@
+[
+  {
+    "group": "A",
+    "step": "A01 시작_첫전송_이미지지침",
+    "what": "기본값: 에셋 출력 켬·메인 모델 (사용자 2026-10-26 설정 기본)",
+    "ok": true,
+    "info": false,
+    "expect": {
+      "on": "1",
+      "model": "main"
+    },
+    "actual": {
+      "on": "1",
+      "model": "main"
+    },
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A01 시작_첫전송_이미지지침",
+    "what": "이미지 지침이 요청 맨 끝(유저 글 뒤)",
+    "ok": true,
+    "info": false,
+    "expect": "맨 끝 system",
+    "actual": "## Inserting Character Visual Images\n\n### Objective\n- Genera",
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A01 시작_첫전송_이미지지침",
+    "what": "대상 명단 = 명부 요원 영문명(Jaemtri·Spangdal·Aileen 포함)",
+    "ok": true,
+    "info": false,
+    "expect": "포함",
+    "actual": 55,
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A01 시작_첫전송_이미지지침",
+    "what": "표정 세트 42종(지침 MAIN_KEYWORDS)",
+    "ok": true,
+    "info": false,
+    "expect": 42,
+    "actual": 42,
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A01 시작_첫전송_이미지지침",
+    "what": "주인공 이미지 끔(기본): 주인공 태그 금지 줄이 있고 {{user}} 가 이름으로 풀림",
+    "ok": true,
+    "info": false,
+    "expect": "한여름",
+    "actual": "Do not create tags for 한여름.",
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A01 시작_첫전송_이미지지침",
+    "what": "이미지 지침이 한 번만",
+    "ok": true,
+    "info": false,
+    "expect": 1,
+    "actual": 1,
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A02 응답태그_그림칸",
+    "what": "알려진 태그 3개가 그림 칸(따옴표 꼴·밑줄 표정 포함), 세트 밖 표정·없는 이름은 칸 없음",
+    "ok": true,
+    "info": false,
+    "expect": [
+      "Jaemtri_curious",
+      "Aileen_smile",
+      "Spangdal_forced smiling"
+    ],
+    "actual": [
+      "{{raw::Jaemtri_curious}}",
+      "{{raw::Aileen_smile}}",
+      "{{raw::Spangdal_forced smiling}}"
+    ],
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A02 응답태그_그림칸",
+    "what": "페르소나 태그(<img=한여름_smile>)는 주인공 이미지 끔이어도 그리면 유저 사진",
+    "ok": true,
+    "info": true,
+    "expect": "기록",
+    "actual": [
+      "{{source::user}}"
+    ],
+    "why": "info"
+  },
+  {
+    "group": "A",
+    "step": "A02 응답태그_그림칸",
+    "what": "화면에 태그 원문이 남지 않음",
+    "ok": true,
+    "info": false,
+    "expect": "없음",
+    "actual": [],
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A02 응답태그_그림칸",
+    "what": "최근 6개 조건(CBS chat_index)이 칸에 붙음(설정 imgShow 기본 6)",
+    "ok": true,
+    "info": false,
+    "expect": "-5",
+    "actual": "lastmessageid}}-5",
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A03 여러턴_옛태그지우기",
+    "what": "태그는 끝에서 6개 메시지(유저 글 포함) 안에만 남음(설정 imgSend 기본 6)",
+    "ok": true,
+    "info": false,
+    "expect": "끝 6개 안",
+    "actual": [
+      {
+        "i": 6,
+        "n": 6,
+        "tags": 1
+      },
+      {
+        "i": 8,
+        "n": 4,
+        "tags": 1
+      },
+      {
+        "i": 10,
+        "n": 2,
+        "tags": 1
+      }
+    ],
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A03 여러턴_옛태그지우기",
+    "what": "이미지 지침은 맨 끝 그대로",
+    "ok": true,
+    "info": false,
+    "expect": "맨 끝",
+    "actual": "## Inserting Character Visual Images\n\n##",
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A04 설정_에셋출력_끔",
+    "what": "이미지 페이지가 열리고 끔 단추가 있음",
+    "ok": true,
+    "info": false,
+    "expect": true,
+    "actual": {
+      "offOk": true,
+      "page": "설정\nAI 상담\n기능\n세계\n지침\n점검\n호출\n호출 흐름\n로어북 호출\n생성 공통\n표시\n화면\n캐릭터 이미지\n켬\n상태창\n기능\n상황판\n켬\n인터넷\n괴담톡\n위키\n소지품\n켬\n상점\n우주 쇼핑몰\n백일몽 포인트몰\n망상홈쇼핑\n기록\n일지\n인물\n켬\n세력\n캐릭터 이미지\n켬\n\n본문에 등장한 캐릭터의 등록 이미지를 채팅 속에 띄워요. 이미지 목록은 봇 카드에 있어요.\n\n이 기능의 호출 · 매 턴 자동 호출 없음\n이미지 태그 보충\n호출 없음 (메인이 태그를 씀)\n호출 흐름 →\n\n사용\n본문에 등장하는 캐릭터의 등록 이미지를 표시하도록 이미지 태그를 적어요. 이미지와"
+    },
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A04 설정_에셋출력_끔",
+    "what": "채팅 변수 $st_asset_on=0",
+    "ok": true,
+    "info": false,
+    "expect": "0",
+    "actual": "0",
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A04 설정_에셋출력_끔",
+    "what": "채팅 속 그림 칸 숨김(display:none)",
+    "ok": true,
+    "info": false,
+    "expect": "display:none",
+    "actual": ":is(.gim,.x-risu-gim,.ib-asset-hover,.x-risu-ib-asset-hover){display:none!important}",
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A04 설정_에셋출력_끔",
+    "what": "끈 뒤 요청: 이미지 지침 없음",
+    "ok": true,
+    "info": false,
+    "expect": "없음",
+    "actual": false,
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A04 설정_에셋출력_끔",
+    "what": "끈 뒤 요청: 최근 것까지 태그 전부 지움(전수검사 11-13)",
+    "ok": true,
+    "info": false,
+    "expect": 0,
+    "actual": [],
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A04 설정_에셋출력_끔",
+    "what": "[참고] 끈 채팅에서도 화면 처리기는 칸을 만들고 style 로 숨김",
+    "ok": true,
+    "info": true,
+    "expect": "기록",
+    "actual": 0,
+    "why": "info"
+  },
+  {
+    "group": "A",
+    "step": "A05 설정_에셋출력_켬",
+    "what": "켬: 변수 1·칸 보임·지침 돌아옴·최근 태그 남음",
+    "ok": true,
+    "info": false,
+    "expect": "모두",
+    "actual": {
+      "onOk": true,
+      "css": ":is(.gim,.x-risu-gim,.ib-asset-hover,.x-risu-ib-asset-hover){display:block!impor",
+      "last": "## Inserting Character Visual ",
+      "tags": 5
+    },
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A06 주인공이미지_켬",
+    "what": "켬: 주인공 금지 줄 빠짐, 페르소나 이름(한여름)이 명단에",
+    "ok": true,
+    "info": false,
+    "expect": "한여름 포함·금지 없음",
+    "actual": {
+      "pOk": true,
+      "has": true,
+      "rule": null,
+      "tail": [
+        "Aestheticism",
+        "Brownie",
+        "한여름"
+      ]
+    },
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A06 주인공이미지_켬",
+    "what": "페르소나 태그는 유저 사진({{source::user}})",
+    "ok": true,
+    "info": false,
+    "expect": "source::user",
+    "actual": "{{source::user}}",
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A07 장면인물만",
+    "what": "장면 인물만: 최근 대화에 나온 잼트리·에일린 + 주인공만",
+    "ok": true,
+    "info": false,
+    "expect": "좁아짐",
+    "actual": {
+      "scOk": true,
+      "chars7": [
+        "Jaemtri",
+        "Aileen",
+        "한여름"
+      ]
+    },
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A08 새로고침_다시그리기",
+    "what": "새로고침 뒤에도 태그가 그림 칸으로(에셋 목록 첫 읽기를 기다림)",
+    "ok": true,
+    "info": false,
+    "expect": "칸",
+    "actual": [],
+    "why": ""
+  },
+  {
+    "group": "A",
+    "step": "A08 새로고침_다시그리기",
+    "what": "[참고] 새로고침 뒤 채팅을 다시 저장해 다시 그리게 함(redrawAfterLoad)",
+    "ok": true,
+    "info": true,
+    "expect": "기록",
+    "actual": 1,
+    "why": "info"
+  }
+]
