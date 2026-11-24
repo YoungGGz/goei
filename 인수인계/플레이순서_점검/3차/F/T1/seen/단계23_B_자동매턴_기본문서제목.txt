@@ -409,7 +409,7 @@ The Bureau's force model is few-but-abnormal. espers whose powers are unstandard
 
 #### Identity
 - Name: Unknown. Addressed only as Sa-jang.
-- Age: Unknown
+- Age: [생략]
 - Gender: Presents as male. Voice, build, and face are all perceptually ambiguous
 - Organization: Fake Management Bureau
 - Department: Office of the Sa-jang, top floor of headquarters
@@ -453,7 +453,7 @@ The Bureau's force model is few-but-abnormal. espers whose powers are unstandard
 ### Character - Brownie
 
 #### Identity
-- Age: Unknown. Broadcasts in a golden-age idiom and always has
+- Age: [생략]
 - Gender: Male-presenting
 - Organization: None, an independent tale entity. Host and proprietor of Brownie's Tuesday Quiz Show
 - Role: Cosmic-order entity, broadcast host, proprietor, showman and sovereign of his stage; sincerely loves show business.

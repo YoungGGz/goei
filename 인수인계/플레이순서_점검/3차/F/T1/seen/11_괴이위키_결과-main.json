@@ -563,7 +563,7 @@
       "what": "참고 자료에 큐라스 원본 로어북",
       "ok": true,
       "expect": "원본",
-      "actual": "\n[주제 원본: 큐라스]\n### Character - Kyuras\n\n#### Identity\n- Age: early 30s\n- Gender: Male\n- Organization: Management Bureau\n- Department: Suppression Team\n-",
+      "actual": "\n[주제 원본: 큐라스]\n### Character - Kyuras\n\n#### Identity\n- Age: [생략]\n- Gender: Male\n- Organization: Management Bureau\n- Department: Suppression Team\n-",
       "why": ""
     },
     {
