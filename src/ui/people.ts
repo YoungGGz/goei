@@ -9,7 +9,7 @@ import { messageText } from '../core/refs';
 import { tokens } from '../core/gnet';
 import { factionList } from '../core/factions';
 import { updateChat, type ChatContext } from '../host/risu';
-import { backfillPeople, chatId, clearDiag, consolidatePerson, diagKeep, loadDiag, rereadPerson, onPeopleStatus, peopleStatus, requestPeopleUpdate, rosterOf, sheetOf, type DiagRun } from '../host/people';
+import { backfillPeople, chatId, clearDiag, consolidatePerson, diagKeep, livePeopleStore, loadDiag, rereadPerson, onPeopleStatus, peopleStatus, requestPeopleUpdate, rosterOf, sheetOf, type DiagRun } from '../host/people';
 import { anchorOf, changeId, entryId, entryStates, isAlive, liveChanges, liveEntries, liveness, messageKey, peopleStore, plain, putChange, putEntry, splitUnread, withPeople, type EntryState, type Liveness } from '../core/people/store';
 import { addressOf, affinityView, opennessOf, tasteOf } from '../core/people/affinity';
 import { factionNow, knownFactionCodes, stageMid as factionStageMid, userFactionOf } from '../core/people/faction';
@@ -223,7 +223,7 @@ const affOpts = (ctx: ChatContext, name: string) => ({ temper: temperOf(name), s
 
 /** 사원증 창의 「기록」 단추: 그 이름의 기록이 있나 */
 export function hasPersonRecord(ctx: ChatContext, name: string): boolean {
-  return !!peopleStore(ctx.chat).people[name];
+  return !!livePeopleStore(ctx.chat, ctx.char.globalLore).people[name];
 }
 
 // ── 설정 페이지 ──
@@ -345,7 +345,7 @@ function updateBar(ctx: ChatContext, canChat = true): string {
   // 2026-10-29 사용자: 숫자는 안 읽은 응답 전부를 세는데 「지금 갱신」은 마지막으로 읽은 응답 뒤만 읽어 헷갈렸다 →
   // 「지금 갱신」 옆엔 그 단추가 읽는 새 응답 수, 「지난 응답 읽기」 옆엔 그 앞의 안 읽은 응답 수. 단추는 각자 숫자 바로 옆
   const st = peopleStatus();
-  const store = peopleStore(ctx.chat);
+  const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
   const { newer, older } = splitUnread(ctx.chat, store);
   const dis = st.busy || peopleUi.busy || !canChat ? 'disabled' : '';
   const label = !canChat ? '채팅을 시작한 뒤에 갱신할 수 있어요' : st.busy ? st.label || '갱신 중…' : newer.length ? `새 응답 ${newer.length}개` : '새 응답 없음';
@@ -562,7 +562,7 @@ export function peopleFactionPane(ctx: ChatContext, canChat = true): string {
 
 /** 위키 홈의 타일 */
 export function peopleHomeTile(ctx: ChatContext): string {
-  const store = peopleStore(ctx.chat);
+  const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
   const count = Object.keys(store.people).length;
   const pending = Object.keys(store.pending).length;
   const live = liveness(ctx.chat);
@@ -584,7 +584,7 @@ const stageBadge = (value: number) => {
 
 /** 인물 목록 (소속별), 등록 대기, 지금 갱신 */
 export function peopleListView(ctx: ChatContext): string {
-  const store = peopleStore(ctx.chat);
+  const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
   const live = liveness(ctx.chat);
   const changes = liveChanges(store, live);
   const changed = changedPeople(store, ctx.chat, live);
@@ -641,7 +641,7 @@ export function peopleListView(ctx: ChatContext): string {
 
 /** 기록 탭 「세력」 하위 탭 (2026-10-29: 위키 안 인물 목록 아래 절에서 독립 화면으로): 아는 세력 전부, 값·구간·시작값 */
 export function factionListView(ctx: ChatContext): string {
-  const store = peopleStore(ctx.chat);
+  const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
   const live = liveness(ctx.chat);
   const changes = liveChanges(store, live);
   const s = peopleSettings(ctx.chat.scriptstate);
@@ -689,7 +689,7 @@ const factionStageId = (value: number, b: readonly number[]) => (value >= b[0] ?
 
 /** 세력 평판 상세: 막대·몹 반응·변경 기록·직접 고정 */
 export function factionView(ctx: ChatContext, code: string): string {
-  const store = peopleStore(ctx.chat);
+  const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
   const s = peopleSettings(ctx.chat.scriptstate);
   const names = Object.fromEntries(factionList(ctx.char.globalLore).map((f) => [f.code, f.name]));
   const live = liveness(ctx.chat);
@@ -877,7 +877,7 @@ function changeRow(ctx: ChatContext, c: Change, live: Liveness): string {
 
 /** 인물 상세 */
 export function personView(ctx: ChatContext, name: string): string {
-  const store = peopleStore(ctx.chat);
+  const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
   const p = store.people[name];
   if (!p) return `<div class="ph-room nw-pane pp-pane">${head(name, '')}<div class="ph-blank"><p>「${esc(name)}」의 기록이 없어요.</p></div></div>`;
   const live = liveness(ctx.chat);
@@ -938,7 +938,7 @@ export function personView(ctx: ChatContext, name: string): string {
 
 /** 사건·장소·세력·물건 문서 */
 export function peopleDocsView(ctx: ChatContext): string {
-  const store = peopleStore(ctx.chat);
+  const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
   const live = liveness(ctx.chat);
   const byType = new Map<DocType, Doc[]>();
   for (const d of Object.values(store.docs)) (byType.get(d.type) ?? byType.set(d.type, []).get(d.type)!).push(d);
@@ -1203,7 +1203,7 @@ export async function handlePeople(action: string, value: string | undefined, ct
     case 'pp-sex-edit': {
       const [who, f] = v.split('|') as [string, SexualField];
       peopleUi.sexEdit = v;
-      peopleUi.sexDraft = peopleStore(ctx.chat).people[who]?.sexual?.[f]?.text ?? '';
+      peopleUi.sexDraft = livePeopleStore(ctx.chat, ctx.char.globalLore).people[who]?.sexual?.[f]?.text ?? '';
       env.render();
       return true;
     }
@@ -1286,7 +1286,7 @@ export async function handlePeople(action: string, value: string | undefined, ct
     case 'pp-fac-save': {
       const reason = peopleUi.affReason.trim();
       const fs = peopleSettings(ctx.chat.scriptstate);
-      const qualStage = fs.factionQual ? (peopleUi.affStage || factionNow(peopleStore(ctx.chat), v, liveChanges(peopleStore(ctx.chat), liveness(ctx.chat)), userFactionOf(peopleStore(ctx.chat), ctx.chat), fs).stage.id) : '';
+      const qualStage = fs.factionQual ? (peopleUi.affStage || factionNow(livePeopleStore(ctx.chat, ctx.char.globalLore), v, liveChanges(livePeopleStore(ctx.chat, ctx.char.globalLore), liveness(ctx.chat)), userFactionOf(livePeopleStore(ctx.chat, ctx.char.globalLore), ctx.chat), fs).stage.id) : '';
       const raw = qualStage ? factionStageMid(qualStage as 'neutral', fs.factionBounds) : Number(peopleUi.affNum);
       if (!qualStage && (!Number.isFinite(raw) || peopleUi.affNum.trim() === '')) {
         peopleUi.notice = '숫자를 적어 주세요.';
@@ -1344,7 +1344,7 @@ export async function handlePeople(action: string, value: string | undefined, ct
       return true;
     }
     case 'pp-addr-edit': {
-      const store = peopleStore(ctx.chat);
+      const store = livePeopleStore(ctx.chat, ctx.char.globalLore);
       const p = store.people[v];
       const cur = p ? addressOf(p, liveChanges(store, liveness(ctx.chat))) : null;
       Object.assign(peopleUi, { addrEdit: true, addrTo: cur?.toUser ?? '', addrReg: cur?.register ?? '존댓말', addrPin: !!p?.address.pin, notice: '' });

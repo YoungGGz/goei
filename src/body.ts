@@ -84,7 +84,7 @@ import { peopleStore } from './core/people/store';
 import { peopleSettings } from './core/people/settings';
 import { identityText } from './core/people/identity';
 import { extraNames, temperOf } from './core/people/base';
-import { requestPeopleUpdate, directorNoteText, factionNamesOf, ownNames, rosterOf, routerPeople } from './host/people';
+import { requestPeopleUpdate, directorNoteText, factionNamesOf, livePeopleStore, ownNames, rosterOf, routerPeople } from './host/people';
 import { traceBegin, traceEnd, traceMain, traceReply, traceTurnId } from './host/trace';
 import { progressAbort, progressEnd, progressPlan, progressTurn, progressWatch } from './core/progress';
 import { turnPlan } from './core/progplan';
@@ -482,7 +482,8 @@ function knownIdentity({ chat }: ChatContext): string {
 async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }: ChatContext): Promise<M[]> {
   const settings = peopleSettings(chat.scriptstate);
   if (!settings.on) return messages;
-  const store = peopleStore(chat);
+  // 사라진 응답(다시 굴림·지움)이 만든 인물·이름 옮기기는 뺀 모습으로 읽는다 (host/people.ts livePeopleStore, 3차 점검 R40)
+  const store = livePeopleStore(chat, char.globalLore);
   if (!Object.keys(store.people).length) return messages;
   const me = playerAgent(char.globalLore, chat.scriptstate);
   const lastUser = [...messages].reverse().find((m) => m?.role === 'user');

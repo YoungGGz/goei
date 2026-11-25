@@ -136,6 +136,18 @@ export function ownNames(lore: LoreEntry[] | undefined, vars: Record<string, unk
   // 요원으로 플레이해도 페르소나 이름은 같이 뺀다: 페르소나 이름이 기본값(User)인 채면 요청 글에 User 가 그대로 남아, 갱신기가 「User」를 새 인물로 올리면 등록됐다 (결정 I-08, 3차 점검 R32)
   return [...new Set([me?.name ?? '', persona ?? ''].map((n) => n.trim()).filter(Boolean))];
 }
+/** 읽는 쪽(본편 요청의 Router 명단·인물 기록 블록, 인물 창)이 쓰는 인물 기록: 저장된 기록에서, 다시 굴리거나 지워서 사라진 응답이 한 이름 옮기기와 그 응답이 만든 인물을 뺀 모습.
+ *  갱신기가 저장할 때 돌리는 정리(undoGoneRenames·dropGonePeople)를 읽는 사본에 그대로 돌린다 (저장은 하지 않는다: 다음 갱신이 같은 정리를 저장한다).
+ *  전에는 갱신기가 성공해 저장할 때까지 사라진 응답의 인물이 명단·목록에 남았다 (결정 I-05, 3차 점검 R40) */
+export function livePeopleStore(chat: Chat, lore: LoreEntry[] | undefined): PeopleStore {
+  const s = peopleStore(chat);
+  if (!Object.keys(s.people).length) return s;
+  const settings = peopleSettings(chat.scriptstate);
+  const factions = factionNamesOf(lore);
+  undoGoneRenames(s, chat, settings.keepMsgs, (names) => liveAppearing(s, chat, names, factions));
+  dropGonePeople(s, chat, (gone) => liveAppearing(s, chat, gone, factions), settings.always);
+  return s;
+}
 function excludedNames(ctx: ChatContext): string[] {
   return ownNames(ctx.char.globalLore, ctx.chat.scriptstate);
 }
