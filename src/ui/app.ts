@@ -12,7 +12,7 @@ import type { Faction, FactionCode, LangCode, LoreEntry, Manifest } from '../cor
 import {
   activeEvents, type Catalog, endedShown, codesToNames, factionNames, lastStatusFields, locName, parseCatalog, readWorld, rosterFor, startWorldVars, agentLocked, readDirectory, worldOn,
 } from '../core/world';
-import { loadContext, updateChat, type ChatContext } from '../host/risu';
+import { loadContext, onSaveDenied, SAVE_DENIED, updateChat, type ChatContext } from '../host/risu';
 import { isWaiting, onWaiting } from '../host/waiting';
 import { freeUseLock } from '../host/usebox';
 import { prepareBaseDocs } from '../core/wiki';
@@ -125,6 +125,9 @@ let view: View = { kind: 'loading' };
 let draft: Draft = { lang: 'ko' };
 let busy = false;
 let notice = '';
+/** 리스AI 가 저장을 거절한 세션: 창 맨 위에 알림 한 줄 (거절은 새로고침 전까지 이어진다. 3차 점검 R23·R24) */
+let saveDenied = false;
+const saveDeniedHtml = () => (saveDenied ? `<div class="${noticeClass(SAVE_DENIED)} gx-notice" role="alert">${esc(SAVE_DENIED)}</div>` : '');
 /** 괴담넷 탭 (완성 전까지 숨김) */
 const GNET_ON = true;
 /** records = 「기록」(일지·가계부·인물·세력, 2026-10-29 가계부 메뉴 자리). 가계부는 2026-11-05부터 기록의 하위 탭: 사원증 잔고 줄·폰 머리 칩·옛 「wallet」 탭 요청은 openWallet() 으로 */
@@ -1647,6 +1650,12 @@ const DRAFT_SEL = '[data-it-form] [name], input[name="wt-adj"], input[name="br-n
 /** 그 칸들이 같은 양식인지 (다른 물건·탭으로 넘어가면 지키지 않는다) */
 const draftKey = () => `${tab}|${itemsUi.sub}|${itemsUi.mode}|${itemsUi.open}|${walletTabUi.kind}|${walletTabUi.edit}|${br.login}|${curTab().id}`;
 
+onSaveDenied(() => {
+  if (saveDenied) return;
+  saveDenied = true;
+  render();
+});
+
 function render(): void {
   if (!root) return;
   // 설정 창의 설정 페이지는 패널 상태를 그대로 보여 주므로 패널을 다시 그릴 때 같이 그린다 (2026-10-27)
@@ -2016,8 +2025,8 @@ function body(): string {
       if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
       // 가계부·소지품이 둘 다 꺼졌으면 소지품 탭을 상황판으로 옮긴다 (제목·메뉴·본문이 어긋나지 않게, 전수점검 사소-68)
       if (tab === 'items' && !invMenuOn(view.ctx)) tab = 'board';
-      if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
-      return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
+      if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${saveDeniedHtml()}${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
+      return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${saveDeniedHtml()}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
     case 'opening':
       return `${header('커스텀 임무 · 첫 장면 고르기', '<button class="gx-x" data-action="repick" aria-label="시작 설정 다시 고르기">' + ICONS.back + '</button>')}<div class="gx-content">${missionTab(view.ctx, true, notice, busy)}</div>`;
     case 'picker':

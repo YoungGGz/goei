@@ -115,7 +115,15 @@ export const SAVE_DENIED = '리스AI 에서 저장을 거절했어요. 새로고
 /** 채팅·로어북을 쓴 바로 뒤에 부른다. Risu 는 「데이터베이스 수정」 권한을 거절하면 쓰기를 조용히 건너뛰니, 쓴 뒤에 그 답을 본다.
  *  방금 쓰기가 이미 물었으니 여기서는 팝업 없이 그 세션의 답만 돌아온다 (3차 점검 R23·R24) */
 async function written(): Promise<void> {
-  if ((await Promise.resolve(risuai.requestPluginPermission?.('dbWrite')).catch(() => true)) === false) throw new Error(SAVE_DENIED);
+  if ((await Promise.resolve(risuai.requestPluginPermission?.('dbWrite')).catch(() => true)) !== false) return;
+  for (const f of deniedListeners) f();
+  throw new Error(SAVE_DENIED);
+}
+// 저장 거절 알림 (창이 맨 위 한 줄로 띄운다. 저장하는 곳마다 따로 알리지 않게 한 곳에서, 사용자 2026-11-26)
+const deniedListeners = new Set<() => void>();
+export function onSaveDenied(f: () => void): () => void {
+  deniedListeners.add(f);
+  return () => deniedListeners.delete(f);
 }
 
 async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Chat) => Chat | null): Promise<Chat | null> {
