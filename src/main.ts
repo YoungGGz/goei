@@ -58,7 +58,8 @@ async function load(first: boolean): Promise<Body | null> {
     } catch (error) {
       console.log(`[goei] 본체를 받지 못했어요: ${error instanceof Error ? error.message : String(error)}`);
       failedAt = Date.now();
-      if (ask()) showPanel(VERSION, install, '', 'fetch');
+      // 까닭이 정해진 실패(플러그인이 옛 판 등)는 받기 창에 처음부터 보인다 (3차 점검 R29: 「다시 받기」를 눌러야 「업데이트해 주세요」가 나왔다)
+      if (ask()) showPanel(VERSION, install, error instanceof BodyError ? error.message : '', 'fetch');
       return null;
     }
     lap('본체 받음');

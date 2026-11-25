@@ -298,6 +298,8 @@ export interface ShopItem {
   soldAt?: string;
   /** 숨긴 진짜 효과 (11-09 사용자: 우주몰은 보이는 효과가 광고 문구 — 모호·검열·거짓·뚱딴지·가끔 진실 — 이고 진짜는 플레이어·소지품에 안 보이고 본편 모델만 안다) */
   truth?: string;
+  /** 코드가 끼워 넣은 물건 (쇼핑몰 시그니처 상품, ui/malls.ts fixedItem). 진열 요청의 지난 목록에 넣지 않는다: 도움말 「모델에게는 이름을 알리지 않고」(3차 점검 R13) */
+  fixed?: boolean;
 }
 
 export interface ShopIdentity {
@@ -839,7 +841,7 @@ export function applyShelf(st: ShopState, r: ShelfReply, s: ShopSettings): ShopS
   const fresh = s.avoidPrev ? r.items.filter((x) => !st.items.some((y) => sameShopName(y.name, x.name))) : r.items;
   const items = withIds(base, fresh, [], st.items.filter((x) => x.sold)).slice(0, s.shelf);
   if (!items.length) throw new ShopError('받은 물건 줄이 모두 겹쳐서 버렸어요. 다시 받아 보세요.');
-  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold).map((x) => x.name)])].slice(-s.keep.prev);
+  const prev = [...new Set([...st.prev, ...st.items.filter((x) => !x.sold && !x.fixed).map((x) => x.name)])].slice(-s.keep.prev);
   const talk = r.owner ? [...st.talk, { who: 'owner' as const, text: r.owner, ...keyOf(st) }] : st.talk;
   return { ...base, items: [...st.items.filter((x) => x.sold), ...items], talk: talk.slice(-s.keep.talk), prev, closed: false };
 }
@@ -1137,8 +1139,9 @@ const G = (name: GuideName = 'Shop') => guideSections(name);
 
 /** 「다시 내지 말 것」 목록: 지난 진열대에 남았던 것 + 여기서 산 것 + (진열 요청이면) 지금 진열대에 걸린 안 팔린 것 (2026-11-22 사용자: 다 사고 새로고침하면 같은 물건이 다시 나옴).
  *  지금 걸린 것은 applyShelf 가 새 진열을 받은 뒤에야 prev 에 넣으므로 여기서 같이 넣는다 (아무것도 안 사고 새로고침해도 같은 물건이 다시 나오지 않게).
- *  문의 요청(talk)은 지금 진열을 따로 넘기고 그 물건의 값 바꾸기·빼기를 받으므로 지금 진열은 넣지 않는다 */
-export const prevNames = (st: ShopState, talk = false): string[] => [...new Set([...st.prev, ...st.items.filter((x) => x.sold || !talk).map((x) => x.name)])];
+ *  문의 요청(talk)은 지금 진열을 따로 넘기고 그 물건의 값 바꾸기·빼기를 받으므로 지금 진열은 넣지 않는다.
+ *  코드가 끼운 물건(fixed, 시그니처 상품)은 넣지 않는다: 이름을 모델에게 알리지 않는다 (같은 이름을 모델이 내면 받는 쪽이 버린다, 3차 점검 R13) */
+export const prevNames = (st: ShopState, talk = false): string[] => [...new Set([...st.prev, ...st.items.filter((x) => !x.fixed && (x.sold || !talk)).map((x) => x.name)])];
 
 const SHELF_RULES = (g: Record<string, string>, s: ShopSettings, st: ShopState, guide: GuideName = 'Shop', truthMode: TruthMode = 'mix', talk = false) => {
   const r = s.size;

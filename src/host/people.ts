@@ -33,11 +33,12 @@ import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/order
 import { ensureItemIcons, itemPictures } from './itemicons';
 import { DIAG_KEEP_DEFAULT, getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
-import { guideSections, guideTxt } from '../core/guides';
+import { guideTxt } from '../core/guides';
 
 /** Director 기본 지침(지침 탭 「Director」의 FACTS·SCENE 절)은 buildDirector 가 읽는다 */
 /** Router 기본 지침: 지침 탭 「Router」의 ROLE·RULES 절 */
-const routerBase = () => { const g = guideSections('Router'); return [g.ROLE, g.RULES].filter((x) => x?.trim()).join('\n'); };
+// 절을 비우면 그 절의 기본 글 (guideTxt): 지침 탭의 「비우면 기본 글이 쓰여요」 표시와 같게 (3차 점검 R48: 비운 절이 통째로 빠졌다)
+const routerBase = () => [guideTxt('Router', 'ROLE'), guideTxt('Router', 'RULES')].filter((x) => x?.trim()).join('\n');
 import { factionCodesIn, parseIdentity, rankLevel } from '../core/people/identity';
 import type { Identity, PeopleStore, Person } from '../core/people/types';
 import { factionList } from '../core/factions';

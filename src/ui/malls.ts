@@ -126,7 +126,7 @@ const jobs = new Set<string>();
 
 /** 진열대 짜기 / 운영자에게 묻기. 같은 채팅을 보고 있을 때만 저장 */
 /** 시그니처 상품 → 진열 물건 (할인 전 값이 더 크면 ※할인!※ 딱지) */
-const fixedItem = (f: CosFixed): Omit<ShopItem, 'id'> => ({ name: f.name.trim(), desc: f.desc, effect: f.effect, use: false, price: f.price, truth: f.truth.trim() || '?', ...(f.was && f.was > f.price ? { tag: 'sale' as const, was: f.was } : {}) });
+const fixedItem = (f: CosFixed): Omit<ShopItem, 'id'> => ({ name: f.name.trim(), desc: f.desc, effect: f.effect, use: false, price: f.price, truth: f.truth.trim() || '?', fixed: true, ...(f.was && f.was > f.price ? { tag: 'sale' as const, was: f.was } : {}) });
 
 /** 팔기 확정 (「판매」 단추와 운영자의 <deal/> 가 같이 쓴다): 가계부 수입 + 소지품에서 뺌 + 판 것 목록. 팔 수 없으면 null */
 function saleDone<C extends ChatContext['chat']>(chat: C, site: MallSite, itemId: string): C | null {

@@ -1061,6 +1061,11 @@ export function newlyBought(list: Item[], lastAnchor: string): Item[] {
   return list.filter((e) => e.from === 'store' && e.anchor === lastAnchor);
 }
 
+/** 「이번 턴에 산 것」을 셀 물건: 살아 있는 물건 + 이번 턴에 사서 같은 턴에 되판 것 (3차 점검 R07: 되판 물건은 목록에서 숨어, 산 값·치른 대가가 본편에 안 갔다. 판 일은 soldNow 가 따로 넘긴다) */
+export const boughtPool = (it: Items, alive: Set<string>, nowKey: string): Item[] => [
+  ...liveItems(it, alive),
+  ...(nowKey ? it.list.filter((e) => e.from === 'store' && e.anchor === nowKey && e.soldAt === nowKey).map((e) => viewItem(e, alive)) : []),
+];
 /** 이번 턴에 산 것 가운데 설정 「메인 요청에 붙이는 것」을 통과한 것 (inventoryText 의 boughtNow) */
 const boughtPassing = (live: Item[], nowKey: string, vars?: Record<string, unknown>): Item[] =>
   newlyBought(live, nowKey).filter((e) => (e.store === 'hs' ? hsBuyPasses(vars) : boughtPasses(vars, e.store)));
@@ -1215,7 +1220,7 @@ export function recentItemLog(chat: Chat, it: Items, n: number, vars?: Record<st
   // 「새로 산 것」(This turn: just bought)에 실제로 오르는 것: inventoryText 가 itemsBlock 에 넘기는 목록과 같은 셈(boughtListed). 같은 턴에 열어 숨은 택배 상자는 거기 없으니 여기 남긴다.
   // 망상홈쇼핑만이 아니라 상점·우주몰도 이번 턴에 산 것은 「Recently: got」에서 뺀다 (2026-11-22 사용자: 두 번 적힘)
   let boughtIds: Set<string> | null = null;
-  const inBought = (id: string) => (boughtIds ??= new Set(boughtListed(liveItems(it, aliveAnchors(chat)), nowKey, vars).map((x) => x.id))).has(id);
+  const inBought = (id: string) => (boughtIds ??= new Set(boughtListed(boughtPool(it, aliveAnchors(chat), nowKey), nowKey, vars).map((x) => x.id))).has(id);
   return it.log.filter((l) => {
     if (!l.anchor || !keys.has(l.anchor)) return false;
     // 상점 「메인 요청에 붙이는 것」을 끈 판 것·산 것은 뺀다 (soldNow·newlyBought 와 같게, 전수검사 11-13)
@@ -1370,7 +1375,7 @@ export function inventoryText(chat: Chat): string {
   const use: BlockUse[] = usesToSend(chat, it, alive);
   const resumed = invJustResumed(chat);
   const soldOff = [...soldNow(it, lastBotKey(chat), currentShop(chat)?.shop, (place, plain) => soldPasses(vars, place, plain)), ...mallEvents(chat)];
-  const boughtNow = boughtPassing(live, lastBotKey(chat), vars);
+  const boughtNow = boughtPassing(boughtPool(it, alive, lastBotKey(chat)), lastBotKey(chat), vars);
   // 포인트몰에서 사고 아직 안 받은 것 (2026-11-16 사용자: 받는 것은 회사에서): 기다리는 동안 한 줄. 설정 「메인 요청에 붙이는 것」 포인트몰 「구매」를 따른다
   // 「받기」를 눌러 이번 턴에 받으러 가는 것은 따로 한 줄(PICKUP_TRY)로 가고, 기다리는 줄에서는 뺀다
   const bmOpen = boughtPasses(vars, 'bm') ? bmWaiting(vars, alive) : [];

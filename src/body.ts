@@ -46,6 +46,7 @@ import { createFab, type Fab } from './host/overlay';
 import { createProgWin, progressOn, type ProgWin } from './host/progwin';
 import { BRAND } from './ui/brand';
 import { cardPalette as themedCardPalette, currentTheme, onThemeChange, repaintTheme, setCurrentTheme, themeName } from './ui/theme';
+import { outsideThoughts } from './core/thoughts';
 import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, keepImgTagsInRequest, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
 import { loadModuleAssets, modulePicker } from './host/assets';
 import { getPrefs } from './core/settings';
@@ -907,6 +908,32 @@ async function redrawAfterLoad(): Promise<void> {
   }
 }
 
+/** 생각 블록 밖의 글 한 조각을 화면 꼴로 (displayNow 가 outsideThoughts 로 부른다) */
+function drawPart(text: string, ours: boolean): string {
+  let out = text;
+  // 플러그인이 넣은 첫 장면 메시지: 표식만 뗀다 (core/dispatch SCENE_MARK)
+  if (out.includes(SCENE_MARK)) out = stripSceneMark(out);
+  if (liteNow && hasWorldTags(out)) out = cleanOutput(out);
+  if (liteNow && hasUnlockTag(out)) out = stripUnlockTags(out);
+  if (hasSceneCard(out)) out = renderSceneCards(out, sceneCardHtml);
+  if (hasCall(out)) out = renderCalls(out, callCardHtml);
+  if (out.includes(START_MARK)) out = renderStartCards(out, startCardHtml);
+  // 상태창은 카드 정규식 대신 플러그인이 그린다 (칸이 어긋나도 깨지지 않게, 설정의 배색으로)
+  if (hasStatusTag(out)) out = renderStatus(out);
+  // 상점 표식 → 「상점 열기」 카드 (host/shopcard.ts). 상태창 뒤에 붙으니 상태창 상자 아래에 온다
+  if (hasShopTag(out)) out = renderShopCard(out);
+  // 맞춤 주문 완성 표식 → 알림 카드 (같은 방식)
+  if (hasReadyTag(out)) out = renderReadyCard(out);
+  // 캐릭터 이미지 태그는 플러그인이 그림 칸으로. Lite 판정 전(다른 채팅에서 돌아온 직후)에는 태그가 모두 에셋 모듈에 있는 이름일 때만
+  if (hasImgTag(out)) {
+    const pick = modulePicker();
+    const self = userInfo().name;
+    // 우리 메시지(판정 뒤이거나 상태창 같은 표식이 있는 글)면 늘 그린다. 그래야 표시 범위 밖 메시지에서 태그 글자가 남지 않는다
+    if (ours || imgTagsKnown(out, pick, self)) out = renderImgTags(out, pick, getPrefs().imgShow ?? IMG_RECENT.def, self);
+  }
+  return out;
+}
+
 function displayNow(text: string): string {
   // 플러그인 고유 표식(시작 카드·지시문·전화 카드)은 Lite 판정 전에도 바꾼다.
   // 다른 채팅에 갔다 오면 Risu가 판정(liteNow)보다 먼저 메시지를 다시 그려서 원문이 드러난 채 남았다.
@@ -916,26 +943,8 @@ function displayNow(text: string): string {
   let out = text;
   if (isLanding(text)) out = landingHtml();
   else {
-    // 플러그인이 넣은 첫 장면 메시지: 표식만 뗀다 (core/dispatch SCENE_MARK)
-    if (out.includes(SCENE_MARK)) out = stripSceneMark(out);
-    if (liteNow && hasWorldTags(out)) out = cleanOutput(out);
-    if (liteNow && hasUnlockTag(out)) out = stripUnlockTags(out);
-    if (hasSceneCard(out)) out = renderSceneCards(out, sceneCardHtml);
-    if (hasCall(out)) out = renderCalls(out, callCardHtml);
-    if (out.includes(START_MARK)) out = renderStartCards(out, startCardHtml);
-    // 상태창은 카드 정규식 대신 플러그인이 그린다 (칸이 어긋나도 깨지지 않게, 설정의 배색으로)
-    if (hasStatusTag(out)) out = renderStatus(out);
-    // 상점 표식 → 「상점 열기」 카드 (host/shopcard.ts). 상태창 뒤에 붙으니 상태창 상자 아래에 온다
-    if (hasShopTag(out)) out = renderShopCard(out);
-    // 맞춤 주문 완성 표식 → 알림 카드 (같은 방식)
-    if (hasReadyTag(out)) out = renderReadyCard(out);
-    // 캐릭터 이미지 태그는 플러그인이 그림 칸으로. Lite 판정 전(다른 채팅에서 돌아온 직후)에는 태그가 모두 에셋 모듈에 있는 이름일 때만
-    if (hasImgTag(out)) {
-      const pick = modulePicker();
-      const self = userInfo().name;
-      // 우리 메시지(판정 뒤이거나 상태창 같은 표식이 있는 글)면 늘 그린다. 그래야 표시 범위 밖 메시지에서 태그 글자가 남지 않는다
-      if (ours || imgTagsKnown(out, pick, self)) out = renderImgTags(out, pick, getPrefs().imgShow ?? IMG_RECENT.def, self);
-    }
+    // 표식·태그는 생각 블록 밖의 글에서만 카드로 바꾼다 (3차 점검 R01: 생각 속 상태창·상점 표식·그림 태그가 화면에 그려졌다)
+    out = outsideThoughts(out, (part) => drawPart(part, ours));
     if (out.includes(UNSENT_MARK)) out = renderUnsentMark(out, unsentMarkHtml());
     if (wantsOpeningHint(text)) out += openingHintHtml();
   }
