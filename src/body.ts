@@ -212,8 +212,8 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   await liteReady;
   try {
     setWaiting(true);
-    setUseLockAt(null); // 「사용」 잠금: 어느 채팅인지 읽기 전에는 전부 (host/usebox.ts)
     forgetWithdrawn(); // 새 요청: 지난 요청을 물린 표시는 잊는다 (host/unsent.ts)
+    setUseLockAt(null); // 「사용」 잠금: 어느 채팅인지 읽기 전에는 전부 (host/usebox.ts)
     // 다른 봇의 요청: 이 봇 채팅의 「사용」은 잠그지 않는다 (없는 자리를 적어 둔다)
     if (!liteNow) setUseLockAt({ charIndex: -1, chatIndex: -1 });
     // 판정이 늦어 이 봇의 요청이었을 수도 있다: 손대지 못한 요청의 답에는 사용을 적지 않는다 (onOutput)
