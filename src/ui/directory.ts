@@ -59,8 +59,11 @@ export const dirUi = {
   confirmDel: '',
 };
 
-export function resetDirectory(): void {
+/** keepDraft: 화면 상태만 처음으로 돌리고, 아직 카드에 못 적은 고친 값(초안)은 둔다 (3차 점검 R53: 글을 치고 곧바로 「거점」으로 옮기면 기다리던 저장이 빈 초안을 보고 고친 값을 버렸다) */
+export function resetDirectory(keepDraft = false): void {
+  const kept = keepDraft && dirty() ? { draft: dirUi.draft, base: dirUi.base, from: dirUi.from } : null;
   Object.assign(dirUi, { kind: 'anomaly', q: '', open: '', draft: null, base: '', from: null, busy: false, notice: '', done: '', adding: false, addQ: '', help: false, pick: '', pickQ: '', crop: '', confirmDel: '' });
+  if (kept) Object.assign(dirUi, kept);
 }
 
 const esc = (s: unknown) =>

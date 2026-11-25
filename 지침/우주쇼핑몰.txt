@@ -410,6 +410,10 @@ classical martial arts, sci-fi, fantasy, cyberpunk, steampunk, ancient, occult, 
 [{item}] {said}
 @@END
 
+@@SECTION ASK_SELL_BARE
+[판매: {item}]
+@@END
+
 @@SECTION MALL_NAME
 우주 쇼핑몰
 @@END

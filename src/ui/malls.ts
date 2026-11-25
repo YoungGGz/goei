@@ -646,9 +646,11 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (saved) await deskRun({ ...ctx, chat: saved }, env, 'talk', next);
         return true;
       }
-      if (site !== 'cos' || !said || v.loading || !st.loaded || st.closed) return true;
+      // 팔 물건을 고른 뒤에는 글이 없어도 보낸다 (물건만 내민다. 장면 속 상점 shop-say 와 같다, 3차 점검 R12). 값이 나온 뒤에는 「판매」 단추가 있으니 빈 말은 안 보낸다. 그때 내 말 꼴은 지침 「우주 쇼핑몰」의 ASK_SELL_BARE 절
+      const bare = !said && st.sell && typeof st.sell.price !== 'number' ? guideTxt('Cos', 'ASK_SELL_BARE', { item: st.sell.name }) : '';
+      if (site !== 'cos' || (!said && !bare) || v.loading || !st.loaded || st.closed) return true;
       const chip = st.items.find((x) => x.id === v.chip && !x.sold);
-      const next = stampLastLine(sayToOwner(st, chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said, shopLimits(ctx.chat.scriptstate)), lastBot(ctx.chat)?.key ?? '');
+      const next = stampLastLine(sayToOwner(st, bare || (chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said), shopLimits(ctx.chat.scriptstate)), lastBot(ctx.chat)?.key ?? '');
       v.input = '';
       v.chip = '';
       v.picking = false;
@@ -909,7 +911,7 @@ function cosAsk(ctx: ChatContext, st: ShopState, v: View, mobile: boolean): stri
   return `<div class="cs-win cs-askwin" role="dialog" aria-label="운영자에게 질문"${at}><div class="cs-wt"><b>★ 운영자에게 질문 ★ - Netscape</b><button data-action="mall-ask-close" aria-label="닫기">×</button></div>
     <div class="q-hd">${ufo}<div><b>${esc(MALL_OWNER.cos)}</b><small>● 운영자 여기에 있음, 지금</small></div></div>
     <div class="q-lg" data-chatlog="cos">${log}${wait}${shutLine}</div>${failBox(v, 'q-fail')}${pickList}${sellList}${sellCard}${chip ? `<div class="q-card"><i class="q-th">${pic(chip)}</i><span>붙인 상품</span><button class="cs-ln" data-action="mall-show" data-value="${esc(chip.id)}">${esc(chip.name)} <b>${won(chip.price)}</b></button><button class="q-x" data-action="mall-chip" data-value="" aria-label="상품 떼기">×</button></div>` : ''}
-    <div class="q-in"><button class="cs-btn" data-action="mall-pick" aria-pressed="${v.picking}"${shut ? ' disabled' : ''}>상품 붙이기</button><button class="cs-btn" data-action="mall-sell-open" aria-pressed="${v.selling}"${shut ? ' disabled' : ''}>내 물건 팔기</button><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${shut ? '문의가 끊겼어요' : o ? (offered ? '값을 다시 불러 보거나 그냥 팔아라' : '값을 부르거나 그냥 보내라') : '넣어라 질문, 여기에'}" aria-label="질문"${v.loading || shut ? ' disabled' : ''}><button class="cs-btn" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, !!v.loading || !st.loaded || shut)}>전송</button></div><i class="cs-rs" aria-hidden="true"></i></div>`;
+    <div class="q-in"><button class="cs-btn" data-action="mall-pick" aria-pressed="${v.picking}"${shut ? ' disabled' : ''}>상품 붙이기</button><button class="cs-btn" data-action="mall-sell-open" aria-pressed="${v.selling}"${shut ? ' disabled' : ''}>내 물건 팔기</button><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${shut ? '문의가 끊겼어요' : o ? (offered ? '값을 다시 불러 보거나 그냥 팔아라' : '값을 부르거나 그냥 보내라') : '넣어라 질문, 여기에'}" aria-label="질문"${v.loading || shut ? ' disabled' : ''}><button class="cs-btn" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, !!v.loading || !st.loaded || shut, !!o && !offered)}>전송</button></div><i class="cs-rs" aria-hidden="true"></i></div>`;
 }
 
 function cosHtml(ctx: ChatContext, mobile: boolean): string {
