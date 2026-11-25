@@ -16,7 +16,7 @@ import {
   AGENT_MAX, basicDefaults, CONSULT_CHATS_RANGE, CONSULT_LINES_RANGE, DIM_DEFAULT, FOLD_FILL_DEFAULT, FOLD_FILL_RANGE, FOLD_ZOOM_DEFAULT, FOLD_ZOOM_RANGE, TRACE_KEEP_RANGE, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
 } from '../core/settings';
 import type { WorldSettings } from '../core/world/engine';
-import { savePrefs, saveVarDefaults, varDefaultsToLoad } from '../host/prefs';
+import { PrefsSaveError, savePrefs, saveVarDefaults, varDefaultsToLoad } from '../host/prefs';
 import { keepTurns } from '../host/trace';
 import { consultKeep } from '../core/consult';
 import { activeBooksRow, advSections } from './advanced';
@@ -641,7 +641,8 @@ async function saveDefaults(env: SettingsEnv, change: (p: Prefs) => Prefs): Prom
   try {
     await savePrefs(change);
   } catch (error) {
-    settingsUi.notice = `기본값을 저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+    // 기기 저장소 쓰기 실패는 설정 창이 제 알림 줄에 이미 띄웠다 (host/prefs.ts PrefsSaveError). 기기 설정(메뉴 위치 등)에 「기본값을…」이라는 다른 일의 말이 뜨지 않게 (3차 점검 R16)
+    if (!(error instanceof PrefsSaveError && error.shown)) settingsUi.notice = error instanceof PrefsSaveError ? error.message : `기본값을 저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
   }
   settingsUi.busy = false;
   env.render();

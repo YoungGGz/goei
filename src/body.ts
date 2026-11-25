@@ -1,4 +1,4 @@
-import { clearUnsent, unsentShown } from './host/unsent';
+import { clearUnsent, forgetWithdrawn, unsentShown, wasWithdrawn } from './host/unsent';
 import { chatCardsAt, refreshStatusContext, renderStatus, resetStatusContext, setRecordsOpener, setWikiOpener } from './host/statusview';
 import { openingShown, refreshOpeningHint, setOpeningHint, setRepickOpener, wantsOpeningHint } from './host/openinghint';
 import { hasStatusTag } from './core/world';
@@ -213,6 +213,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   try {
     setWaiting(true);
     setUseLockAt(null); // 「사용」 잠금: 어느 채팅인지 읽기 전에는 전부 (host/usebox.ts)
+    forgetWithdrawn(); // 새 요청: 지난 요청을 물린 표시는 잊는다 (host/unsent.ts)
     // 다른 봇의 요청: 이 봇 채팅의 「사용」은 잠그지 않는다 (없는 자리를 적어 둔다)
     if (!liteNow) setUseLockAt({ charIndex: -1, chatIndex: -1 });
     // 판정이 늦어 이 봇의 요청이었을 수도 있다: 손대지 못한 요청의 답에는 사용을 적지 않는다 (onOutput)
@@ -634,6 +635,16 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const raw = chat.message?.[arg.messageIndex]?.data;
     if (typeof raw !== 'string') {
       progressAbort(pTurn); // 응답이 안 붙음: 본편 실패로 닫는다
+      return;
+    }
+    // 답을 기다리는 중에 「취소」로 물린 요청의 답이 늦게 왔다: 물린 요청이니 채팅에 남기지 않고(빈 채팅에 답만 혼자 붙었다, 3차 점검 R30) 아무 처리도 하지 않는다
+    if (wasWithdrawn(arg.characterIndex, arg.chatIndex, chat)) {
+      forgetWithdrawn();
+      await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+        const list = cur.message ?? [];
+        return arg.messageIndex === list.length - 1 && list[arg.messageIndex]?.role === 'char' ? { ...cur, message: list.slice(0, -1) } : null;
+      }).catch(() => null);
+      progressAbort(pTurn);
       return;
     }
     traceReply(raw);

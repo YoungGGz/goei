@@ -151,3 +151,28 @@ test('R41: 갱신기가 별명(「독사」)만 보고 올린 새 인물은 다�
     assert.deepEqual(rep.applied.newPeople, ['백사헌']);
   }
 });
+
+// ── R16 ──
+test('R16: 기기 저장소 쓰기가 실패하면 메모리 값(추가 규칙 사본 포함)을 되돌리고 알린 뒤 던진다', async () => {
+  const P = await load('prefs16', "export * from '../host/prefs'; export { getPrefs } from './settings'; export { getUserRules } from './guides';");
+  let fail = false;
+  const store = new Map();
+  globalThis.risuai = { pluginStorage: { setItem: async (k, v) => { if (fail) throw new Error('quota'); store.set(k, v); }, getItem: async (k) => store.get(k) ?? null } };
+  try {
+    const rule = { id: 'r1', title: '시험', text: '규칙 글', to: ['RP'], on: true };
+    await P.savePrefs((p) => ({ ...p, rules: [rule] }));
+    assert.equal(P.getUserRules().length, 1);
+    const seen = [];
+    P.onPrefsSaveFail((m) => { seen.push(m); return true; });
+    fail = true;
+    await assert.rejects(P.savePrefs((p) => ({ ...p, rules: [{ ...rule, on: false }], navFold: true })), (e) => e instanceof P.PrefsSaveError && e.shown === true);
+    assert.equal(seen.length, 1);
+    assert.match(seen[0], /이 기기에 저장하지 못했어요/);
+    // 화면이 읽는 값 = 저장된 값 (규칙은 켬 그대로, 메뉴 접기도 그대로)
+    assert.equal(P.getUserRules()[0].on, true);
+    assert.equal(P.getPrefs().navFold, undefined);
+    assert.equal(JSON.parse([...store.values()][0]).rules[0].on, true);
+  } finally {
+    delete globalThis.risuai;
+  }
+});

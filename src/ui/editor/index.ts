@@ -10,7 +10,7 @@ import { GUIDE_LABEL, type GuideName } from '../../core/guides';
 import { LEGACY_DATA } from '../../core/lorebooks';
 import { getPrefs } from '../../core/settings';
 import { updateCharacterLore, type ChatContext } from '../../host/risu';
-import { savePrefs } from '../../host/prefs';
+import { onPrefsSaveFail, savePrefs } from '../../host/prefs';
 import { bindCropDrag, cropValue, directoryConfirmPopup, directoryDraft, directoryExtList, directoryInput, directoryList, directoryPhotoList, directoryView, dirUi, dirty as dirDirty, handleDirectory, resetDirectory, setCrop } from '../directory';
 import { handleImgPrompt, imgInput, imgPromptPane } from '../imgprompt';
 import { GHOST_ICON, ICONS } from '../icons';
@@ -161,6 +161,13 @@ export function closeEditor(): void {
 }
 
 export const editorOpen = () => edUi.open;
+// 기기 저장소(이 기기 설정·지침·추가 규칙) 쓰기 실패: 창 위 알림 줄에 띄운다. 값은 host/prefs.ts 가 쓰기 전으로 되돌렸으니 다시 그려 화면도 맞춘다 (3차 점검 R16)
+onPrefsSaveFail((message) => {
+  if (!edUi.open) return false;
+  edUi.notice = message;
+  render();
+  return true;
+});
 /** 설정 페이지가 떠 있나 (패널이 다시 그려질 때 같이 그린다). 관제(호출 흐름)도 설정값을 그대로 보이는 화면이라 같이 그린다:
  *  범위 밖 수를 치면 저장은 끝값인데 칸에는 친 수가 남았다 (2차 점검 16-문제2) */
 export const editorOnSettings = () => edUi.open && (isSetNode(edUi.node) || edUi.node === 'manage:flow');
@@ -300,7 +307,7 @@ function ensureRoot(): HTMLElement {
       // 바로 저장 (2026-11-08 사용자: 지침도). 손을 뗀 뒤 한 번
       const key = el.dataset.key ?? '';
       const g = key.includes('|') ? key.slice(0, key.lastIndexOf('|')) : key;
-      later(`guide:${g}`, () => void guideAction('ed-guide-save', g).then(() => guideUi.info && render()));
+      later(`guide:${g}`, () => void guideAction('ed-guide-save', g).then(() => guideUi.info && render()).catch(() => {})); // 실패 알림은 아래 onPrefsSaveFail 이 띄운다
       return;
     }
     if (ruleInput(name, el.dataset.key ?? '', el.value)) return;

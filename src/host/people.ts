@@ -130,11 +130,11 @@ export const chatId = (ctx: ChatContext) => `${String(ctx.char.chaId ?? ctx.char
 
 export const sheetOf = (ctx: ChatContext) => (name: string): string | null => bookText({ char: ctx.char, chat: ctx.chat }, name) || null;
 
-/** 기록하지 않는 이름: 주인공. 캐릭터로 플레이하면 그 요원, 아니면 페르소나 이름 (지침 Router 「never list the user's own character」, 갱신기 「@user = the persona」) */
+/** 기록하지 않는 이름: 주인공. 캐릭터로 플레이하면 그 요원과 페르소나 이름, 아니면 페르소나 이름 (지침 Router 「never list the user's own character」, 갱신기 「@user = the persona」) */
 export function ownNames(lore: LoreEntry[] | undefined, vars: Record<string, unknown> | undefined, persona = userInfo().name): string[] {
   const me = playerAgent(lore, vars);
-  const name = (me?.name || persona || '').trim();
-  return name ? [name] : [];
+  // 요원으로 플레이해도 페르소나 이름은 같이 뺀다: 페르소나 이름이 기본값(User)인 채면 요청 글에 User 가 그대로 남아, 갱신기가 「User」를 새 인물로 올리면 등록됐다 (결정 I-08, 3차 점검 R32)
+  return [...new Set([me?.name ?? '', persona ?? ''].map((n) => n.trim()).filter(Boolean))];
 }
 function excludedNames(ctx: ChatContext): string[] {
   return ownNames(ctx.char.globalLore, ctx.chat.scriptstate);

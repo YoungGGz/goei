@@ -7,7 +7,7 @@ import { timeMs } from '../core/timing';
 import { body as rootBody, themeVars } from './overlay';
 import { inside, type Rect } from '../core/fab';
 import type { ThemeName } from '../ui/theme';
-import { isPhoneSize } from '../ui/media';
+import { isCoveredSize } from '../ui/media';
 import { getPrefs } from '../core/settings';
 import { progressWatchdog, GROUPS, GROUP_LABEL, groupState, onProgress, progressTurn, running, runningStages, stageCount, stageState, turnSummary, type Stage, type StageState, type Turn } from '../core/progress';
 
@@ -517,8 +517,8 @@ export async function createProgWin(): Promise<ProgWin> {
   return {
     async setVisible(next) {
       const { vw, vh } = await viewport().catch(() => ({ vw: 1024, vh: 768 }));
-      // 폰 꼴인지는 창(상황판·설정)과 같은 기준 하나로 (ui/media.ts): 폭만 보면 가로로 든 폰은 PC 꼴 점이 창 단추를 덮었고, 펼친 폴드는 창은 PC 인데 이것만 폰 꼴이었다 (3차 점검 R08)
-      const ph = isPhoneSize(vw, vh);
+      // 막대 꼴(창이 열리면 숨는다)로 할지는 창 배치 기준(ui/media.ts)에서 받는다: 폭만 보면 가로로 든 폰에서 PC 꼴 점이 창 단추를 덮었다 (3차 점검 R08)
+      const ph = isCoveredSize(vw, vh);
       if (ph !== phone) {
         phone = ph;
         await host.setAttribute('x-goei-phone', ph ? 'true' : 'false');
