@@ -38,12 +38,17 @@ const isRow = (a: unknown): a is Row => Array.isArray(a) && typeof a[0] === 'str
 let modRows: Row[] = [];
 let modVer = 0;
 let modBusy: Promise<boolean> | null = null;
+let modChar = -2;
+/** 지금 목록이 어느 캐릭터 번호를 보고 읽은 것인지 (화면 처리기가 다른 캐릭터 목록으로 그림 태그를 고르지 않게, 3차 점검 R03) */
+export const moduleAssetsChar = () => modChar;
 /** 모듈 에셋 목록을 다시 읽는다. 바뀌었으면 true (창을 열 때 한 번, 기다리지 않고 부른다) */
 export function loadModuleAssets(): Promise<boolean> {
   modBusy ??= (async () => {
     let rows: Row[] = [];
+    let readFor = -2;
     try {
       const idx = await risuai.getCurrentCharacterIndex();
+      readFor = Number.isInteger(idx) ? idx : -2;
       const char = Number.isInteger(idx) && idx >= 0 ? ((await risuai.getCharacterFromIndex(idx)) as CharacterSnapshot | null) : null;
       rows = ((char?.additionalAssets ?? []) as unknown[]).filter(isRow);
     } catch {
@@ -59,6 +64,7 @@ export function loadModuleAssets(): Promise<boolean> {
     }
     const changed = JSON.stringify(rows) !== JSON.stringify(modRows);
     if (changed) (modRows = rows), modVer++;
+    modChar = readFor;
     return changed;
   })().finally(() => {
     modBusy = null;

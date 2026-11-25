@@ -48,7 +48,7 @@ import { BRAND } from './ui/brand';
 import { cardPalette as themedCardPalette, currentTheme, onThemeChange, repaintTheme, setCurrentTheme, themeName } from './ui/theme';
 import { outsideThoughts } from './core/thoughts';
 import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, keepImgTagsInRequest, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
-import { loadModuleAssets, modulePicker } from './host/assets';
+import { loadModuleAssets, moduleAssetsChar, modulePicker } from './host/assets';
 import { getPrefs } from './core/settings';
 import { appDimmed, appShown, openApp, openInstall, openRecords, openShop, openWiki } from './ui/app';
 import { isGoeiLore, isLanding } from './core/install';
@@ -342,13 +342,15 @@ type LoreChar = { name?: string; globalLore?: LoreEntry[]; loreSettings?: unknow
 
 /** CBS 환경의 유저 이름: 아직 모르면 `{{user}}`를 그대로 둔다 (빈 이름으로 풀면 「's current …」처럼 깨진다. QC 2026-10-28) */
 const userOrTag = () => userInfo().name || undefined;
+/** 플러그인이 만드는 글의 `{{user}}`: 요원으로 플레이하면 그 요원 이름, 아니면 페르소나 이름 (페르소나 이름이 기본값 「User」여도 주인공이 누구인지 이어지게) */
+const userFor = (char: LoreChar, chat: Chat) => playerAgent(char.globalLore, chat.scriptstate)?.name || userOrTag();
 
 function loreFor(char: LoreChar, chat0: Chat, input?: string) {
   // 플러그인이 넣은 첫 장면 메시지는 키워드 훑기에서 뺀다 (카드 인사말이던 때와 같게: Risu 는 인사말을 chat.message 에 두지 않았다. 2026-11-05)
   const chat = chat0.message?.some((m) => isSceneMessage(m.data)) ? { ...chat0, message: chat0.message.filter((m) => !isSceneMessage(m.data)) } : chat0;
   const mode = advValue(chat.scriptstate, 'gen', 'lore_mode') as LoreMode;
   const player = playerAgent(char.globalLore, chat.scriptstate);
-  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, userOrTag(), loreLimits(chat.scriptstate)), input, ...(player ? { exclude: [player.lore] } : {}) });
+  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, player?.name || userOrTag(), loreLimits(chat.scriptstate)), input, ...(player ? { exclude: [player.lore] } : {}) });
 }
 
 /** 고른 로어북을 자리 항목이 읽는 채팅 변수에 적는다 (요청 전이라 Risu가 세고 넘치면 오래된 채팅을 지운다).
@@ -412,7 +414,7 @@ function fixLore<M extends PromptMessage>(messages: M[], { char, chat }: ChatCon
     return patchSlots(messages, chat.scriptstate, got.vars).messages;
   }
   const parts: LoreBlockPart[] = [];
-  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userOrTag() };
+  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userFor(char, chat) };
   // 🏷️Tag 의 상태창 절은 이 채팅의 칸 구성에서 만든다 (`{status_section}` 자리)
   const cols = usedCols(colConfig(chat.scriptstate));
   for (const b of ALWAYS_BOOKS) {
@@ -491,7 +493,7 @@ async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }
   const user = me?.name || userInfo().name || guideTxt('Common', 'REFS.USER_NAME');
   // 시트 원문은 로어 덩어리에 들어간 글과 같은 변환(장식 줄 떼기·같은 CBS 환경)으로 읽어야 split·record 모드가 요청에서 그 글을 찾아 뺄 수 있다
   // (bookText 는 @@dont_activate 줄을 남기고 {{user}}를 「주인공」으로 풀어 한 번도 맞지 않았다. QC 2026-10-28)
-  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userOrTag() };
+  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userFor(char, chat) };
   const sheetOf = (name: string): string | null => {
     const e = (char.globalLore ?? []).find((x) => x.mode !== 'folder' && x.comment === name && typeof x.content === 'string');
     const text = e ? stripDecorators(evaluate(e.content as string, env)).trim() : '';
@@ -891,8 +893,30 @@ function cardButtonStyle(): string {
 /** 에셋 목록 첫 읽기 (시작 때 건다). 화면 처리기는 태그가 있으면 이것을 한 번 기다린다 */
 let assetsFirst: Promise<unknown> = Promise.resolve();
 
+/** 화면 처리기의 「괴이 채팅인가」 판정: 지금 캐릭터 번호와 그 판정 한 칸. 번호가 바뀔 때만 캐릭터를 다시 읽는다.
+ *  Risu 는 화면 처리기에 글만 넘기고, 감시(1초)의 liteNow 는 채팅을 옮긴 직후 앞 채팅 값이라 그릴 때마다 여기서 정한다 (3차 점검 R02·R03) */
+let drawChar: { index: number; lite: Promise<boolean> } | null = null;
+async function drawsHere(): Promise<number> {
+  const index = await risuai.getCurrentCharacterIndex();
+  if (!Number.isInteger(index) || index < 0) return -1;
+  if (drawChar?.index !== index) {
+    const mine = { index, lite: getChar<{ globalLore?: LoreEntry[] }>(index).then((char) => isGoeiLore(char?.globalLore)) };
+    drawChar = mine;
+    // 못 읽었으면 기억하지 않는다 (다음에 그릴 때 다시 읽는다)
+    mine.lite.catch(() => {
+      if (drawChar === mine) drawChar = null;
+    });
+  }
+  return (await drawChar.lite.catch(() => false)) ? index : -1;
+}
+
 async function onDisplay(text: string): Promise<string> {
   if (typeof text !== 'string') return text;
+  // 괴이 카드의 채팅이 아니면 글을 그대로 둔다 (다른 봇 글의 [▣|…]·[shop:…]·<img=…> 를 그리지 않는다)
+  const here = await drawsHere().catch(() => -1);
+  if (here < 0) return text;
+  // 에셋 목록이 다른 캐릭터를 보고 읽은 것이면 다시 읽은 뒤 그린다
+  if (hasImgTag(text) && moduleAssetsChar() !== here) await assetsFirst.catch(() => undefined).then(() => (moduleAssetsChar() !== here ? loadModuleAssets().catch(() => false) : false));
   // 이미지 태그는 에셋 목록이 있어야 그린다. 목록을 아직 못 읽었으면 첫 읽기를 기다린다 (안 기다리면 원문 태그가 남고, 새로고침 전엔 다시 그려지지 않는다)
   if (hasImgTag(text) && !modulePicker()) await assetsFirst.catch(() => undefined);
   // 플러그인이 넣은 첫 장면: 안내(첫 행동·재선택)를 붙일지 아직 모르면 지금 채팅 상태를 읽어 정한다.
@@ -924,12 +948,12 @@ async function redrawAfterLoad(): Promise<void> {
 }
 
 /** 생각 블록 밖의 글 한 조각을 화면 꼴로 (displayNow 가 outsideThoughts 로 부른다) */
-function drawPart(text: string, ours: boolean): string {
+function drawPart(text: string): string {
   let out = text;
   // 플러그인이 넣은 첫 장면 메시지: 표식만 뗀다 (core/dispatch SCENE_MARK)
   if (out.includes(SCENE_MARK)) out = stripSceneMark(out);
-  if (liteNow && hasWorldTags(out)) out = cleanOutput(out);
-  if (liteNow && hasUnlockTag(out)) out = stripUnlockTags(out);
+  if (hasWorldTags(out)) out = cleanOutput(out);
+  if (hasUnlockTag(out)) out = stripUnlockTags(out);
   if (hasSceneCard(out)) out = renderSceneCards(out, sceneCardHtml);
   if (hasCall(out)) out = renderCalls(out, callCardHtml);
   if (out.includes(START_MARK)) out = renderStartCards(out, startCardHtml);
@@ -939,34 +963,25 @@ function drawPart(text: string, ours: boolean): string {
   if (hasShopTag(out)) out = renderShopCard(out);
   // 맞춤 주문 완성 표식 → 알림 카드 (같은 방식)
   if (hasReadyTag(out)) out = renderReadyCard(out);
-  // 캐릭터 이미지 태그는 플러그인이 그림 칸으로. Lite 판정 전(다른 채팅에서 돌아온 직후)에는 태그가 모두 에셋 모듈에 있는 이름일 때만
-  if (hasImgTag(out)) {
-    const pick = modulePicker();
-    const self = userInfo().name;
-    // 우리 메시지(판정 뒤이거나 상태창 같은 표식이 있는 글)면 늘 그린다. 그래야 표시 범위 밖 메시지에서 태그 글자가 남지 않는다
-    if (ours || imgTagsKnown(out, pick, self)) out = renderImgTags(out, pick, getPrefs().imgShow ?? IMG_RECENT.def, self);
-  }
+  // 캐릭터 이미지 태그는 플러그인이 그림 칸으로 (늘 그린다. 그래야 표시 범위 밖 메시지에서 태그 글자가 남지 않는다)
+  if (hasImgTag(out)) out = renderImgTags(out, modulePicker(), getPrefs().imgShow ?? IMG_RECENT.def, userInfo().name);
   return out;
 }
 
 function displayNow(text: string): string {
-  // 플러그인 고유 표식(시작 카드·지시문·전화 카드)은 Lite 판정 전에도 바꾼다.
-  // 다른 채팅에 갔다 오면 Risu가 판정(liteNow)보다 먼저 메시지를 다시 그려서 원문이 드러난 채 남았다.
-  // 이 표식은 이 봇 메시지에만 있으니 다른 봇에서는 아무것도 바뀌지 않는다.
-  // 이 봇 메시지인지: Lite 판정 전에도 알아볼 수 있는 표식들 (상태창 [▣|…], 시작·지시문·전화 카드)
-  const ours = liteNow || isLanding(text) || text.includes(UNSENT_MARK) || text.includes(START_MARK) || text.includes(SCENE_MARK) || hasStatusTag(text) || hasSceneCard(text) || hasCall(text) || hasShopTag(text) || hasReadyTag(text);
+  // 괴이 카드의 채팅일 때만 불린다 (onDisplay 가 그릴 때마다 지금 캐릭터로 정한다)
   let out = text;
   if (isLanding(text)) out = landingHtml();
   else {
     // 표식·태그는 생각 블록 밖의 글에서만 카드로 바꾼다 (3차 점검 R01: 생각 속 상태창·상점 표식·그림 태그가 화면에 그려졌다)
-    out = outsideThoughts(out, (part) => drawPart(part, ours));
+    out = outsideThoughts(out, drawPart);
     if (out.includes(UNSENT_MARK)) out = renderUnsentMark(out, unsentMarkHtml());
     if (wantsOpeningHint(text)) out += openingHintHtml();
   }
   // 유저 사진 주소를 Risu가 채워 주는 숨은 칸 (host/user.ts). 이 봇 메시지에만
-  if (ours && !out.includes('data-goei-user')) out += USER_MARK;
+  if (!out.includes('data-goei-user')) out += USER_MARK;
   // 「다음 메시지에 사용」 칩이 들어갈 빈 자리 (host/usebox.ts). 마지막 메시지의 것만 본 화면 style 이 채워 보인다
-  if (ours && !isLanding(text) && !out.includes('data-goei-card="use"')) out += USE_SLOT;
+  if (!isLanding(text) && !out.includes('data-goei-card="use"')) out += USE_SLOT;
   return out;
 }
 
@@ -1019,6 +1034,7 @@ function startWatcher(fab: Fab | null): () => void {
   // 설치·점검으로 카드가 바뀌면 다음 차례에 다시 판정 (플로팅 버튼이 바로 생기게)
   setInstalledHook(() => {
     state.forget();
+    drawChar = null;
   });
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;

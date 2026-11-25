@@ -51,7 +51,7 @@ test('R01: outsideThoughts 는 블록 밖 글에만 적용하고 블록은 그�
   // 닫히지 않은 블록이 맨 앞이면(받는 중) 통째로 생각이다
   assert.equal(T.outsideThoughts('<think>cd [x]', up), '<think>cd [x]');
   const src = readFileSync('src/body.ts', 'utf8');
-  assert.match(src, /out = outsideThoughts\(out, \(part\) => drawPart\(part, ours\)\);/);
+  assert.match(src, /out = outsideThoughts\(out, drawPart\);/);
 });
 
 // ── R04 ──

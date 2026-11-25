@@ -110,6 +110,14 @@ export function updateChat(charIndex: number, chatIndex: number, mutate: (chat: 
   return run;
 }
 
+/** Risu 가 저장을 거절했을 때의 안내 */
+export const SAVE_DENIED = '리스AI 에서 저장을 거절했어요. 새로고침하면 다시 물어요.';
+/** 채팅·로어북을 쓴 바로 뒤에 부른다. Risu 는 「데이터베이스 수정」 권한을 거절하면 쓰기를 조용히 건너뛰니, 쓴 뒤에 그 답을 본다.
+ *  방금 쓰기가 이미 물었으니 여기서는 팝업 없이 그 세션의 답만 돌아온다 (3차 점검 R23·R24) */
+async function written(): Promise<void> {
+  if ((await Promise.resolve(risuai.requestPluginPermission?.('dbWrite')).catch(() => true)) === false) throw new Error(SAVE_DENIED);
+}
+
 async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Chat) => Chat | null): Promise<Chat | null> {
   const latest = (await risuai.getChatFromIndex(charIndex, chatIndex)) as Chat | null;
   if (!latest) throw new Error('채팅을 찾을 수 없어요. 채팅을 다시 열어 주세요.');
@@ -129,6 +137,7 @@ async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Cha
   }
   if (!next) return null;
   await risuai.setChatToIndex(charIndex, chatIndex, next);
+  await written();
   // 열려 있는 채팅을 저장했으면 쓰기가 된 뒤에 저장한 값을 그 채팅 값으로 삼는다 (쓰기가 실패하면 읽은 값 그대로)
   if (shown && shown.key === key) {
     shown = { key, state: next.scriptstate };
@@ -156,6 +165,7 @@ export async function updateCharacterLore(charIndex: number, mutate: (lore: Lore
   const next = mutate(rest);
   if (!next) return false;
   await risuai.setCharacterToIndex(charIndex, { ...latest, globalLore: [...splitAssetCopy(stripVirtual(next)).rest, ...copy] });
+  await written();
   notifyLoreSaved(charIndex);
   return true;
 }
@@ -167,6 +177,7 @@ export async function setAssetCopy(charIndex: number, put: boolean): Promise<Lor
   const { rest } = splitAssetCopy(stripVirtual(latest.globalLore ?? []));
   const copy = put ? makeAssetCopy(withWorldLore(rest)) : [];
   await risuai.setCharacterToIndex(charIndex, { ...latest, globalLore: [...rest, ...copy] });
+  await written();
   return copy;
 }
 

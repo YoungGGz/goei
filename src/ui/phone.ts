@@ -314,7 +314,12 @@ async function send(ctx: ChatContext, env: PhoneEnv, rid: string, text: string) 
     readRoom(r);
     r.pending = { message: m.id, status: 'error', action: { type: 'send' } };
     return writePhone(chat, st);
+  }).catch((error: unknown) => {
+    // 저장하지 못했으면(리스AI 가 저장을 거절 등) 쓴 글은 입력칸에 그대로 두고 까닭을 알린다 (3차 점검 R23)
+    phone.notice = error instanceof Error ? error.message : String(error);
+    return undefined;
   });
+  if (saved === undefined) return env.render();
   if (!saved) {
     phone.notice = giftBlocked ? '단톡방에서는 선물을 보낼 수 없어요.' : '이전 답장을 다시 시도하거나 건너뛴 뒤 보내 주세요.';
     return env.refresh();

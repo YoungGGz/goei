@@ -238,7 +238,8 @@ void risuai
 
 // 선택지용사처럼 필요한 권한을 처음에 한 번에 묻는다 (업데이트하면 Risu가 권한을 다시 묻는데,
 // 기능을 하나씩 켜는 도중에 묻지 않게)
-for (const permission of ['replacer', 'mainDom', 'sendChat']) {
+// 'db'(데이터베이스 읽기)는 에셋 모듈 목록을 읽을 때 쓴다. 여기서 같이 묻지 않으면 2초쯤 뒤에 네 번째로 따로 떴다 (3차 점검 R31. 묻는 개수는 같다)
+for (const permission of ['replacer', 'mainDom', 'sendChat', 'db']) {
   try {
     await risuai.requestPluginPermission(permission);
   } catch {

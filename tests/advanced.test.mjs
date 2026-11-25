@@ -226,6 +226,6 @@ test('advanced: 로어북 검색 깊이·예산, 세력 요약·요원 명단, �
   // 본편 조립기가 이 설정을 실제로 쓴다
   const body = readFileSync(new URL('../src/body.ts', import.meta.url), 'utf8');
   assert.match(body, /if \(!alwaysBookOn\(chat\.scriptstate, b\.kind\)\) continue;/);
-  assert.match(body, /loreOptions\(char, chat, mode, userOrTag\(\), loreLimits\(chat\.scriptstate\)\)/);
+  assert.match(body, /loreOptions\(char, chat, mode, player\?\.name \|\| userOrTag\(\), loreLimits\(chat\.scriptstate\)\)/);
   assert.match(body, /if \(type !== 'model' \|\| !Array\.isArray\(messages\)\) return messages;\n[^\n]*\n  if \(isOwnMainCall\(messages\)\) return messages;/);
 });
