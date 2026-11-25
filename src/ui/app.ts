@@ -205,7 +205,8 @@ const env: FieldEnv = {
   refresh: () => refresh(),
   close: () => close(),
   setNotice: (text) => {
-    notice = text;
+    // 저장 거절은 창 맨 위 한 줄이 이미 알린다 (같은 글을 두 번 띄우지 않는다)
+    notice = text === SAVE_DENIED ? '' : text;
   },
   setBusy: (on) => {
     busy = on;

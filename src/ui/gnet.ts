@@ -34,7 +34,7 @@ import { fitPrompt } from '../core/budget';
 import { personaText } from '../host/user';
 import { playerSource } from '../core/player';
 import { defaultsAction, defaultsButtons, defaultsConfirm } from './defaults';
-import { updateChat, type ChatContext } from '../host/risu';
+import { SAVE_DENIED, updateChat, type ChatContext } from '../host/risu';
 import { BOARD_NAME, BOARD_REF_CFG, BOARD_SITE_VAR, BOARD_SITES, boardView, boardWrite, isBoardSite, type BoardSite } from '../core/boards';
 import { JOINT_VAR, jointOn } from '../core/netjoint';
 import { siteLogo } from './browser';
@@ -227,7 +227,7 @@ async function run(ctx: ChatContext, env: GnetEnv, label: string, work: () => Pr
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     const ui = jobUi(env, site);
-    ui.notice = msg;
+    if (msg !== SAVE_DENIED) ui.notice = msg; // 저장 거절은 창 맨 위 한 줄이 알린다
     const raw = (error as { raw?: string }).raw;
     if (raw) ui.failure = { label, reason: msg, raw };
   } finally {

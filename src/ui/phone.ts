@@ -38,7 +38,7 @@ import { advChipRow, advRow, advSetRow } from './advanced';
 import { fitPrompt } from '../core/budget';
 import { personaText } from '../host/user';
 import { playerSource } from '../core/player';
-import { updateChat, type ChatContext } from '../host/risu';
+import { SAVE_DENIED, updateChat, type ChatContext } from '../host/risu';
 import { isPhone } from './media';
 import { isWaiting, onWaiting } from '../host/waiting';
 
@@ -316,7 +316,8 @@ async function send(ctx: ChatContext, env: PhoneEnv, rid: string, text: string) 
     return writePhone(chat, st);
   }).catch((error: unknown) => {
     // 저장하지 못했으면(리스AI 가 저장을 거절 등) 쓴 글은 입력칸에 그대로 두고 까닭을 알린다 (3차 점검 R23)
-    phone.notice = error instanceof Error ? error.message : String(error);
+    const msg = error instanceof Error ? error.message : String(error);
+    if (msg !== SAVE_DENIED) phone.notice = msg; // 저장 거절은 창 맨 위 한 줄이 알린다
     return undefined;
   });
   if (saved === undefined) return env.render();
