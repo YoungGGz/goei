@@ -493,6 +493,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           walletLoose: walletOn && walletLoose(cur.scriptstate),
           points: pointsUse,
           items: itemsOn,
+          appears: (name, aliases, indexes) => appearingIn(cur, indexes, [{ name, aliases }], (n) => seedBaseFor(n, userFaction(cur), undefined, roster.find((r) => r.name === n)).faction ?? '', factionNamesOf(fresh.char.globalLore)).has(name),
         });
         diag.report = report;
         // 되돌리기용 (리수폿 J-4): 이 갱신이 새로 만든 것. 다시 읽기(only)는 적지 않는다

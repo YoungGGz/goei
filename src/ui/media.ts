@@ -23,6 +23,10 @@ export const zoomK = (): number => (mode() === 'zoom' ? foldZoom() : 1);
 export const phoneMax = (): number => (getPrefs().fold === 'phone' ? FOLD_MAX : BASE);
 export const phoneMq = (): string => (mode() === 'zoom' ? 'not all' : `(max-width: ${phoneMax()}px), (max-height: 499px) and (pointer: coarse)`);
 export const isPhone = (): boolean => matchMedia(phoneMq()).matches;
+/** 같은 기준을 화면 크기 숫자로 (본 화면에 붙는 호출 진행 창 host/progwin.ts 가 쓴다: 그쪽은 리스 화면 크기를 숫자로만 안다).
+ *  가로로 든 폰(손가락 화면, 높이 500 미만)은 늘 폰, 폭은 phoneMax() 까지. 중간 폭(펼친 폴드)의 PC 배치는 폰이 아니다 (3차 점검 R08) */
+export const isPhoneSize = (vw: number, vh: number): boolean =>
+  (vh < 500 && typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || vw <= phoneMax();
 /** 기준이 바뀌는 경계를 다 지켜본다 (설정을 바꿔도 다시 걸 필요가 없게) */
 export const PHONE_WATCH = [`(max-width: ${BASE}px)`, `(max-width: ${FOLD_MAX}px)`, LAND];
 /** 펼친 폴드에서 창이 차지하는 화면 몫(%): 설정 「펼친 폴드 창 가로·세로」(prefs.foldW·foldH) */

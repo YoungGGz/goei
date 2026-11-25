@@ -123,3 +123,31 @@ test('R48: Router 기본 지침은 절마다 비면 기본 글', () => {
 test('R29: 받기 실패 까닭을 받기 창에 처음부터 넘긴다', () => {
   assert.match(readFileSync('src/main.ts', 'utf8'), /showPanel\(VERSION, install, error instanceof BodyError \? error\.message : '', 'fetch'\)/);
 });
+
+// ── R41 ──
+test('R41: 갱신기가 별명(「독사」)만 보고 올린 새 인물은 다른 근거(초상 태그·소속)가 없으면 버린다', async () => {
+  const { initTestData } = await import('./data-init.mjs');
+  const P = await load('people41', "export * as U from '../people/updater'; export * as T from '../people/types'; export * as St from '../people/settings'; export * as B from '../people/base'; export * as H from '../../host/people'; export * as Pack from '../datapack';".replace(/\.\.\/people\//g, './people/').replace("'../../host/people'", "'../host/people'").replace("'../datapack'", "'./datapack'"));
+  initTestData(P.Pack);
+  const run = (text) => {
+    const c = { message: [{ role: 'user', data: '복도', chatId: 'u1' }, { role: 'char', data: text, chatId: 'c1' }] };
+    const store = P.T.emptyStore();
+    const s = { ...P.St.peopleSettings({}), twoTurn: false };
+    const input = P.U.buildUpdate(c, store, [1], { settings: s, system: '', values: {}, names: P.B.allNames([]) });
+    const m = [...input.tags].find(([, i]) => i === 1)[0];
+    const appears = (name, aliases, indexes) => P.H.appearingIn(c, indexes, [{ name, aliases }], (n) => P.B.seedBaseFor(n, 'A00', undefined).faction ?? '', {}).has(name);
+    return P.U.applyUpdate(store, c, input, { new_people: [{ name: '백사헌', m, quote: text.replace(/<img=[^>]*>/g, '').trim().slice(0, 12) }] }, { settings: s, sheetOf: () => null, appears });
+  };
+  let rep = run('독사가 웃으며 다가왔다.');
+  assert.deepEqual(rep.applied.newPeople, []);
+  assert.deepEqual(rep.dropped.map((d) => [d.who, d.reason]), [['백사헌', '별명만 나옴(다른 근거 없음)']]);
+  // 이름이 같이 나오면 받는다
+  rep = run('독사, 백사헌이 웃으며 다가왔다.');
+  assert.deepEqual(rep.applied.newPeople, ['백사헌']);
+  // 별명 + 초상 태그면 받는다 (코드 판정과 같은 근거)
+  const en = P.B.RELATIONS.people['백사헌']?.english?.[0];
+  if (en) {
+    rep = run(`독사가 웃으며 다가왔다.\n<img=${en}_smile>`);
+    assert.deepEqual(rep.applied.newPeople, ['백사헌']);
+  }
+});

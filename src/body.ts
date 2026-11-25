@@ -1033,8 +1033,9 @@ function startWatcher(fab: Fab | null): () => void {
         if (switched) resetStatusContext();
         await readTheme(snap).catch(() => {});
         await refreshStatusContext(snap.charIndex, snap.chatIndex).catch(() => {});
-        // Risu 가 옮긴 직후 앞 채팅 목록으로 그린 상태창이 남아 있을 수 있으니 채팅을 그대로 한 번 저장해 다시 그리게 한다
-        if (switched) await updateChat(snap.charIndex, snap.chatIndex, (cur) => nudgeMessages(cur, (d) => hasStatusTag(d))).catch(() => null);
+        // Risu 가 옮긴 직후 앞 채팅 목록으로 그린 상태창이 남아 있을 수 있으니 채팅을 그대로 한 번 저장해 다시 그리게 한다.
+        // 처음 보이는 채팅(새로고침 직후·다른 봇에서 옴)도 같다: Risu 가 목록(보고서 카드 열쇠 표·위키 이름)이 차기 전에 이미 그려, 보고서 카드가 빠진 채 남았다 (3차 점검 R45)
+        if (chatKey !== shownChat) await updateChat(snap.charIndex, snap.chatIndex, (cur) => nudgeMessages(cur, (d) => hasStatusTag(d))).catch(() => null);
         await refreshOpeningHint(snap.charIndex, snap.chatIndex).catch(() => {});
         await refreshUseBox(snap.charIndex, snap.chatIndex).catch(() => {});
       } else if (!next.fabVisible && next.changed) {
