@@ -1064,7 +1064,8 @@ export function newlyBought(list: Item[], lastAnchor: string): Item[] {
 /** 「이번 턴에 산 것」을 셀 물건: 살아 있는 물건 + 이번 턴에 사서 같은 턴에 되판 것 (3차 점검 R07: 되판 물건은 목록에서 숨어, 산 값·치른 대가가 본편에 안 갔다. 판 일은 soldNow 가 따로 넘긴다) */
 export const boughtPool = (it: Items, alive: Set<string>, nowKey: string): Item[] => [
   ...liveItems(it, alive),
-  ...(nowKey ? it.list.filter((e) => e.from === 'store' && e.anchor === nowKey && e.soldAt === nowKey).map((e) => viewItem(e, alive)) : []),
+  // 판 것만: soldAt 은 같은 턴에 연 택배 상자를 숨기는 데도 쓰이므로(ui/homeshop.ts openBox) 그 응답의 「팖」 기록이 있는 것으로 가린다
+  ...(nowKey ? it.list.filter((e) => e.from === 'store' && e.anchor === nowKey && e.soldAt === nowKey && it.log.some((l) => l.what === 'sell' && l.item === e.id && l.anchor === nowKey)).map((e) => viewItem(e, alive)) : []),
 ];
 /** 이번 턴에 산 것 가운데 설정 「메인 요청에 붙이는 것」을 통과한 것 (inventoryText 의 boughtNow) */
 const boughtPassing = (live: Item[], nowKey: string, vars?: Record<string, unknown>): Item[] =>

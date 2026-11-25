@@ -10,8 +10,8 @@ import { updateChat } from '../host/risu';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { generate, type LlmMessage } from '../host/llm';
 import { facePic } from '../host/assets';
-import { personaText } from '../host/user';
-import { playerSource } from '../core/player';
+import { personaText, userInfo } from '../host/user';
+import { playerAgent, playerSource } from '../core/player';
 import { genSettings } from '../core/advanced';
 import { collectRefs, limitRefs, recentTurns, refText, storyText, type RefRow, type RefSource } from '../core/refs';
 import { buildRegistry } from '../core/world/registry';
@@ -30,7 +30,7 @@ import { addItem, dropUse, EQUIP_LABEL, gridItems, useSentAt, itemLeft, itemUseV
 import { getPrefs } from '../core/settings';
 import { guideTxt } from '../core/guides';
 import {
-  applyShelf, applyTalk, cancelSell, dropPending, stampReply, closeSale, currentShop, markSold, mergeLate, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
+  applyShelf, applyTalk, cancelSell, dropPending, stampReply, closeSale, currentShop, lastBot, markSold, mergeLate, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, settleShop, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
   type ShopItem, type ShopSource, type ShopState,
 } from '../core/shop';
 import { ICONS } from './icons';
@@ -508,12 +508,33 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
   if (kind === 'talk' && shopUi.pick) revealSel();
 }
 
+/** shop-open 이 방문 상태를 되살린 뒤 다시 들어오는 중 (한 번만 되살린다) */
+let resettled = false;
 /** 상점 팝업의 data-action. 처리했으면 true. 'shop-say' 의 value 는 입력칸 글 */
 export async function shopAction(action: string, value: string | undefined, ctx: ChatContext, env: ShopEnv): Promise<boolean> {
   const st = liveShop(ctx.chat);
   pts = !!st?.identity.points;
   switch (action) {
     case 'shop-open': {
+      // 카드는 그려져 있는데 방문 상태가 없다(응답 뒤 정리가 저장에 실패했거나 아직 안 돌았다): 응답이 붙을 때 도는 그 정리(settleShop)를 지금 돌리고 다시 연다.
+      // 전에는 그대로 닫아, 카드로 연 창에 상점 대신 상황판이 떴다 (3차 점검 R06). 마지막 응답에 표식이 없으면 정리가 남은 카드를 지운다
+      if (!st && !resettled && shopOn(ctx.chat.scriptstate)) {
+        const self = [playerAgent(ctx.char.globalLore, ctx.chat.scriptstate)?.name ?? '', userInfo().name];
+        const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+          const last = lastBot(chat);
+          const r = last ? settleShop(chat, last.index, self) : null;
+          return r ? { ...chat, ...(r.message ? { message: r.message } : {}), scriptstate: { ...(chat.scriptstate ?? {}), ...r.vars } } : null;
+        }).catch(() => null);
+        if (saved && liveShop(saved)) {
+          resettled = true;
+          await env.refresh(); // 창이 쥔 채팅도 되살린 것으로
+          try {
+            return await shopAction(action, value, { ...ctx, chat: saved }, env);
+          } finally {
+            resettled = false;
+          }
+        }
+      }
       // 꺼져 있거나(설정에서 끔) 방문이 없으면 열지 않는다
       if (!st || !shopOn(ctx.chat.scriptstate)) {
         shopUi.open = false;

@@ -721,12 +721,14 @@ async function deskRun(ctx: ChatContext, env: MallEnv, kind: 'make' | 'talk', st
       build = (key, late) => {
         const wait = pendingMe(st0.talk);
         const said = st0.talk.map((l, i) => (i >= st0.talk.length - wait ? lateLine({ ...l, k: key }, late) : l));
-        return { ...st0, talk: [...said, ...value.say.map((t) => lateLine<DeskLine>({ who: 'op', text: t, k: key }, late)), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
+        return { ...st0, anchor: key, talk: [...said, ...value.say.map((t) => lateLine<DeskLine>({ who: 'op', text: t, k: key }, late)), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
       };
     }
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
-    await saveDesk(cur, build(lastBot(cur.chat)?.key ?? '', useLocked(cur.charIndex, cur.chatIndex)));
+    // 마지막 응답 키는 저장하는 그 채팅(updateChat 이 새로 읽은 것)에서 읽는다. 창을 닫아 둔 사이 본편이 넘어가면 env.current() 는 닫기 전의 낡은 채팅이라,
+    // 줄 키가 앞 턴 키로 남아 다음 본편에 안 가고, 다시 열면 「본편이 넘어간 상담」으로 보고 새 상담사를 붙였다 (3차 점검 R14)
+    await updateChat(cur.charIndex, cur.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...deskVars(build(lastBot(chat)?.key ?? '', useLocked(cur.charIndex, cur.chatIndex))) } }));
   } catch (error) {
     v.notice = error instanceof Error ? error.message : String(error);
     v.failRaw = deskRawSafe(String((error as { raw?: string }).raw ?? ''));

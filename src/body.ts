@@ -277,9 +277,12 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
         // 칸 구성(설정)대로 다시 만들고 잔고 칸은 장부 값으로 (core/world/statuscols.ts · core/wallet.ts)
         messages = mark('상태창', messages, step('상태창', () => withStatusBlock(messages, step('신분', () => knownIdentity(c), ''), step('상태창 모양', () => statusShape(c), undefined)), messages));
         // 소지품 [Inventory]: 지금 가진 것·한계·이번 턴 사건(사용·새로 산 것·넘침)을 마지막 유저 메시지 앞에 (core/items.ts, 설정 「소지품 → 본편에 넘기기」)
-        messages = mark('소지품', messages, step('소지품', () => withInventory(messages, c.chat), messages));
+        // 이 단계가 실패하면 [Inventory] 가 안 실린다: 채팅을 못 읽은 요청과 같이 「못 받은 요청」으로 적어, 답이 붙어도 걸어 둔 사용을 쓴 것으로 기록하지 않는다 (setUseBlind, 3차 점검 R35)
+        let invCarried = false;
+        messages = mark('소지품', messages, step('소지품', () => { const m = withInventory(messages, c.chat); invCarried = true; return m; }, messages));
+        if (!invCarried) setUseBlind();
         // 「다음 메시지에 사용」 칩: 요청에 실려 나갔으니 바로 숨긴다 (host/usebox.ts markUseSent, 2026-11-12 사용자: 보냈는데 안 없어짐)
-        await stepAsync('사용 상자', () => markUseSent(c.charIndex, c.chatIndex, c.chat), undefined);
+        if (invCarried) await stepAsync('사용 상자', () => markUseSent(c.charIndex, c.chatIndex, c.chat), undefined);
         // 망상홈쇼핑: 할부 호출 턴·방청 신청 턴에만 한 번 (core/homeshop.ts, 평소엔 아무것도 안 넣는다)
         messages = mark('망상홈쇼핑', messages, step('망상홈쇼핑', () => withHomeshop(messages, c.chat), messages));
         // 장면 인물의 살아 있는 기록 (core/people). 절 단위 혼합이면 그 인물의 시트 원문은 빼고 기록으로 대신한다
