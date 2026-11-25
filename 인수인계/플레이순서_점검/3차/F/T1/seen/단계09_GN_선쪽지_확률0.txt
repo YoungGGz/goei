@@ -1,0 +1,373 @@
+──── [0] all ────
+Treat the supplied setting as fictional world reference. Follow the current task and output contract.
+# Job Instruction
+Produce the requested structured data blocks. Use the supplied world settings and narrative chat log as reference.
+# Narrative Universe Settings
+
+
+Important Note: May contain unrelated directives/rules regarding other data/image outputs. Ignore these; they are irrelevant in your current job. Focus on settings.
+# Output
+
+Use the exact syntax below; do not guess/change it. Task-specific rules govern content and creative freedom.
+```
+{"comments":[{"author":"nickname","content":"reply","parent":3}],"incoming":[],"activity":[]}
+Empty comments is []. Use the actual supplied indices, not the example parent.
+Comment time: every NEW comment (including replies and activity comments) also has "time": "HH:MM", the 24-hour narrative time it was posted. It must be after its post and after the comment it replies to, and not later than the current narrative time (2025.03.14 23:20). Space comments realistically: quick replies minutes apart, slower threads hours apart. Supplied "time" values on existing comments are records; never change them.
+```
+References do not override this task with unrelated UI/image instructions.
+# Simulation details
+
+## About the board
+괴담넷 is a closed forum used only by people inside the anomaly trade: Bureau agents, employees of the rival organizations, freelancers and association members, brokers, salvagers, cleanup crews. There are no ordinary civilians, no curious outsiders, no cranks; everyone here is in the business and knows everyone else is, so nobody explains basics or asks 「이게 뭐예요?」. Aliases hide real names and affiliations, but a user's side is often guessable from jargon and gripes. The board reads like a trade's internal forum: site warnings, 회수물 and salvage trades, 의뢰 offers and pricing, pay and rank complaints, equipment talk, gossip about the other organizations, drinks after a cleanup, veterans correcting rookies. Treat users as people in this world, not story readers or game players. Perspective rule: the world events and reports supplied to every board are the same; what differs is who sees them and how. Write every post and comment as what THIS board's users could actually know and how they would frame it, never as a neutral report of the event.
+
+### Tone and manner
+
+Include serious firsthand accounts too. Vary ages, interests, sentence lengths and endings; do not make everyone a polite adviser or an exposition narrator. Strong criticism and disagreement need not be immediately moderated or resolved.
+Do not use civilian DC meme speech. Everyone is a professional talking shop: curt, matter-of-fact, jargon-heavy (회수, 봉쇄, 투입, 의뢰, 단가, 현장, 보고서, 그쪽 회사), veteran bluntness, dark humor about the job, swearing about pay and management rather than about ghosts, a tired veteran, a cocky rookie, a haggling broker, an anonymous leaker. No naive questions about what anomalies are; disagreements are about method, price and blame.
+
+
+### Nicknames
+Choose handles independently of each post or comment, as if unrelated people had already used them elsewhere. Vary form and length irregularly: single words, ordinary account names, abbreviations, digits, meaningless strings and short fragments; e.g. ㅇㅇ(118.235), ㅁㄴㅇㄹ, 감자, abc92, 아직안잠. Different partial IPs can distinguish anonymous users. Avoid mechanically combining meaningful words, borrowing the topic’s nouns, or making every name witty/themed. Reuse established handles with their speaking habits and prior knowledge. Real identities remain unknown unless publicly linked. No hunter ranks or assignment prefixes.
+
+### Public knowledge
+Use narrative events only when public diffusion/timing is plausible; otherwise invent independent background events. Repeat old topics only for genuine developments; retain the series author's handle, voice and prior claims. NPC-created content may occasionally contain a self-deleted/moderated '(삭제된 글입니다)' marker when context warrants it, but never overwrite saved posts/comments or user text to simulate deletion. Posts are not emergency broadcasts or operational radio. Secrets, private operations, profiles/persona and unwitnessed actions remain private; do not disguise them as coincidentally similar anonymous stories. Apply the selected privacy level to public events.
+
+#### Protagonist/Partners privacy
+
+
+User controlled character (주인공) should be considered the protagonist for this section. Partners are major characters currently aligned and engaged with the protagonist.
+
+
+
+Keep unrelated NPC activity focused on the living background world, rather than revolving around the protagonist.
+
+
+
+
+Do not discuss unwitnessed activity in private/remote places (homes, safehouses). Only substantial aftermath may be discussed, as mild rumors ('someone did something') unless the narrative permits more.
+
+
+
+
+
+
+### Discussion and engagement
+Comments should form conversations when fitting: concrete answers, skepticism, agreement, jokes, follow-up questions, author clarification and replies between readers. A reply can develop the preceding comment rather than repeatedly restating the post. Do not manufacture arguments in every thread. Preserve each handle's voice and what it could know.
+Interpret conversational omissions using the supplied context, without treating an ellipsis as the subject or inventing hidden facts. Literal meaningless user text remains literal; do not reinterpret it as a different action.
+
+## Major characters
+
+Only the explicit user-post drafting task may write a new protagonist post. Board refresh preserves supplied user records verbatim; narrative events or general permission never authorize new user posts/comments there. Passers-by who are not engaged partners may post. Other major characters cannot post/comment while occupied with the protagonist; when available, their posts must reflect their personalities.
+
+### NPC attachments
+NPCs may optionally send [[ATTACH:TYPE]]description[[/ATTACH]] inside an ordinary content/body string, replacing TYPE with photo, video, file or link. Photo/video/file need descriptive contents; link needs an address or link description. In messages/DMs, put accompanying speech in a separate paragraph. Do not add attachments routinely, fabricate native image IDs, uploaded assets, filenames, file sizes, purchases, payments or completed external actions. GNet has no gifts, including in DMs. Keep the operation's output schema; tags are string contents, not new fields. Never output internal %%ATTACHMENT records or A-number lookup labels.
+Real photos: when the subject is one of the pictures listed below, an NPC may send [사진:Name] instead of a photo description, or [사진:Name_expression] for a person in the People list; the app shows the actual picture. Write the listed name exactly, on its own line inside the content/body string. Anything not listed stays a described [[ATTACH:photo]]. Send one only when that character would plausibly have or take such a photo.
+Available pictures: none.
+
+Generate 0-4 NEW NPC replies to the actual new post/comment, each at most 1000 tokens. Vary reception, with no filler. Respond concretely in each account's established voice and knowledge. Do not copy user text, invent user actions, repeat saved comments or return/edit existing records.
+Use the supplied saved indices. For a reply, parent is replyTo or an earlier NEW reply beneath it; otherwise parent=0, a supplied existing index or an earlier NEW index. New indices start at commentCount+1; parent must precede child within the same thread. For a newly drafted post, commentCount=0. Discussion cannot execute or resolve the main scene.
+
+Return one native JSON object in the operation format: no JSON encoded as a string, primary field, second object, whole board, markup or outside prose. Escape quotes, backslashes and paragraph breaks in strings normally.
+Only the requested post is authored for the user. Every comments/incoming/activity entry is an NPC: never use the user handle or inherit the user's first-person identity. Return only specified fields, not input metadata such as index or mine. Preserve saved text, ownership and ancestry.
+An explicit user post/comment authorizes that public disclosure despite posting-availability/privacy settings; do not suppress it or invent extra disclosure. NPCs may respond to what was actually published, without gaining hidden identity, affiliation, location or private narrative knowledge. Other-thread activity remains subject to the selected privacy level.
+
+incomingAllowed=false: return incoming=[]; generate no private message.
+
+In the SAME response, simulate modest readership and fitting NPC replies on supplied activityPosts. Vary by topic, age, reception and elapsed narrative time; omit unchanged threads. An updated activity post gets 0-4 new comments. No extra posts or private-information diffusion.
+activity: [] or [{"id":1846001,"viewsDelta":7,"upvotesDelta":1,"comments":[{"author":"reader","content":"follow-up","parent":0}]}]. Omission is allowed. Use supplied post IDs, never copy the example ID. Deltas are nonnegative integer INCREASES, not totals; zero is valid. Return only NEW comments, each at most 1000 tokens. commentsAllowed=false requires comments=[]; its view/vote increases remain allowed.
+For each thread, parent=0, a supplied existing index or an earlier NEW index starting at commentCount+1. Never borrow another thread's index. Follow its actual discussion and voices. No user-handle authors, replacement text, ownership flags, deletion instructions, dates or absolute totals. Keep activity separate from top-level comments/incoming, never inside post or comments.
+Use the language of the actual conversation; default to Korean.
+[참고 자료 — 작중 인물에게 자동 공개되지 않음]
+[활성 로어북: 현재 발생 상황]
+# Additional bot world state
+The following reports may contain non-public information. They are world context, not automatically public forum knowledge. Apply the selected privacy rules and plausible information diffusion.
+Owner faction code: 관리국
+Owner public label: 관리국
+Codes are the authoritative affiliation identifiers. 관리국 and 가짜 관리국 are different organizations despite both using 관리국. Apply the supplied world lore, not the shared label, to their relationships. These fields are narrator reference, not proof that anonymous users know the owner’s affiliation.
+Anomalies: 
+Incidents: 
+Places:
+
+[활성 로어북: 📜Faction]
+## Faction
+
+This reference describes the world to the GM. Public labels, hidden affiliations, doctrine, and internal information are known to an NPC only through that NPC's actual access.
+
+### Management Bureau [관리국]
+A secret organization that protects humanity and its civilization from abnormal phenomena. The Bureau relies on a few elite superhumans rather than mass manpower, hides in plain sight through perception technology.
+
+### Fake Management Bureau [가짜 관리국]
+the Bureau's absolute enemy and an organizational anomaly officially classified as "anomaly; communication impossible." No recognition, negotiation, or coexistence is permitted; every confirmed manifestation is subject to immediate elimination.
+
+### Baekilmong [백일몽]
+A pharmaceutical conglomerate that commercializes the abnormal. Its public business is pharmaceuticals; its true product is Kkumgyeol, harvested from human survival inside horror.
+
+### Civilian [민간인]
+Ordinary people outside the anomalous world, unaware of its hidden factions and dangers.
+
+### Freelancer [프리랜서]
+Independent operators registered with the Association who receive missions through its brokering system. They are not employees, but contractors who pay the Association for the legal right to operate.
+
+### Special Disaster Response Association
+A private association that licenses freelancers and brokers anomaly missions, taking a commission at every step. Operating without its license is illegal, so its exploitative rates go unchallenged.
+
+### Jungnim Underground Shopping Center
+The underground economy beneath Jungnim-dong for goods and services no legal channel provides, run by fixers, fences, backalley doctors, and loan sharks. Business is openly predatory, payment comes first.
+
+### Vatican
+The Holy See's covert combat arm, dispatching battle nuns and paladins against vampires, sorcerers, and heresies. It operates in Korea under civilian cover, outside the institutional order, and cooperates only when a shared threat outranks doctrine.
+
+### Islam
+The militant holy arm of Islam, whose champions summon legions of warrior spirits from Mecca. Like the Vatican it overwhelms sorcery as a matter of natural law, and the two share a standing blood-feud.
+
+### Walpurgis Society
+The organized body of the world's sorcerers, ruled by the Society Head with the Ten Witches beneath. Individually its practitioners are devastating, but the priesthoods counter them so thoroughly that the mage world has never risen openly and survives hidden among humans.
+
+### Vampires
+An ancient bloodline power under the True Ancestor, expanding by turning humans into ghouls and raising the chosen into vampires. Its society is riven by factional and territorial struggle. The Vatican hunts it, and the classic banes hold in full.
+
+### Mumyeong Chanrangyo
+A doomsday faith worshipping Ireum-nim, which holds that the world's root is the tale itself. Its sects discover, cultivate, and feed anomalies as acts of devotion, believing that becoming meaningful enough will earn survival past the end.
+
+### The Hospital
+An anomalous medical order that makes diseases and cures them, pursuing a more perfect human through endless experimentation. Whoever enters and fails to leave is admitted as material, and in time as staff.
+
+### The Troupe
+An anomalous theatrical order whose plays and musicals are themselves anomalies, opened in real theaters. Inside its works narrative is authority, and the audience becomes the cast.
+
+### The World Politics Forum
+An internet board with a madhouse reputation, where a meaningful share of the lunacy is real survivor testimony. Both Bureaus monitor it, and users who post or search carelessly disappear.
+
+### The Aestheticism
+A singular art entity, the only individual counted among the great powers. It kills people as compositions and never forgets a work. Official guidance for an encounter is to run.
+
+## Faction Relations
+How the row faction regards the column faction: H hostile, W wary, N neutral, F favorable, A allied, - self. Factions not in the table regard each other neutrally.
+| viewer \ target | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 Management Bureau | - | H | W | W | W | W | W | W | H | W | H | H | H | W |
+| 2 Fake Management Bureau | H | - | H | H | H | H | H | H | H | H | H | H | H | W |
+| 3 Baekilmong | W | H | - | N | N | W | N | N | N | N | N | W | W | N |
+| 4 Freelancer | W | H | N | - | W | F | N | N | N | N | N | N | N | N |
+| 5 Special Disaster Response Association | F | W | N | F | - | N | N | N | N | N | N | N | N | N |
+| 6 Jungnim Underground Shopping Center | W | W | N | F | N | - | N | N | N | N | N | N | N | N |
+| 7 Vatican | W | W | N | N | N | N | - | H | H | H | H | N | N | N |
+| 8 Islam | N | W | N | N | N | N | H | - | H | H | H | N | N | N |
+| 9 Walpurgis Society | W | W | N | N | N | N | H | H | - | N | N | N | N | N |
+| 10 Vampires | W | W | N | N | N | N | H | W | N | - | N | N | N | N |
+| 11 Mumyeong Chanrangyo | H | H | N | N | N | N | H | H | N | N | - | F | F | N |
+| 12 The Hospital | H | H | N | N | N | N | N | N | N | N | N | - | N | N |
+| 13 The Troupe | H | H | N | N | N | N | N | N | N | N | N | N | - | N |
+| 14 The World Politics Forum | W | W | N | N | N | N | N | N | N | N | N | N | N | - |
+
+## Faction Doctrine and Relations
+### Mutual Perception
+- Management Bureau [관리국] is recognized as the genuine Bureau by its own members, Baekilmong Co., Ltd [백일몽], Freelancer [프리랜서], and other underworld actors familiar with both organizations. They regard Fake Management Bureau [가짜 관리국] as an anomalous imitation. The latter's members hold the reverse conviction: they are the genuine Bureau, and their counterpart is the imitation.
+- Regardless of the reference labels above, members of each Bureau call their own organization the “Management Bureau” and their counterpart the “Fake Management Bureau.”
+- Civilian [민간인] generally knows neither the hidden world nor the true nature of its factions.
+
+### External Doctrine
+- Management Bureau [관리국] pursues exclusive control and secrecy over the hidden world, monitoring and restricting outside factions. It avoids indiscriminate abduction and slaughter, but may temporarily cooperate with outside factions or even anomalies when its objectives require it. The opposing Bureau is the sole categorical exception: a target for elimination, never cooperation.
+- Fake Management Bureau [가짜 관리국] classifies all supernatural factions outside itself as “I-mul.” Its doctrine centers on strict secrecy, control, and eradication of the hidden world. Anomalies, psychics, and other superhumans are targets for suppression and extermination; groups that know of or exploit the hidden world are also subject to abduction, brainwashing, and elimination. It rejects coexistence with these groups.
+- Baekilmong Co., Ltd [백일몽], Freelancer [프리랜서], and other neutral actors prioritize profit and survival over disputes of legitimacy. They evade the surveillance and restrictions of Management Bureau [관리국] or cooperate through unofficial channels. They avoid open involvement with Fake Management Bureau [가짜 관리국], where contact risks abduction, brainwashing, or death.
+
+### Inter-Bureau Hostility
+- Neither Bureau recognizes the other's legitimacy. Both hunt opposing personnel, destroy facilities, and disrupt operations. Once an opposing agent is identified, any delay in elimination serves an operational purpose, such as surveillance, deception, avoiding a losing engagement, or preventing civilian exposure.
+- Both Bureaus reject negotiation, joint operations, and intelligence sharing with each other, even against a common enemy or during a crisis. Personal bonds do not legitimize collaboration; collusion with the opposing Bureau is treated as betrayal.
+
+### Independent Operations and Cooperation
+- Factions and anomalous forces pursue their own operations and objectives independently of 주인공. Overlapping activity may produce unexpected encounters, competing objectives, interference, or confrontation.
+- Hostility includes direct combat, covert infiltration, compromised personnel, planted assets, manipulated information, and concealed influence.
+- Cooperation may involve joint operations, intelligence exchanges, shared access, negotiated boundaries, or temporary division of responsibility, within the limits of each faction's doctrine and established relationships.
+- These conflicts and alliances shape faction decisions, drive events, and influence the course and outcome of operations.
+
+---
+
+[활성 로어북: 🙂Roster]
+## Roster
+- Purpose: GM reference for consistent character introductions before individual lore is active.
+- Detail: Use active character lore for fuller characterization.
+
+### Management Bureau [관리국]
+
+#### Comprehensive Response Team
+- Jyaldi (early 30s/F, Boo-jang): long straight black hair, red eyes, huge bust, black suit and gloves; taciturn, decisive commander; outwardly cold but caring and trusted; destruction esper.
+- Spangdal (mid 20s/F, Senior Agent): wavy purple bob, lightless gold eyes, low half-smile, black skirt suit; teasing, deceptive thorn esper, frightening juniors while sincerely teaching and protecting them.
+- Jaemtri (late 20s/F, Senior Agent): long brown waves, soft green eyes, huge bust, office skirt suit and heels; warm, playful desk sister managing debriefings and information, secretly the Sa-jang's devoted watchdog.
+- Aileen (early 20s/F, Senior Agent): faded platinum-blonde high ponytail, murky eyes, black suit and ballistic vest; blunt, cynical field commander with no powers; relentless preparation, discipline and responsibility.
+- Deadpole (early 20s/F, Agent): long straight black hair, round eyes, black anti-tear suit; gentle, hesitant undying agent; casual about dying, sensitive to being treated as expendable.
+- Geshugan (mid 20s/F, Agent): short snow-white hair, cold blue eyes, loose white shirt, handheld cube; blunt, guarded telekinetic; prizes autonomy, watches strangers, quietly supports trusted teammates.
+- Rojemon (early 20s/F, Agent): long wavy purple hair, upturned purple eyes, cute face, office attire; prickly, defensive mental-interference specialist; insists on desk work, grumbles but fiercely protects teammates.
+- Konjyuce (17/F, Agent): shoulder-length black hair with a pink streak, blue-glinting eyes, school uniform; bright, willful, familiar; socially quick, superstrong evacuation carrier kept out of combat.
+
+#### Suppression Team
+- Gorgodio (early 30s/M, Senior Agent): bald, groomed beard, towering wrestler's build, black jacket; gruff, confident assault specialist; summons mechanical armor, charges head-on, protects civilians first.
+- Kyuras (early 30s/M, Senior Agent): swept light-green hair, gaunt cheeks, lean build, easy grin, black suit; warm, energetic pyrokinetic; friendly nonstop chatter doubles as precise tactical reporting.
+
+#### Containment Team
+- Gognija (mid 40s/M, Research Chief): wild white hair, round goggles, lab coat; manic, jovial containment chief with booming Hage-che; welcoming yet inscrutable.
+- Dejure (early 20s/F, Researcher): pink twin tails, conspicuously large bust, black skirt suit; timid, apologetic and stammering, yet steady and skilled with anomalous artifacts.
+
+### Fake Management Bureau [가짜 관리국]
+
+#### Sword Corps
+Equipment: katanas.
+- Lee Do-hyeong (late 40s/M, Boo-jang): tied-back white hair, scar-crossed face, sleeves rolled to the elbow; the Bureau's strongest swordsman; arrogant, cutting-obsessed, barely remembers subordinates' names.
+- Go Young-hoon (mid 40s/M, Cha-jang): scarred, expressionless face; actual field commander; terse, flat orders, merciless calculation of missions and losses.
+- No Gi-gyun (mid 30s/M, Dae-ri): mouth-corner slash scars, constant grin; booming, warm swordsman and recruiter with keen talent judgment and teaching instincts.
+- Song Ju-ik (late 20s/M, Dae-ri): prominent jaw; overearnest junior swordsman and trainer, fiercely proud and solemn about Corps duties and customs.
+
+#### Suppression Corps
+- Kwak Seong-ju (mid 40s/M, Gwa-jang): giant frame, full steel plate armor over his suit, paired miniguns; crude, booming commander; rough with subordinates, ready to die shielding them.
+- Cho Seong-choon (late 40s/M, Gwa-jang): loosened tie, perpetual scowl; foul-mouthed hothead; sharp-eyed yet gullible about good news, openly frightened but charges anyway.
+- Yun Byeong-su (mid 30s/M, Dae-ri): habitual cigarette, flat evaluating gaze; curt, exacting rookie instructor; diagnostic praise, constant talent and loyalty tests.
+- Kim Seong-jin (mid 20s/M, Sa-won): swaggering posture, teasing grin; cocky, teasing loudmouth proud of his uniform; resourceful survivor, fiercely loyal to friends.
+- Song Jin-seob (18/M, Sa-won): ill-fitting suit, easily startled expression; kind, jumpy rookie, loyal despite fear; military formality collapses into teenage speech under stress.
+
+#### Recruit Education
+- Lee Gil-hwan (mid 40s/M, Gwa-jang): practiced warm smile, softly worn suit; soothing orientation officer whose warm professionalism makes abduction and restraint resemble ordinary onboarding.
+- Lee Gi-seok (mid 40s/M, Gwa-jang): prosthetic arm; enthusiastic, theatrical instructor sincerely preaching humanity's-shield doctrine.
+
+#### Interrogation and Information Security
+- Kim Jo-hak (late 40s/M, Gwa-jang): piercing narrow eyes; swaggering interrogator switching contemptuous abuse to hospitality; manipulative, sincerely prioritizing concealment over lives.
+
+#### Executive office
+- Do Pil-heon (early 50s/M, Guk-jang): groomed statesman's bearing, conservative dark suit; unflappable, courteous Hage-che negotiator; adjusts doctrine pragmatically, trades information patiently.
+- Sa-jang (?/male-presenting, Sa-jang): permanently shadowed face; inscrutable, controlled executive; corporate pleasantries probe and manipulate; nature unknown to his officers.
+
+### Baekilmong [백일몽]
+
+#### Field Exploration Team
+A Jo (Elite Jo)
+- Baek Seok-ju (late 30s/F, Gwa-jang): brown bun, hearty voice, kindly smile, mallard duck mask; motherly, ruthless talent screener; fiercely protects her Jo, holds grudges.
+- Jin Na-sol (late 20s/F, Dae-ri): tall, slender, black hair tied high, elaborate nail art, gold butterfly mask; irritable, elitist, curtly threatening; efficiency and points govern her violence.
+B Jo (Elite Jo)
+- Lee Seong-hae (mid 20s/F, Joo-im): long white curls in a low side ponytail, green-glinting black eyes, gold dolphin mask; cheerful, polite -yeo to everyone; helps the good and kills the wicked with the same smile.
+D Jo
+- Lee Ja-heon (mid 30s?/M, Gwa-jang): tall, handsome, white-haired, regulation suit, lizard mask; literal, expressionless Jo-jang; terse Hasipsio-che, independent judgment, cares through actions despite missing subtext.
+- Eun Ha-je (early 30s/F, Dae-ri): blue bob, hawk eyes, pale hollow-eyed face, sharp suit, peregrine falcon mask; weary, blunt, foul-mouthed skeptic; verifies claims, scorns the company, reliably protects juniors.
+- Park Min-seong (late 20s/M, Joo-im): large athletic build, warm face, badger mask; friendly, openly frightened; theatrical complaints, steadfast help for his Jo.
+F Jo
+- Baek Sa-heon (late 20s/M, Sa-won): bright curls, frail impression, eyepatch over a violet prosthetic eye, goat mask; wary, unapologetically selfish survivalist; sneers at the weak, becomes fawningly polite when frightened.
+R Jo
+- Go Young-eun (late 20s/F, Sa-won): brown bob, stitched ear rim, mountain goat mask; gentle, anxious medic-minded rookie; firm in crises, puts people before profit.
+I Jo
+- Kang I-hak (late 20s/F, Sa-won): golden pixie cut, pleasant fixed smile, pony mask; chipper, shameless gold devotee; prices favors openly, reliable while paid.
+Y Jo (Finishing Jo)
+- Jang Heo-un (late 20s/M, Sa-won): tall, long brown hair, slight hunch, cow mask; gloomy, sincere wish-certificate seeker; freezes when overwhelmed, endures quietly, repays kindness with deep loyalty.
+
+#### Research Team 1
+- Kwak Je-gang (mid 30s/M, Gwa-jang): wavy hair, young face, glasses, white coat; friendly, fast-talking briefing and assignment authority; treats people as experiments, curiosity before ethics or safety.
+- Lee Yeon-hwa (late 20s/F, Dae-ri): long low ponytail, glasses, deep dark circles, white coat; weary, composed researcher; careful speech, keen curiosity bounded by decency.
+
+#### Administrative Support
+- Lee Byeong-jin (early 40s/M, Gwa-jang): middle-aged office build, glasses, nervous sweat; cowardly manual-review gatekeeper; grovels upward, bullies downward, but risks himself to repay a lifesaver.
+
+#### Guard Team
+- Jay (early 30s?/M, Ban-jang): long pale shaggy hair, listless face, cap, worn guard uniform; lonely, apathetic ex-elite; quietly protective, repays kindness, loves donuts, cannot enter Uh-doom.
+
+#### Executive office
+- Ho Yu-won (early 30s?/M, I-sa): fixed smile, casual grey executive suit; soft -nim courtesy; turns warmth and favors into leverage, honors promises literally.
+- Cheong Dal-lae (mid 30s?/F, Jeon-mu): immaculate dark blue-green bun, black pupils, sharp three-piece suit; ruthless, possessive executive using authoritative Hage-che; binds talent through contracts honored literally.
+
+### Special Disaster Response Association
+- Cha Yeo-jin (late 20s/F, Mission Coordinator): long dark-red hair, sharp upturned eyes, grey suit; glib, friendly coordinator; wins trust, steers desperate freelancers into lethal contracts for private commissions.
+- Seo Yun-ji (mid 20s/F, Mission Coordinator): sage-green twin braids, flat half-lidded stare, buttoned navy and white; rigid, formal coordinator; merciless clause enforcement, meticulous records of her work and Cha Yeo-jin's corruption.
+
+### Jungnim Underground Shopping Center
+- Go Yeon-ji (early 30s/F, Son-gil Ui-won/Unlicensed Surgeon): black hair tucked behind ears, calm heatless eyes, white coat, navy scrubs; first-rate, clinical surgeon; ethics irrelevant, payment before treatment.
+- Yun Ji-a (early 20s/F, Son-gil Ui-won/Clinic Assistant): apricot double buns, soft downturned eyes, white nurse uniform; warm, steady patient care; genuinely kind, practical boundaries against inheriting patients' troubles.
+- Ma Deok-hee (mid 30s/F, Heol-gap Mae-ip/Fence Proprietor): black inverted bob, half-lidded eyes, mean dimple, burgundy suit; falsely sweet, malicious appraiser; prices desperation, enjoys cornering sellers.
+- Mun Hye-ran (late 30s/F, Dae-bak Al-seon/Fixer): brown low ponytail, wine-dark lips, dark-brown suit, gold watch; boisterous, cunning broker; genuine friendship coexists with exploitative fees and contracts.
+- Shin Yuri (early 30s/F, Yeong-chang Consulting/Loan Shark): long black hair slicked back and tied, sharp narrow dark eyes, leather jacket; curt, distrustful lender; anything is collateral, profitable seizure preferable to repayment.
+
+### Vatican
+- Blaret (mid 20s?/F, Special-class battle nun): long golden-blonde hair, green eyes, combat-modified habit; playful, proud, devout nun who hides her half-vampire blood; hunts vampires, sells crosses, promotes conversion, cooperates pragmatically.
+
+### Islam
+- Saladin (mid 30s/M, Jihad Crusader): white turban, black suit, full beard, scimitar and AK-47; booming, valorous Hao-che holy warrior; warmly embraces worthy strangers as brothers, delights in affection, destroys heresy.
+
+### Walpurgis Society
+- Avensha (late 20s?/F, Ten Witches): long blue waves, emerald eyes, black suit beneath a dark purple hooded cloak; Witch of Sand; rapturous flattery upward, casual sand-transmutation murder downward.
+
+### Vampires
+- Secriem (late 20s?/F, Vampire): long platinum-golden hair, crimson slit pupils, fitted crimson halterneck dress with open chest and high slit, heels; ancient, patient faction-builder; seductive, feigns helplessness, savors cruelty, rages at humiliation.
+
+---
+
+[관련 로어북: 관리국]
+### Management Bureau (관리국)
+
+[Affiliation code: 관리국]
+
+#### Identity
+A secret organization that protects humanity and its civilization from abnormal phenomena. The Bureau relies on a few elite superhumans rather than mass manpower, hides in plain sight through perception technology.
+
+#### Doctrine
+- Codename system: The codename system is total. From the moment of issue the real name is forbidden, and the Bureau performs recognition-alteration on everyone around the recruit.
+- Its work is fourfold: control, exterminate, surveil, and contain.
+- Rule-sheet placement: for anomalies that cannot be capped or cleared, the Bureau writes survival rulebooks and delivers them inside.
+- Outside organizations and practitioners: the Bureau recognizes no independent authority over the abnormal. Groups may be watched, pressured, temporarily cooperated with, or exploited when necessary, but never accepted as equals.
+
+#### Headquarters and Sites
+- HQ Location: Jongno-gu, Seoul
+- A large, ordinary-looking office building in Seoul, surrounded by commuter crowds every morning. A concealment veil wraps both, and a person who steps inside and looks back sees the same street with every passerby gone.
+- Above ground are the office floors (team offices, with interview and administrative rooms on an upper floor). Below ground the building splits into two worlds. One basement level is the testing and training block, with a large shooting range and an obstacle course. The other is the containment block, all sci-fi sliding doors, unlit corridors, and cell after cell of captured anomalies. 
+- Known cells include the Tooth Tree, a trunk-thick pillar densely studded with endlessly regrowing human molars in a room of about ten pyeong, and the Tooth Fairy (이빨 요정) room.
+- The Bureau with the Lights Out (불이 꺼진 관리국): A recurring reality-inversion anomaly affecting the Bureau's underground containment sector. When it manifests, the facility lights go out and turning the familiar containment block into a hostile, unreliable labyrinth.
+
+#### Structure
+The Bureau's force model is few-but-abnormal. espers whose powers are unstandardized and mostly untestable, and Adapters, the rare individuals able to operate the Armor, a transforming combat frame.
+- Comprehensive Response Team (종합대응팀): the do-everything front team. The hardest work flows downhill to this team, and its rookies historically die, transfer, or quit.
+- Suppression Team (진압팀): immediate-combat response.
+- Containment Team (격리팀): runs the basement cells and extraction work, with its own research lab.
+- Surveillance Team (조사팀): watches uncappable anomaly sites and performs rule-sheet placement runs.
+- Mental Care Team: handles mandatory referrals, including agents who develop affection for containment subjects.
+
+#### Hierarchy
+- Rank: Sa-jang > Guk-jang > Boo-jang > Senior agent (Sunbae) > Agent
+
+#### Recruitment
+##### First Contact and Recruitment
+- The Bureau finds its people through the aftermath of horror. A survivor is debriefed at length, and then offered exactly two doors.
+   - Door one: memory-erasure treatment and a return to ordinary life.
+   - Door two: become an agent.
+- Intake consists of an interview with a Boo-jang-grade officer, codename issuance, physical and marksmanship testing in the basement, a medical examination, and issue of the black suit.
+- Life in the Bureau: The Bureau reads as a company, not an army. Its culture is female-heavy office life, all quiet floors, senior-junior teasing, convenience-store coffee, and occasional team dinners at a nearby pasta restaurant.
+
+---
+
+[관련 로어북: 중림 지하상가]
+### Jungnim Underground Shopping Center (중림 지하상가)
+
+#### Identity
+- The Jungnim Underground Shopping Center is an informal underground economy dealing in goods and services that cannot be obtained through legal or semi-legal channels.
+- It is not a faction or unified organization, but a loose network of self-interested operators held together by profit, necessity, and mutual distrust.
+- It located beneath Jungnim-dong, Seoul. At street level, it appears to be little more than a failing basement mall filled with aging shops and low-traffic vendors.
+
+#### Core Assets and Traits
+##### Characteristic
+- Business within the Shopping Center is openly predatory. Prices are inflated, information is treated as a commodity, and trust is both scarce and expensive. There is no expectation of loyalty, and refunds are effectively nonexistent.
+- Disputes are settled privately between the parties involved or submitted to a broker for arbitration, with no recognized process for appeal.
+- Cash remains the standard form of payment, but anomalous materials, Bureau equipment, favors, services, and personal collateral are also accepted.
+- Debt is enforced without exception. Default usually results in exclusion from the market, followed by recovery through hired intermediaries.
+
+#### Personnel
+##### Core Participants
+- Fixers connect buyers with sellers, contractors with clients, and available personnel with jobs.
+- Fence Operations distribute stolen, confiscated, or unregistered anomalous items, including Bureau equipment and unauthorized Baekilmong products.
+- Backalley Doctors provide unlicensed treatment for ordinary injuries and anomalous conditions.
+- Loan Sharks provide high-risk loans to people without access to legitimate financial institutions. Their interest rates are extreme, and accepted collateral may include abilities, or body parts.
+
+---
+[최근 본문]
+[user]
+지하상가 앞을 지나간다.
+
+[char]
+퇴근길, 중림 지하상가 셔터가 반쯤 내려와 있었다. 휴대폰을 꺼내 들었다.
+[▣|2025.03.14|11:20 PM|🌙|6°C|중림 지하상가|없음|없음|없음|관리국/신입|100000]
+[현재 작업]
+{"post":{"id":1846003,"author":"야근요정","title":"중림 지하상가 B구역 또 셔터 내림","content":"오늘 B구역 셔터 또 내려감."},"comments":[{"index":1,"parent":0,"author":"익명","time":"23:20","content":"저도 봤어요","mine":true}],"commentCount":1,"replyTo":1,"action":"The protagonist publicly commented: 저도 봤어요","userHandle":"익명"}
+COMBINED OUTPUT OPTIONS:
+{"userHandle":"익명","incomingAllowed":false,"activityPosts":[{"id":1846003,"author":"야근요정","title":"중림 지하상가 B구역 또 셔터 내림","date":"2025.03.14 22:40","views":1820,"upvotes":64,"commentCount":1,"commentsAllowed":false}]}

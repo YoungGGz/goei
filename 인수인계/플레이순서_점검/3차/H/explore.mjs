@@ -1,0 +1,15 @@
+import { boot, act, fText, sleep, OUT, baseRules, updaterScript, openItems } from './hlib.mjs';
+const u = updaterScript();
+await baseRules(u.file);
+const { t } = await boot();
+await openItems(t);
+const dump = async (tag, root='.gx') => { const a = await t.F().evaluate((root) => [...document.querySelector(root).querySelectorAll('[data-action],[data-change],[data-input]')].filter(e=>e.offsetParent!==null).map((e) => `${e.dataset.action??('change:'+(e.dataset.change??e.dataset.input))}=${e.dataset.value ?? ''}|${(e.innerText||e.getAttribute('aria-label')||e.value||'').replace(/\s+/g,' ').slice(0,40)}`), root); console.log(`---${tag}\n`+a.filter(x=>!/^(nav-|agent-info|ops-|pick-event|wiki-goto|end-event|rec-journal|agents-view|id-fold|close|menu-fold)/.test(x)).join('\n')); };
+await dump('items');
+const ids = await t.F().evaluate(()=>[...document.querySelectorAll('[data-drag],[data-drop]')].map(e=>`drag=${e.dataset.drag??''} drop=${e.dataset.drop??''} cls=${e.className}`));
+console.log(ids.join('\n'));
+await act(t,'items-open','i_fj8jo8'); await dump('popup 권총'); await t.shot('x-pop-pc');
+await act(t,'items-close');
+await act(t,'items-sub','wallet'); await dump('wallet');
+await act(t,'ed-open','set:items',{wait:2000}); await dump('set:items'); await t.shot('x-set-items-pc');
+console.log(await fText(t));
+await u.stop(); await t.close();

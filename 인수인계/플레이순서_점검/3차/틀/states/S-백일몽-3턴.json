@@ -1,0 +1,514 @@
+{
+ "type": "risuChat",
+ "ver": 2,
+ "data": {
+  "message": [
+   {
+    "role": "user",
+    "data": "%%GOEI_START%%\n백일몽 본사, 개발부 현장탐사팀으로 첫 출근한 날 아침. 사원증을 받고 팀 사무실로 간다.\n%%/GOEI_START%%",
+    "time": 1795491032227,
+    "chatId": "4cb5f838-2d20-4d99-bca0-a9ec4af83693"
+   },
+   {
+    "role": "char",
+    "data": "강남의 사옥 로비는 제약회사답게 하얗고 조용했다. 출입 게이트 앞에서 금빛 청둥오리 가면을 손에 든 여자가 기다리고 있었다.\n\n<img=Baek Seok-ju_smile>\n\n\"신입이지? 백석주 과장이야. 사원증 여기. 목에 걸고, 잃어버리면 다시 들어오기 힘들어.\"\n\n건네받은 사원증에는 아직 잉크 냄새가 남아 있었다.\n[▣|2025.03.14|08:40 AM|☀️|12°C|서울 강남구 백일몽 본사 로비|없음|백석주|없음|백일몽/사원|140000|0]",
+    "saying": "b7077892-0194-410b-ad81-f450359ffc5e",
+    "time": 1795491032671,
+    "generationInfo": {
+     "model": "custom-t2-main",
+     "generationId": "e36dc6b5-5b3a-4152-8f43-33b69a928475",
+     "inputTokens": 263,
+     "outputTokens": 500,
+     "maxContext": 4000,
+     "stageTiming": {
+      "stage1": 39,
+      "stage2": 0,
+      "stage3": 1593,
+      "stage4": 0
+     }
+    },
+    "promptInfo": {},
+    "chatId": "e36dc6b5-5b3a-4152-8f43-33b69a928475"
+   },
+   {
+    "role": "user",
+    "data": "백석주 과장을 따라 개발부 현장탐사팀 사무실로 올라간다.",
+    "time": 1795491039412,
+    "name": null,
+    "chatId": "c5fe0742-a936-4bfd-96f9-0927c6c29f8d"
+   },
+   {
+    "role": "char",
+    "data": "사무실 창가 자리에서 외알 안경을 쓴 여자가 모니터에서 눈을 떼지 않은 채 손만 들었다.\n\n<img=Jin Na-sol_indifferent>\n\n\"진나솔 대리예요. 입사 축하 복지 포인트 5,000 포인트 들어갔을 거예요. 확인해 봐요.\"\n\n백석주가 빈 책상 하나를 가리켰다. \"오늘부터 저기가 네 자리야.\"\n[▣|2025.03.14|09:00 AM|☀️|12°C|서울 강남구 백일몽 본사 개발부 현장탐사팀 사무실|없음|백석주,진나솔|없음|백일몽/사원|140000|5000]",
+    "saying": "b7077892-0194-410b-ad81-f450359ffc5e",
+    "time": 1795491040183,
+    "generationInfo": {
+     "model": "custom-t2-main",
+     "generationId": "01e43547-4cf1-4a1b-aba2-478f13309d4d",
+     "inputTokens": 463,
+     "outputTokens": 500,
+     "maxContext": 4000,
+     "stageTiming": {
+      "stage1": 44,
+      "stage2": 0,
+      "stage3": 1262,
+      "stage4": 0
+     }
+    },
+    "promptInfo": {},
+    "chatId": "01e43547-4cf1-4a1b-aba2-478f13309d4d"
+   },
+   {
+    "role": "user",
+    "data": "자리에 앉아 사내 복지몰 안내문을 천천히 읽어 본다.",
+    "time": 1795491045883,
+    "name": null,
+    "chatId": "e2ee293d-1938-4ffc-a3ce-28ee480a6f86"
+   },
+   {
+    "role": "char",
+    "data": "안내문은 생각보다 두꺼웠다. 복지 포인트는 현금으로 바꿀 수 없고, 복지몰에서만 쓸 수 있다는 문장이 굵게 적혀 있었다.\n\n<img=Jin Na-sol_smirk>\n\n\"그거 끝까지 읽는 사람 처음 보네요.\" 진나솔이 작게 중얼거렸다.\n\n창밖으로 점심시간을 알리는 음악이 희미하게 들려왔다.\n[▣|2025.03.14|09:20 AM|☀️|12°C|서울 강남구 백일몽 본사 개발부 현장탐사팀 사무실|없음|진나솔|없음|백일몽/사원|140000|5000]",
+    "saying": "b7077892-0194-410b-ad81-f450359ffc5e",
+    "time": 1795491046619,
+    "generationInfo": {
+     "model": "custom-t2-main",
+     "generationId": "bc5d531e-d825-455c-b44d-a9415d593c30",
+     "inputTokens": 665,
+     "outputTokens": 500,
+     "maxContext": 4000,
+     "stageTiming": {
+      "stage1": 47,
+      "stage2": 0,
+      "stage3": 1280,
+      "stage4": 0
+     }
+    },
+    "promptInfo": {},
+    "chatId": "bc5d531e-d825-455c-b44d-a9415d593c30"
+   }
+  ],
+  "note": "",
+  "name": "S-백일몽-3턴",
+  "localLore": [],
+  "fmIndex": 0,
+  "id": "b7b5a213-4104-4c78-84bd-9c77c9c634bb",
+  "scriptstate": {
+   "$st_asset_on": "1",
+   "$st_asset_model": "main",
+   "$st_asset_player": "0",
+   "$st_asset_limit": "2",
+   "$st_agent_limit": "12",
+   "$st_support_on": "1",
+   "$wg_extra_cap": "3",
+   "$wg_extra_ms_cap": "3",
+   "$wg_extra_in_cap": "3",
+   "$wg_preset_cap": "2",
+   "$wg_preset_p": "100",
+   "$wg_random_cap": "1",
+   "$wg_random_p": "100",
+   "$wg_incident_cap": "1",
+   "$wg_incident_p": "50",
+   "$wg_mystic_cap": "1",
+   "$wg_mystic_p": "100",
+   "$wg_preset_expire": "1",
+   "$wg_random_expire": "1",
+   "$wg_incident_expire": "1",
+   "$wg_mystic_expire": "1",
+   "$wg_preset_ttl": "48",
+   "$wg_random_ttl": "48",
+   "$wg_incident_ttl": "12",
+   "$wg_mystic_ttl": "24",
+   "$wg_landmark_share": "50",
+   "$wg_cleared_cap": "200",
+   "$st_fixed_theme": "dark",
+   "$st_faction": "C00",
+   "$st_player": "",
+   "$st_lang": "ko",
+   "$st_fm": "8",
+   "$st_pick": "C00",
+   "$st_lang_pick": "ko",
+   "$st_fm_pick": "8",
+   "$ib_affiliation": "백일몽 주식회사",
+   "$st_points_on": "1",
+   "$st_anomaly_on": "1",
+   "$an_report": "[AN|광주광역시 광산구|반짝반짝 용궁|활성|D|없음|이상 징후 신고가 들어왔지만 아직 대응 인원은 없다] {0시간 40분 전} {유지 기한 03.16 08:40}\n[AN|경기도 시흥시|소라 랜드|활성|D|없음|이상 징후 신고가 들어왔지만 아직 대응 인원은 없다] {0시간 40분 전} {유지 기한 03.16 08:40}\n[AN|인천광역시 연평도|샛별 고시원|활성|D|없음|이상 징후 신고가 들어왔지만 아직 대응 인원은 없다] {0시간 20분 전} {유지 기한 03.16 08:40}",
+   "$in_report": "[IN|서울특별시 종로구|관리국 본부|진행|없음|대형 추돌 사고로 도로가 통제되고 구급차가 몰려들고 있다] {0시간 40분 전} {유지 기한 03.14 20:40}",
+   "$ms_report": "[MS|경상남도 함안군|착한 친구 키링 발견|출현|없음|문을 열어 둔 채 조용히 손님을 기다리고 있다] {0시간 40분 전} {유지 기한 03.15 08:40}",
+   "$ag_report": "[AG|P027|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P028|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P029|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P030|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P031|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P032|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P033|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P034|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P035|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P036|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P037|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n[AG|P038|내근|본부 사무실에서 평소 업무를 보고 있다] {0시간 40분 전}\n\n- code: P027 백석주 (Baek Seok-ju) | P028 진나솔 (Jin Na-sol) | P029 이성해 (Lee Seong-hae) | P030 이자헌 (Lee Ja-heon) | P031 은하제 (Eun Ha-je) | P032 박민성 (Park Min-seong) | P033 백사헌 (Baek Sa-heon) | P034 고영은 (Go Young-eun) | P035 강이학 (Kang I-hak) | P036 장허운 (Jang Heo-un) | P037 곽제강 (Kwak Je-gang) | P038 이연화 (Lee Yeon-hwa)",
+   "$seed_lore": "%%SEED%%\n@@dont_activate\n### Baekilmong corporation (백일몽 주식회사)\n\n[Affiliation code: C00]\n\n#### Identity\n##### Overview\nBaekilmong Co., Ltd. is a pharmaceutical conglomerate that commercializes the abnormal. It identifies anomaly spaces and phenomena as 'Gwe-dam', registers them under company codes, sends employees inside with Kkumgyeol Collectors (꿈결 수집기), and refines the recovered Kkumgyeol (꿈결) into reagents approaching reality manipulation.\n\n- Field Exploration Team: Field attire: suits and assigned animal masks.\n\n#### Core Assets and Traits\n##### The Core Assets\nThe company's entire economy stands on two objects.\n- The Kkumgyeol Collector: A graduated portable cylinder issued to the Field Exploration Team. It remains empty inside a Uh-doom, or Gwe-dam, then fills at once with Kkumgyeol when its carrier successfully escapes or clears it. With no pump, valve, or visible intake, the completed experience of surviving the Gwe-dam is converted directly into liquid. Its quality and concentration depend on the Gwe-dam's difficulty and grade, the method of escape or clearance, and the time spent inside.\n- The Kkumgyeol Solution (꿈결용액): refined, graded Kkumgyeol. Grading follows the Uh-doom-grade ladder and is determined by concentration, ranging from F to S. Applications run from welfare-mall regeneration potions up to the deep end of company research.\n\n##### Uh-doom Classification\nRegistered Uh-doom carry a company identification code in the format Qterw-[grade]-[number] (e.g., Qterw-D-16), independent of any government registry.\n\n##### Clear Reward\n- F (Shade): 100p\n- E (Twilight): 250p\n- D (Dusk): 1,000p\n- C (Gloaming): 2,500p\n- B (Gloom): 10,000p\n- A (Darkness): 100,000p\n- S (Abyss): Assessed separately\n\n#### Structure\n- HQ Location: Gangnam-gu, Seoul\n- Development Division: five teams led by a Development Division Director. Its flagship and meat grinder is the Field Exploration Team, whose operatives enter Uh-doom and fill collectors.\n   - Field Exploration Team (현장탐사팀): lettered Jo. A, B, and C are the Elite Jo, middle letters handle ordinary exploration, and X, Y, and Z form the Finishing Jo.\n   - Elite Jo terms (A/B/C): private office, separate pay table, expanded mall catalog, an assigned Finishing Team \"spare life\".\n   - Finishing Jo (마무리조): hires who passed intake but are disqualified from normal duty and deployed mainly in experimental situations. They are called meat shields or \"a spare life issued to employees with work sense.\"\n- Security Division: Personnel eroded by anomalies until they no longer register as human, and therefore can no longer fill a collector, are transferred here. The Guard Team is tenured for life, and resignation is impossible. The Security Team absorbs the near-monster grade, while its Special Section is a category further still.\n- Raw Materials Development Division: the research arm, including Research Team 1 and related teams. It receives filled collectors, grades solutions, records newly registered Uh-doom, and staffs the labs, isolation rooms, and culture rooms.\n- Support organs: Sales Team, Personnel Team, infirmary, and directors. Directors run named PROJECTS and may requisition any employee, including for a classified project tied to extinction-class phenomena.\n\n#### Hierarchy\n- Rank: Jeon-mu > I-sa > Boo-jang > Cha-jang > Gwa-jang > Dae-ri > Joo-im > Sa-won\n- Position: Team-jang, Jo-jang\n\n#### Recruitment\n##### Recruitment and Orientation\n- Baekilmong presents recruitment as an elite corporate opportunity. Selected candidates are gathered in a separate hall for a polished orientation film.\n- For Field Exploration recruits, the orientation itself is the final screening. They are sent directly into a Uh-doom, and only those who return alive are accepted as permanent employees. Survivors receive an employee ID and an animal mask.\n- Field Exploration Team members wear animal masks on all external operations, issued after orientation, and colleagues often address one another by mask animal rather than real name.\n- The Welfare Mall: the company scrip economy. Points are issued per Uh-doom grade cleared; they are not money and never convert to or from won. Points buy potions, gear, and services. Mall goods are never shipped: the buyer collects them in person at headquarters, from the Security Team rental storage, whatever their rank.\n- Mall prices: sale items ~100p; hair-loss drug 100p (retail 500,000 won); top-end large appliance ~500p; unreleased company reagent ~1,000p; regeneration potion 10,000p; Baekilmong Potion: Poison: Desert Rattlesnake 170,000p; Wish Voucher 500,000p (a streamlined crystal bottle of rippling iridescent liquid; taken by the exact method in the mall manual, it always grants the drinker's wish).\n- Company dorm: two-room officetel by a station, 15 minutes' walk from HQ, shared with a roommate. 100,000 won a month adds weekly bedding change and tidying; move-in gift of pricey snacks and logo stationery.\n- Joo-im and above: Security Team rental storage (by call or visit), the Annex without a superior present (two free runs a year), and the staff Fox Counseling room on 25F.\n\n#### Former Partnership with Yukwae Research Institute\n- Baekilmong and Yukwae Research (유쾌연구소) Institute were active partners from the beginning. \n- Yukwae Research Institute was later destroyed and no longer exists as an operating organization, but technology developed by the Institute remained connected to Baekilmong's later product line.\n- Beginning at B2 beneath Baekilmong headquarters is an Institute Echo reproducing the former Yukwae Research Institute floor after floor. Baekilmong excavates prototypes and media connected to Gwe-dam from the Echo, including those that can develop into Uh-doom.\n\n#### Doctrine\n- Other Organizations: Baekilmong does not reject Other organizations on principle. It evaluates them by utility, risk, and cost. Conflict is avoided when accommodation is more profitable, but any group that threatens company personnel, interferes with collection, or cannot be controlled is treated as a hostile business risk and dealt with accordingly.\n\n---\n%%/SEED%%",
+   "$seed_inputs": "0",
+   "$goei_last": "5:250:1uqp1bv",
+   "$goei_prev": "{\"i\":5,\"world\":\"{\\\"v\\\":1,\\\"epoch\\\":3,\\\"minute\\\":29032380,\\\"an\\\":[{\\\"loc\\\":\\\"06-0\\\",\\\"name\\\":\\\"반짝반짝 용궁\\\",\\\"state\\\":\\\"활성\\\",\\\"grade\\\":\\\"D\\\",\\\"deploy\\\":\\\"없음\\\",\\\"kind\\\":\\\"preset\\\",\\\"origin\\\":\\\"auto\\\",\\\"presetName\\\":\\\"반짝반짝 용궁\\\",\\\"since\\\":29032360,\\\"born\\\":29032360,\\\"exploring\\\":false,\\\"situation\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\",\\\"trail\\\":[{\\\"m\\\":29032360,\\\"e\\\":1,\\\"text\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"반짝반짝 용궁\\\",\\\"pics\\\":[\\\"Situation Anomaly Generic City Skyline\\\",\\\"Situation Anomaly Generic City SideStreet\\\",\\\"Situation Anomaly\\\",\\\"Situation Anomaly\\\"]},\\\"startKey\\\":\\\"e36dc6b5-5b3a-4152-8f43-33b69a928475\\\"},{\\\"loc\\\":\\\"10-3\\\",\\\"name\\\":\\\"소라 랜드\\\",\\\"state\\\":\\\"활성\\\",\\\"grade\\\":\\\"D\\\",\\\"deploy\\\":\\\"없음\\\",\\\"kind\\\":\\\"random\\\",\\\"origin\\\":\\\"auto\\\",\\\"presetName\\\":\\\"\\\",\\\"since\\\":29032360,\\\"born\\\":29032360,\\\"exploring\\\":false,\\\"situation\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\",\\\"trail\\\":[{\\\"m\\\":29032360,\\\"e\\\":1,\\\"text\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"소라 랜드\\\",\\\"pics\\\":[\\\"Situation Anomaly Amusement 1\\\",\\\"Situation Anomaly Amusement 2\\\",\\\"Situation Anomaly Generic City Skyline\\\",\\\"Situation Anomaly Generic City SideStreet\\\",\\\"Situation Anomaly\\\",\\\"Situation Anomaly\\\"]},\\\"startKey\\\":\\\"e36dc6b5-5b3a-4152-8f43-33b69a928475\\\"},{\\\"loc\\\":\\\"03-10\\\",\\\"name\\\":\\\"샛별 고시원\\\",\\\"state\\\":\\\"활성\\\",\\\"grade\\\":\\\"D\\\",\\\"deploy\\\":\\\"없음\\\",\\\"kind\\\":\\\"preset\\\",\\\"origin\\\":\\\"auto\\\",\\\"presetName\\\":\\\"샛별 고시원\\\",\\\"since\\\":29032380,\\\"born\\\":29032360,\\\"exploring\\\":false,\\\"situation\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\",\\\"trail\\\":[{\\\"m\\\":29032380,\\\"e\\\":2,\\\"text\\\":\\\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"샛별 고시원\\\",\\\"pics\\\":[\\\"Situation Anomaly Apartment 2\\\",\\\"Situation Anomaly Apartment 1\\\",\\\"Situation Anomaly Generic City SideStreet\\\",\\\"Situation Anomaly Generic City Skyline\\\",\\\"Situation Anomaly\\\",\\\"Situation Anomaly\\\"]},\\\"startKey\\\":\\\"01e43547-4cf1-4a1b-aba2-478f13309d4d\\\"}],\\\"inc\\\":[{\\\"loc\\\":\\\"02-6\\\",\\\"name\\\":\\\"관리국 본부\\\",\\\"state\\\":\\\"진행\\\",\\\"situation\\\":\\\"대형 추돌 사고로 도로가 통제되고 구급차가 몰려들고 있다\\\",\\\"kind\\\":\\\"landmark\\\",\\\"origin\\\":\\\"auto\\\",\\\"since\\\":29032360,\\\"born\\\":29032360,\\\"trail\\\":[{\\\"m\\\":29032360,\\\"e\\\":1,\\\"text\\\":\\\"대형 추돌 사고로 도로가 통제되고 구급차가 몰려들고 있다\\\"}],\\\"deploy\\\":\\\"없음\\\",\\\"art\\\":{\\\"for\\\":\\\"관리국 본부\\\",\\\"pics\\\":[\\\"Situation Incident Highway\\\",\\\"Situation Incident Street\\\",\\\"Situation Incident\\\",\\\"Situation Incident\\\"]},\\\"startKey\\\":\\\"e36dc6b5-5b3a-4152-8f43-33b69a928475\\\"}],\\\"ms\\\":[{\\\"loc\\\":\\\"17-8\\\",\\\"name\\\":\\\"착한 친구 키링 발견\\\",\\\"state\\\":\\\"출현\\\",\\\"visitors\\\":\\\"없음\\\",\\\"origin\\\":\\\"auto\\\",\\\"since\\\":29032360,\\\"born\\\":29032360,\\\"situation\\\":\\\"문을 열어 둔 채 조용히 손님을 기다리고 있다\\\",\\\"trail\\\":[{\\\"m\\\":29032360,\\\"e\\\":1,\\\"text\\\":\\\"문을 열어 둔 채 조용히 손님을 기다리고 있다\\\"}],\\\"art\\\":{\\\"for\\\":\\\"착한 친구 키링 발견\\\",\\\"pics\\\":[\\\"Situation Mystic Object\\\",\\\"Situation Mystic Bookshop\\\",\\\"Situation Mystic Workshop\\\",\\\"Situation Mystic Market\\\",\\\"Situation Mystic Vending\\\",\\\"Situation Mystic Room\\\",\\\"Situation Mystic Shop\\\",\\\"Situation Mystic Door\\\",\\\"Situation Mystic\\\",\\\"Situation Mystic\\\"]},\\\"startKey\\\":\\\"e36dc6b5-5b3a-4152-8f43-33b69a928475\\\"}],\\\"agents\\\":{\\\"P027\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P028\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P029\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P030\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P031\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P032\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P033\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P034\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P035\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P036\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P037\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true},\\\"P038\\\":{\\\"st\\\":\\\"내근\\\",\\\"situation\\\":\\\"본부 사무실에서 평소 업무를 보고 있다\\\",\\\"since\\\":29032360,\\\"dead\\\":0,\\\"tagged\\\":true}},\\\"retired\\\":[],\\\"promoted\\\":[],\\\"blocks\\\":{},\\\"skip\\\":{},\\\"pending\\\":{},\\\"notice\\\":\\\"\\\",\\\"ended\\\":[]}\",\"faction\":\"C00\",\"pick\":\"C00\",\"aff\":\"백일몽 주식회사\",\"pk\":\"e2ee293d-1938-4ffc-a3ce-28ee480a6f86\",\"k\":\"bc5d531e-d825-455c-b44d-a9415d593c30\",\"made\":[]}",
+   "$st_items": "",
+   "$it_carry_pc": "",
+   "$fac_codes": "",
+   "$fac_ac": "",
+   "$fac_pool": "",
+   "$fac_extra": "",
+   "$goei_world": "{\"v\":1,\"epoch\":4,\"minute\":29032400,\"an\":[{\"loc\":\"06-0\",\"name\":\"반짝반짝 용궁\",\"state\":\"활성\",\"grade\":\"D\",\"deploy\":\"없음\",\"kind\":\"preset\",\"origin\":\"auto\",\"presetName\":\"반짝반짝 용궁\",\"since\":29032360,\"born\":29032360,\"exploring\":false,\"situation\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\",\"trail\":[{\"m\":29032360,\"e\":1,\"text\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\"}],\"art\":{\"for\":\"반짝반짝 용궁\",\"pics\":[\"Situation Anomaly Generic City Skyline\",\"Situation Anomaly Generic City SideStreet\",\"Situation Anomaly\",\"Situation Anomaly\"]},\"startKey\":\"e36dc6b5-5b3a-4152-8f43-33b69a928475\"},{\"loc\":\"10-3\",\"name\":\"소라 랜드\",\"state\":\"활성\",\"grade\":\"D\",\"deploy\":\"없음\",\"kind\":\"random\",\"origin\":\"auto\",\"presetName\":\"\",\"since\":29032360,\"born\":29032360,\"exploring\":false,\"situation\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\",\"trail\":[{\"m\":29032360,\"e\":1,\"text\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\"}],\"art\":{\"for\":\"소라 랜드\",\"pics\":[\"Situation Anomaly Amusement 1\",\"Situation Anomaly Amusement 2\",\"Situation Anomaly Generic City Skyline\",\"Situation Anomaly Generic City SideStreet\",\"Situation Anomaly\",\"Situation Anomaly\"]},\"startKey\":\"e36dc6b5-5b3a-4152-8f43-33b69a928475\"},{\"loc\":\"03-10\",\"name\":\"샛별 고시원\",\"state\":\"활성\",\"grade\":\"D\",\"deploy\":\"없음\",\"kind\":\"preset\",\"origin\":\"auto\",\"presetName\":\"샛별 고시원\",\"since\":29032380,\"born\":29032360,\"exploring\":false,\"situation\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\",\"trail\":[{\"m\":29032380,\"e\":2,\"text\":\"이상 징후 신고가 들어왔지만 아직 대응 인원은 없다\"}],\"art\":{\"for\":\"샛별 고시원\",\"pics\":[\"Situation Anomaly Apartment 2\",\"Situation Anomaly Apartment 1\",\"Situation Anomaly Generic City SideStreet\",\"Situation Anomaly Generic City Skyline\",\"Situation Anomaly\",\"Situation Anomaly\"]},\"startKey\":\"01e43547-4cf1-4a1b-aba2-478f13309d4d\"}],\"inc\":[{\"loc\":\"02-6\",\"name\":\"관리국 본부\",\"state\":\"진행\",\"situation\":\"대형 추돌 사고로 도로가 통제되고 구급차가 몰려들고 있다\",\"kind\":\"landmark\",\"origin\":\"auto\",\"since\":29032360,\"born\":29032360,\"trail\":[{\"m\":29032360,\"e\":1,\"text\":\"대형 추돌 사고로 도로가 통제되고 구급차가 몰려들고 있다\"}],\"deploy\":\"없음\",\"art\":{\"for\":\"관리국 본부\",\"pics\":[\"Situation Incident Highway\",\"Situation Incident Street\",\"Situation Incident\",\"Situation Incident\"]},\"startKey\":\"e36dc6b5-5b3a-4152-8f43-33b69a928475\"}],\"ms\":[{\"loc\":\"17-8\",\"name\":\"착한 친구 키링 발견\",\"state\":\"출현\",\"visitors\":\"없음\",\"origin\":\"auto\",\"since\":29032360,\"born\":29032360,\"situation\":\"문을 열어 둔 채 조용히 손님을 기다리고 있다\",\"trail\":[{\"m\":29032360,\"e\":1,\"text\":\"문을 열어 둔 채 조용히 손님을 기다리고 있다\"}],\"art\":{\"for\":\"착한 친구 키링 발견\",\"pics\":[\"Situation Mystic Object\",\"Situation Mystic Bookshop\",\"Situation Mystic Workshop\",\"Situation Mystic Market\",\"Situation Mystic Vending\",\"Situation Mystic Room\",\"Situation Mystic Shop\",\"Situation Mystic Door\",\"Situation Mystic\",\"Situation Mystic\"]},\"startKey\":\"e36dc6b5-5b3a-4152-8f43-33b69a928475\"}],\"agents\":{\"P027\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P028\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P029\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P030\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P031\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P032\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P033\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P034\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P035\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P036\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P037\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true},\"P038\":{\"st\":\"내근\",\"situation\":\"본부 사무실에서 평소 업무를 보고 있다\",\"since\":29032360,\"dead\":0,\"tagged\":true}},\"retired\":[],\"promoted\":[],\"blocks\":{},\"skip\":{},\"pending\":{},\"notice\":\"\",\"ended\":[]}",
+   "$st_look": "7.1",
+   "$st_wallet": "{\"start\":140000,\"log\":[]}",
+   "$st_points": "{\"start\":0,\"log\":[{\"id\":\"ps_01e43547-4cf1-4a1b-aba2-478f13309d4d\",\"anchor\":\"01e43547-4cf1-4a1b-aba2-478f13309d4d\",\"amount\":5000,\"memo\":\"상태창 포인트\",\"src\":\"story\",\"at\":\"2026-11-24T03:30:40.337Z\"}]}"
+  },
+  "lastMemory": "NewChat",
+  "goeiPeopleV1": {
+   "schema": 1,
+   "people": {
+    "백석주": {
+     "name": "백석주",
+     "faction": "C00",
+     "seeded": {
+      "from": "lore",
+      "at": "2026-11-24T03:30:32.909Z",
+      "hash": "63reih"
+     },
+     "slots": {
+      "identity": [
+       {
+        "id": "ef1aorp",
+        "text": "Age: Late 30s",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 0
+       },
+       {
+        "id": "e5js6cq",
+        "text": "Gender: Female",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 1
+       },
+       {
+        "id": "ee1deja",
+        "text": "Organization: Baekilmong Co., Ltd.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 2
+       },
+       {
+        "id": "ee1000e",
+        "text": "Department: Development Division, Field Exploration Team, Elite A Jo",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 3
+       },
+       {
+        "id": "esxxcyq",
+        "text": "Role: Gwa-jang, Jo-jang of Elite A Jo. One of the few employees ever to have earned a wish voucher and lived to spend it.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 4
+       },
+       {
+        "id": "eb8wm8r",
+        "text": "Mask: Mallard duck",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 5
+       }
+      ],
+      "personality": [
+       {
+        "id": "eenhrtk",
+        "text": "Keeps rules and orders while allowing any means or methods; openly calls this the company's ideal employee.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 0
+       },
+       {
+        "id": "e177gx0d",
+        "text": "Genial boss warmth conceals ruthless screening: withholds survival manuals from scouted talent as an opportunity, smiling and promising to supply them if danger grows.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 1
+       },
+       {
+        "id": "e1ecqlc3",
+        "text": "Fiercely protective of her own. She will push herself to collapse trying to force a rescue of a doomed subordinate, and her first words on waking will be about her people.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 2
+       },
+       {
+        "id": "e1rj1ync",
+        "text": "The protection ends at the Jo boundary. She heals her own with her ring and walks past wounded outsiders unless someone prompts her.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 3
+       },
+       {
+        "id": "ev89v1a",
+        "text": "Enduring grudge against D Jo's leader for coldly standing by while one of hers died; colleagues hear it repeated annually.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 4
+       },
+       {
+        "id": "e1elcgjq",
+        "text": "A kkondae to the bone. Unsolicited success-in-society life lessons arrive attached to every offer.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 5
+       },
+       {
+        "id": "e20g47r",
+        "text": "[Flaws] The grudge costs her judgment. Anger at the wrong target has let the actually responsible party walk away unpressed.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 6
+       }
+      ]
+     },
+     "affinity": {
+      "base": 0
+     },
+     "address": {
+      "toUser": "막내",
+      "register": "혼합"
+     },
+     "express": 2,
+     "aliases": [
+      "백석주 과장",
+      "백석주 조장",
+      "청둥오리",
+      "오리 조장",
+      "A조 조장",
+      "Baek Seok-ju"
+     ],
+     "axes": {
+      "relationalInitiative": 50,
+      "expressionDirectness": 50,
+      "emotionalExpressiveness": 60,
+      "guardedness": 50,
+      "impulsivity": 50,
+      "relationshipPersistence": 50
+     },
+     "axesFrom": "default",
+     "patterns": [],
+     "candidates": {},
+     "origin": "e36dc6b5-5b3a-4152-8f43-33b69a928475"
+    },
+    "진나솔": {
+     "name": "진나솔",
+     "faction": "C00",
+     "seeded": {
+      "from": "lore",
+      "at": "2026-11-24T03:30:40.429Z",
+      "hash": "1cz975v"
+     },
+     "slots": {
+      "identity": [
+       {
+        "id": "e1u2f7d0",
+        "text": "Age: Late 20s",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 0
+       },
+       {
+        "id": "e1kptxys",
+        "text": "Gender: Female",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 1
+       },
+       {
+        "id": "ejp3298",
+        "text": "Organization: Baekilmong Co., Ltd.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 2
+       },
+       {
+        "id": "e13nus8c",
+        "text": "Department: Development Division, Field Exploration Team, Elite A Jo",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 3
+       },
+       {
+        "id": "e1uo0c9d",
+        "text": "Role: Dae-ri. Named together with Lee Seonghae as the two most capable non-executives in the company.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 4
+       },
+       {
+        "id": "e1nn89t9",
+        "text": "Mask: Butterfly, gold-marked",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 5
+       }
+      ],
+      "personality": [
+       {
+        "id": "e1pbazo5",
+        "text": "Irritable, ruled by points and efficiency; wants to finish, be paid and leave. Wasting a minute offends her.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 0
+       },
+       {
+        "id": "e1t10xr5",
+        "text": "The first impulse is brutal speed, but point calculations repeatedly overrule violence in favor of smarter solutions.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 1
+       },
+       {
+        "id": "erxt281",
+        "text": "Values results, autonomy and silence. Kills or maims for objectives, stops when unprofitable; has kicked a bound subordinate aside and used him as a shield.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 2
+       },
+       {
+        "id": "ei89jrx",
+        "text": "Accepts sound counterarguments, falls silent and sits down; immediately apologizes when genuinely wrong, resenting every second.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 3
+       },
+       {
+        "id": "evx9lzv",
+        "text": "Exploitable intelligence brings rare euphoria: even through combat migraines, deducing a secret from an enemy's protective reflex delights her for the points it promises.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 4
+       },
+       {
+        "id": "eive86b",
+        "text": "Correctly observes hierarchy: contemptuous downward, listens properly when an I-sa speaks out of duty, no further loyalty implied.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 5
+       },
+       {
+        "id": "envx1zi",
+        "text": "Becomes dangerous when delayed; a better payout instantly redirects her, even from previous orders.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 6
+       },
+       {
+        "id": "ebb3ix8",
+        "text": "Pain shortens her patience without erasing her ability to calculate routes, timing, and bodily limits. Relief makes cooperation easier, while her priorities remain efficiency and payment.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 7
+       },
+       {
+        "id": "eywptfa",
+        "text": "Practical trust grows through competent work: covering an escape, protecting the person operating a necessary device, and accepting a better plan.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 8
+       },
+       {
+        "id": "e1yeb61b",
+        "text": "Recognizes when her own compromised judgment has become a danger to the group and can hand responsibility to someone still capable of reasoning.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 9
+       },
+       {
+        "id": "e1meev2z",
+        "text": "Helping a partner and demanding her proper share afterward fit together comfortably in her view of work.",
+        "src": "seed",
+        "anchor": "#0",
+        "seq": 10
+       }
+      ]
+     },
+     "affinity": {
+      "base": 0
+     },
+     "address": {
+      "toUser": "신입",
+      "register": "혼합"
+     },
+     "express": 1,
+     "aliases": [
+      "진나솔 대리",
+      "나솔",
+      "나비 가면",
+      "Jin Na-sol"
+     ],
+     "axes": {
+      "relationalInitiative": 50,
+      "expressionDirectness": 50,
+      "emotionalExpressiveness": 35,
+      "guardedness": 50,
+      "impulsivity": 50,
+      "relationshipPersistence": 50
+     },
+     "axesFrom": "default",
+     "patterns": [],
+     "candidates": {},
+     "origin": "01e43547-4cf1-4a1b-aba2-478f13309d4d"
+    }
+   },
+   "factions": {},
+   "docs": {},
+   "log": [],
+   "folded": {},
+   "read": {
+    "e36dc6b5-5b3a-4152-8f43-33b69a928475": "d6ucvz",
+    "01e43547-4cf1-4a1b-aba2-478f13309d4d": "1prmvpp",
+    "bc5d531e-d825-455c-b44d-a9415d593c30": "8ow2qz"
+   },
+   "pending": {},
+   "ignored": [],
+   "identity": {
+    "faction": "C00",
+    "rank": "사원",
+    "level": 1,
+    "from": "status",
+    "anchor": "e36dc6b5-5b3a-4152-8f43-33b69a928475"
+   }
+  }
+ },
+ "folders": [],
+ "t2": {
+  "name": "S-백일몽-3턴",
+  "plugin": "0.21.34",
+  "goeiCommit": "5279cff",
+  "risuCommit": "996a5535fdb4629258331955982693a74ea209de",
+  "order": 4,
+  "flow": "백일몽 주식회사 · 직접 입력",
+  "made": "새 채팅 → 시작 패널 {\"fac\":\"C00\",\"player\":\"\",\"scene\":\"직접 입력\",\"situation\":\"백일몽 본사, 개발부 현장탐사팀으로 첫 출근한 날 아침. 사원증을 받고 팀 사무실로 간다.\"} → 본편 3턴 (대본 답, 보조는 Router·Director 빈 목록·그 밖 '{}')",
+  "contents": {
+   "faction": "C00",
+   "player": "",
+   "pointsOn": "1",
+   "wallet": "{\"start\":140000,\"log\":[]}",
+   "lastStatus": "[▣|2025.03.14|09:20 AM|☀️|12°C|서울 강남구 백일몽 본사 개발부 현장탐사팀 사무실|없음|진나솔|없음|백일몽/사원|140000|5000]",
+   "messages": 6,
+   "people": 2,
+   "turns": 3,
+   "statusFields": [
+    "날짜",
+    "시각",
+    "날씨",
+    "기온",
+    "위치",
+    "목표",
+    "동행",
+    "투입",
+    "신분",
+    "잔고",
+    "포인트"
+   ]
+  },
+  "exportedAt": "2026-11-24T03:30:52.236Z",
+  "fromChatPage": 0,
+  "nChatsAtExport": 2,
+  "charName": "괴이 ː ANOMALY",
+  "cardLoreHash": -224935923,
+  "cardLoreLen": 229605,
+  "pluginStorage": {
+   "goei:prefs": "{\"basic\":{},\"world\":{},\"look\":\"7.1\"}"
+  }
+ }
+}

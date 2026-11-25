@@ -1,0 +1,24 @@
+92c92
+<   const t = await openT2({ via: 'plain', fake: FAKE, ...o });
+---
+>   const t = await openT2({ via: 'plain', fake: FAKE, out: OUT, ...o });
+11c11
+< } from '../../../../../tests/qc-host.mjs';
+---
+> } from '/home/user/goei/tests/qc-host.mjs';
+40c40
+< { const raw = readFileSync(new URL('../../../../../지침/이동_임무_지시문.txt', import.meta.url), 'utf8'); for (const m of raw.matchAll(/===([A-Z]+)===\n([\s\S]*?)(?====|$)/g)) DIR[m[1]] = m[2].trim(); }
+---
+> { const raw = readFileSync('/home/user/goei/지침/이동_임무_지시문.txt', 'utf8'); for (const m of raw.matchAll(/===([A-Z]+)===\n([\s\S]*?)(?====|$)/g)) DIR[m[1]] = m[2].trim(); }
+6c6
+< import { launch, boot, startChat, request, output, setVars, setSaveFail, clearSaveFail, saveFails, counts, testBodyCode } from '../../../../tests/qc-host.mjs';
+---
+> import { launch, boot, startChat, request, output, setVars, setSaveFail, clearSaveFail, saveFails, counts, testBodyCode } from '/home/user/goei/tests/qc-host.mjs';
+5c5
+< import { launch, boot, startChat, request, output, setVars, setSaveFail, clearSaveFail, saveFails, testBodyCode } from '../../../../tests/qc-host.mjs';
+---
+> import { launch, boot, startChat, request, output, setVars, setSaveFail, clearSaveFail, saveFails, testBodyCode } from '/home/user/goei/tests/qc-host.mjs';
+31c31
+<   await t.shot(`../../I/out/run5-${mode}-after-reroll-failed`);
+---
+>   await t.shot(`run5-${mode}-after-reroll-failed`);
