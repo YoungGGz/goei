@@ -39,7 +39,7 @@ import { SHOP_AMOUNTS, isGiveKey, isGiveShop, isShopAmount, isShopFn, shopAmount
 import { SHOP_SHELF_HI, SHOP_SHELF_LO, SHOP_SHELF_VAR, SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags, SHOP_LIMITS, isShopLimit } from '../core/shop';
 import { BM_ORDERS_KEEP_VAR, COS_ORDERS_KEEP_VAR, ORDERS_KEEP_RANGE } from '../core/orders';
 import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT, WALLET_CAP_MAX, WALLET_CAP_MIN, WALLET_CAP_VAR, walletCapOf } from '../core/wallet';
-import { updateChat, type ChatContext } from '../host/risu';
+import { updateChatOf, type ChatContext } from '../host/risu';
 import { barButtons, directoryBar, directoryDone, directoryDoneClear, directorySearch, directoryView } from './directory';
 import { drawerBox } from './drawer';
 import { toast } from './toast';
@@ -565,7 +565,7 @@ export async function bulkShopOff(ctx: ChatContext): Promise<void> {
 }
 
 async function dropShopTags(ctx: ChatContext): Promise<void> {
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const list = chat.message ?? [];
     if (!list.some((m) => m.role === 'char' && hasShopTag(String(m.data ?? '')))) return null;
     return { ...chat, message: list.map((m) => (m.role === 'char' && hasShopTag(String(m.data ?? '')) ? { ...m, data: stripShopTags(String(m.data)) } : m)) };
@@ -613,7 +613,7 @@ async function save(ctx: ChatContext, env: SettingsEnv, change: (chat: Chat) => 
   settingsUi.notice = '';
   env.render();
   try {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (latest) => {
+    await updateChatOf(ctx, (latest) => {
       const vars = change(latest);
       return vars ? { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...vars } } : null;
     });

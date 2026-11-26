@@ -38,7 +38,7 @@ import { advChipRow, advRow, advSetRow } from './advanced';
 import { fitPrompt } from '../core/budget';
 import { personaText } from '../host/user';
 import { playerSource } from '../core/player';
-import { SAVE_DENIED, updateChat, type ChatContext } from '../host/risu';
+import { SAVE_DENIED, updateChatOf, type ChatContext } from '../host/risu';
 import { isPhone } from './media';
 import { isWaiting, onWaiting } from '../host/waiting';
 
@@ -234,7 +234,7 @@ function viewingRoom(env: PhoneEnv): string | null {
 function generate(ctx: ChatContext, env: PhoneEnv, rid: string, label: string) {
   return run(ctx, env, label, '대화 갱신', async () => {
     const req = token();
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    const saved = await updateChatOf(ctx, (chat) => {
       const st = readPhone(chat);
       const r = st.rooms[rid];
       if (!r?.pending) return null;
@@ -257,7 +257,7 @@ function generate(ctx: ChatContext, env: PhoneEnv, rid: string, label: string) {
       throw new PhoneError(msg, (error as { raw?: string }).raw ?? raw);
     }
     let note = '';
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    await updateChatOf(ctx, (chat) => {
       const cur = readPhone(chat);
       const room = cur.rooms[rid];
       if (!room?.pending || (room.pending as { request?: string }).request !== req) {
@@ -279,7 +279,7 @@ function generate(ctx: ChatContext, env: PhoneEnv, rid: string, label: string) {
 }
 
 async function markFailed(ctx: ChatContext, rid: string, req: string) {
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const st = readPhone(chat);
     const r = st.rooms[rid];
     if (!r?.pending || (r.pending as { request?: string }).request !== req) return null;
@@ -298,7 +298,7 @@ async function send(ctx: ChatContext, env: PhoneEnv, rid: string, text: string) 
     return env.render();
   }
   let giftBlocked = false;
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  const saved = await updateChatOf(ctx, (chat) => {
     const st = readPhone(chat);
     const r = st.rooms[rid];
     if (!r || r.pending) return null;
@@ -349,7 +349,7 @@ async function roomRefresh(ctx: ChatContext, env: PhoneEnv, rid: string) {
     phone.notice = `${why} 내가 보낸 메시지의 답장에는 이 제한이 없어요.`;
     return env.render();
   }
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  const saved = await updateChatOf(ctx, (chat) => {
     const cur = readPhone(chat);
     const room = cur.rooms[rid];
     if (!room || room.pending) return null;
@@ -384,7 +384,7 @@ async function createGroup(ctx: ChatContext, env: PhoneEnv) {
   }
   let rid = '';
   let error = '';
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  const saved = await updateChatOf(ctx, (chat) => {
     const st = readPhone(chat);
     const time = phoneTime(chat);
     if (inviteRoom) {
@@ -468,7 +468,7 @@ export function refreshInbox(ctx: ChatContext, env?: PhoneEnv, automatic = false
     let note = '';
     // 자동 확인은 사용자가 다음 말을 보낸 뒤에 끝날 수 있다: 본편 응답을 기다리는 동안에는 저장하지 않고, 대기가 풀린 뒤 앞 메시지가 그대로인지 확인하고 저장한다
     if (automatic) await park();
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    await updateChatOf(ctx, (chat) => {
       // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
       if (automatic && !chatPrefixKept(ctx.chat, chat)) {
         note = '채팅이 바뀌어서 이번 자동 확인 결과는 저장하지 않았어요.';
@@ -542,7 +542,7 @@ export async function autoRefresh(ctx: ChatContext, messageIndex: number, env?: 
   // 턴 열쇠: 같은 턴의 응답을 다시 굴려도 다시 부르지 않는다 (core/shop.ts turnKeyAt)
   const stamp = turnKeyAt(ctx.chat, messageIndex);
   if (String(ctx.chat.scriptstate?.[PH_AUTO_LAST] ?? '') === stamp) return;
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [PH_AUTO_LAST]: stamp } }));
+  const saved = await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [PH_AUTO_LAST]: stamp } }));
   if (!saved) return;
   try {
     directory(ctx.char.globalLore, saved);
@@ -563,7 +563,7 @@ export async function autoView(ctx: ChatContext, messageIndex: number, env?: Pho
   if (!data.trim()) return;
   const stamp = turnKeyAt(ctx.chat, messageIndex);
   if (String(ctx.chat.scriptstate?.[PH_VIEW_LAST] ?? '') === stamp) return;
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [PH_VIEW_LAST]: stamp } }));
+  const saved = await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [PH_VIEW_LAST]: stamp } }));
   if (!saved) return;
   const notice = phone.notice;
   await makeView({ ...ctx, chat: saved }, env ?? envForAuto(ctx), true);
@@ -588,7 +588,7 @@ export function openCheck(ctx: ChatContext, env: PhoneEnv): void {
 export async function readOpenRoom(ctx: ChatContext, env: PhoneEnv): Promise<void> {
   if (!env.visible() || phone.view !== 'room' || !phone.room) return;
   const rid = phone.room;
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  const saved = await updateChatOf(ctx, (chat) => {
     const st = readPhone(chat);
     const r = st.rooms[rid];
     if (!r) return null;
@@ -606,7 +606,7 @@ async function openDm(ctx: ChatContext, env: PhoneEnv, cid: string) {
   if (!c) return;
   const rid = `dm_${c.id}`;
   stashDraft(ctx);
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const st = readPhone(chat);
     dropEmpty(ctx, st, rid);
     const r = st.rooms[rid];
@@ -649,7 +649,7 @@ function dropEmpty(ctx: { charIndex: number; chatIndex: number }, st: PState, ke
 
 async function openRoom(ctx: ChatContext, env: PhoneEnv, rid: string) {
   stashDraft(ctx);
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const st = readPhone(chat);
     const r = st.rooms[rid];
     if (!r) return null;
@@ -662,7 +662,7 @@ async function openRoom(ctx: ChatContext, env: PhoneEnv, rid: string) {
 }
 
 async function mutate(ctx: ChatContext, env: PhoneEnv, f: (st: PState, chat: Chat) => boolean | void, extra: (chat: Chat) => Record<string, string> = () => ({})) {
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const st = readPhone(chat);
     if (f(st, chat) === false) return null;
     return writePhone(chat, st, extra(chat));
@@ -671,7 +671,7 @@ async function mutate(ctx: ChatContext, env: PhoneEnv, f: (st: PState, chat: Cha
 }
 
 async function setVars(ctx: ChatContext, env: PhoneEnv, vars: Record<string, string>) {
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+  await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
   await env.refresh();
 }
 
@@ -686,7 +686,7 @@ async function placeCall(ctx: ChatContext, env: PhoneEnv, target: string, purpos
     phone.notice = '상대 이름을 확인해 주세요. (60자 이내, 줄바꿈·괄호 없이)';
     return env.render();
   }
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const message = (chat.message ?? []).slice();
     const last = message[message.length - 1];
     const record = callRecord(target.trim(), purpose);
@@ -902,7 +902,7 @@ function makeView(ctx: ChatContext, env: PhoneEnv, automatic = false, contId = '
     let roomName = value.name;
     // 본편 응답을 기다리는 동안에는 저장하지 않는다 (refreshInbox 와 같음)
     if (automatic) await park();
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    await updateChatOf(ctx, (chat) => {
       // 그 사이 새 메시지가 붙기만 했으면 받은 결과는 요청한 턴의 것이라 그대로 넣는다. 앞 메시지가 바뀌었을 때만 버린다
       if (automatic && !chatPrefixKept(ctx.chat, chat)) {
         note = '채팅이 바뀌어서 이번 보기 전용 방은 저장하지 않았어요.';
@@ -1654,7 +1654,7 @@ async function addContact(ctx: ChatContext, env: PhoneEnv) {
     phone.notice = '이 소속에는 직접 추가한 연락처가 들어갈 탭이 열려 있지 않아요. 설정에서 「모든 연락처 공개」를 켤 수 있어요.';
     return env.render();
   }
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const data = readCustom(chat);
     if (match) data.items.push({ id: match.id, name: match.name, agentId: match.agentId });
     else {
@@ -1669,7 +1669,7 @@ async function addContact(ctx: ChatContext, env: PhoneEnv) {
 
 async function deleteContact(ctx: ChatContext, env: PhoneEnv, cid: string) {
   if (phoneBusy(ctx)) return;
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const data = readCustom(chat);
     data.items = data.items.filter((x) => x.id !== cid);
     const st = readPhone(chat);

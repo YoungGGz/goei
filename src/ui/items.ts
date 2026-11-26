@@ -7,7 +7,7 @@
 // 플러그인은 막지도 경고하지도 않는다: 칸이 넘치면 넘친 칸을 붉은 테두리로 보여 줄 뿐, 푸는 건 본편 응답 (core/items.ts).
 import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
-import { updateChat } from '../host/risu';
+import { updateChat, updateChatOf } from '../host/risu';
 import { freeUseLock, refreshUseBox, useLocked, useSending, useSentTurn } from '../host/usebox';
 import { itemIconStatus, itemIconUrl, itemPictures } from '../host/itemicons';
 import { aliveAnchors } from '../core/wallet';
@@ -457,7 +457,7 @@ export interface ItemsEnv {
 
 /** 소지품 메뉴의 data-action. 처리했으면 true. form 은 폼 요소를 넘긴다 (items-save) */
 export async function itemsAction(action: string, value: string | undefined, ctx: ChatContext, env: ItemsEnv, formEl?: HTMLElement | null): Promise<boolean> {
-  const write = (fn: (it: Items, alive: Set<string>) => Items) => updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  const write = (fn: (it: Items, alive: Set<string>) => Items) => updateChatOf(ctx, (chat) => {
     const alive = aliveAnchors(chat);
     // 사라진 응답이 바꾼 칸은 옛 값으로 굳힌 뒤 고친다. 손으로 바꾼 칸은 본문이 바꾼 기록에서 빼어, 그 응답을 다시 굴려도 손으로 정한 값이 남는다 (core/items.ts noteEdits)
     const cur = settleEdits(readItems(chat.scriptstate), alive);
@@ -549,7 +549,7 @@ export async function itemsAction(action: string, value: string | undefined, ctx
       const keep = itemsUi.open;
       if (!keep || !value) return true;
       let held = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const vars = chat.scriptstate;
         const q = readItemUse(vars);
         // 답을 기다리는 중에는 사용에 넣은 줄을 합치지 않는다: 줄이 사라지면 모델은 쓴 것으로 받았는데 기록·횟수가 안 맞았다 (11-14 재검토)
@@ -803,7 +803,7 @@ type UseHeld = 'wait' | 'sending';
  *  id 물건이 「보내는 중」이면 바꾸지 않는다 (보낸 뒤 「한 번 더」로 횟수가 보낸 것보다 더 깎이던 것, 11-14 사용자) */
 async function queueUse(ctx: ChatContext, fn: (q: ItemUse[]) => ItemUse[], id: string): Promise<UseHeld | ''> {
   let held: UseHeld | '' = '';
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     held = lockedHere(ctx) ? 'wait' : useSending(chat, ctx.charIndex, ctx.chatIndex, id) ? 'sending' : '';
     if (held) return null;
     // 자리 바꾸기·지난 자리 사본은 core/items.ts queueUseVars

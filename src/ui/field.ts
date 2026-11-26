@@ -14,7 +14,7 @@ import {
 import { buildClosures, journalSettings, recordVars } from '../core/journal';
 import { chatCardsAt, refreshStatusContext } from '../host/statusview';
 import { assetUrl } from '../host/assets';
-import { nudgeMessages, updateChat, type CharacterSnapshot, type ChatContext } from '../host/risu';
+import { nudgeMessages, updateChatOf, type CharacterSnapshot, type ChatContext } from '../host/risu';
 import { noticeClass, sendNow } from '../host/send';
 import { markUnsent, withdrawUnsentAt } from '../host/unsent';
 import { isWaiting } from '../host/waiting';
@@ -632,7 +632,7 @@ async function compose(ctx: ChatContext, env: FieldEnv, build: (latest: Chat, x:
   env.setNotice('');
   env.render();
   try {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (latest) => {
+    await updateChatOf(ctx, (latest) => {
       if (isWaiting()) throw new DirectiveError(WAIT_SEND_NOTE);
       const x = ctxOf(ctx, latest);
       return build(latest, x).chat;
@@ -765,7 +765,7 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
   env.setNotice('');
   try {
     let closedAt = -1;
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (latest) => {
+    const saved = await updateChatOf(ctx, (latest) => {
       const x = ctxOf(ctx, latest);
       const w = structuredClone(x.world);
       const err = change(w, x);
@@ -788,7 +788,7 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
     if (saved && closedAt >= 0) {
       try {
         await refreshStatusContext(ctx.charIndex, ctx.chatIndex, { chat: saved, char: ctx.char });
-        if (chatCardsAt(saved, closedAt).length) await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => nudgeMessages(cur, (_d, i) => i === closedAt));
+        if (chatCardsAt(saved, closedAt).length) await updateChatOf(ctx, (cur) => nudgeMessages(cur, (_d, i) => i === closedAt));
       } catch {
         /* 다시 못 그려도 종료는 저장됐다 (다음 저장·채팅 전환 때 보인다) */
       }

@@ -4,7 +4,7 @@ import type { Chat } from '../core/types';
 import { bookText } from '../core/refs';
 import { generate, runModel, LlmError, type LlmMessage } from './llm';
 import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, repairDirector, runSearches, type DirectorInput, type DirectorNote } from '../core/people/director';
-import { loadContext, updateChat, type ChatContext } from './risu';
+import { loadContext, updateChatOf, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
 import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, dropGonePeople, pruneScene, undoGoneRenames } from '../core/people/store';
 import { foldCues, foldOpenness, pruneEntries, pruneNotes } from '../core/people/prune';
@@ -364,7 +364,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   const held: string[] = [];
   const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity, roster, confirm: settings.newPeople === 'confirm', held, factions: factionNamesOf(ctx.char.globalLore) });
   if (seeded.length || held.length || idChanged || dropped.length) {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
+    await updateChatOf(ctx, (cur) => {
       const s = peopleStore(cur);
       dropExcluded(s, exclude);
       for (const n of seeded) {
@@ -483,7 +483,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       // 쓰기: 응답 대기 중이면 기다리고, 같은 채팅인지·메시지가 그대로인지 확인
       await waitNotBusy();
       const keys = new Map([...input.tags.values()].map((i) => [i, messageKey(fresh.chat.message[i], i)]));
-      const saved = await updateChat(fresh.charIndex, fresh.chatIndex, (cur) => {
+      const saved = await updateChatOf(fresh, (cur) => {
         if (chatId({ ...fresh, chat: cur }) !== id) return null;
         for (const [i, k] of keys) if (!cur.message[i] || messageKey(cur.message[i], i) !== k) return null;
         const s = peopleStore(cur);
@@ -620,7 +620,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   }
   if (clearUndo && batchFailed) {
     const undo: ClearUndo = clearUndo;
-    const back = await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
+    const back = await updateChatOf(ctx, (cur) => {
       if (chatId({ ...ctx, chat: cur }) !== id) return null;
       const s = peopleStore(cur);
       restoreClearUndo(s, undo);
@@ -749,7 +749,7 @@ async function consolidateInner(ctx: ChatContext, name: string, settings: People
     diag.raw = raw;
     diag.outChars = raw.length;
     await waitNotBusy();
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
+    const saved = await updateChatOf(ctx, (cur) => {
       if (chatId({ ...ctx, chat: cur }) !== id) return null;
       const s = peopleStore(cur);
       diag.tidy = applyConsolidate(s, name, input, value, liveness(cur), settings);

@@ -6,7 +6,7 @@ import { ADV, advChanged, advItem, advValue, advVar, type AdvFeature, type AdvIt
 import { ACTIVE_BOOKS_VAR, activeBooks, bookNames, toggleActiveBook, type RefSource } from '../core/refs';
 import { getPrefs } from '../core/settings';
 import { savePrefs } from '../host/prefs';
-import { updateCharacterLore, updateChat, type ChatContext } from '../host/risu';
+import { updateCharacterLore, updateChatOf, type ChatContext } from '../host/risu';
 import { syncDecorators, type LoreMode } from '../core/lore';
 import { fnSet, type FnFeature } from '../core/reffn';
 import { keepOpen } from './panels';
@@ -214,7 +214,7 @@ export async function handleAdvanced(action: string, value: string | undefined, 
       env.render();
       return true;
     }
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [ACTIVE_BOOKS_VAR]: toggleActiveBook(chat.scriptstate, v) } }));
+    await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [ACTIVE_BOOKS_VAR]: toggleActiveBook(chat.scriptstate, v) } }));
     await env.refresh();
     return true;
   } else return false;
@@ -235,7 +235,7 @@ export async function handleAdvanced(action: string, value: string | undefined, 
     env.render();
     return true;
   }
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...patch } }));
+  const saved = await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...patch } }));
   // 로어북 보내는 방식을 바꾸면 카드 로어북 첫 줄(@@dont_activate)도 바로 맞춘다
   const mode = advValue(saved?.scriptstate, 'gen', 'lore_mode') as LoreMode;
   if (syncDecorators(ctx.char.globalLore, mode)) await updateCharacterLore(ctx.charIndex, (lore) => syncDecorators(lore, mode)).catch(() => false);

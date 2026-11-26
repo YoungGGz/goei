@@ -12,7 +12,7 @@ import type { Faction, FactionCode, LangCode, LoreEntry, Manifest } from '../cor
 import {
   activeEvents, type Catalog, endedShown, codesToNames, factionNames, lastStatusFields, locName, parseCatalog, readWorld, rosterFor, startWorldVars, agentLocked, readDirectory, worldOn,
 } from '../core/world';
-import { loadContext, onSaveDenied, SAVE_DENIED, updateChat, type ChatContext } from '../host/risu';
+import { loadContext, onSaveDenied, SAVE_DENIED, updateChat, updateChatOf, type ChatContext } from '../host/risu';
 import { isWaiting, onWaiting } from '../host/waiting';
 import { freeUseLock } from '../host/usebox';
 import { prepareBaseDocs } from '../core/wiki';
@@ -978,7 +978,7 @@ async function close(): Promise<void> {
 async function stagedTheme(ctx: ChatContext, value: string | undefined): Promise<void> {
   if (value !== 'light' && value !== 'dark' && value !== 'paper') return;
   try {
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) =>
+    const saved = await updateChatOf(ctx, (chat) =>
       chatPhase(chat, isWaiting()) === 'started' || chat.scriptstate?.['$st_fixed_theme'] === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), $st_fixed_theme: value } },
     );
     if (saved) ctx.chat = saved;
@@ -1343,7 +1343,7 @@ async function handle(action: string, value?: string): Promise<void> {
       // 로그아웃해도 $br_nick 은 남겨 다음 로그인 창에 미리 채운다 (11-09 사용자: 로그아웃하면 닉네임이 날아갔다)
       const vars: Record<string, string> = { $br_login: nick ? '1' : '0', [GN_NICK]: nick };
       if (nick) vars.$br_nick = nick;
-      const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+      const saved = await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
       if (saved) ctx.chat = saved;
       return render();
     }
@@ -1399,7 +1399,7 @@ async function handle(action: string, value?: string): Promise<void> {
     case 'wallet-del': {
       if (view.kind !== 'started' || !value || !walletEditable(view.ctx.chat.scriptstate)) return;
       const ctx = view.ctx;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         if (walletTabUi.kind === 'p') return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(removeWalletEntry(readPoints(chat.scriptstate), value ?? '')) } };
         const w = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(removeWalletEntry(w, value ?? '')) } };
@@ -1417,7 +1417,7 @@ async function handle(action: string, value?: string): Promise<void> {
       // 범위는 원·포인트 같이 본다 (전수점검 사소-29: 원은 1조가 넘어도 안내 없이 창이 닫히고 잔고는 그대로였다). 맞춤 거래(차액)가 범위를 넘어도 같은 안내
       let over = Math.abs(n) > WALLET_MAX;
       const ctx = view.ctx;
-      if (!over) await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      if (!over) await updateChatOf(ctx, (chat) => {
         const alive = aliveAnchors(chat);
         if (pts) {
           const p = readPoints(chat.scriptstate);
@@ -1514,7 +1514,7 @@ async function start(): Promise<void> {
     if (plan.kind === 'direct' && !situation) throw new StartError('시작할 상황을 적어 주세요.');
     // 시작 메시지: 자동 전송 없이 첫 장면 아래에 「적고 전송」 안내 (Risu가 첫 장면을 다시 그리기 전에 켠다)
     setOpeningHint(plan.kind === 'opening' ? (plan.scene ?? null) : null);
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    const saved = await updateChatOf(ctx, (chat) => {
       if (chatPhase(chat, isWaiting()) === 'started') throw new StartError(isWaiting() ? WAIT_SEND_NOTE : '그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
       const next = applyStart(chat, plan, '', isWaiting());
       if (situation) next.message = [...(next.message ?? []), newMessage(startRecord(situation))];
@@ -1561,7 +1561,7 @@ async function turnWorldOn(): Promise<void> {
   render();
   try {
     const catalog = parseCatalog(ctx.char.globalLore);
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    await updateChatOf(ctx, (chat) => {
       if (worldOn(chat)) return null;
       const faction = String(chat.scriptstate?.['$st_faction'] ?? '');
       return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...startWorldVars(catalog, worldSettings(ctx.char.globalLore, chat.scriptstate), faction, Math.random, String(chat.scriptstate?.['$st_player'] ?? '')) } };

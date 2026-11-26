@@ -40,7 +40,7 @@ import { cleanOutput, hasWorldTags, parseCatalog, processOutput, readDirectory, 
 import { basicSettings, missingBasicVars, worldSettings } from './core/settings';
 import { staleFactionVars } from './core/factions';
 import { supplementAssets } from './host/asset';
-import { loadContext, updateCharacterLore, updateChat, nudgeMessages, getChar, type ChatContext, type CharacterSnapshot } from './host/risu';
+import { loadContext, locateChat, updateCharacterLore, updateChat, updateChatOf, nudgeMessages, getChar, type ChatContext, type CharacterSnapshot } from './host/risu';
 import { WatchState, type WatchSnapshot } from './core/watch';
 import { createFab, type Fab } from './host/overlay';
 import { createProgWin, progressOn, type ProgWin } from './host/progwin';
@@ -633,6 +633,8 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const raw0 = arg.char as { globalLore?: LoreEntry[] } | null;
     const chat = arg.chat as Chat | null;
     if (!raw0 || !chat || !isGoeiLore(raw0.globalLore)) return; // 다른 봇: 아무것도 안 함
+    // 뒤 작업의 저장은 이 응답의 채팅에 (도는 사이 Risu 에서 채팅 번호가 밀려도, 3차 점검 R09)
+    const at = { charIndex: arg.characterIndex, chatIndex: arg.chatIndex, chat };
     // 이벤트의 캐릭터는 카드 그대로라 세계 데이터(가상 로어북)가 없다. 경량 카드는 명부 폴더가 가상이라 이걸 빼면 상황판 처리가 통째로 건너뛰어진다 (2026-10-27)
     const char = { ...raw0, globalLore: withWorldLore(raw0.globalLore) };
     const raw = chat.message?.[arg.messageIndex]?.data;
@@ -643,7 +645,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 답을 기다리는 중에 「취소」로 물린 요청의 답이 늦게 왔다: 물린 요청이니 채팅에 남기지 않고(빈 채팅에 답만 혼자 붙었다, 3차 점검 R30) 아무 처리도 하지 않는다
     if (wasWithdrawn(arg.characterIndex, arg.chatIndex, chat)) {
       forgetWithdrawn();
-      await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      await updateChatOf(at, (cur) => {
         const list = cur.message ?? [];
         return arg.messageIndex === list.length - 1 && list[arg.messageIndex]?.role === 'char' ? { ...cur, message: list.slice(0, -1) } : null;
       }).catch(() => null);
@@ -654,7 +656,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     let latest: Chat | null = null;
     if (chat.scriptstate?.['$st_anomaly_on'] === '1') {
       const catalog = parseCatalog(char.globalLore);
-      latest = await updateChat(arg.characterIndex, arg.chatIndex, (cur) =>
+      latest = await updateChatOf(at, (cur) =>
         processOutput(cur, arg.messageIndex, raw, catalog, worldSettings(char.globalLore, cur.scriptstate), Math.random),
       );
     }
@@ -664,7 +666,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const walletStart = getPrefs().walletStart ?? WALLET_START_DEFAULT;
     // 설정 「상태창 잔고 따르기」를 끄면 맞추지 않는다 (장부 값만 믿고, 다음 요청의 [Previous status] 잔고를 장부로 덮는다)
     if (colConfig(chat.scriptstate).wallet !== 'off' && walletSyncOn(chat.scriptstate) && syncWalletToStatus(readWallet((latest ?? chat).scriptstate, walletStart), latest ?? chat)) {
-      latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      latest = (await updateChatOf(at, (cur) => {
         const w = syncWalletToStatus(readWallet(cur.scriptstate, walletStart), cur);
         return w ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...walletVars(w) } } : null;
       }).catch(() => null)) ?? latest;
@@ -676,7 +678,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
       const flag = pointsAuto(cur0.scriptstate) ? pointsFlagFor(cur0, isPointsOrg(String(cur0.scriptstate?.['$ib_affiliation'] ?? ''))) : null;
       const needSync = colConfig(cur0.scriptstate).points !== 'off' && walletSyncOn(cur0.scriptstate) && !!syncPointsToStatus(readPoints(cur0.scriptstate), cur0);
       if (flag || needSync) {
-        latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+        latest = (await updateChatOf(at, (cur) => {
           const add: Record<string, string> = {};
           const f = pointsAuto(cur.scriptstate) ? pointsFlagFor(cur, isPointsOrg(String(cur.scriptstate?.['$ib_affiliation'] ?? ''))) : null;
           if (f) {
@@ -700,7 +702,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const useAsked = sentReroll(arg.characterIndex, arg.chatIndex, latest ?? chat);
     // 손대지 못하고 보낸 요청의 답(useBlind): 모델이 사용을 못 받았으니 적지 않고 자리를 그대로 둔다
     if (!useBlind() && settleItemUse(latest ?? chat, arg.messageIndex, useSent, useAsked)) {
-      latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      latest = (await updateChatOf(at, (cur) => {
         const vars = settleItemUse(cur, arg.messageIndex, useSent, useAsked);
         return vars ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...vars } } : null;
       }).catch(() => null)) ?? latest;
@@ -712,7 +714,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 이 응답에 표식이 없고 방문 중인 상점이 없어도 돌린다: 접속 표식(`@web:사이트`)은 방문 상태를 남기지 않아, 건너뛰면 지난 응답의 접속 카드가 남았다 (11-16). 바뀔 것이 없으면 settleShop 이 null
     // 갱신기가 상점을 판단하면(설정 「상점 판단」, 11-09) 여기서는 건드리지 않는다: 갱신기가 표식을 붙이고 같은 정리를 돌린다 (host/people.ts). 그래야 같은 가게에 머무는 동안 방문 기록이 지워지지 않는다
     if ((shopJudgeBy((latest ?? chat).scriptstate).by === 'main' || !shopOn((latest ?? chat).scriptstate)) && settleShop(latest ?? chat, arg.messageIndex, selfNames)) {
-      latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      latest = (await updateChatOf(at, (cur) => {
         const r = settleShop(cur, arg.messageIndex, selfNames);
         return r ? { ...cur, ...(r.message ? { message: r.message } : {}), scriptstate: { ...(cur.scriptstate ?? {}), ...r.vars } } : null;
       }).catch(() => null)) ?? latest;
@@ -721,7 +723,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     {
       const base = latest ?? ((await risuai.getChatFromIndex(arg.characterIndex, arg.chatIndex)) as Chat | null);
       if (base && settleReady(base, cosReadyMode(base.scriptstate) !== 'off')) {
-        latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+        latest = (await updateChatOf(at, (cur) => {
           const message = settleReady(cur, cosReadyMode(cur.scriptstate) !== 'off');
           return message ? { ...cur, message } : null;
         }).catch(() => null)) ?? latest;
@@ -737,7 +739,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
       return Object.keys(vars).length ? vars : null;
     };
     if (missing(now.scriptstate)) {
-      now = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      now = (await updateChatOf(at, (cur) => {
         const vars = missing(cur.scriptstate);
         return vars ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...vars } } : null;
       })) ?? now;
@@ -746,17 +748,17 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 저장 직후 Risu 가 메시지를 다시 그릴 때 카드 열쇠 표가 비어 있으면 종료 응답 아래 보고서 카드가 안 나오고 다음 저장까지 기다려야 했다
     await refreshStatusContext(arg.characterIndex, arg.chatIndex, { char, chat: now }).catch(() => {});
     // 이번 응답에서 종료된 사건의 카드가 있으면 채팅을 그대로 한 번 저장해 그 메시지를 다시 그리게 한다 (설정 변경 때와 같은 기법)
-    if (latest && chatCardsAt(now, arg.messageIndex).length) now = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => nudgeMessages(cur, (_d, i) => i === arg.messageIndex)).catch(() => null)) ?? now;
+    if (latest && chatCardsAt(now, arg.messageIndex).length) now = (await updateChatOf(at, (cur) => nudgeMessages(cur, (_d, i) => i === arg.messageIndex)).catch(() => null)) ?? now;
     // 다음 요청에 넣을 로어북을 미리 골라 둔다 (다시 굴리기·자동 전송은 입력 처리를 거치지 않는다)
     await storeLore(arg.characterIndex, arg.chatIndex, undefined, { char, chat: now }).catch(() => {});
     // 막혔던 요청을 사용자가 전송 버튼으로 보냈으면 카드의 「전송을 눌러 주세요」·취소를 없앤다
-    if (now.message.some((m) => typeof m.data === 'string' && isUnsent(m.data))) now = (await updateChat(arg.characterIndex, arg.chatIndex, clearUnsent)) ?? now;
+    if (now.message.some((m) => typeof m.data === 'string' && isUnsent(m.data))) now = (await updateChatOf(at, clearUnsent)) ?? now;
     // 인물 기록 갱신 (core/people): 매 턴 설정이면 보조 모델 1회. 다른 보조 호출 앞에, 병렬 설정이 아니면 끝날 때까지 차례로
     {
       const pp = requestPeopleUpdate('turn', { at: { charIndex: arg.characterIndex, chatIndex: arg.chatIndex } }).catch((error) => console.log(`[goei] 인물 기록 갱신 실패: ${error instanceof Error ? error.message : String(error)}`))
         // 이번 응답에서 끝난 내 사건 보고서에 그 응답의 가계부 맞춤·호감 계기까지 넣는다 (전수검사 11-13)
         .then(() => (readReports(now).items.some((r) => r.mine && r.idx === arg.messageIndex)
-          ? updateChat(arg.characterIndex, arg.chatIndex, (cur) => { const v = refreshClosures(cur, arg.messageIndex, walletStart); return v ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...v } } : null; }).catch(() => null)
+          ? updateChatOf(at, (cur) => { const v = refreshClosures(cur, arg.messageIndex, walletStart); return v ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...v } } : null; }).catch(() => null)
           : null));
       after.push(pp);
       if (!peopleSettings(now.scriptstate).parallel) await pp;
@@ -774,9 +776,12 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const malls = MALL_SITES.filter((site) => mallAutoTurn(now!, site));
     if (netTasks.length || viewAuto || wikiAuto || malls.length) {
       const fresh = async () => {
-        const c = ((await risuai.getChatFromIndex(arg.characterIndex, arg.chatIndex)) as Chat | null) ?? now!;
+        const loc = await locateChat(arg.characterIndex, arg.chatIndex, chat.id);
+        // 그 사이 이 채팅이 지워졌다: 자동 호출을 하지 않는다 (다른 채팅 글로 부르지 않게)
+        if (!loc && typeof chat.id === 'string' && chat.id) throw new Error('채팅이 지워졌어요');
+        const c = loc?.chat ?? now!;
         c.message ??= [];
-        return { charIndex: arg.characterIndex, chatIndex: arg.chatIndex, char: char as never, chat: c };
+        return { charIndex: arg.characterIndex, chatIndex: loc?.chatIndex ?? arg.chatIndex, char: char as never, chat: c };
       };
       after.push((async () => {
         applyAdvanced(now!.scriptstate);
@@ -941,7 +946,7 @@ async function redrawAfterLoad(): Promise<void> {
     if (!ctx || !isGoeiLore(ctx.char.globalLore)) return;
     if (!ctx.chat.message.some((m) => typeof m.data === 'string' && m.data.includes('<img='))) return;
     // 같은 글을 그대로 저장하면 Risu(Chats.svelte, 글 해시로 그린 것을 재사용)가 다시 그리지 않는다. 그림 태그가 있는 글의 끝 줄바꿈을 붙였다 뗐다 해 글이 바뀌게 한다 (보이는 것·요청은 그대로)
-    await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => nudgeMessages(cur, (d) => d.includes('<img=')));
+    await updateChatOf(ctx, (cur) => nudgeMessages(cur, (d) => d.includes('<img=')));
   } catch {
     /* 다시 그리지 못해도 그만 (다음 채팅 전환 때 그려진다) */
   }

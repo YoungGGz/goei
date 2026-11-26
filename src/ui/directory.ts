@@ -15,7 +15,7 @@ import { LEGACY_DATA } from '../core/lorebooks';
 import { SCENARIOS } from '../core/scenarios';
 import { BUILTIN, extraTabId, FACTION_TYPES, nextCode, placeholdersReady, staleFactionVars, withFactionPlaceholders } from '../core/factions';
 import { CUSTOM_FM, agentScene, factionScenes, nextCustomFm } from '../core/scenes';
-import { updateCharacterLore, updateChat, type ChatContext } from '../host/risu';
+import { updateCharacterLore, updateChatOf, type ChatContext } from '../host/risu';
 import { imageUrl, picAvatar } from './images';
 import { ICONS } from './icons';
 import { switchHtml } from './controls';
@@ -1045,7 +1045,7 @@ export async function handleDirectory(action: string, value: string | undefined,
       // 해금은 채팅마다라 명부가 아니라 지금 채팅에 바로 적는다
       if (!d.appendices.some((x) => x.lore === v)) break;
       try {
-        await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+        await updateChatOf(ctx, (chat) => {
           const cur = readUnlocked(chat.scriptstate);
           const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
           return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [UNLOCK_VAR]: unlockedValue(next) } };
@@ -1441,7 +1441,7 @@ export async function handleDirectory(action: string, value: string | undefined,
         // 지금 채팅의 새 세력 변수(태그·세력 로어북 자리표시자)를 바로 맞춘다. 다른 채팅은 다음 응답 때 맞춰진다
         if (saved && (ctx.chat.message ?? []).length) {
           const lore = saved;
-          await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+          await updateChatOf(ctx, (chat) => {
             const vars = staleFactionVars(lore, chat.scriptstate);
             return vars ? { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } } : null;
           }).catch(() => null);

@@ -20,7 +20,7 @@ import type { Chat } from '../core/types';
 import { formatDelta, formatWon } from '../core/wallet';
 import { factionNames, locName, parseCatalog, readWorld, worldOn } from '../core/world';
 import { playerAgent } from '../core/player';
-import { updateChat, type ChatContext } from '../host/risu';
+import { updateChatOf, type ChatContext } from '../host/risu';
 import { onOffSwitch } from './controls';
 import { drawerBox } from './drawer';
 import { walletPane, walletTools } from './wallet';
@@ -525,7 +525,7 @@ export async function handleRecords(action: string, value: string | undefined, c
       const on = !readReports(ctx.chat).items.find((r) => r.id === v)?.pin;
       rec.busy = true;
       try {
-        await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...reportVars(pinReport(readReports(chat), v, on)) } }));
+        await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...reportVars(pinReport(readReports(chat), v, on)) } }));
         rec.info = on ? '고정했어요. 상한에 밀려 지워지지 않아요.' : '고정을 풀었어요.';
       } catch (error) {
         rec.notice = error instanceof Error ? error.message : String(error);
@@ -629,7 +629,7 @@ async function setVars(ctx: ChatContext, env: RecordsEnv, vars: Record<string, s
   rec.busy = true;
   rec.notice = '';
   try {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+    await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
   } catch (error) {
     rec.notice = error instanceof Error ? error.message : String(error);
   }

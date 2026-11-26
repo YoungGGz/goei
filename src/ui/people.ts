@@ -8,7 +8,7 @@ import type { Chat } from '../core/types';
 import { messageText } from '../core/refs';
 import { tokens } from '../core/gnet';
 import { factionList } from '../core/factions';
-import { updateChat, type ChatContext } from '../host/risu';
+import { updateChatOf, type ChatContext } from '../host/risu';
 import { backfillPeople, chatId, clearDiag, consolidatePerson, diagKeep, livePeopleStore, loadDiag, rereadPerson, onPeopleStatus, peopleStatus, requestPeopleUpdate, rosterOf, sheetOf, type DiagRun } from '../host/people';
 import { anchorOf, changeId, entryId, entryStates, isAlive, liveChanges, liveEntries, liveness, messageKey, peopleStore, plain, putChange, putEntry, splitUnread, withPeople, type EntryState, type Liveness } from '../core/people/store';
 import { addressOf, affinityView, opennessOf, tasteOf } from '../core/people/affinity';
@@ -232,7 +232,7 @@ async function setVars(ctx: ChatContext, env: PeopleEnv, vars: Record<string, st
   peopleUi.busy = true;
   peopleUi.notice = '';
   try {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+    await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
   } catch (error) {
     peopleUi.notice = error instanceof Error ? error.message : String(error);
   }
@@ -967,7 +967,7 @@ async function mutate(ctx: ChatContext, env: PeopleEnv, fn: (store: PeopleStore,
   peopleUi.notice = '';
   env.render();
   try {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    await updateChatOf(ctx, (chat) => {
       const store = peopleStore(chat);
       return fn(store, chat) ? withPeople(chat, store) : null;
     });
