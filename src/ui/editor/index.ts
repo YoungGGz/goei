@@ -10,6 +10,7 @@ import { GUIDE_LABEL, type GuideName } from '../../core/guides';
 import { LEGACY_DATA } from '../../core/lorebooks';
 import { getPrefs } from '../../core/settings';
 import { updateCharacterLore, type ChatContext } from '../../host/risu';
+import { resetDirectoryLore } from '../../core/install';
 import { onPrefsSaveFail, savePrefs } from '../../host/prefs';
 import { bindCropDrag, cropValue, directoryConfirmPopup, directoryDraft, directoryExtList, directoryInput, directoryList, directoryPhotoList, directoryView, dirUi, dirty as dirDirty, handleDirectory, resetDirectory, setCrop } from '../directory';
 import { handleImgPrompt, imgInput, imgPromptPane } from '../imgprompt';
@@ -964,11 +965,25 @@ async function flushLater(): Promise<void> {
   await Promise.all(all.map((l) => Promise.resolve(l.fn()).catch(() => undefined)));
 }
 // 점검 「초기화」: 고친 세계도 버리고 플러그인 원래 값으로 (2026-11-08 사용자: 초기화는 전체 초기화)
+// 명부(요원·조직·거점 등 카드 명부)도 설치 기본값으로: 고친 칸과 직접 추가한 것까지 (사용자 2026-11-26, 3차 점검 R55)
 resetHooks.push(() => {
   const ctx = host?.ctx();
-  if (ctx) overridesOf(ctx);
-  setOverrides({});
-  autoSaveWorld();
+  if (!ctx) return;
+  // 기다리던 세계 저장·초안은 버린다 (초기화 뒤에 옛 값을 다시 적지 않게)
+  const w = laters.get('world');
+  if (w) clearTimeout(w.t), laters.delete('world');
+  void (async () => {
+    if (saving) await saving.catch(() => undefined);
+    try {
+      await updateCharacterLore(ctx.charIndex, resetDirectoryLore);
+      resetDirectory();
+      edUi.from = null;
+      await host?.refresh();
+    } catch (error) {
+      edUi.notice = `저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    render();
+  })();
 });
 
 /** 세계(카드 명부) 고친 것을 카드에 바로 적는다 */
