@@ -3,7 +3,7 @@
 // 보고서 카드(2026-10-29, docs/설계안_기록_보고서.md 5-12절): 사건이 종료된 응답의 상태창 원문(statusKey)을 열쇠로 그 상태창 상자 바로 아래에 카드를 붙인다.
 // 설정 「채팅에 보고서 표시」(안 띄움 / 내가 출동한 사건만 / 전부)에 따라 열쇠 표를 모으고, 끄면 표가 비어 다시 그릴 때 카드가 없다. 본문·요청에는 아무것도 넣지 않는다.
 import { buildRegistry, colConfig, findStatusTags, hiddenCols, setStatusColumns, statusTimeline } from '../core/world';
-import { journalSettings, readReports, type Report } from '../core/journal';
+import { journalSettings, liveReports, type Report } from '../core/journal';
 import { listDocs, prepareBaseDocs } from '../core/wiki';
 import type { Chat, LoreEntry } from '../core/types';
 import { looseTerm, sameTerm, statusHtml, type StatusContext } from '../ui/status';
@@ -43,7 +43,7 @@ function collectCards(chat: Chat): Map<string, Report[]> {
   const mode = journalSettings(chat.scriptstate).chatCard;
   const map = new Map<string, Report[]>();
   if (mode === 'off') return map;
-  for (const r of readReports(chat).items) {
+  for (const r of liveReports(chat).items) {
     if (!r.statusKey || (mode === 'mine' && !r.mine)) continue;
     const list = map.get(r.statusKey);
     if (!list) map.set(r.statusKey, [r]);

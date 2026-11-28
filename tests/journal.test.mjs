@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseCatalog, DEFAULT_SETTINGS, applyOutput, bootstrap, parseWorld, serializeWorld, endEvent, activeEvents, processOutput, startWorldVars, readWorld, locName,
-  buildClosures, readJournal, readReports, rewindClosures, trimJournal, trimReports, pinReport, recordVars, journalSettings, JR, JR_DEFAULTS,
+  buildClosures, readJournal, readReports, liveJournal, liveReports, dropTurnRows, trimJournal, trimReports, pinReport, recordVars, journalSettings, JR, JR_DEFAULTS,
   journalLine, mineReasons, periodOf, parseAgents, settings,
 } from '../dist-test/core.mjs';
 // 묶음 3: PNG 카드(순수 그리기)
@@ -263,7 +263,7 @@ test('리롤 되감기: 같은 번호의 응답을 다시 반영하면 그 응�
   const built = buildClosures({ chat, index: i, world: w, closed: w.closed, catalog, faction: 'A00', settings: journalSettings(chat.scriptstate), now: '2025-01-01T00:00:00.000Z' });
   assert.equal(built.rows[0].cause, 'manual');
   assert.equal(built.rows[0].mine, true);
-  const r = rewindClosures(built.journal, built.reports, i);
+  const r = dropTurnRows(built.journal, built.reports, [built.rows[0].anchor]);
   assert.equal(r.changed, false);
   assert.equal(r.journal.rows.length, 1);
   // 같은 종료를 두 번 반영해도 한 줄
@@ -272,38 +272,40 @@ test('리롤 되감기: 같은 번호의 응답을 다시 반영하면 그 응�
   assert.equal(twice.journal.rows.length, 1);
 });
 
-test('리롤 판정은 번호 + 앞 메시지 열쇠, 되감기는 그 응답이 만든 줄(id)만: 앞 메시지를 지운 뒤 같은 번호에 온 새 턴·리롤은 옛 일지·보고서·세계를 건드리지 않는다', () => {
+test('사라진 응답의 줄은 가려지고(지우지 않음) ◀ 로 돌아오면 다시 보인다: 앞 메시지를 지운 뒤의 새 턴·리롤은 옛 일지·보고서·세계를 건드리지 않는다', () => {
   let chat = play(MINE_TURNS, { ids: true });
   const old = readJournal(chat).rows[0];
   assert.equal(old.idx, 7);
-  const prev = JSON.parse(chat.scriptstate.$goei_prev);
-  assert.deepEqual(prev.made, [old.id], '$goei_prev 에 그 응답이 만든 일지 줄 id');
-  assert.equal(prev.pk, chat.message[6].chatId, '$goei_prev 에 앞 메시지 열쇠');
-  // 진짜 리롤 (Risu 는 새 chatId 를 준다): 앞 메시지가 같으니 되감긴다
+  assert.equal(old.anchor, chat.message[7].chatId);
+  const turns = JSON.parse(chat.scriptstate.$goei_turns);
+  assert.equal(turns.last, chat.message[7].chatId, '$goei_turns 에 마지막으로 반영한 응답의 열쇠');
+  // 진짜 리롤 (Risu 는 새 chatId 를 준다): 버린 응답의 줄은 가려지고 세계는 종료 전으로
   const re = processOutput({ ...chat, message: chat.message.map((m, k) => (k === 7 ? { ...m, chatId: 'm99', data: `아직.\n${ST('12:30 PM')}` } : m)) }, 7, `아직.\n${ST('12:30 PM')}`, catalog, S, rng);
-  assert.equal(readJournal(re).rows.length, 0, '진짜 리롤이면 그 응답의 줄이 지워진다');
+  assert.equal(liveJournal(re).rows.length, 0, '진짜 리롤이면 그 응답의 줄이 안 보인다');
+  assert.equal(liveReports(re).items.length, 0);
   assert.equal(readWorld(re).inc.length, 1, '세계도 종료 전으로');
-  // 앞 메시지 0·1 을 지운다 (종료 응답은 번호 5 가 됨). 한 턴 진행하면 새 응답이 번호 7 에 온다 — 번호는 같지만 앞 유저 메시지가 다르다 → 리롤이 아니다
+  // ◀ 로 버린 응답을 다시 고름 (그 응답이 열쇠째 돌아온다): 줄도 세계도 그 응답의 것으로 (R19)
+  const back = { ...re, message: chat.message };
+  assert.equal(liveJournal(back).rows.length, 1, '돌아온 응답의 줄이 다시 보인다');
+  assert.equal(readWorld(back).inc.length, 0, '돌아온 응답이 끝낸 사건은 끝난 채');
+  // 앞 메시지 0·1 을 지운다 (종료 응답은 번호 5 가 됨). 한 턴 진행하면 새 응답이 번호 7 에 온다 — 옛 응답은 살아 있다
   chat = { ...chat, message: chat.message.slice(2) };
   chat = play(['괜찮아요?', C(`조용하다.\n${ST('01:00 PM')}`)], { seed: chat, ids: true });
   assert.equal(chat.message.length, 8);
-  assert.equal(readJournal(chat).rows.length, 1, '옛 줄은 그대로 (번호만 같은 새 턴은 리롤이 아니다)');
+  assert.equal(liveJournal(chat).rows.length, 1, '옛 줄은 그대로');
   assert.equal(readWorld(chat).inc.length, 0, '세계도 옛 상태로 돌아가지 않는다 (사건은 끝난 채)');
   // 한 턴 더 가서 번호 9 의 응답을 리롤 (종료 없는 응답) → 옛 줄·보고서 그대로
   chat = play(['산책', C(`아무 일 없음.\n${ST('01:30 PM')}`)], { seed: chat, ids: true });
-  assert.equal(JSON.parse(chat.scriptstate.$goei_prev).i, 9);
   const i = 9;
   const again = `다시.\n${ST('01:40 PM')}`;
   chat = processOutput({ ...chat, message: chat.message.map((m, k) => (k === i ? { ...m, chatId: 'm98', data: again } : m)) }, i, again, catalog, S, rng);
-  assert.equal(readJournal(chat).rows.length, 1, '옛 줄은 그대로');
-  assert.equal(readReports(chat).items.length, 1, '옛 보고서도 그대로');
-  assert.deepEqual(JSON.parse(chat.scriptstate.$goei_prev).made, [], '종료 없는 응답은 만든 줄이 없다');
-  // 되감기 함수 자체: id 목록이 비면 아무것도 안 지우고, 옛 저장(목록 없음)은 번호로
+  assert.equal(liveJournal(chat).rows.length, 1, '옛 줄은 그대로');
+  assert.equal(liveReports(chat).items.length, 1, '옛 보고서도 그대로');
+  // 지우기 함수 자체: 열쇠가 비면 아무것도 안 지우고, 그 응답이 만든 자동 줄만 지운다
   const j = readJournal(chat), r = readReports(chat);
-  assert.equal(rewindClosures(j, r, []).changed, false);
-  assert.equal(rewindClosures(j, r, [old.id]).journal.rows.length, 0, 'id 로 지운다');
-  assert.equal(rewindClosures(j, r, 7).journal.rows.length, 0, '옛 $goei_prev(목록 없음)는 번호로');
-  assert.equal(rewindClosures(j, r, 5).changed, false);
+  assert.equal(dropTurnRows(j, r, []).changed, false);
+  assert.equal(dropTurnRows(j, r, [old.anchor]).journal.rows.length, 0, '열쇠로 지운다');
+  assert.equal(dropTurnRows(j, r, ['없는 열쇠']).changed, false);
 });
 
 // ── 저장: 상한·고정·연결 ──
@@ -324,9 +326,9 @@ test('상한: 일지는 오래된 줄부터, 보고서는 고정 안 된 것 가
   assert.equal(pinReport(r, '없음', true), r);
   assert.equal(pinReport(r, 'r1', false).items[0].pin, undefined);
   // 되감기는 고정한 보고서와 그 줄도 지운다 (다시 굴리면 그 응답이 만든 것은 되돌아간다, 전수점검 2차 18-B1)
-  const rw = rewindClosures(j, r, 1);
+  const rw = dropTurnRows(j, r, ['#1']);
   assert.ok(!rw.journal.rows.some((x) => x.id === 'j1') && !rw.reports.items.some((x) => x.id === 'r1'));
-  const rw2 = rewindClosures(j, r, 2);
+  const rw2 = dropTurnRows(j, r, ['#2']);
   assert.ok(!rw2.journal.rows.some((x) => x.id === 'j2') && !rw2.reports.items.some((x) => x.id === 'r2'));
   // 깨진 값은 빈 저장소, 깨진 줄은 버림
   assert.deepEqual(readJournal({ $goei_journal: '{bad' }).rows, []);

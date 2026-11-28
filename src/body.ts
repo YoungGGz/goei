@@ -226,7 +226,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
       // 호출 흐름 기록: 새 턴 (host/trace.ts). 이 뒤의 라우터·디렉터 호출은 이 턴의 「본편 전」
       await stepAsync('호출 기록', () => traceBegin(), undefined);
       ctx = await stepAsync('채팅 읽기', () => loadContext(), null);
-      // 다시 굴리기: 버린 응답이 상황판·소속에 반영한 것을 되감은 변수로 요청을 만든다 (채팅에는 저장하지 않는다. 응답이 붙으면 processOutput 이 같은 기준에서 다시 반영)
+      // 다시 굴리기·지운 응답: 채팅에 살아 있는 마지막 응답의 상황판·소속으로 요청을 만든다 (채팅에는 저장하지 않는다. 응답이 붙으면 processOutput 이 같은 결과에서 반영)
       if (ctx) ctx = step('리롤 되감기', () => rerollContext(ctx!), ctx);
       if (ctx) setUseLockAt(ctx); // 「사용」 잠금은 요청을 보낸 이 채팅에만
       else setUseBlind(); // 채팅을 못 읽음: [Inventory] 도 못 넣는다
@@ -313,7 +313,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   return out;
 }
 
-/** 다시 굴린(또는 앞 응답을 지운) 요청이면 상황판·소속 변수를 버린 응답 전으로 되감은 문맥, 아니면 지금 상태·카드로 브리핑을 다시 만든 문맥 (core/world/output.ts requestWorldVars) */
+/** 다시 굴린(또는 앞 응답을 지운) 요청이면 살아 있는 마지막 응답의 상황판·소속으로 만든 문맥, 아니면 지금 상태·카드로 브리핑을 다시 만든 문맥 (core/world/output.ts requestWorldVars) */
 function rerollContext(ctx: ChatContext): ChatContext {
   if (!worldOn(ctx.chat)) return ctx;
   const vars = requestWorldVars(ctx.chat, parseCatalog(ctx.char.globalLore), worldSettings(ctx.char.globalLore, ctx.chat.scriptstate));

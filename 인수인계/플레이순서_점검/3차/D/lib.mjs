@@ -129,7 +129,20 @@ export async function turn(t, turnDef, sendFn, userText) {
   const aux = await t.fakeLog(seq0, 'aux');
   return { ok: true, rec, req, reply, seq0, aux };
 }
-export const world = async (t) => { const st = await t.chatState(true); try { return JSON.parse(st.scriptstate?.$goei_world ?? 'null'); } catch { return null; } };
+// 지금 상황판: 플러그인의 readWorld 와 같은 길 (2026-11-28 응답별 결과 $goei_turns — 채팅에 살아 있는 마지막 응답의 결과, 없으면 바탕, 그것도 없으면 $goei_world).
+// 저장값 $goei_world 는 「마지막으로 쓴 상황판」이라 응답을 지운 직후에는 지금 상황판과 다르다. raw=true 면 그 저장값 그대로.
+export const world = async (t, raw = false) => {
+  const st = await t.chatState(true);
+  try {
+    const turns = raw ? null : JSON.parse(st.scriptstate?.$goei_turns || 'null');
+    if (turns?.v === 1) {
+      const by = new Map((turns.list ?? []).map((x) => [x.k, x]));
+      for (let i = st.message.length - 1; i >= 0; i--) { const hit = by.get(st.message[i].chatId || `#${i + 1}`); if (hit) return JSON.parse(hit.w); }
+      if (turns.base) return JSON.parse(turns.base.w);
+    }
+    return JSON.parse(st.scriptstate?.$goei_world ?? 'null');
+  } catch { return null; }
+};
 export function saveJson(file, v) { writeFileSync(file, JSON.stringify(v, (k, x) => (typeof x === 'string' ? redact(x) : x), 1)); }
 export function saveText(file, s) { writeFileSync(file, redact(s)); }
 export const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'));

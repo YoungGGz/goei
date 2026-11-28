@@ -1,6 +1,7 @@
-// 일지·보고서 읽기/쓰기·상한·고정·리롤 되감기 (docs/설계안_기록_보고서.md 1-5절).
+// 일지·보고서 읽기/쓰기·상한·고정·사라진 응답 가리기 (docs/설계안_기록_보고서.md 1-5절).
 // 채팅 변수 JSON 하나씩. 깨진 값은 빈 저장소로 (parseWorld 와 같은 관용). 일지는 영구 보관 — 메시지가 지워져도 지우지 않는다.
 import type { Chat, ScriptState } from '../types';
+import { deadTurnKeys } from '../world/turns';
 import { JOURNAL_KEY, REPORTS_KEY, type JournalRow, type JournalStore, type Report, type ReportStore } from './types';
 
 type Vars = Record<string, unknown> | undefined;
@@ -112,20 +113,32 @@ export function pinReport(r: ReportStore, id: string, on: boolean): ReportStore 
   return { v: 1, items: r.items.map((x) => (x.id === id ? { ...x, pin: on || undefined } : x)) };
 }
 
+/** 응답이 만든 자동 종료 줄인가 (모델 태그·기한). 손으로 끝낸 줄은 끝낸 사실이 남으므로 응답이 사라져도 남는다 */
+const auto = (cause: string) => cause === 'model' || cause === 'ttl';
+
 /**
- * 리롤·지운 응답 되감기: 그 응답을 다시 굴리거나 지우고 다음 응답이 반영될 때, **바로 그 응답이 만들었던** 일지 줄·보고서를 지운다 (고정한 보고서도).
- * 대상은 `$goei_prev` 가 적어 둔 그 응답의 일지 줄 id 목록(`made`)이다 — 메시지 번호(idx)로 지우면 앞 메시지를 지운 뒤 같은 번호에 온 무관한
- * 리롤이 옛 기록을 지운다(일지는 영구 보관). 수동 종료는 리롤 기준 상태에도 반영돼 있어 되살아나지 않으므로(world/output.ts prevWorldVars) 목록에 없고 남는다.
- * id 목록이 없는 옛 `$goei_prev` 만 번호로 자동 종료를 지운다.
+ * 화면·요약용 일지: 사라진 응답(지웠거나 다시 굴린 것, core/world/turns.ts deadTurnKeys)이 만든 자동 종료 줄은 가린다.
+ * 지우지는 않는다 — ◀ 로 그 응답을 다시 고르면 줄도 돌아온다. 쓰는 쪽(buildClosures 등)은 readJournal 로 전부 읽는다.
  */
-export function rewindClosures(j: JournalStore, r: ReportStore, target: number | string[]): { journal: JournalStore; reports: ReportStore; changed: boolean } {
-  const auto = (cause: string) => cause === 'model' || cause === 'ttl';
-  // 보고서 id 는 일지 줄 id 와 같은 해시 (`r…` ↔ `j…`)
-  const made = Array.isArray(target) ? new Set(target.map((id) => id.slice(1))) : null;
-  const hitRow = (row: JournalRow) => (made ? made.has(row.id.slice(1)) : row.idx === target && auto(row.cause));
-  const hitRpt = (x: Report) => (made ? made.has(x.id.slice(1)) : x.idx === target && auto(x.cause));
-  const items = r.items.filter((x) => !hitRpt(x));
-  const rows = j.rows.filter((row) => !hitRow(row));
+export function liveJournal(chat: Chat): JournalStore {
+  const j = readJournal(chat);
+  const dead = deadTurnKeys(chat);
+  if (!dead.size) return j;
+  return { v: 1, rows: j.rows.filter((r) => !(auto(r.cause) && dead.has(r.anchor))) };
+}
+
+export function liveReports(chat: Chat): ReportStore {
+  const r = readReports(chat);
+  const dead = deadTurnKeys(chat);
+  if (!dead.size) return r;
+  return { v: 1, items: r.items.filter((x) => !(auto(x.cause) && dead.has(x.anchor))) };
+}
+
+/** 응답별 결과가 상한에서 밀려 다시 돌아올 수 없게 된 사라진 응답(keys)의 자동 종료 줄·보고서를 지운다 (고정한 보고서도) */
+export function dropTurnRows(j: JournalStore, r: ReportStore, keys: string[]): { journal: JournalStore; reports: ReportStore; changed: boolean } {
+  const gone = new Set(keys);
+  const items = r.items.filter((x) => !(auto(x.cause) && gone.has(x.anchor)));
+  const rows = j.rows.filter((row) => !(auto(row.cause) && gone.has(row.anchor)));
   const changed = items.length !== r.items.length || rows.length !== j.rows.length;
   return { journal: changed ? { v: 1, rows } : j, reports: changed ? { v: 1, items } : r, changed };
 }

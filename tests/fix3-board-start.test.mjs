@@ -17,8 +17,8 @@ const bundle = async (contents) => {
 const m = await bundle(`
   export { parseCatalog } from './src/core/world/catalog';
   export { DEFAULT_SETTINGS, requestMission, parseWorld, endEvent, endUpcoming, activeEvents, endedShown } from './src/core/world/engine';
-  export { processOutput, rerollRequestVars, requestWorldVars, prevWorldVars, withdrawUnsent, startWorldVars, worldVars, readWorld } from './src/core/world/output';
-  export { readJournal, readReports, pinReport, recordVars, buildClosures, journalSettings } from './src/core/journal';
+  export { processOutput, rerollRequestVars, requestWorldVars, manualWorldVars, copyPending, withdrawUnsent, startWorldVars, worldVars, readWorld } from './src/core/world/output';
+  export { readJournal, readReports, liveJournal, liveReports, pinReport, recordVars, buildClosures, journalSettings } from './src/core/journal';
   export { sceneRecord, setUnsent } from './src/core/dispatch';
   export { unsentOpening, chatPhase, applyStart, planStart } from './src/core/start';
   export { applyWorldPack } from './src/core/datapack';
@@ -57,11 +57,10 @@ function reply(chat, data, chatId) {
 function closeByHand(chat, key) {
   const w = m.readWorld(chat);
   assert.ok(m.endEvent(w, key), '지금 상태에서는 끝난다');
-  const next = { ...chat, scriptstate: { ...chat.scriptstate, ...m.worldVars(w, catalog, S, 'A00') } };
+  const next = { ...chat, scriptstate: { ...chat.scriptstate, ...m.manualWorldVars(chat, w, catalog, S, 'A00', (p) => void (m.endEvent(p, key) || m.endUpcoming(p, key))) } };
   const index = chat.message.length - 1;
   const built = m.buildClosures({ chat: next, index, world: w, closed: w.closed, catalog, faction: 'A00', settings: m.journalSettings(chat.scriptstate) });
   next.scriptstate = { ...next.scriptstate, ...m.recordVars(built.journal, built.reports) };
-  next.scriptstate = { ...next.scriptstate, ...m.prevWorldVars(chat.scriptstate, (p) => void (m.endEvent(p, key) || m.endUpcoming(p, key))) };
   return next;
 }
 const msNames = (chat) => m.readWorld(chat).ms.map((e) => `${e.name}|${e.state}`);
@@ -211,7 +210,7 @@ test('15-Q2: 괴이를 끝내고 요원을 사망으로 적은 응답을 지우�
   assert.ok(anNames(after).includes('어두운 정원|활성'), anNames(after).join());
   assert.notDeepEqual(m.readWorld(chat).agents.P001, m.readWorld(before).agents.P001, '지운 응답은 요원을 바꿨다');
   assert.deepEqual(m.readWorld(after).agents.P001, m.readWorld(before).agents.P001, '요원도 그 응답 전으로');
-  assert.equal(m.readJournal(after.scriptstate).rows.length, 0, '지운 응답의 종료 줄도 없다');
+  assert.equal(m.liveJournal(after).rows.length, 0, '지운 응답의 종료 줄도 없다');
   // 그다음 턴은 평소대로 (방금 반영한 응답은 살아 있다)
   const u4 = { role: 'user', data: '다음', chatId: 'u4' };
   assert.equal(m.rerollRequestVars({ ...after, message: [...after.message, u4] }, catalog, S), null);
@@ -247,13 +246,13 @@ test('18-B1: 보고서를 고정해도 그 응답을 다시 굴리면 보고서�
   const r2 = `본문2 다시\n[AN|부산광역시 연제구|어두운 정원|활성|C|없음|버틴다]\n${ST('10:30 AM')}`;
   chat = m.processOutput({ ...chat, message: [...chat.message.slice(0, 3), { role: 'char', data: r2, chatId: 'c2b' }] }, 3, r2, catalog, S, never);
   assert.ok(anNames(chat).includes('어두운 정원|활성'));
-  assert.equal(m.readJournal(chat.scriptstate).rows.length, 0, '일지도 진행 중과 맞게');
-  assert.equal(m.readReports(chat.scriptstate).items.length, 0, '고정한 보고서도 버린 응답의 것이면 되돌아간다');
+  assert.equal(m.liveJournal(chat).rows.length, 0, '일지도 진행 중과 맞게');
+  assert.equal(m.liveReports(chat).items.length, 0, '고정한 보고서도 버린 응답의 것이면 되돌아간다');
   // 다음 턴에 다시 격리 → 한 줄
   const u3 = { role: 'user', data: '다시 격리', chatId: 'u3' };
   chat = reply({ ...chat, message: [...chat.message, u3] }, `본문3\n[AN|부산광역시 연제구|어두운 정원|격리|C|없음|끝]\n${ST('11:00 AM')}`, 'c3');
-  assert.equal(m.readJournal(chat.scriptstate).rows.length, 1);
-  assert.equal(m.readReports(chat.scriptstate).items.length, 1);
+  assert.equal(m.liveJournal(chat).rows.length, 1);
+  assert.equal(m.liveReports(chat).items.length, 1);
 });
 
 // ── 검토에서 찾은 것: 지운 응답 되돌리기의 빈틈 ──
@@ -264,10 +263,12 @@ test('응답을 지운 뒤 임무 창에서 건 요청은 되돌아간 상태에
   const u2 = { role: 'user', data: '다음', chatId: 'u2' };
   chat = reply({ ...chat, message: [...chat.message, u2] }, `본문2\n[AN|부산광역시 연제구|어두운 정원|활성|C|없음|정원]\n${ST('10:30 AM')}`, 'c2');
   // 응답2 를 지우고 임무 창에서 소라 랜드를 요청 (ui/field.ts sendMission 과 같은 길: 지금 상태에 대기를 걸고 카드를 붙임)
-  const w = m.readWorld(chat);
+  const gone = { ...chat, message: chat.message.slice(0, 3) };
+  const w = m.readWorld(gone);
+  assert.ok(!w.an.some((e) => e.name === '어두운 정원'), '지운 직후 창이 읽는 상황판에 지운 응답의 괴이가 없다 (R18)');
   assert.equal(m.requestMission(w, catalog, S, 'an', '소라 랜드'), null);
   const card = { role: 'user', data: m.sceneRecord({ target: '소라 랜드', party: '나' }, '지시문'), chatId: 'u3' };
-  const del = { ...chat, message: [...chat.message.slice(0, 3), card], scriptstate: { ...chat.scriptstate, ...m.worldVars(w, catalog, S, 'A00') } };
+  const del = { ...gone, message: [...gone.message, card], scriptstate: { ...gone.scriptstate, ...m.manualWorldVars(gone, w, catalog, S, 'A00', m.copyPending(w)) } };
   const vars = m.rerollRequestVars(del, catalog, S);
   assert.ok(vars, '지운 응답 전 상태로');
   assert.ok(!m.parseWorld(vars.$goei_world).an.some((e) => e.name === '어두운 정원'), '지운 응답이 띄운 괴이는 없다');
@@ -283,10 +284,10 @@ test('응답을 지운 뒤 임무 창에서 건 요청은 되돌아간 상태에
 test('메시지를 다 지우고 같은 채팅에서 다시 시작하면 옛 기준 상태가 남지 않는다 (첫 요청이 옛 상황판으로 가지 않음)', () => {
   const u1 = { role: 'user', data: '간다', chatId: 'u1' };
   const old = reply(startChat([u1]), `본문1\n[AN|부산광역시 연제구|어두운 정원|활성|C|없음|정원]\n${ST('10:00 AM')}`, 'c1');
-  assert.ok(old.scriptstate.$goei_prev);
+  assert.ok(old.scriptstate.$goei_turns);
   // 다시 시작: applyStart 가 시작 변수를 덮어쓴다 (planStart 의 scriptstate 에 빈 기준 상태가 들어 있다)
   const fresh = m.startWorldVars(catalog, S, 'A00', never);
-  const plan = { fmIndex: -1, scriptstate: { $goei_last: '', $goei_prev: '', ...fresh }, seedMissing: [], kind: 'direct' };
+  const plan = { fmIndex: -1, scriptstate: { $goei_turns: '', ...fresh }, seedMissing: [], kind: 'direct' };
   const again = m.applyStart({ ...old, message: [] }, plan);
   const first = { ...again, message: [{ role: 'user', data: '새 시작', chatId: 'n1' }] };
   assert.equal(m.rerollRequestVars(first, catalog, S), null, '옛 응답이 없다고 옛 상태로 되감지 않는다');

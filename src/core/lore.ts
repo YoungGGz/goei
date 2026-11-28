@@ -12,8 +12,7 @@ import { hasSceneCard, readScene } from './dispatch';
 import type { Chat, LoreEntry } from './types';
 import { hasVirtual, isVirtual } from './world/virtual';
 import { readDirectory, type AppendixWhen } from './world/directory';
-import { parseWorld } from './world/engine';
-import { WORLD_KEY } from './world/output';
+import { readWorld } from './world/output';
 import { findStatusTags } from './world/status';
 
 export type LoreKind = 'org' | 'site' | 'anomaly' | 'agent';
@@ -440,7 +439,7 @@ export function loreState(chat: Chat): LoreState {
     if (tags.length) ({ target, place, companions } = tags[tags.length - 1]);
     if (tags.length) break;
   }
-  const w = parseWorld(chat.scriptstate?.[WORLD_KEY]);
+  const w = readWorld(chat);
   const board = [...w.an.filter((a) => a.state === '활성').map((a) => a.name), ...w.ms.filter((m) => m.state === '출현').map((m) => m.name)];
   const deployed = Object.entries(w.agents).filter(([, r]) => r.st === '작전투입' || r.st === '외근').map(([n]) => n);
   return { target, board, deployed, place, companions, unlocked: readUnlocked(chat.scriptstate) };

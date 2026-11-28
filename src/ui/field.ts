@@ -9,7 +9,7 @@ import { basicSettings, worldSettings } from '../core/settings';
 import {
   activeEvents, agentLocked, endedShown, factionNames, cancelMission, type Catalog, endEvent, type EventKind, locName, MAP_CODES,
   type MissionKind, NATION_PINS, endUpcoming, parseCatalog, readWorld, REGION_PINS, regionName, requestMission, rosterFor, SEALED_LOC,
-  SIGUN, type WorldEvent, worldOn, worldVars, type WorldSettings, type WorldState, codesToNames, landmarkLoc, landmarksOf, placeWhere, prevWorldVars,
+  SIGUN, type WorldEvent, worldOn, type WorldSettings, type WorldState, codesToNames, landmarkLoc, landmarksOf, placeWhere, manualWorldVars, copyPending,
 } from '../core/world';
 import { buildClosures, journalSettings, recordVars } from '../core/journal';
 import { chatCardsAt, refreshStatusContext } from '../host/statusview';
@@ -682,7 +682,7 @@ export function depart(ctx: ChatContext, env: FieldEnv): Promise<void> {
     if (x.on && last?.role === 'user' && hasSceneCard(String(last.data ?? '')) && kinds.some((k) => x.world.pending[k])) {
       const w = structuredClone(x.world);
       for (const k of kinds) cancelMission(w, k);
-      chat = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...worldVars(w, x.catalog, x.settings, x.faction) } };
+      chat = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...manualWorldVars(latest, w, x.catalog, x.settings, x.faction, copyPending(w)) } };
     }
     return { chat: placeRecord(chat, sceneRecord({ target: targetName(target), party: partyLabel(names, support) }, body), note) };
   });
@@ -716,7 +716,7 @@ export function sendMission(ctx: ChatContext, env: FieldEnv, opening: boolean): 
       if (last?.role === 'user' && hasSceneCard(String(last.data ?? ''))) for (const k of ['an', 'ms', 'in'] as EventKind[]) cancelMission(w, k);
       const err = requestMission(w, x.catalog, x.settings, kind, name);
       if (err) throw new DirectiveError(err);
-      chat = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...worldVars(w, x.catalog, x.settings, x.faction) } };
+      chat = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...manualWorldVars(latest, w, x.catalog, x.settings, x.faction, copyPending(w)) } };
     }
     const body = sceneDirective(d, dest, names, support, opening);
     return { chat: placeRecord(chat, sceneRecord({ target: name, party: partyLabel(names, support) }, body), note) };
@@ -749,7 +749,7 @@ async function cancelRequest(ctx: ChatContext, env: FieldEnv, kind: EventKind): 
     }
     env.setBusy(false);
   }
-  await saveWorld(ctx, env, (w) => (cancelMission(w, kind), null));
+  await saveWorld(ctx, env, (w) => (cancelMission(w, kind), null), (p) => cancelMission(p, kind));
 }
 
 /** 손 종료의 기준 메시지: 마지막 봇 응답 (상태창·위치·카드 열쇠를 거기서 읽는다). 응답이 없으면 마지막 메시지 */
@@ -759,8 +759,8 @@ function closeIndexOf(chat: Chat): number {
   return Math.max(0, list.length - 1);
 }
 
-/** onPrev: 리롤 기준 상태에 반영할 변경이 지금 상태의 것과 다를 때 (없으면 change 를 그대로) */
-async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState, x: Ctx) => string | null, onPrev?: (p: WorldState) => void): Promise<void> {
+/** other: 지금 읽히지 않는 다른 응답별 결과·바탕에 옮길 같은 조작 (core/world/output.ts manualWorldVars) */
+async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState, x: Ctx) => string | null, other: (p: WorldState) => void): Promise<void> {
   env.setBusy(true);
   env.setNotice('');
   try {
@@ -770,7 +770,7 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
       const w = structuredClone(x.world);
       const err = change(w, x);
       if (err) throw new Error(err);
-      const next: Chat = { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...worldVars(w, x.catalog, x.settings, x.faction) } };
+      const next: Chat = { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...manualWorldVars(latest, w, x.catalog, x.settings, x.faction, other) } };
       // 손으로 끝낸 상황도 일지·보고서에 (core/journal). 기준은 마지막 봇 응답 (마지막이 유저 메시지면 상태창이 없어 카드 열쇠·위치가 비었다)
       if (w.closed?.length) {
         const index = closeIndexOf(latest);
@@ -780,8 +780,6 @@ async function saveWorld(ctx: ChatContext, env: FieldEnv, change: (w: WorldState
           closedAt = index;
         }
       }
-      // 리롤 기준 상태에도 같은 손 변경을 (core/world/output.ts prevWorldVars)
-      next.scriptstate = { ...next.scriptstate, ...prevWorldVars(latest.scriptstate, (p) => (onPrev ? onPrev(p) : change(p, x))) };
       return next;
     });
     // 손 종료로 보고서가 생겼으면 채팅 카드 열쇠 표를 다시 모으고, 카드가 붙을 응답이 있으면 채팅을 그대로 한 번 저장해 다시 그리게 한다
@@ -898,7 +896,7 @@ export async function handleField(action: string, value: string | undefined, ctx
       }
       field.confirmEnd = null;
       if (field.target?.type === 'event' && field.target.key === v) field.target = null;
-      // 기준 상태에서는 그 상황이 아직 발생 예정이거나 없을 수 있다 (마지막 응답이 처음 띄운 것) — 그때는 예정을 거두고 이름을 막아, 다시 굴려도 끝낸 채로 둔다
+      // 다른 응답별 결과에서는 그 상황이 아직 발생 예정이거나 없을 수 있다 (마지막 응답이 처음 띄운 것) — 그때는 예정을 거두고 이름을 막아, 다시 굴려도 끝낸 채로 둔다
       await saveWorld(ctx, env, (w) => (endEvent(w, v) ? null : '이미 끝났거나 바뀐 상황이에요.'), (p) => void (endEvent(p, v) || endUpcoming(p, v)));
       return true;
     case 'team-toggle': {

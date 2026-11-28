@@ -15,7 +15,7 @@ const src = (p) => JSON.stringify(resolve('src', p));
 await writeFile(join(dir, 'entry.ts'), [
   `export { parseCatalog } from ${src('core/world/catalog.ts')};`,
   `export { DEFAULT_SETTINGS, requestMission, parseWorld, serializeWorld } from ${src('core/world/engine.ts')};`,
-  `export { processOutput, rerollRequestVars, withdrawUnsent, startWorldVars, worldVars, readWorld } from ${src('core/world/output.ts')};`,
+  `export { processOutput, rerollRequestVars, withdrawUnsent, startWorldVars, worldVars, manualWorldVars, copyPending, readWorld } from ${src('core/world/output.ts')};`,
   `export { sceneRecord, setUnsent } from ${src('core/dispatch.ts')};`,
   `export { applyWorldPack } from ${src('core/datapack.ts')};`,
 ].join('\n'));
@@ -134,7 +134,7 @@ test('채팅 중 커스텀 임무 턴·보통 턴의 다시 굴리기, 상황판
   // 채팅 중 커스텀 임무: 창에서 걸고 카드를 보냄 (sendMission 과 같게 지금 상태에만)
   const w = m.readWorld(chat);
   assert.equal(m.requestMission(w, catalog, S0, 'an', '명일 아파트'), null);
-  chat = { ...chat, scriptstate: { ...chat.scriptstate, ...m.worldVars(w, catalog, S0, 'A00') } };
+  chat = { ...chat, scriptstate: { ...chat.scriptstate, ...m.manualWorldVars(chat, w, catalog, S0, 'A00', m.copyPending(w)) } };
   const pendingAn = chat.scriptstate.$an_report;
   const card = { role: 'user', data: m.sceneRecord({ target: '명일 아파트', party: '나' }, '지시문'), chatId: 'u2' };
   const c1 = chat.message[1];
