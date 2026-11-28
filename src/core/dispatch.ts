@@ -2,7 +2,7 @@
 // 지시문 문장은 카드의 Directive 로어북에서 읽고, 채팅에는 SCENE_CARD로 감싼 유저 메시지 하나로 남긴다.
 // 화면에는 카드(목표·투입)만 보이고, 모델 요청에서는 감싼 표식만 지운 본문이 간다.
 import type { LoreEntry } from './types';
-import { guideDefault, guidePrompt } from './guides';
+import { guideDefault, guideText, rulesFor } from './guides';
 
 export class DirectiveError extends Error {}
 
@@ -29,7 +29,8 @@ const REQUIRED = ['COMMON', 'OPENING', 'CONTINUATION', 'CONTEXT'];
 
 export function parseDirective(_lore?: LoreEntry[] | undefined): Directive {
   // 지시문 문장은 플러그인 내장 지침 (core/guides.ts Directive). 카드 로어북은 읽지 않는다 (2026-10-27)
-  return parseDirectiveText(guidePrompt('Directive'));
+  // 덧붙일 규칙은 틀을 채운 뒤에 붙인다 (sceneDirective): 규칙 글의 [[영문]] 이 치환 자리로 읽혀 출동이 막히거나 글이 바뀌었다 (3차 점검 R17)
+  return parseDirectiveText(guideText('Directive'));
 }
 
 function parseDirectiveText(raw: string): Directive {
@@ -93,7 +94,9 @@ function partyClause(d: Directive, names: string[], support: number): string {
 /** COMMON + (OPENING|CONTINUATION) + CONTEXT */
 export function sceneDirective(d: Directive, dest: string, names: string[], support: number, opening: boolean): string {
   const values = { DEST: dest, PARTY: partyClause(d, names, support) };
-  return [d.sections.COMMON, d.sections[opening ? 'OPENING' : 'CONTINUATION'], d.sections.CONTEXT].map((t) => fill(t, values)).join('\n\n');
+  const rules = rulesFor('Directive');
+  // 규칙은 COMMON 절 끝에 그대로 (치환을 거치지 않는다. RP 규칙과 같게)
+  return [d.sections.COMMON, d.sections[opening ? 'OPENING' : 'CONTINUATION'], d.sections.CONTEXT].map((t, i) => fill(t, values) + (i === 0 && rules ? `\n\n${rules}` : '')).join('\n\n');
 }
 
 /** 함께 가는 인원: 요원 + 지원. 유저 포함 최대 4명 */

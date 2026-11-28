@@ -1,0 +1,432 @@
+{
+  "results": [
+    {
+      "part": "B_",
+      "step": "15 B_빈답",
+      "what": "실패 안내 「문서를 만들지 못했어요」 + 빈 응답 사유",
+      "ok": true,
+      "expect": "안내",
+      "actual": "「빛이 없으라」 문서를 만들지 못했어요. 모델이 빈 응답을 보냈어요.",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "15 B_빈답",
+      "what": "문서가 생기지 않음, 작성 화면에 그대로",
+      "ok": true,
+      "expect": "없음",
+      "actual": false,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "15 B_빈답",
+      "what": "다시 누를 수 있음",
+      "ok": true,
+      "expect": true,
+      "actual": true,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "16 B_꼴틀림_다시묻기",
+      "what": "호출 2회(첫 답 + 다시 묻기)",
+      "ok": true,
+      "expect": 2,
+      "actual": 2,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "16 B_꼴틀림_다시묻기",
+      "what": "다시 묻기에 첫 답과 형식 오류 사유",
+      "ok": true,
+      "expect": "첫 답 + ERR_FORMAT",
+      "actual": "]\n그냥 설명글입니다. 위키 형식 아님.\nThe previous reply was rejected and nothing was saved. Reply again from the same data, following the required output format exactly. Validation error: 위키 형식(<lightboard-namuwiki>)이 아닌 응답이에요.\nFirst analyze the error source step-by-step in a short <lb-process> block, then print only the required node with the corrected data in it, without apologies, explanations, or preambles.",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "16 B_꼴틀림_다시묻기",
+      "what": "저장 = 다시 물어 받은 답",
+      "ok": true,
+      "expect": "다시묻기로",
+      "actual": true,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "17 B_잘린답_기존문서유지",
+      "what": "안내: 닫는 태그 없음 + 기존 문서는 그대로",
+      "ok": true,
+      "expect": "안내",
+      "actual": "「빛이 없으라」 문서를 만들지 못했어요. 문서가 끝까지 오지 않았어요 (닫는 태그 없음). 응답 길이 한도에 걸렸을 수 있어요. 분량을 줄이거나 다시 시도해 주세요. 기존 문서는 그대로 두었어요.",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "17 B_잘린답_기존문서유지",
+      "what": "저장 본문 그대로",
+      "ok": true,
+      "expect": "다시묻기로",
+      "actual": "e:개요\n[Paragraph]다시묻기로 다시 쓴 빛이 없으라 문서.\n</lightboard-namuwiki>",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "18 B_연타_작성중다른문서",
+      "what": "연타해도 호출 1회",
+      "ok": true,
+      "expect": 1,
+      "actual": 1,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "18 B_연타_작성중다른문서",
+      "what": "다른 문서 작성 화면: 작성 중 줄이 보이고 단추는 막힘",
+      "ok": true,
+      "expect": "막힘",
+      "actual": {
+        "busy": true,
+        "dis": true
+      },
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "18 B_연타_작성중다른문서",
+      "what": "억지로 눌러도 호출 안 늘어남",
+      "ok": true,
+      "expect": 1,
+      "actual": 1,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "19 B_늦은답_창닫음",
+      "what": "창을 닫은 뒤 온 답도 원래 채팅에 저장",
+      "ok": true,
+      "expect": "늦게온",
+      "actual": "tle:개요\n[Paragraph]늦게온 다시 쓴 빛이 없으라 문서.\n</lightboard-namuwiki>",
+      "why": "ui/wiki.ts 머리 주석 「창을 닫아도 계속」"
+    },
+    {
+      "part": "B_",
+      "step": "20 B_새로고침_재부팅",
+      "what": "대문 최근 변경에 채팅 문서",
+      "ok": true,
+      "expect": "빛이 없으라",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "20 B_새로고침_재부팅",
+      "what": "문서가 그대로",
+      "ok": true,
+      "expect": "늦게온",
+      "actual": "괴이위키\n최근 변경\n빛이 없으라\n✎ 다시 쓰기\n🗑 삭제\n최근 수정 시각: 오늘 · 분류: 괴이 · Let There Be No Light\n1. 개요\n\n늦게온 다시 쓴 빛이 없으라 문서.\n\n참조 자료",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "21 B_자동매턴_제목고르기",
+      "what": "호출 2회(제목 + 본문)",
+      "ok": true,
+      "expect": 2,
+      "actual": 2,
+      "why": "setdef/wiki.ts auto 도움말 「호출이 2회」"
+    },
+    {
+      "part": "B_",
+      "step": "21 B_자동매턴_제목고르기",
+      "what": "후보 제목 목록·최근 챗로그",
+      "ok": true,
+      "expect": "후보·챗로그",
+      "actual": {
+        "n": 148,
+        "story": true
+      },
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "21 B_자동매턴_제목고르기",
+      "what": "이미 쓴 문서(빛이 없으라)가 후보에 있으면 [이미 쓴 문서]에",
+      "ok": true,
+      "expect": "[이미 쓴 문서] 빛이 없으라",
+      "actual": "[이미 쓴 문서]\n- 빛이 없으라\n\n[최근 챗로그]\n[user]\n소라 랜드 정문으로 걸어간다.\n\n[char]\n소라 랜드 정문",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "21 B_자동매턴_제목고르기",
+      "what": "주인공이 아닌 기본 문서 제목도 후보(소라 랜드)",
+      "ok": true,
+      "expect": "소라 랜드",
+      "actual": [
+        "- 소라 랜드",
+        "- 인류의 신비전",
+        "- 명일 아파트",
+        "- 금지된 비디오",
+        "- 교회"
+      ],
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "21 B_자동매턴_제목고르기",
+      "what": "「교황청」 문서 저장",
+      "ok": true,
+      "expect": "저장",
+      "actual": true,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "21 B_자동매턴_제목고르기",
+      "what": "$nw_auto_last = 이 턴 표시",
+      "ok": true,
+      "expect": "있음",
+      "actual": "t:u2",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "22 B_자동매턴_다시굴리기",
+      "what": "버린 응답(c2)에 맞춰 자동으로 쓴 「교황청」 문서가 되돌아감",
+      "ok": false,
+      "expect": "없음",
+      "actual": {
+        "남음": true,
+        "body": "h]자동 다시 쓴 교황청 문서.\n</lightboard-namuwiki>"
+      },
+      "why": "사용자 11-22 「다시 굴리면 그 응답이 만든 것은 다 되돌아감」(goei-feedback-dont-ask-internals-1122)"
+    },
+    {
+      "part": "B_",
+      "step": "22 B_자동매턴_다시굴리기",
+      "what": "다시 굴린 새 응답(c2b)에는 자동 작성이 돌지 않음",
+      "ok": true,
+      "expect": "0회(같은 턴 열쇠)",
+      "actual": 0,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "23 B_자동매턴_기본문서제목",
+      "what": "기본 문서 제목을 자동으로 쓸 때도 기본 문서 본문이 [이전 위키]로 감(손으로 다시 쓸 때와 같게)",
+      "ok": false,
+      "expect": "[이전 위키] = 기본 문서",
+      "actual": {
+        "calls": 2,
+        "previous": false
+      },
+      "why": "단계 PC08(기본 문서 다시 쓰기는 이전 문서로 넣음)·설정 「다시 쓸 때 이전 문서 참조」 기본 켬"
+    },
+    {
+      "part": "B_",
+      "step": "23 B_자동매턴_기본문서제목",
+      "what": "채팅 문서 「소라 랜드」 생김(기본 문서를 덮음)",
+      "ok": true,
+      "expect": "생김",
+      "actual": true,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "24 B_자동창열때",
+      "what": "창(위키 탭)을 열면 2회",
+      "ok": true,
+      "expect": 2,
+      "actual": 2,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "24 B_자동창열때",
+      "what": "같은 응답에서 다시 열면 더 안 돎",
+      "ok": true,
+      "expect": 2,
+      "actual": 2,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "25 B_자동_후보밖제목",
+      "what": "문서 수 그대로",
+      "ok": true,
+      "expect": 3,
+      "actual": 3,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "26 B_쓸수없는제목",
+      "what": "안내 「쓸 수 없는 제목이에요」",
+      "ok": true,
+      "expect": "안내",
+      "actual": "괴이위키\n최근 변경\n쓸 수 없는 제목이에요. 꺾쇠(<>), 줄바꿈, {{ }} 없이 300자 이내로 적어 주세요.\n괴이위키:대문\n최근 수정 시각: 오늘\n분류: 괴이위키\n여러분이 기록해 나가는 괴담의 나무\n\n괴이위키에 오신 것을 환영합니다!\n\n괴이위키는 누구나 기여할 수 있는 위키입니다.\n검증되지 않았거나 편향된 내용이 있을 수 있습니다.\n\n검색\n\t\n오늘의 ",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "27 B_꼬리말제목",
+      "what": "꼬리말을 떼고 「교황청」 문서로",
+      "ok": true,
+      "expect": "교황청",
+      "actual": "괴이위키\n최근 변경\n교황청\n✎ 다시 쓰기\n🗑 삭제\n최근 수정 시각: 오늘 · 분류: 세력\n1. 개요\n\n창열때 다시 쓴 교황청 문서.\n\n참조 자",
+      "why": "core/wiki.ts canonicalTitle QUALIFIERS"
+    },
+    {
+      "part": "B_",
+      "step": "28 B_컨텍스트_장면만끔_개수",
+      "what": "최근 문서 2개(설정 개수)",
+      "ok": true,
+      "expect": 2,
+      "actual": [
+        "소라 랜드",
+        "교황청"
+      ],
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "28 B_컨텍스트_장면만끔_개수",
+      "what": "끄면 빠짐",
+      "ok": true,
+      "expect": 0,
+      "actual": 0,
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "29 B_그림본문_보조모델_이전문서끔",
+      "what": "설정 「이전 문서 참조」 끔이면 다시 쓰기 칸 기본 OFF",
+      "ok": true,
+      "expect": "0",
+      "actual": "0",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "29 B_그림본문_보조모델_이전문서끔",
+      "what": "보조 모델(submodel)로 감",
+      "ok": true,
+      "expect": "submodel",
+      "actual": "submodel",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "29 B_그림본문_보조모델_이전문서끔",
+      "what": "BODY IMAGES 절과 그림 목록(주제 그림 포함)",
+      "ok": true,
+      "expect": "목록",
+      "actual": [
+        "- Sora Land = 소라 랜드",
+        "- The Basement = 예술가의 지하실",
+        "- Bureau with the Lights Out = 불이 꺼진 관리국",
+        "- Tooth Fairy = 이빨 요정",
+        "- Management Bureau = 관리국"
+      ],
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "29 B_그림본문_보조모델_이전문서끔",
+      "what": "인물 그림은 목록에 없음",
+      "ok": true,
+      "expect": "인물 없음",
+      "actual": [],
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "29 B_그림본문_보조모델_이전문서끔",
+      "what": "목록의 그림을 쓴 [Image] 가 본문에 그려짐",
+      "ok": true,
+      "expect": "그림",
+      "actual": {
+        "name": "Sora Land",
+        "fig": "blob:null/d899fa38-1599-4505-9"
+      },
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "29 B_그림본문_보조모델_이전문서끔",
+      "what": "meta.model = aux",
+      "ok": true,
+      "expect": "aux",
+      "actual": "aux",
+      "why": ""
+    },
+    {
+      "part": "B_",
+      "step": "30 B_컨텍스트_상한_자르기",
+      "what": "긴 문서는 잘려 들어가고 끝에 「…(이하 생략)」",
+      "ok": true,
+      "expect": "잘림",
+      "actual": {
+        "len": 1953,
+        "tail": "graph]회전목마 \n…(이하 생략)"
+      },
+      "why": ""
+    }
+  ],
+  "notes": [
+    {
+      "part": "B_",
+      "step": "15 B_빈답",
+      "what": "빈 답 호출 수(다시 묻기 포함)",
+      "actual": 3
+    },
+    {
+      "part": "B_",
+      "step": "17 B_잘린답_기존문서유지",
+      "what": "호출 수",
+      "actual": 2
+    },
+    {
+      "part": "B_",
+      "step": "17 B_잘린답_기존문서유지",
+      "what": "서랍 「최근 실패 원문」",
+      "actual": "최근 실패 원문 (빛이 없으라)문서가 끝까지 오지 않았어요 (닫는 태그 없음). 응답 길이 한도에 걸렸을 수 있어요. 분량을 줄이거나 다시 시도해 주세요.<lightboard-namuwiki doc_title=\"빛이 없으라\">\n[Paragraph]잘린 글"
+    },
+    {
+      "part": "B_",
+      "step": "19 B_늦은답_창닫음",
+      "what": "다시 연 화면",
+      "actual": "괴이위키\n최근 변경\n괴이위키:대문\n최근 수정 시각: 오늘\n분류: 괴이위키\n여러분이 기록해 나가는 괴담의 나무\n\n괴이위키에 오신 것을 환영합니다!\n\n괴이위키는 누구나 기여할 수 있는 위키입니다.\n검증되지 않았거나 편향된 내용이 있을 수 있습니다.\n\n검색\n\t\n오늘의 문서 · 반짝반짝 용궁\n진주와 황금으로 지은 바닷속 동화 마을. 상아색 오두막, 산호 정원, 장"
+    },
+    {
+      "part": "B_",
+      "step": "21 B_자동매턴_제목고르기",
+      "what": "기본 문서가 있는 제목은 [이미 쓴 문서]에 없음",
+      "actual": {
+        "written": "\n- 빛이 없으라",
+        "soraInWritten": false
+      }
+    },
+    {
+      "part": "B_",
+      "step": "25 B_자동_후보밖제목",
+      "what": "호출 수",
+      "actual": 2
+    },
+    {
+      "part": "B_",
+      "step": "27 B_꼬리말제목",
+      "what": "「교황청 (조직)」 → ",
+      "actual": "괴이위키\n최근 변경\n교황청\n✎ 다시 쓰기\n🗑 삭제\n최근 수정 시각: 오늘 · 분류: 세력\n1. 개요\n\n창열때 다시 쓴 교황청 문서.\n\n참조 자료"
+    },
+    {
+      "part": "B_",
+      "step": "30 B_컨텍스트_상한_자르기",
+      "what": "덩어리 길이(자)",
+      "actual": 2507
+    }
+  ],
+  "errors": []
+}

@@ -58,7 +58,8 @@ async function load(first: boolean): Promise<Body | null> {
     } catch (error) {
       console.log(`[goei] 본체를 받지 못했어요: ${error instanceof Error ? error.message : String(error)}`);
       failedAt = Date.now();
-      if (ask()) showPanel(VERSION, install, '', 'fetch');
+      // 까닭이 정해진 실패(플러그인이 옛 판 등)는 받기 창에 처음부터 보인다 (3차 점검 R29: 「다시 받기」를 눌러야 「업데이트해 주세요」가 나왔다)
+      if (ask()) showPanel(VERSION, install, error instanceof BodyError ? error.message : '', 'fetch');
       return null;
     }
     lap('본체 받음');
@@ -237,7 +238,8 @@ void risuai
 
 // 선택지용사처럼 필요한 권한을 처음에 한 번에 묻는다 (업데이트하면 Risu가 권한을 다시 묻는데,
 // 기능을 하나씩 켜는 도중에 묻지 않게)
-for (const permission of ['replacer', 'mainDom', 'sendChat']) {
+// 'db'(데이터베이스 읽기)는 에셋 모듈 목록을 읽을 때 쓴다. 여기서 같이 묻지 않으면 2초쯤 뒤에 네 번째로 따로 떴다 (3차 점검 R31. 묻는 개수는 같다)
+for (const permission of ['replacer', 'mainDom', 'sendChat', 'db']) {
   try {
     await risuai.requestPluginPermission(permission);
   } catch {

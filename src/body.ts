@@ -1,4 +1,4 @@
-import { clearUnsent, unsentShown } from './host/unsent';
+import { clearUnsent, forgetWithdrawn, unsentShown, wasWithdrawn } from './host/unsent';
 import { chatCardsAt, refreshStatusContext, renderStatus, resetStatusContext, setRecordsOpener, setWikiOpener } from './host/statusview';
 import { openingShown, refreshOpeningHint, setOpeningHint, setRepickOpener, wantsOpeningHint } from './host/openinghint';
 import { hasStatusTag } from './core/world';
@@ -40,14 +40,15 @@ import { cleanOutput, hasWorldTags, parseCatalog, processOutput, readDirectory, 
 import { basicSettings, missingBasicVars, worldSettings } from './core/settings';
 import { staleFactionVars } from './core/factions';
 import { supplementAssets } from './host/asset';
-import { loadContext, updateCharacterLore, updateChat, nudgeMessages, getChar, type ChatContext, type CharacterSnapshot } from './host/risu';
+import { loadContext, locateChat, updateCharacterLore, updateChat, updateChatOf, nudgeMessages, getChar, type ChatContext, type CharacterSnapshot } from './host/risu';
 import { WatchState, type WatchSnapshot } from './core/watch';
 import { createFab, type Fab } from './host/overlay';
 import { createProgWin, progressOn, type ProgWin } from './host/progwin';
 import { BRAND } from './ui/brand';
 import { cardPalette as themedCardPalette, currentTheme, onThemeChange, repaintTheme, setCurrentTheme, themeName } from './ui/theme';
+import { outsideThoughts } from './core/thoughts';
 import { hasImgTag, IMG_RECENT, imgHidden, imgTagsKnown, keepImgTagsInRequest, renderImgTags, setImgHidden, stripOldImgTags } from './core/imgtag';
-import { loadModuleAssets, modulePicker } from './host/assets';
+import { loadModuleAssets, moduleAssetsChar, modulePicker } from './host/assets';
 import { getPrefs } from './core/settings';
 import { appDimmed, appShown, openApp, openInstall, openRecords, openShop, openWiki } from './ui/app';
 import { isGoeiLore, isLanding } from './core/install';
@@ -83,7 +84,7 @@ import { peopleStore } from './core/people/store';
 import { peopleSettings } from './core/people/settings';
 import { identityText } from './core/people/identity';
 import { extraNames, temperOf } from './core/people/base';
-import { requestPeopleUpdate, directorNoteText, factionNamesOf, ownNames, rosterOf, routerPeople } from './host/people';
+import { requestPeopleUpdate, directorNoteText, factionNamesOf, livePeopleStore, ownNames, rosterOf, routerPeople } from './host/people';
 import { traceBegin, traceEnd, traceMain, traceReply, traceTurnId } from './host/trace';
 import { progressAbort, progressEnd, progressPlan, progressTurn, progressWatch } from './core/progress';
 import { turnPlan } from './core/progplan';
@@ -211,6 +212,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   await liteReady;
   try {
     setWaiting(true);
+    forgetWithdrawn(); // 새 요청: 지난 요청을 물린 표시는 잊는다 (host/unsent.ts)
     setUseLockAt(null); // 「사용」 잠금: 어느 채팅인지 읽기 전에는 전부 (host/usebox.ts)
     // 다른 봇의 요청: 이 봇 채팅의 「사용」은 잠그지 않는다 (없는 자리를 적어 둔다)
     if (!liteNow) setUseLockAt({ charIndex: -1, chatIndex: -1 });
@@ -224,7 +226,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
       // 호출 흐름 기록: 새 턴 (host/trace.ts). 이 뒤의 라우터·디렉터 호출은 이 턴의 「본편 전」
       await stepAsync('호출 기록', () => traceBegin(), undefined);
       ctx = await stepAsync('채팅 읽기', () => loadContext(), null);
-      // 다시 굴리기: 버린 응답이 상황판·소속에 반영한 것을 되감은 변수로 요청을 만든다 (채팅에는 저장하지 않는다. 응답이 붙으면 processOutput 이 같은 기준에서 다시 반영)
+      // 다시 굴리기·지운 응답: 채팅에 살아 있는 마지막 응답의 상황판·소속으로 요청을 만든다 (채팅에는 저장하지 않는다. 응답이 붙으면 processOutput 이 같은 결과에서 반영)
       if (ctx) ctx = step('리롤 되감기', () => rerollContext(ctx!), ctx);
       if (ctx) setUseLockAt(ctx); // 「사용」 잠금은 요청을 보낸 이 채팅에만
       else setUseBlind(); // 채팅을 못 읽음: [Inventory] 도 못 넣는다
@@ -276,9 +278,12 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
         // 칸 구성(설정)대로 다시 만들고 잔고 칸은 장부 값으로 (core/world/statuscols.ts · core/wallet.ts)
         messages = mark('상태창', messages, step('상태창', () => withStatusBlock(messages, step('신분', () => knownIdentity(c), ''), step('상태창 모양', () => statusShape(c), undefined)), messages));
         // 소지품 [Inventory]: 지금 가진 것·한계·이번 턴 사건(사용·새로 산 것·넘침)을 마지막 유저 메시지 앞에 (core/items.ts, 설정 「소지품 → 본편에 넘기기」)
-        messages = mark('소지품', messages, step('소지품', () => withInventory(messages, c.chat), messages));
+        // 이 단계가 실패하면 [Inventory] 가 안 실린다: 채팅을 못 읽은 요청과 같이 「못 받은 요청」으로 적어, 답이 붙어도 걸어 둔 사용을 쓴 것으로 기록하지 않는다 (setUseBlind, 3차 점검 R35)
+        let invCarried = false;
+        messages = mark('소지품', messages, step('소지품', () => { const m = withInventory(messages, c.chat); invCarried = true; return m; }, messages));
+        if (!invCarried) setUseBlind();
         // 「다음 메시지에 사용」 칩: 요청에 실려 나갔으니 바로 숨긴다 (host/usebox.ts markUseSent, 2026-11-12 사용자: 보냈는데 안 없어짐)
-        await stepAsync('사용 상자', () => markUseSent(c.charIndex, c.chatIndex, c.chat), undefined);
+        if (invCarried) await stepAsync('사용 상자', () => markUseSent(c.charIndex, c.chatIndex, c.chat), undefined);
         // 망상홈쇼핑: 할부 호출 턴·방청 신청 턴에만 한 번 (core/homeshop.ts, 평소엔 아무것도 안 넣는다)
         messages = mark('망상홈쇼핑', messages, step('망상홈쇼핑', () => withHomeshop(messages, c.chat), messages));
         // 장면 인물의 살아 있는 기록 (core/people). 절 단위 혼합이면 그 인물의 시트 원문은 빼고 기록으로 대신한다
@@ -308,7 +313,7 @@ async function onBeforeRequest<M extends PromptMessage>(messages: M[], type: str
   return out;
 }
 
-/** 다시 굴린(또는 앞 응답을 지운) 요청이면 상황판·소속 변수를 버린 응답 전으로 되감은 문맥, 아니면 지금 상태·카드로 브리핑을 다시 만든 문맥 (core/world/output.ts requestWorldVars) */
+/** 다시 굴린(또는 앞 응답을 지운) 요청이면 살아 있는 마지막 응답의 상황판·소속으로 만든 문맥, 아니면 지금 상태·카드로 브리핑을 다시 만든 문맥 (core/world/output.ts requestWorldVars) */
 function rerollContext(ctx: ChatContext): ChatContext {
   if (!worldOn(ctx.chat)) return ctx;
   const vars = requestWorldVars(ctx.chat, parseCatalog(ctx.char.globalLore), worldSettings(ctx.char.globalLore, ctx.chat.scriptstate));
@@ -337,13 +342,15 @@ type LoreChar = { name?: string; globalLore?: LoreEntry[]; loreSettings?: unknow
 
 /** CBS 환경의 유저 이름: 아직 모르면 `{{user}}`를 그대로 둔다 (빈 이름으로 풀면 「's current …」처럼 깨진다. QC 2026-10-28) */
 const userOrTag = () => userInfo().name || undefined;
+/** 플러그인이 만드는 글의 `{{user}}`: 요원으로 플레이하면 그 요원 이름, 아니면 페르소나 이름 (페르소나 이름이 기본값 「User」여도 주인공이 누구인지 이어지게) */
+const userFor = (char: LoreChar, chat: Chat) => playerAgent(char.globalLore, chat.scriptstate)?.name || userOrTag();
 
 function loreFor(char: LoreChar, chat0: Chat, input?: string) {
   // 플러그인이 넣은 첫 장면 메시지는 키워드 훑기에서 뺀다 (카드 인사말이던 때와 같게: Risu 는 인사말을 chat.message 에 두지 않았다. 2026-11-05)
   const chat = chat0.message?.some((m) => isSceneMessage(m.data)) ? { ...chat0, message: chat0.message.filter((m) => !isSceneMessage(m.data)) } : chat0;
   const mode = advValue(chat.scriptstate, 'gen', 'lore_mode') as LoreMode;
   const player = playerAgent(char.globalLore, chat.scriptstate);
-  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, userOrTag(), loreLimits(chat.scriptstate)), input, ...(player ? { exclude: [player.lore] } : {}) });
+  return computeLore(char.globalLore, chat, { ...loreOptions(char, chat, mode, player?.name || userOrTag(), loreLimits(chat.scriptstate)), input, ...(player ? { exclude: [player.lore] } : {}) });
 }
 
 /** 고른 로어북을 자리 항목이 읽는 채팅 변수에 적는다 (요청 전이라 Risu가 세고 넘치면 오래된 채팅을 지운다).
@@ -407,7 +414,7 @@ function fixLore<M extends PromptMessage>(messages: M[], { char, chat }: ChatCon
     return patchSlots(messages, chat.scriptstate, got.vars).messages;
   }
   const parts: LoreBlockPart[] = [];
-  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userOrTag() };
+  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userFor(char, chat) };
   // 🏷️Tag 의 상태창 절은 이 채팅의 칸 구성에서 만든다 (`{status_section}` 자리)
   const cols = usedCols(colConfig(chat.scriptstate));
   for (const b of ALWAYS_BOOKS) {
@@ -477,7 +484,8 @@ function knownIdentity({ chat }: ChatContext): string {
 async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }: ChatContext): Promise<M[]> {
   const settings = peopleSettings(chat.scriptstate);
   if (!settings.on) return messages;
-  const store = peopleStore(chat);
+  // 사라진 응답(다시 굴림·지움)이 만든 인물·이름 옮기기는 뺀 모습으로 읽는다 (host/people.ts livePeopleStore, 3차 점검 R40)
+  const store = livePeopleStore(chat, char.globalLore);
   if (!Object.keys(store.people).length) return messages;
   const me = playerAgent(char.globalLore, chat.scriptstate);
   const lastUser = [...messages].reverse().find((m) => m?.role === 'user');
@@ -485,7 +493,7 @@ async function withPeople<M extends PromptMessage>(messages: M[], { char, chat }
   const user = me?.name || userInfo().name || guideTxt('Common', 'REFS.USER_NAME');
   // 시트 원문은 로어 덩어리에 들어간 글과 같은 변환(장식 줄 떼기·같은 CBS 환경)으로 읽어야 split·record 모드가 요청에서 그 글을 찾아 뺄 수 있다
   // (bookText 는 @@dont_activate 줄을 남기고 {{user}}를 「주인공」으로 풀어 한 번도 맞지 않았다. QC 2026-10-28)
-  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userOrTag() };
+  const env = { vars: chat.scriptstate ?? {}, char: char.name, user: userFor(char, chat) };
   const sheetOf = (name: string): string | null => {
     const e = (char.globalLore ?? []).find((x) => x.mode !== 'folder' && x.comment === name && typeof x.content === 'string');
     const text = e ? stripDecorators(evaluate(e.content as string, env)).trim() : '';
@@ -625,6 +633,8 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const raw0 = arg.char as { globalLore?: LoreEntry[] } | null;
     const chat = arg.chat as Chat | null;
     if (!raw0 || !chat || !isGoeiLore(raw0.globalLore)) return; // 다른 봇: 아무것도 안 함
+    // 뒤 작업의 저장은 이 응답의 채팅에 (도는 사이 Risu 에서 채팅 번호가 밀려도, 3차 점검 R09)
+    const at = { charIndex: arg.characterIndex, chatIndex: arg.chatIndex, chat };
     // 이벤트의 캐릭터는 카드 그대로라 세계 데이터(가상 로어북)가 없다. 경량 카드는 명부 폴더가 가상이라 이걸 빼면 상황판 처리가 통째로 건너뛰어진다 (2026-10-27)
     const char = { ...raw0, globalLore: withWorldLore(raw0.globalLore) };
     const raw = chat.message?.[arg.messageIndex]?.data;
@@ -632,11 +642,21 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
       progressAbort(pTurn); // 응답이 안 붙음: 본편 실패로 닫는다
       return;
     }
+    // 답을 기다리는 중에 「취소」로 물린 요청의 답이 늦게 왔다: 물린 요청이니 채팅에 남기지 않고(빈 채팅에 답만 혼자 붙었다, 3차 점검 R30) 아무 처리도 하지 않는다
+    if (wasWithdrawn(arg.characterIndex, arg.chatIndex, chat)) {
+      forgetWithdrawn();
+      await updateChatOf(at, (cur) => {
+        const list = cur.message ?? [];
+        return arg.messageIndex === list.length - 1 && list[arg.messageIndex]?.role === 'char' ? { ...cur, message: list.slice(0, -1) } : null;
+      }).catch(() => null);
+      progressAbort(pTurn);
+      return;
+    }
     traceReply(raw);
     let latest: Chat | null = null;
     if (chat.scriptstate?.['$st_anomaly_on'] === '1') {
       const catalog = parseCatalog(char.globalLore);
-      latest = await updateChat(arg.characterIndex, arg.chatIndex, (cur) =>
+      latest = await updateChatOf(at, (cur) =>
         processOutput(cur, arg.messageIndex, raw, catalog, worldSettings(char.globalLore, cur.scriptstate), Math.random),
       );
     }
@@ -646,7 +666,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const walletStart = getPrefs().walletStart ?? WALLET_START_DEFAULT;
     // 설정 「상태창 잔고 따르기」를 끄면 맞추지 않는다 (장부 값만 믿고, 다음 요청의 [Previous status] 잔고를 장부로 덮는다)
     if (colConfig(chat.scriptstate).wallet !== 'off' && walletSyncOn(chat.scriptstate) && syncWalletToStatus(readWallet((latest ?? chat).scriptstate, walletStart), latest ?? chat)) {
-      latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      latest = (await updateChatOf(at, (cur) => {
         const w = syncWalletToStatus(readWallet(cur.scriptstate, walletStart), cur);
         return w ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...walletVars(w) } } : null;
       }).catch(() => null)) ?? latest;
@@ -658,7 +678,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
       const flag = pointsAuto(cur0.scriptstate) ? pointsFlagFor(cur0, isPointsOrg(String(cur0.scriptstate?.['$ib_affiliation'] ?? ''))) : null;
       const needSync = colConfig(cur0.scriptstate).points !== 'off' && walletSyncOn(cur0.scriptstate) && !!syncPointsToStatus(readPoints(cur0.scriptstate), cur0);
       if (flag || needSync) {
-        latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+        latest = (await updateChatOf(at, (cur) => {
           const add: Record<string, string> = {};
           const f = pointsAuto(cur.scriptstate) ? pointsFlagFor(cur, isPointsOrg(String(cur.scriptstate?.['$ib_affiliation'] ?? ''))) : null;
           if (f) {
@@ -682,7 +702,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const useAsked = sentReroll(arg.characterIndex, arg.chatIndex, latest ?? chat);
     // 손대지 못하고 보낸 요청의 답(useBlind): 모델이 사용을 못 받았으니 적지 않고 자리를 그대로 둔다
     if (!useBlind() && settleItemUse(latest ?? chat, arg.messageIndex, useSent, useAsked)) {
-      latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      latest = (await updateChatOf(at, (cur) => {
         const vars = settleItemUse(cur, arg.messageIndex, useSent, useAsked);
         return vars ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...vars } } : null;
       }).catch(() => null)) ?? latest;
@@ -694,7 +714,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 이 응답에 표식이 없고 방문 중인 상점이 없어도 돌린다: 접속 표식(`@web:사이트`)은 방문 상태를 남기지 않아, 건너뛰면 지난 응답의 접속 카드가 남았다 (11-16). 바뀔 것이 없으면 settleShop 이 null
     // 갱신기가 상점을 판단하면(설정 「상점 판단」, 11-09) 여기서는 건드리지 않는다: 갱신기가 표식을 붙이고 같은 정리를 돌린다 (host/people.ts). 그래야 같은 가게에 머무는 동안 방문 기록이 지워지지 않는다
     if ((shopJudgeBy((latest ?? chat).scriptstate).by === 'main' || !shopOn((latest ?? chat).scriptstate)) && settleShop(latest ?? chat, arg.messageIndex, selfNames)) {
-      latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      latest = (await updateChatOf(at, (cur) => {
         const r = settleShop(cur, arg.messageIndex, selfNames);
         return r ? { ...cur, ...(r.message ? { message: r.message } : {}), scriptstate: { ...(cur.scriptstate ?? {}), ...r.vars } } : null;
       }).catch(() => null)) ?? latest;
@@ -703,7 +723,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     {
       const base = latest ?? ((await risuai.getChatFromIndex(arg.characterIndex, arg.chatIndex)) as Chat | null);
       if (base && settleReady(base, cosReadyMode(base.scriptstate) !== 'off')) {
-        latest = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+        latest = (await updateChatOf(at, (cur) => {
           const message = settleReady(cur, cosReadyMode(cur.scriptstate) !== 'off');
           return message ? { ...cur, message } : null;
         }).catch(() => null)) ?? latest;
@@ -719,7 +739,7 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
       return Object.keys(vars).length ? vars : null;
     };
     if (missing(now.scriptstate)) {
-      now = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => {
+      now = (await updateChatOf(at, (cur) => {
         const vars = missing(cur.scriptstate);
         return vars ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...vars } } : null;
       })) ?? now;
@@ -728,17 +748,17 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     // 저장 직후 Risu 가 메시지를 다시 그릴 때 카드 열쇠 표가 비어 있으면 종료 응답 아래 보고서 카드가 안 나오고 다음 저장까지 기다려야 했다
     await refreshStatusContext(arg.characterIndex, arg.chatIndex, { char, chat: now }).catch(() => {});
     // 이번 응답에서 종료된 사건의 카드가 있으면 채팅을 그대로 한 번 저장해 그 메시지를 다시 그리게 한다 (설정 변경 때와 같은 기법)
-    if (latest && chatCardsAt(now, arg.messageIndex).length) now = (await updateChat(arg.characterIndex, arg.chatIndex, (cur) => nudgeMessages(cur, (_d, i) => i === arg.messageIndex)).catch(() => null)) ?? now;
+    if (latest && chatCardsAt(now, arg.messageIndex).length) now = (await updateChatOf(at, (cur) => nudgeMessages(cur, (_d, i) => i === arg.messageIndex)).catch(() => null)) ?? now;
     // 다음 요청에 넣을 로어북을 미리 골라 둔다 (다시 굴리기·자동 전송은 입력 처리를 거치지 않는다)
     await storeLore(arg.characterIndex, arg.chatIndex, undefined, { char, chat: now }).catch(() => {});
     // 막혔던 요청을 사용자가 전송 버튼으로 보냈으면 카드의 「전송을 눌러 주세요」·취소를 없앤다
-    if (now.message.some((m) => typeof m.data === 'string' && isUnsent(m.data))) now = (await updateChat(arg.characterIndex, arg.chatIndex, clearUnsent)) ?? now;
+    if (now.message.some((m) => typeof m.data === 'string' && isUnsent(m.data))) now = (await updateChatOf(at, clearUnsent)) ?? now;
     // 인물 기록 갱신 (core/people): 매 턴 설정이면 보조 모델 1회. 다른 보조 호출 앞에, 병렬 설정이 아니면 끝날 때까지 차례로
     {
       const pp = requestPeopleUpdate('turn', { at: { charIndex: arg.characterIndex, chatIndex: arg.chatIndex } }).catch((error) => console.log(`[goei] 인물 기록 갱신 실패: ${error instanceof Error ? error.message : String(error)}`))
         // 이번 응답에서 끝난 내 사건 보고서에 그 응답의 가계부 맞춤·호감 계기까지 넣는다 (전수검사 11-13)
         .then(() => (readReports(now).items.some((r) => r.mine && r.idx === arg.messageIndex)
-          ? updateChat(arg.characterIndex, arg.chatIndex, (cur) => { const v = refreshClosures(cur, arg.messageIndex, walletStart); return v ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...v } } : null; }).catch(() => null)
+          ? updateChatOf(at, (cur) => { const v = refreshClosures(cur, arg.messageIndex, walletStart); return v ? { ...cur, scriptstate: { ...(cur.scriptstate ?? {}), ...v } } : null; }).catch(() => null)
           : null));
       after.push(pp);
       if (!peopleSettings(now.scriptstate).parallel) await pp;
@@ -756,9 +776,12 @@ async function onOutput(arg: { char: unknown; chat: unknown; characterIndex: num
     const malls = MALL_SITES.filter((site) => mallAutoTurn(now!, site));
     if (netTasks.length || viewAuto || wikiAuto || malls.length) {
       const fresh = async () => {
-        const c = ((await risuai.getChatFromIndex(arg.characterIndex, arg.chatIndex)) as Chat | null) ?? now!;
+        const loc = await locateChat(arg.characterIndex, arg.chatIndex, chat.id);
+        // 그 사이 이 채팅이 지워졌다: 자동 호출을 하지 않는다 (다른 채팅 글로 부르지 않게)
+        if (!loc && typeof chat.id === 'string' && chat.id) throw new Error('채팅이 지워졌어요');
+        const c = loc?.chat ?? now!;
         c.message ??= [];
-        return { charIndex: arg.characterIndex, chatIndex: arg.chatIndex, char: char as never, chat: c };
+        return { charIndex: arg.characterIndex, chatIndex: loc?.chatIndex ?? arg.chatIndex, char: char as never, chat: c };
       };
       after.push((async () => {
         applyAdvanced(now!.scriptstate);
@@ -875,8 +898,30 @@ function cardButtonStyle(): string {
 /** 에셋 목록 첫 읽기 (시작 때 건다). 화면 처리기는 태그가 있으면 이것을 한 번 기다린다 */
 let assetsFirst: Promise<unknown> = Promise.resolve();
 
+/** 화면 처리기의 「괴이 채팅인가」 판정: 지금 캐릭터 번호와 그 판정 한 칸. 번호가 바뀔 때만 캐릭터를 다시 읽는다.
+ *  Risu 는 화면 처리기에 글만 넘기고, 감시(1초)의 liteNow 는 채팅을 옮긴 직후 앞 채팅 값이라 그릴 때마다 여기서 정한다 (3차 점검 R02·R03) */
+let drawChar: { index: number; lite: Promise<boolean> } | null = null;
+async function drawsHere(): Promise<number> {
+  const index = await risuai.getCurrentCharacterIndex();
+  if (!Number.isInteger(index) || index < 0) return -1;
+  if (drawChar?.index !== index) {
+    const mine = { index, lite: getChar<{ globalLore?: LoreEntry[] }>(index).then((char) => isGoeiLore(char?.globalLore)) };
+    drawChar = mine;
+    // 못 읽었으면 기억하지 않는다 (다음에 그릴 때 다시 읽는다)
+    mine.lite.catch(() => {
+      if (drawChar === mine) drawChar = null;
+    });
+  }
+  return (await drawChar.lite.catch(() => false)) ? index : -1;
+}
+
 async function onDisplay(text: string): Promise<string> {
   if (typeof text !== 'string') return text;
+  // 괴이 카드의 채팅이 아니면 글을 그대로 둔다 (다른 봇 글의 [▣|…]·[shop:…]·<img=…> 를 그리지 않는다)
+  const here = await drawsHere().catch(() => -1);
+  if (here < 0) return text;
+  // 에셋 목록이 다른 캐릭터를 보고 읽은 것이면 다시 읽은 뒤 그린다
+  if (hasImgTag(text) && moduleAssetsChar() !== here) await assetsFirst.catch(() => undefined).then(() => (moduleAssetsChar() !== here ? loadModuleAssets().catch(() => false) : false));
   // 이미지 태그는 에셋 목록이 있어야 그린다. 목록을 아직 못 읽었으면 첫 읽기를 기다린다 (안 기다리면 원문 태그가 남고, 새로고침 전엔 다시 그려지지 않는다)
   if (hasImgTag(text) && !modulePicker()) await assetsFirst.catch(() => undefined);
   // 플러그인이 넣은 첫 장면: 안내(첫 행동·재선택)를 붙일지 아직 모르면 지금 채팅 상태를 읽어 정한다.
@@ -901,48 +946,47 @@ async function redrawAfterLoad(): Promise<void> {
     if (!ctx || !isGoeiLore(ctx.char.globalLore)) return;
     if (!ctx.chat.message.some((m) => typeof m.data === 'string' && m.data.includes('<img='))) return;
     // 같은 글을 그대로 저장하면 Risu(Chats.svelte, 글 해시로 그린 것을 재사용)가 다시 그리지 않는다. 그림 태그가 있는 글의 끝 줄바꿈을 붙였다 뗐다 해 글이 바뀌게 한다 (보이는 것·요청은 그대로)
-    await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => nudgeMessages(cur, (d) => d.includes('<img=')));
+    await updateChatOf(ctx, (cur) => nudgeMessages(cur, (d) => d.includes('<img=')));
   } catch {
     /* 다시 그리지 못해도 그만 (다음 채팅 전환 때 그려진다) */
   }
 }
 
+/** 생각 블록 밖의 글 한 조각을 화면 꼴로 (displayNow 가 outsideThoughts 로 부른다) */
+function drawPart(text: string): string {
+  let out = text;
+  // 플러그인이 넣은 첫 장면 메시지: 표식만 뗀다 (core/dispatch SCENE_MARK)
+  if (out.includes(SCENE_MARK)) out = stripSceneMark(out);
+  if (hasWorldTags(out)) out = cleanOutput(out);
+  if (hasUnlockTag(out)) out = stripUnlockTags(out);
+  if (hasSceneCard(out)) out = renderSceneCards(out, sceneCardHtml);
+  if (hasCall(out)) out = renderCalls(out, callCardHtml);
+  if (out.includes(START_MARK)) out = renderStartCards(out, startCardHtml);
+  // 상태창은 카드 정규식 대신 플러그인이 그린다 (칸이 어긋나도 깨지지 않게, 설정의 배색으로)
+  if (hasStatusTag(out)) out = renderStatus(out);
+  // 상점 표식 → 「상점 열기」 카드 (host/shopcard.ts). 상태창 뒤에 붙으니 상태창 상자 아래에 온다
+  if (hasShopTag(out)) out = renderShopCard(out);
+  // 맞춤 주문 완성 표식 → 알림 카드 (같은 방식)
+  if (hasReadyTag(out)) out = renderReadyCard(out);
+  // 캐릭터 이미지 태그는 플러그인이 그림 칸으로 (늘 그린다. 그래야 표시 범위 밖 메시지에서 태그 글자가 남지 않는다)
+  if (hasImgTag(out)) out = renderImgTags(out, modulePicker(), getPrefs().imgShow ?? IMG_RECENT.def, userInfo().name);
+  return out;
+}
+
 function displayNow(text: string): string {
-  // 플러그인 고유 표식(시작 카드·지시문·전화 카드)은 Lite 판정 전에도 바꾼다.
-  // 다른 채팅에 갔다 오면 Risu가 판정(liteNow)보다 먼저 메시지를 다시 그려서 원문이 드러난 채 남았다.
-  // 이 표식은 이 봇 메시지에만 있으니 다른 봇에서는 아무것도 바뀌지 않는다.
-  // 이 봇 메시지인지: Lite 판정 전에도 알아볼 수 있는 표식들 (상태창 [▣|…], 시작·지시문·전화 카드)
-  const ours = liteNow || isLanding(text) || text.includes(UNSENT_MARK) || text.includes(START_MARK) || text.includes(SCENE_MARK) || hasStatusTag(text) || hasSceneCard(text) || hasCall(text) || hasShopTag(text) || hasReadyTag(text);
+  // 괴이 카드의 채팅일 때만 불린다 (onDisplay 가 그릴 때마다 지금 캐릭터로 정한다)
   let out = text;
   if (isLanding(text)) out = landingHtml();
   else {
-    // 플러그인이 넣은 첫 장면 메시지: 표식만 뗀다 (core/dispatch SCENE_MARK)
-    if (out.includes(SCENE_MARK)) out = stripSceneMark(out);
-    if (liteNow && hasWorldTags(out)) out = cleanOutput(out);
-    if (liteNow && hasUnlockTag(out)) out = stripUnlockTags(out);
-    if (hasSceneCard(out)) out = renderSceneCards(out, sceneCardHtml);
-    if (hasCall(out)) out = renderCalls(out, callCardHtml);
-    if (out.includes(START_MARK)) out = renderStartCards(out, startCardHtml);
-    // 상태창은 카드 정규식 대신 플러그인이 그린다 (칸이 어긋나도 깨지지 않게, 설정의 배색으로)
-    if (hasStatusTag(out)) out = renderStatus(out);
-    // 상점 표식 → 「상점 열기」 카드 (host/shopcard.ts). 상태창 뒤에 붙으니 상태창 상자 아래에 온다
-    if (hasShopTag(out)) out = renderShopCard(out);
-    // 맞춤 주문 완성 표식 → 알림 카드 (같은 방식)
-    if (hasReadyTag(out)) out = renderReadyCard(out);
-    // 캐릭터 이미지 태그는 플러그인이 그림 칸으로. Lite 판정 전(다른 채팅에서 돌아온 직후)에는 태그가 모두 에셋 모듈에 있는 이름일 때만
-    if (hasImgTag(out)) {
-      const pick = modulePicker();
-      const self = userInfo().name;
-      // 우리 메시지(판정 뒤이거나 상태창 같은 표식이 있는 글)면 늘 그린다. 그래야 표시 범위 밖 메시지에서 태그 글자가 남지 않는다
-      if (ours || imgTagsKnown(out, pick, self)) out = renderImgTags(out, pick, getPrefs().imgShow ?? IMG_RECENT.def, self);
-    }
+    // 표식·태그는 생각 블록 밖의 글에서만 카드로 바꾼다 (3차 점검 R01: 생각 속 상태창·상점 표식·그림 태그가 화면에 그려졌다)
+    out = outsideThoughts(out, drawPart);
     if (out.includes(UNSENT_MARK)) out = renderUnsentMark(out, unsentMarkHtml());
     if (wantsOpeningHint(text)) out += openingHintHtml();
   }
   // 유저 사진 주소를 Risu가 채워 주는 숨은 칸 (host/user.ts). 이 봇 메시지에만
-  if (ours && !out.includes('data-goei-user')) out += USER_MARK;
+  if (!out.includes('data-goei-user')) out += USER_MARK;
   // 「다음 메시지에 사용」 칩이 들어갈 빈 자리 (host/usebox.ts). 마지막 메시지의 것만 본 화면 style 이 채워 보인다
-  if (ours && !isLanding(text) && !out.includes('data-goei-card="use"')) out += USE_SLOT;
+  if (!isLanding(text) && !out.includes('data-goei-card="use"')) out += USE_SLOT;
   return out;
 }
 
@@ -995,6 +1039,7 @@ function startWatcher(fab: Fab | null): () => void {
   // 설치·점검으로 카드가 바뀌면 다음 차례에 다시 판정 (플로팅 버튼이 바로 생기게)
   setInstalledHook(() => {
     state.forget();
+    drawChar = null;
   });
   let stopped = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -1021,8 +1066,9 @@ function startWatcher(fab: Fab | null): () => void {
         if (switched) resetStatusContext();
         await readTheme(snap).catch(() => {});
         await refreshStatusContext(snap.charIndex, snap.chatIndex).catch(() => {});
-        // Risu 가 옮긴 직후 앞 채팅 목록으로 그린 상태창이 남아 있을 수 있으니 채팅을 그대로 한 번 저장해 다시 그리게 한다
-        if (switched) await updateChat(snap.charIndex, snap.chatIndex, (cur) => nudgeMessages(cur, (d) => hasStatusTag(d))).catch(() => null);
+        // Risu 가 옮긴 직후 앞 채팅 목록으로 그린 상태창이 남아 있을 수 있으니 채팅을 그대로 한 번 저장해 다시 그리게 한다.
+        // 처음 보이는 채팅(새로고침 직후·다른 봇에서 옴)도 같다: Risu 가 목록(보고서 카드 열쇠 표·위키 이름)이 차기 전에 이미 그려, 보고서 카드가 빠진 채 남았다 (3차 점검 R45)
+        if (chatKey !== shownChat) await updateChat(snap.charIndex, snap.chatIndex, (cur) => nudgeMessages(cur, (d) => hasStatusTag(d))).catch(() => null);
         await refreshOpeningHint(snap.charIndex, snap.chatIndex).catch(() => {});
         await refreshUseBox(snap.charIndex, snap.chatIndex).catch(() => {});
       } else if (!next.fabVisible && next.changed) {

@@ -6,12 +6,12 @@
 import { needAttr } from './needfill';
 import { josa } from '../core/josa';
 import type { ChatContext } from '../host/risu';
-import { updateChat } from '../host/risu';
+import { updateChatOf } from '../host/risu';
 import { refreshUseBox, useLocked } from '../host/usebox';
 import { generate, type LlmMessage } from '../host/llm';
 import { facePic } from '../host/assets';
-import { personaText } from '../host/user';
-import { playerSource } from '../core/player';
+import { personaText, userInfo } from '../host/user';
+import { playerAgent, playerSource } from '../core/player';
 import { genSettings } from '../core/advanced';
 import { collectRefs, limitRefs, recentTurns, refText, storyText, type RefRow, type RefSource } from '../core/refs';
 import { buildRegistry } from '../core/world/registry';
@@ -30,7 +30,7 @@ import { addItem, dropUse, EQUIP_LABEL, gridItems, useSentAt, itemLeft, itemUseV
 import { getPrefs } from '../core/settings';
 import { guideTxt } from '../core/guides';
 import {
-  applyShelf, applyTalk, cancelSell, dropPending, stampReply, closeSale, currentShop, markSold, mergeLate, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
+  applyShelf, applyTalk, cancelSell, dropPending, stampReply, closeSale, currentShop, lastBot, markSold, mergeLate, storyStamp, parseShelf, parseTalk, readShop, reviveShop, sayToOwner, shelfItems, shelfPrompt, settleShop, shopLimits, shopOn, shopSettings, shopVars, shortWon, startSell, talkPrompt,
   type ShopItem, type ShopSource, type ShopState,
 } from '../core/shop';
 import { ICONS } from './icons';
@@ -458,7 +458,7 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
     let sold = false;
     const sale = next.sell;
     let merged = next;
-    await updateChat(cur.charIndex, cur.chatIndex, (chat) => {
+    await updateChatOf(cur, (chat) => {
       const now0 = readShop(chat.scriptstate);
       // 그사이 응답이 와서 다른 가게가 됐으면 버린다
       if (!now0 || now0.shop !== next.shop) return null;
@@ -495,7 +495,7 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
       shopUi.failSay = last?.who === 'me' ? last.text : '';
       if (undo?.chip && !shopUi.chip) { shopUi.chip = undo.chip; shopUi.chipKind = undo.chipKind; }
       // 내 말은 적어 뒀으니 답이 안 왔으면 되돌린다
-      await updateChat(cur.charIndex, cur.chatIndex, (chat) => {
+      await updateChatOf(cur, (chat) => {
         const now = readShop(chat.scriptstate);
         if (!now || now.shop !== st0.shop) return null;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...shopVars({ ...now, talk: now.talk.filter((l, i) => !(i === now.talk.length - 1 && l.who === 'me')) }) } };
@@ -508,12 +508,33 @@ async function ask(ctx: ChatContext, env: ShopEnv, kind: 'shelf' | 'talk', st0: 
   if (kind === 'talk' && shopUi.pick) revealSel();
 }
 
+/** shop-open 이 방문 상태를 되살린 뒤 다시 들어오는 중 (한 번만 되살린다) */
+let resettled = false;
 /** 상점 팝업의 data-action. 처리했으면 true. 'shop-say' 의 value 는 입력칸 글 */
 export async function shopAction(action: string, value: string | undefined, ctx: ChatContext, env: ShopEnv): Promise<boolean> {
   const st = liveShop(ctx.chat);
   pts = !!st?.identity.points;
   switch (action) {
     case 'shop-open': {
+      // 카드는 그려져 있는데 방문 상태가 없다(응답 뒤 정리가 저장에 실패했거나 아직 안 돌았다): 응답이 붙을 때 도는 그 정리(settleShop)를 지금 돌리고 다시 연다.
+      // 전에는 그대로 닫아, 카드로 연 창에 상점 대신 상황판이 떴다 (3차 점검 R06). 마지막 응답에 표식이 없으면 정리가 남은 카드를 지운다
+      if (!st && !resettled && shopOn(ctx.chat.scriptstate)) {
+        const self = [playerAgent(ctx.char.globalLore, ctx.chat.scriptstate)?.name ?? '', userInfo().name];
+        const saved = await updateChatOf(ctx, (chat) => {
+          const last = lastBot(chat);
+          const r = last ? settleShop(chat, last.index, self) : null;
+          return r ? { ...chat, ...(r.message ? { message: r.message } : {}), scriptstate: { ...(chat.scriptstate ?? {}), ...r.vars } } : null;
+        }).catch(() => null);
+        if (saved && liveShop(saved)) {
+          resettled = true;
+          await env.refresh(); // 창이 쥔 채팅도 되살린 것으로
+          try {
+            return await shopAction(action, value, { ...ctx, chat: saved }, env);
+          } finally {
+            resettled = false;
+          }
+        }
+      }
       // 꺼져 있거나(설정에서 끔) 방문이 없으면 열지 않는다
       if (!st || !shopOn(ctx.chat.scriptstate)) {
         shopUi.open = false;
@@ -534,7 +555,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       // 답을 기다리던 말이 새로고침 등으로 끊겨 답 없이 남았으면 떼고 입력칸에 돌려준다 (실패했을 때와 같게)
       if (!shopUi.loading && dropPending(st.talk)) {
         let back = '';
-        await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+        await updateChatOf(ctx, (chat) => {
           const now = readShop(chat.scriptstate);
           const d = now && now.shop === st.shop ? dropPending(now.talk) : null;
           if (!now || !d) return null;
@@ -624,7 +645,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       if (!st?.sell || typeof st.sell.price !== 'number' || st.closed || shopUi.loading) return true;
       const o = st.sell;
       let sold = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const done = saleDone(chat, st.shop, o.itemId);
         if (done) sold = true;
         return done;
@@ -685,7 +706,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       shopUi.chip = '';
       shopUi.chipKind = '';
       const next = sayToOwner(st, text, shopLimits(ctx.chat.scriptstate));
-      const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      const saved = await updateChatOf(ctx, (chat) => {
         const now = readShop(chat.scriptstate);
         if (!now || now.shop !== st.shop) return null;
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...shopVars({ ...next, key: now.key }) } };
@@ -699,7 +720,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
       if (!st || !it || st.closed || shopUi.loading) return true;
       const start = getPrefs().walletStart ?? WALLET_START_DEFAULT;
       let bought = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const alive = aliveAnchors(chat);
         const now0 = readShop(chat.scriptstate);
         const now = now0 ? reviveShop(now0, alive) : null;
@@ -731,7 +752,7 @@ export async function shopAction(action: string, value: string | undefined, ctx:
 
 /** 상점 상태 저장 (같은 가게일 때만, 기준 키는 지금 것) */
 async function saveShop(ctx: ChatContext, st: ShopState, next: ShopState): Promise<boolean> {
-  const r = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  const r = await updateChatOf(ctx, (chat) => {
     const now = readShop(chat.scriptstate);
     if (!now || now.shop !== st.shop) return null;
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...shopVars({ ...next, key: now.key }) } };

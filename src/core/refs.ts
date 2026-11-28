@@ -3,7 +3,7 @@
 // 그 로어북들 속 이름으로 한 번 더 찾은 2차 참조를 모아 "[종류: 출처]\n내용" 블록으로 만든다.
 import { guidePrompt, guideTxt, isGuideName } from './guides';
 import { evaluate, type CbsEnv } from './cbs';
-import { readScene, stripSceneCard, stripStartCard, stripUnsentMark } from './dispatch';
+import { readScene, stripSceneCard, stripSceneMark, stripStartCard, stripUnsentMark } from './dispatch';
 import { hasCall, stripCall } from './phone';
 import type { Chat, LoreEntry } from './types';
 import { cleanOutput, hasWorldTags } from './world/tags';
@@ -246,7 +246,8 @@ export interface Turn {
 }
 
 export function messageText(data: string): string {
-  let t = stripThoughts(stripStartCard(stripUnsentMark(String(data ?? ''))));
+  // 첫 장면 표식(%%GOEI_SCENE%%)도 뗀다: 인물 갱신기·곁 기능 요청에 표식 글이 그대로 갔다 (3차 점검 R04)
+  let t = stripSceneMark(stripThoughts(stripStartCard(stripUnsentMark(String(data ?? '')))));
   if (t.includes('%%SCENE_CARD:')) {
     const s = readScene(t);
     // 카드 뒤에 붙은 글은 창의 상황 칸에 적은 것: 같이 남긴다 (거기 적은 사람·장소의 로어북도 찾게. 2026-11-22)

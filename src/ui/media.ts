@@ -23,6 +23,11 @@ export const zoomK = (): number => (mode() === 'zoom' ? foldZoom() : 1);
 export const phoneMax = (): number => (getPrefs().fold === 'phone' ? FOLD_MAX : BASE);
 export const phoneMq = (): string => (mode() === 'zoom' ? 'not all' : `(max-width: ${phoneMax()}px), (max-height: 499px) and (pointer: coarse)`);
 export const isPhone = (): boolean => matchMedia(phoneMq()).matches;
+/** 창이 화면을 거의 다 덮는 크기인가, 화면 크기 숫자로 (본 화면에 붙는 호출 진행 창 host/progwin.ts 가 쓴다: 그쪽은 리스 화면 크기를 숫자로만 안다).
+ *  폰 배치(가로로 든 폰 포함)와 중간 폭(펼친 폴드: PC 배치를 줄여 화면의 95% 로 띄운다) 둘 다다. 이때 진행 창은 가장자리 막대 꼴이고 창이 열리면 숨는다.
+ *  3차 점검 R08: 폭(760)만 봐서 가로로 든 폰(882×344)에서 PC 꼴 점이 창 단추를 덮었다. 중간 폭을 PC 꼴로 두면 752 폭에서도 점이 단추를 덮는다(재현 대본으로 확인) */
+export const isCoveredSize = (vw: number, vh: number): boolean =>
+  (vh < 500 && typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) || vw <= FOLD_MAX;
 /** 기준이 바뀌는 경계를 다 지켜본다 (설정을 바꿔도 다시 걸 필요가 없게) */
 export const PHONE_WATCH = [`(max-width: ${BASE}px)`, `(max-width: ${FOLD_MAX}px)`, LAND];
 /** 펼친 폴드에서 창이 차지하는 화면 몫(%): 설정 「펼친 폴드 창 가로·세로」(prefs.foldW·foldH) */

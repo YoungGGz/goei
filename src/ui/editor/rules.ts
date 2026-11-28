@@ -46,7 +46,7 @@ function saveSoon(next: UserRule[]): void {
     timer = null;
     const p = pending;
     pending = null;
-    if (p) void saveRules(p);
+    if (p) void saveRules(p).catch(() => {}); // 실패 알림은 설정 창이 띄운다 (host/prefs.ts onPrefsSaveFail)
   }, 400);
 }
 

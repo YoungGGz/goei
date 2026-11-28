@@ -6,7 +6,7 @@ import { imgCharacters, imgPromptConfig } from '../core/imgprompt';
 import { basicSettings, getPrefs } from '../core/settings';
 import type { Chat, LoreEntry } from '../core/types';
 import { runModel, type LlmMessage } from './llm';
-import { updateChat } from './risu';
+import { updateChatOf } from './risu';
 import { findShopTag, stripShopTags } from '../core/shop';
 import { findReadyTag, stripReadyTags } from '../core/orders';
 import { userInfo } from './user';
@@ -31,7 +31,7 @@ export async function supplementAssets(t: AssetTarget): Promise<void> {
   if (t.messageIndex !== (t.chat.message?.length ?? 0) - 1) return;
   running = true;
   const note = (text: string) =>
-    updateChat(t.charIndex, t.chatIndex, (c) => (c.scriptstate?.[ASSET_NOTE] === text ? null : { ...c, scriptstate: { ...(c.scriptstate ?? {}), [ASSET_NOTE]: text } })).catch(() => null);
+    updateChatOf(t, (c) => (c.scriptstate?.[ASSET_NOTE] === text ? null : { ...c, scriptstate: { ...(c.scriptstate ?? {}), [ASSET_NOTE]: text } })).catch(() => null);
   try {
     // 메인모델과 같은 구조: 「주인공 이미지」 ON이면 {{user}} 금지를 빼고, 캐릭터로 플레이하지 않으면 페르소나를 명단에. OFF면 주인공 요원을 명단에서 뺀다
     const agent = playerAgent(t.lore, t.chat.scriptstate);
@@ -53,7 +53,7 @@ export async function supplementAssets(t: AssetTarget): Promise<void> {
       await note('이번 응답에는 붙일 이미지가 없었어요.');
       return;
     }
-    const saved = await updateChat(t.charIndex, t.chatIndex, (latest) => {
+    const saved = await updateChatOf(t, (latest) => {
       const list = latest.message ?? [];
       const i = t.messageIndex;
       // 작업 중에 메시지가 바뀌었거나(수정·다시 생성) 새 메시지가 붙었으면 버린다

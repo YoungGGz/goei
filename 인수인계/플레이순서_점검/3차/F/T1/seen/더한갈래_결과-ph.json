@@ -1,0 +1,24 @@
+{
+  "run": 36,
+  "pass": 35,
+  "fails": [
+    {
+      "part": "PH_",
+      "step": "09 PH_초대방정리",
+      "what": "기본값 켬·20 이 보임",
+      "ok": false,
+      "expect": "켬·20",
+      "actual": null,
+      "why": ""
+    }
+  ],
+  "notes": [
+    {
+      "part": "PH_",
+      "step": "09 PH_초대방정리",
+      "what": "설정 화면 「초대받은 단톡방 정리」 줄",
+      "actual": null
+    }
+  ],
+  "errors": []
+}

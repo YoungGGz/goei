@@ -25,7 +25,9 @@ export function onOffSwitch(items: [string, string][], cur: string, action: stri
 export function labelSwitches(root: ParentNode): void {
   root.querySelectorAll<HTMLButtonElement>('button.gx-switch[role="switch"]:not([aria-label])').forEach((b) => {
     const row = b.closest<HTMLElement>('.ps-row, .dir-line, .st-col-row, .dir-in');
-    const name = row?.querySelector<HTMLElement>('.ps-label > b, .st-col-name > b, :scope > span:first-child')?.textContent?.replace(/\s+/g, ' ').trim();
+    const el = row?.querySelector<HTMLElement>('.ps-label > b, .st-col-name > b, :scope > span:first-child');
+    // 이름 안의 「이 기기」 배지(.gx-scope) 글은 이름이 아니다 (3차 점검 R61: 「호출 진행 창이 기기」로 읽혔다)
+    const name = el ? [...el.childNodes].filter((n) => !(n instanceof Element && n.classList.contains('gx-scope'))).map((n) => n.textContent ?? '').join('').replace(/\s+/g, ' ').trim() : '';
     if (name) b.setAttribute('aria-label', name);
   });
 }

@@ -10,7 +10,8 @@ import { GUIDE_LABEL, type GuideName } from '../../core/guides';
 import { LEGACY_DATA } from '../../core/lorebooks';
 import { getPrefs } from '../../core/settings';
 import { updateCharacterLore, type ChatContext } from '../../host/risu';
-import { savePrefs } from '../../host/prefs';
+import { resetDirectoryLore } from '../../core/install';
+import { onPrefsSaveFail, savePrefs } from '../../host/prefs';
 import { bindCropDrag, cropValue, directoryConfirmPopup, directoryDraft, directoryExtList, directoryInput, directoryList, directoryPhotoList, directoryView, dirUi, dirty as dirDirty, handleDirectory, resetDirectory, setCrop } from '../directory';
 import { handleImgPrompt, imgInput, imgPromptPane } from '../imgprompt';
 import { GHOST_ICON, ICONS } from '../icons';
@@ -161,6 +162,13 @@ export function closeEditor(): void {
 }
 
 export const editorOpen = () => edUi.open;
+// 기기 저장소(이 기기 설정·지침·추가 규칙) 쓰기 실패: 창 위 알림 줄에 띄운다. 값은 host/prefs.ts 가 쓰기 전으로 되돌렸으니 다시 그려 화면도 맞춘다 (3차 점검 R16)
+onPrefsSaveFail((message) => {
+  if (!edUi.open) return false;
+  edUi.notice = message;
+  render();
+  return true;
+});
 /** 설정 페이지가 떠 있나 (패널이 다시 그려질 때 같이 그린다). 관제(호출 흐름)도 설정값을 그대로 보이는 화면이라 같이 그린다:
  *  범위 밖 수를 치면 저장은 끝값인데 칸에는 친 수가 남았다 (2차 점검 16-문제2) */
 export const editorOnSettings = () => edUi.open && (isSetNode(edUi.node) || edUi.node === 'manage:flow');
@@ -300,7 +308,7 @@ function ensureRoot(): HTMLElement {
       // 바로 저장 (2026-11-08 사용자: 지침도). 손을 뗀 뒤 한 번
       const key = el.dataset.key ?? '';
       const g = key.includes('|') ? key.slice(0, key.lastIndexOf('|')) : key;
-      later(`guide:${g}`, () => void guideAction('ed-guide-save', g).then(() => guideUi.info && render()));
+      later(`guide:${g}`, () => void guideAction('ed-guide-save', g).then(() => guideUi.info && render()).catch(() => {})); // 실패 알림은 아래 onPrefsSaveFail 이 띄운다
       return;
     }
     if (ruleInput(name, el.dataset.key ?? '', el.value)) return;
@@ -957,11 +965,25 @@ async function flushLater(): Promise<void> {
   await Promise.all(all.map((l) => Promise.resolve(l.fn()).catch(() => undefined)));
 }
 // 점검 「초기화」: 고친 세계도 버리고 플러그인 원래 값으로 (2026-11-08 사용자: 초기화는 전체 초기화)
+// 명부(요원·조직·거점 등 카드 명부)도 설치 기본값으로: 고친 칸과 직접 추가한 것까지 (사용자 2026-11-26, 3차 점검 R55)
 resetHooks.push(() => {
   const ctx = host?.ctx();
-  if (ctx) overridesOf(ctx);
-  setOverrides({});
-  autoSaveWorld();
+  if (!ctx) return;
+  // 기다리던 세계 저장·초안은 버린다 (초기화 뒤에 옛 값을 다시 적지 않게)
+  const w = laters.get('world');
+  if (w) clearTimeout(w.t), laters.delete('world');
+  void (async () => {
+    if (saving) await saving.catch(() => undefined);
+    try {
+      await updateCharacterLore(ctx.charIndex, resetDirectoryLore);
+      resetDirectory();
+      edUi.from = null;
+      await host?.refresh();
+    } catch (error) {
+      edUi.notice = `저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+    }
+    render();
+  })();
 });
 
 /** 세계(카드 명부) 고친 것을 카드에 바로 적는다 */
@@ -1124,8 +1146,9 @@ export async function handle(action: string, value?: string): Promise<void> {
       edUi.drawer = false;
       edUi.notice = '';
       guideUi.info = ''; // 다른 지침으로 옮기면 앞 지침의 「저장했어요」 알림은 지운다 (2026-11-05 QC: 지시문 페이지에 RP 저장 알림이 남아 있었다)
+      manUi.info = ''; // 점검 페이지도 같다: 앞 페이지의 「…뺐어요」 안내를 다음 페이지로 끌고 가지 않는다 (3차 점검 R62)
       dirUi.adding = false;
-      if (edUi.node === 'base') resetDirectory();
+      if (edUi.node === 'base') resetDirectory(true);
       syncSettingsPage();
       if (edUi.node === 'install') {
         instUi.notice = '';
@@ -1169,6 +1192,15 @@ export async function handle(action: string, value?: string): Promise<void> {
       }
       return render();
     }
+    // 거점 화면의 「소속을 정하지 않은 요원이 N명 있어요」 단추: 이 창에서는 종류가 왼쪽 메뉴(edUi.node)라 그 페이지로 옮긴다.
+    // dirUi.kind 만 바꾸면 거점 페이지를 그릴 때 도로 'base' 가 돼 아무 일도 없었다 (3차 점검 N01)
+    if (action === 'dir-kind' && edUi.node === 'base' && value && value !== 'base' && isKind(value)) return handle('ed-node', value);
+    // 직접 만든 조직의 기본 정보 「지우기」: 머리 「삭제」와 같은 길로 (묻고, 기록·관계 덧쓰기까지 같이 지운다).
+    // 명부 줄만 빼면 목록·다음 턴 세력 지침·관계 표에 남았다 (3차 점검 R54)
+    if (action === 'dir-org-del' && edUi.node === 'org' && value) {
+      edUi.sel.org = value;
+      return handle('ed-delete');
+    }
     // 조직 이름 바꾸기: 패널 처리기는 dirUi.open 으로 조직을 찾는데 이 창에서는 고른 기록이 edUi.sel 에만 있다 (전수검사 11-13)
     const oldOrg = action === 'dir-org-rename' && edUi.node === 'org' ? (dirUi.open = edUi.sel.org ?? '') : '';
     await handleDirectory(action, value, ctx, env);
@@ -1196,7 +1228,7 @@ export async function handle(action: string, value?: string): Promise<void> {
     return;
   }
   if (action.startsWith('ip-')) {
-    await handleImgPrompt(action, value, { render });
+    await handleImgPrompt(action, value, { render, lore: ctx.char.globalLore }); // lore 를 넘겨야 명부에 이미 있는 이름을 가려 낸다 (3차 점검 R49)
     return;
   }
   // 조직 기록의 「세력 관계도에 포함」(ed-rel-member-toggle)은 기록 처리기로 보낸다 (전수검사 11-13)

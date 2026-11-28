@@ -9,7 +9,7 @@ import { SPEECH_ENTRY_CHARS, applySpeechSign, parseSpeechMarker, speechVariety }
 import { SEXUAL_FIELDS, SEXUAL_AXIS_OF, explicitOn, isSexualAxis, sexualAnyOn, sexualFieldOn, sexualGlobal, setSexualText } from './sexual';
 import { unknownTo, suspicionShown } from './inject';
 import { seedPerson } from './seed';
-import { temperOf, type RosterRow } from './base';
+import { corroborateKeys, temperOf, type RosterRow } from './base';
 import { rhythmClock, rhythmClockLines, rhythmNow, hookActive, parseHookHead, retireHookText, turnAt, type RhythmClock } from './rhythm';
 import { axesView, ensureAxes, isAxis, isDirection, liveEvidence, observe, readAxes, setAxes, pruneCandidates } from './axes';
 import { AXES } from './types';
@@ -637,6 +637,8 @@ export interface ApplyCtx {
   walletLoose?: boolean;
   /** 소지품 절 켜짐: 변화를 받아 report.items 에 담는다 (input.items 가 null 이면 아무것도 안 받는다) */
   items?: boolean;
+  /** 처음 등장 판정 (host/people.ts appearingIn): 이 메시지들(indexes)에서 이 사람이 등장으로 볼 근거가 있나. 별명만 나온 새 인물을 가리는 데 쓴다 */
+  appears?: (name: string, aliases: string[], indexes: number[]) => boolean;
 }
 
 /** 두 문장이 거의 같은가 (정규화 뒤 포함 또는 2글자 조각 80% 일치) */
@@ -808,6 +810,18 @@ export function applyUpdate(store: PeopleStore, chat: Chat, input: UpdateInput, 
     if (!provisional && !nameInSpan(given, name)) {
       drop('new_people', n, '이름이 원문에 없음', name);
       continue;
+    }
+    // 이름 표 인물이 「다른 근거가 있어야 하는 별명」(aliases.json corroborate: 「독사」「사장님」…)으로만 글에 나왔으면, 코드 판정(host/people.ts appearingIn)에 물어
+    // 같은 근거(초상 태그·소속)가 있을 때만 받는다. 판정은 그 한 곳이 한다 (사용자 2026-11-22 결정 I-01, 3차 점검 R41: 갱신기 길은 별명만으로 첫 등록됐다)
+    if (!provisional && inTable && ctx.appears) {
+      const weak = corroborateKeys(name).map(norm).filter(Boolean);
+      const row = input.names.find((e) => e.name === name);
+      const strong = [name, ...(row?.aliases ?? [])].map(norm).filter((k) => !!k && !weak.includes(k));
+      const inSpan = (keys: string[]) => keys.some((k) => spanTexts.some((t) => t.includes(k)));
+      if (inSpan(weak) && !inSpan(strong) && !ctx.appears(name, row?.aliases ?? [], [...input.tags.values()])) {
+        drop('new_people', n, '별명만 나옴(다른 근거 없음)', name);
+        continue;
+      }
     }
     if (newCount >= 2) {
       drop('new_people', n, '턴당 2명 상한', name);

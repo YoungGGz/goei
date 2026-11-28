@@ -4,7 +4,7 @@ import type { Chat } from '../core/types';
 import { bookText } from '../core/refs';
 import { generate, runModel, LlmError, type LlmMessage } from './llm';
 import { buildDirector, buildDirectorPass2, directorBlock, parseDirectorAny, repairDirector, runSearches, type DirectorInput, type DirectorNote } from '../core/people/director';
-import { loadContext, updateChat, type ChatContext } from './risu';
+import { loadContext, updateChatOf, type ChatContext } from './risu';
 import { isWaiting, onWaiting } from './waiting';
 import { peopleStore, withPeople, splitUnread, unreadIndexes, messageKey, liveness, recordRun, snapshotRun, dropGoneChanges, dropGonePeople, pruneScene, undoGoneRenames } from '../core/people/store';
 import { foldCues, foldOpenness, pruneEntries, pruneNotes } from '../core/people/prune';
@@ -33,11 +33,12 @@ import { bmAsked, bmOrdersKeep, bmOrdersVars, liveBmOrders } from '../core/order
 import { ensureItemIcons, itemPictures } from './itemicons';
 import { DIAG_KEEP_DEFAULT, getPrefs } from '../core/settings';
 import { settleShop, shopJudgeBy, shopJudgeGuide, shopOn, shopRule, stripShopTags } from '../core/shop';
-import { guideSections, guideTxt } from '../core/guides';
+import { guideTxt } from '../core/guides';
 
 /** Director 기본 지침(지침 탭 「Director」의 FACTS·SCENE 절)은 buildDirector 가 읽는다 */
 /** Router 기본 지침: 지침 탭 「Router」의 ROLE·RULES 절 */
-const routerBase = () => { const g = guideSections('Router'); return [g.ROLE, g.RULES].filter((x) => x?.trim()).join('\n'); };
+// 절을 비우면 그 절의 기본 글 (guideTxt): 지침 탭의 「비우면 기본 글이 쓰여요」 표시와 같게 (3차 점검 R48: 비운 절이 통째로 빠졌다)
+const routerBase = () => [guideTxt('Router', 'ROLE'), guideTxt('Router', 'RULES')].filter((x) => x?.trim()).join('\n');
 import { factionCodesIn, parseIdentity, rankLevel } from '../core/people/identity';
 import type { Identity, PeopleStore, Person } from '../core/people/types';
 import { factionList } from '../core/factions';
@@ -129,11 +130,23 @@ export const chatId = (ctx: ChatContext) => `${String(ctx.char.chaId ?? ctx.char
 
 export const sheetOf = (ctx: ChatContext) => (name: string): string | null => bookText({ char: ctx.char, chat: ctx.chat }, name) || null;
 
-/** 기록하지 않는 이름: 주인공. 캐릭터로 플레이하면 그 요원, 아니면 페르소나 이름 (지침 Router 「never list the user's own character」, 갱신기 「@user = the persona」) */
+/** 기록하지 않는 이름: 주인공. 캐릭터로 플레이하면 그 요원과 페르소나 이름, 아니면 페르소나 이름 (지침 Router 「never list the user's own character」, 갱신기 「@user = the persona」) */
 export function ownNames(lore: LoreEntry[] | undefined, vars: Record<string, unknown> | undefined, persona = userInfo().name): string[] {
   const me = playerAgent(lore, vars);
-  const name = (me?.name || persona || '').trim();
-  return name ? [name] : [];
+  // 요원으로 플레이해도 페르소나 이름은 같이 뺀다: 페르소나 이름이 기본값(User)인 채면 요청 글에 User 가 그대로 남아, 갱신기가 「User」를 새 인물로 올리면 등록됐다 (결정 I-08, 3차 점검 R32)
+  return [...new Set([me?.name ?? '', persona ?? ''].map((n) => n.trim()).filter(Boolean))];
+}
+/** 읽는 쪽(본편 요청의 Router 명단·인물 기록 블록, 인물 창)이 쓰는 인물 기록: 저장된 기록에서, 다시 굴리거나 지워서 사라진 응답이 한 이름 옮기기와 그 응답이 만든 인물을 뺀 모습.
+ *  갱신기가 저장할 때 돌리는 정리(undoGoneRenames·dropGonePeople)를 읽는 사본에 그대로 돌린다 (저장은 하지 않는다: 다음 갱신이 같은 정리를 저장한다).
+ *  전에는 갱신기가 성공해 저장할 때까지 사라진 응답의 인물이 명단·목록에 남았다 (결정 I-05, 3차 점검 R40) */
+export function livePeopleStore(chat: Chat, lore: LoreEntry[] | undefined): PeopleStore {
+  const s = peopleStore(chat);
+  if (!Object.keys(s.people).length) return s;
+  const settings = peopleSettings(chat.scriptstate);
+  const factions = factionNamesOf(lore);
+  undoGoneRenames(s, chat, settings.keepMsgs, (names) => liveAppearing(s, chat, names, factions));
+  dropGonePeople(s, chat, (gone) => liveAppearing(s, chat, gone, factions), settings.always);
+  return s;
 }
 function excludedNames(ctx: ChatContext): string[] {
   return ownNames(ctx.char.globalLore, ctx.chat.scriptstate);
@@ -351,7 +364,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   const held: string[] = [];
   const seeded = seedAppearing(store, ctx.chat, unread, sheet, { exclude, identity: identity ?? store.identity, roster, confirm: settings.newPeople === 'confirm', held, factions: factionNamesOf(ctx.char.globalLore) });
   if (seeded.length || held.length || idChanged || dropped.length) {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
+    await updateChatOf(ctx, (cur) => {
       const s = peopleStore(cur);
       dropExcluded(s, exclude);
       for (const n of seeded) {
@@ -470,7 +483,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
       // 쓰기: 응답 대기 중이면 기다리고, 같은 채팅인지·메시지가 그대로인지 확인
       await waitNotBusy();
       const keys = new Map([...input.tags.values()].map((i) => [i, messageKey(fresh.chat.message[i], i)]));
-      const saved = await updateChat(fresh.charIndex, fresh.chatIndex, (cur) => {
+      const saved = await updateChatOf(fresh, (cur) => {
         if (chatId({ ...fresh, chat: cur }) !== id) return null;
         for (const [i, k] of keys) if (!cur.message[i] || messageKey(cur.message[i], i) !== k) return null;
         const s = peopleStore(cur);
@@ -492,6 +505,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
           walletLoose: walletOn && walletLoose(cur.scriptstate),
           points: pointsUse,
           items: itemsOn,
+          appears: (name, aliases, indexes) => appearingIn(cur, indexes, [{ name, aliases }], (n) => seedBaseFor(n, userFaction(cur), undefined, roster.find((r) => r.name === n)).faction ?? '', factionNamesOf(fresh.char.globalLore)).has(name),
         });
         diag.report = report;
         // 되돌리기용 (리수폿 J-4): 이 갱신이 새로 만든 것. 다시 읽기(only)는 적지 않는다
@@ -606,7 +620,7 @@ async function runOnce(reason: string, o: { manual?: boolean; scope?: RunScope; 
   }
   if (clearUndo && batchFailed) {
     const undo: ClearUndo = clearUndo;
-    const back = await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
+    const back = await updateChatOf(ctx, (cur) => {
       if (chatId({ ...ctx, chat: cur }) !== id) return null;
       const s = peopleStore(cur);
       restoreClearUndo(s, undo);
@@ -735,7 +749,7 @@ async function consolidateInner(ctx: ChatContext, name: string, settings: People
     diag.raw = raw;
     diag.outChars = raw.length;
     await waitNotBusy();
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (cur) => {
+    const saved = await updateChatOf(ctx, (cur) => {
       if (chatId({ ...ctx, chat: cur }) !== id) return null;
       const s = peopleStore(cur);
       diag.tidy = applyConsolidate(s, name, input, value, liveness(cur), settings);

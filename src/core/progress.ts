@@ -199,6 +199,16 @@ export function callOwner(label: string): 'turn' | 'prev' | 'manual' {
     const s = planned(prev, label);
     if (s && s.group !== 'router' && s.group !== 'director' && s.group !== 'main') return 'prev';
   }
+  // 새 턴이 응답을 받은 뒤여도, 앞 턴이 이미 시작해 놓고 아직 안 끝난 단계의 다음 호출(「위키 제목」 뒤의 「위키 글」, 그 「다시 묻기」)은 앞 턴 것 (3차 점검 R60).
+  // 그 단계에서 앞 턴이 아직 부르지 않은 이름이거나, 앞 턴만 부른 이름의 다시 묻기일 때만. 이름으로 보는 어림이라 두 턴의 같은 단계가 겹쳐 돌면 틀릴 수 있다 (사용자 2026-11-26: 규칙 하나로)
+  if (prev && !prev.endAt && turn.replyAt) {
+    const s = planned(prev, label);
+    if (s && s.group !== 'router' && s.group !== 'director' && s.group !== 'main' && prev.calls.some((c) => c.stage === s.id)) {
+      const base = baseLabel(label);
+      const same = (c: Call) => baseLabel(c.label) === base;
+      if (!prev.calls.some(same) || (label !== base && !turn.calls.some(same))) return 'prev';
+    }
+  }
   return turnCall(turn, label) ? 'turn' : 'manual';
 }
 

@@ -12,7 +12,7 @@ import type { Faction, FactionCode, LangCode, LoreEntry, Manifest } from '../cor
 import {
   activeEvents, type Catalog, endedShown, codesToNames, factionNames, lastStatusFields, locName, parseCatalog, readWorld, rosterFor, startWorldVars, agentLocked, readDirectory, worldOn,
 } from '../core/world';
-import { loadContext, updateChat, type ChatContext } from '../host/risu';
+import { loadContext, onSaveDenied, SAVE_DENIED, updateChat, updateChatOf, type ChatContext } from '../host/risu';
 import { isWaiting, onWaiting } from '../host/waiting';
 import { freeUseLock } from '../host/usebox';
 import { prepareBaseDocs } from '../core/wiki';
@@ -125,6 +125,9 @@ let view: View = { kind: 'loading' };
 let draft: Draft = { lang: 'ko' };
 let busy = false;
 let notice = '';
+/** 리스AI 가 저장을 거절한 세션: 창 맨 위에 알림 한 줄 (거절은 새로고침 전까지 이어진다. 3차 점검 R23·R24) */
+let saveDenied = false;
+const saveDeniedHtml = () => (saveDenied ? `<div class="${noticeClass(SAVE_DENIED)} gx-notice" role="alert">${esc(SAVE_DENIED)}</div>` : '');
 /** 괴담넷 탭 (완성 전까지 숨김) */
 const GNET_ON = true;
 /** records = 「기록」(일지·가계부·인물·세력, 2026-10-29 가계부 메뉴 자리). 가계부는 2026-11-05부터 기록의 하위 탭: 사원증 잔고 줄·폰 머리 칩·옛 「wallet」 탭 요청은 openWallet() 으로 */
@@ -202,7 +205,8 @@ const env: FieldEnv = {
   refresh: () => refresh(),
   close: () => close(),
   setNotice: (text) => {
-    notice = text;
+    // 저장 거절은 창 맨 위 한 줄이 이미 알린다 (같은 글을 두 번 띄우지 않는다)
+    notice = text === SAVE_DENIED ? '' : text;
   },
   setBusy: (on) => {
     busy = on;
@@ -974,7 +978,7 @@ async function close(): Promise<void> {
 async function stagedTheme(ctx: ChatContext, value: string | undefined): Promise<void> {
   if (value !== 'light' && value !== 'dark' && value !== 'paper') return;
   try {
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) =>
+    const saved = await updateChatOf(ctx, (chat) =>
       chatPhase(chat, isWaiting()) === 'started' || chat.scriptstate?.['$st_fixed_theme'] === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), $st_fixed_theme: value } },
     );
     if (saved) ctx.chat = saved;
@@ -1339,7 +1343,7 @@ async function handle(action: string, value?: string): Promise<void> {
       // 로그아웃해도 $br_nick 은 남겨 다음 로그인 창에 미리 채운다 (11-09 사용자: 로그아웃하면 닉네임이 날아갔다)
       const vars: Record<string, string> = { $br_login: nick ? '1' : '0', [GN_NICK]: nick };
       if (nick) vars.$br_nick = nick;
-      const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+      const saved = await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
       if (saved) ctx.chat = saved;
       return render();
     }
@@ -1395,7 +1399,7 @@ async function handle(action: string, value?: string): Promise<void> {
     case 'wallet-del': {
       if (view.kind !== 'started' || !value || !walletEditable(view.ctx.chat.scriptstate)) return;
       const ctx = view.ctx;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         if (walletTabUi.kind === 'p') return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...pointsVars(removeWalletEntry(readPoints(chat.scriptstate), value ?? '')) } };
         const w = readWallet(chat.scriptstate, getPrefs().walletStart ?? WALLET_START_DEFAULT);
         return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...walletVars(removeWalletEntry(w, value ?? '')) } };
@@ -1413,7 +1417,7 @@ async function handle(action: string, value?: string): Promise<void> {
       // 범위는 원·포인트 같이 본다 (전수점검 사소-29: 원은 1조가 넘어도 안내 없이 창이 닫히고 잔고는 그대로였다). 맞춤 거래(차액)가 범위를 넘어도 같은 안내
       let over = Math.abs(n) > WALLET_MAX;
       const ctx = view.ctx;
-      if (!over) await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      if (!over) await updateChatOf(ctx, (chat) => {
         const alive = aliveAnchors(chat);
         if (pts) {
           const p = readPoints(chat.scriptstate);
@@ -1510,7 +1514,7 @@ async function start(): Promise<void> {
     if (plan.kind === 'direct' && !situation) throw new StartError('시작할 상황을 적어 주세요.');
     // 시작 메시지: 자동 전송 없이 첫 장면 아래에 「적고 전송」 안내 (Risu가 첫 장면을 다시 그리기 전에 켠다)
     setOpeningHint(plan.kind === 'opening' ? (plan.scene ?? null) : null);
-    const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    const saved = await updateChatOf(ctx, (chat) => {
       if (chatPhase(chat, isWaiting()) === 'started') throw new StartError(isWaiting() ? WAIT_SEND_NOTE : '그새 대화가 시작됐어요. 새 채팅에서 다시 골라 주세요.');
       const next = applyStart(chat, plan, '', isWaiting());
       if (situation) next.message = [...(next.message ?? []), newMessage(startRecord(situation))];
@@ -1557,7 +1561,7 @@ async function turnWorldOn(): Promise<void> {
   render();
   try {
     const catalog = parseCatalog(ctx.char.globalLore);
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    await updateChatOf(ctx, (chat) => {
       if (worldOn(chat)) return null;
       const faction = String(chat.scriptstate?.['$st_faction'] ?? '');
       return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...startWorldVars(catalog, worldSettings(ctx.char.globalLore, chat.scriptstate), faction, Math.random, String(chat.scriptstate?.['$st_player'] ?? '')) } };
@@ -1646,6 +1650,12 @@ const pageKey = () => `${tab}|${settingsUi.page}|${wiki.view}|${wiki.title}|${re
 const DRAFT_SEL = '[data-it-form] [name], input[name="wt-adj"], input[name="br-nick"]';
 /** 그 칸들이 같은 양식인지 (다른 물건·탭으로 넘어가면 지키지 않는다) */
 const draftKey = () => `${tab}|${itemsUi.sub}|${itemsUi.mode}|${itemsUi.open}|${walletTabUi.kind}|${walletTabUi.edit}|${br.login}|${curTab().id}`;
+
+onSaveDenied(() => {
+  if (saveDenied) return;
+  saveDenied = true;
+  render();
+});
 
 function render(): void {
   if (!root) return;
@@ -2016,8 +2026,8 @@ function body(): string {
       if (shopUi.open && shopUi.solo) return `<div class="gx-solo"></div>${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
       // 가계부·소지품이 둘 다 꺼졌으면 소지품 탭을 상황판으로 옮긴다 (제목·메뉴·본문이 어긋나지 않게, 전수점검 사소-68)
       if (tab === 'items' && !invMenuOn(view.ctx)) tab = 'board';
-      if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
-      return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
+      if (netSolo && inBrowser()) return `<div class="gx-content gx-netsolo">${saveDeniedHtml()}${browserBody(view.ctx, true)}<button class="gx-x br-solox" data-action="close" aria-label="닫기">${ICONS.close}</button></div>${closeToastHtml()}`;
+      return `${tabs()}${startedHeader(view.ctx)}<div class="gx-content">${tab === 'settings' ? '' : updateBanner(view.ctx)}${saveDeniedHtml()}${notice && tab !== 'map' && tab !== 'mission' ? `<div class="${noticeClass(notice)} gx-notice" role="alert">${esc(notice)}</div>` : ''}${startedBody(view.ctx)}</div>${evPopup(boardClock(view.ctx))}${tab === 'board' ? agentPopup((n) => view.kind === 'started' && hasPersonRecord(view.ctx, n)) : ''}${closeToastHtml()}${shopPopup(view.ctx)}${chatLookPopup(view.ctx)}`;
     case 'opening':
       return `${header('커스텀 임무 · 첫 장면 고르기', '<button class="gx-x" data-action="repick" aria-label="시작 설정 다시 고르기">' + ICONS.back + '</button>')}<div class="gx-content">${missionTab(view.ctx, true, notice, busy)}</div>`;
     case 'picker':

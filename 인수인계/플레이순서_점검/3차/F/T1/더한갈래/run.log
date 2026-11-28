@@ -1,0 +1,106 @@
+PASS [01 PH_연락처추가] 직접 추가한 연락처가 $ph_contacts 에 저장
+PASS [01 PH_연락처추가] 「기타」 탭 목록에 보이고 안내가 뜸
+PASS [01 PH_연락처추가] 삭제 단추가 직접 추가한 연락처에만
+PASS [02 PH_추가연락처_1대1] 참여자 = 박하늘, 메모가 실림
+PASS [02 PH_추가연락처_1대1] 1:1 방 저장(내 말+답)
+PASS [03 PH_연락처삭제_두번] 첫 번째 누름은 「정말 삭제」로 바뀌기만
+PASS [03 PH_연락처삭제_두번] 첫 누름 뒤 아직 지워지지 않음
+PASS [03 PH_연락처삭제_두번] 1:1 방이 지워짐
+PASS [03 PH_연락처삭제_두번] 연락처 목록에서 빠짐
+PASS [03 PH_연락처삭제_두번] 안내 「연락처와 1:1 대화 기록을 지웠어요」
+PASS [03 PH_연락처삭제_두번] 다음 본편 요청에 지운 방 말이 없음
+PASS [04 PH_관전_side] 지침 VIEW.COMMON + ## Side story
+PASS [04 PH_관전_side] 다른 사전설정 절은 안 실림
+PASS [04 PH_관전_side] 보기 전용 방 하나 더 생김(인물이 달라서)
+PASS [04 PH_관전_side] 탭이 늘지 않음: 대화 목록 안(F-01)
+PASS [05 PH_관전_mono] 지침 VIEW.COMMON + ## Soliloquy
+PASS [05 PH_관전_mono] 다른 사전설정 절은 안 실림
+PASS [05 PH_관전_mono] 보기 전용 방 하나 더 생김(인물이 달라서)
+PASS [05 PH_관전_mono] 탭이 늘지 않음: 대화 목록 안(F-01)
+PASS [06 PH_관전_multi] 지침 VIEW.COMMON + ## Inner voices
+PASS [06 PH_관전_multi] 다른 사전설정 절은 안 실림
+PASS [06 PH_관전_multi] 보기 전용 방 하나 더 생김(인물이 달라서)
+PASS [06 PH_관전_multi] 탭이 늘지 않음: 대화 목록 안(F-01)
+PASS [07 PH_이어보기] 이어 보기 요청에 앞 줄(side 첫 줄)이 실림
+PASS [07 PH_이어보기] 같은 방에 이어 붙음·방 수 그대로·이름 그대로
+PASS [07 PH_이어보기] 이어 쓴 방이 목록 맨 뒤(맨 위로 보임)
+PASS [07 PH_이어보기] 보기 전용 방 지우기도 두 번 눌러야
+PASS [08 PH_보관한도_1대1] 말풍선이 3개로 줄고 trimmedRecords 가 셈
+PASS [08 PH_보관한도_1대1] 화면에 「보관 상한으로 정리됐어요」
+PASS [08 PH_보관한도_1대1] 정리 끔이면 그대로 쌓임(8)
+NOTE [09 PH_초대방정리] 설정 화면 「초대받은 단톡방 정리」 줄: {"all":["100","100","20","20"],"text":"대화는 흐름 요약으로 남겨요. 켬 − 개 + 초대받은 단톡방 정리 초대받은 단톡방이 이 수를 넘으면 오래 조용한 방부터 지워요. 내가 말한 방, 안 읽은 말이 있는 방, 내가 만든 방은 지우지 않아요. 켬 − 개 +","inp":"100"}
+PASS [09 PH_초대방정리] 기본값 켬·20 이 보임
+PASS [09 PH_초대방정리] 상한 1: 오래 조용한 옛 초대방이 지워지고 새 초대방이 남음
+PASS [10 PH_선톡확률_쉬는턴] 확률 30·주사위 96: 받을 방 없음 → 호출 없이 「건너뛰었어요」
+PASS [10 PH_선톡확률_쉬는턴] 주사위 11: 요청 1회, 방 receiveMessages true
+PASS [10 PH_선톡확률_쉬는턴] 선톡 받은 뒤 쉬는 턴 표시
+PASS [10 PH_선톡확률_쉬는턴] 쉬는 턴 안: 다시 눌러도 호출 없음
+PASS [01 GN_닉네임_익명_저장_비움] 닉네임 없으면 요청 속 내 닉 = 익명
+PASS [01 GN_닉네임_익명_저장_비움] 게시판 안에서 저장한 닉이 요청에 감
+PASS [01 GN_닉네임_익명_저장_비움] 비우면 다시 익명
+NOTE [01 GN_닉네임_익명_저장_비움] 로그인 창 닉 칸 미리 채운 값(가짜 Risu 페르소나 이름): ""
+PASS [01 GN_닉네임_익명_저장_비움] 브라우저 로그인 = 게시판 닉도 같이 바뀜
+NOTE [02 GN_참조칩_기준] 기준 요청 길이·봇 설명/작가 노트 표지: {"len":40428,"desc":false,"note":false,"persona":false}
+NOTE [03 GN_참조칩_desc_끔] 길이 차이(기준 대비) — 기준에도 이 자료가 없음(가짜 Risu): 0
+NOTE [04 GN_참조칩_authors_끔] 길이 차이(기준 대비) — 기준에도 이 자료가 없음(가짜 Risu): 0
+NOTE [05 GN_참조칩_persona_끔] 길이 차이(기준 대비) — 기준에도 이 자료가 없음(가짜 Risu): 0
+NOTE [06 GN_참조칩_active_끔] 길이 차이(기준 대비) — 표지 없는 칩: -19885
+NOTE [07 GN_참조칩_related_끔] 길이 차이(기준 대비) — 표지 없는 칩: -5475
+NOTE [08 GN_참조칩_secondary_켬] 길이 차이(기준 대비) — 표지 없는 칩: 0
+PASS [09 GN_선쪽지_확률0] 확률 0: 댓글 요청의 incomingAllowed=false
+PASS [09 GN_선쪽지_확률0] 확률 0이면 모델이 쪽지를 써도 저장 안 함
+PASS [10 GN_선쪽지_쉬는턴] 선쪽지 받으면 쉬는 턴 표시
+PASS [10 GN_선쪽지_쉬는턴] 같은 턴 안 다음 댓글: incomingAllowed=false
+PASS [11 GN_폰_주소창_새로고침] 폰에서 주소창 줄 오른쪽 끝에 ↻ 가 보임
+PASS [11 GN_폰_주소창_새로고침] ↻ 누르면 게시판 새로고침 호출 1회
+NOTE [12 GN_쪽지자동정리_상한3] D 줄: ["D|브로커K|npc|답3|0|2025.03.14 23:20","D|브로커K|me|내 쪽지4|0|2025.03.14 23:20","D|브로커K|npc|답4|0|2025.03.14 23:20"]
+PASS [12 GN_쪽지자동정리_상한3] 상대(브로커K)별 쪽지가 3통 이하로 정리
+NOTE [12 GN_쪽지자동정리_상한3] 쪽지 창에 보이는 쪽지 수: 3
+NOTE [01 PIC_선쪽지_사진표식] 쪽지 화면: {"imgs":["blob:null/2fa356bc-4"],"text":"쪽지함\n브로커K\n1통\n처음 이어진 글 「셔터」\n\n이 사람 맞죠?\n\n⤢\n\n      \n2025.03.14 23:20\n괴담넷\n.net\n커뮤니티\n쪽지함\n랭킹\n글 목록\n전체 글\n[현장]\n셔터\n[1]\n내 메뉴\n쪽지함\n내가 쓴 글\n스크랩\n현장\n셔터\n야근요정 · 03.14 22:40 · 조회 4 · 추천 1\n\n셔터 또\n\n▲ 추천 1\n☆ 스크랩\n댓글 1\n익명 03.14 23:20\n답글\n삭제\n\n봤어요\n\n등록\n‹ 목록으로\n새 댓글 보기\n글쓰기\n등록했어요. 추가 답글은 없어요. 새 쪽지가 왔어요."}
+PASS [01 PIC_선쪽지_사진표식] 쪽지의 [사진:잼트리_smile] 은 그림으로(표식 원문이 안 보임)
+NOTE [02 PIC_톡_사진표식_사실만] 답-11: 괴담톡 [사진:] 표시 꼴(판정 안 함): {"imgs":["blob:null/ee334cb3-d"],"text":"2025년 3월 14일\n\n사진 보내 줘요.\n\n23:20\n에일린\n사진\n에일린\n사진\n중림 지하상가\n23:20"}
+NOTE [01 ATT_빈방_사진올리기] 고르기 change·파일·createImageBitmap: {"chg":0,"cib":0}
+NOTE [01 ATT_빈방_사진올리기] 빈 1:1 방(대화 0)에서 사진 고른 뒤 첨부 수: 0
+NOTE [01 ATT_빈방_사진올리기] 화면 글(사진·첨부 줄): ["사진 올리기","사진 묘사"]
+NOTE [01 ATT_빈방_사진올리기] view 상태: {"room":{"dm_c_50303034":{"id":"dm_c_50303034","kind":"dm","members":["c_50303034"],"people":{"c_50303034":{"id":"c_50303034","name":"에일린","agentId":"P004","english":"Aileen","lore":"에일린","group":"A00","rank":"선임 요원","department":"종합대응팀"}},"messages":[],"draft":"","unread":0,"readThrough":0}}}
+NOTE [01 ATT_빈방_사진올리기] 붙여넣기 뒤 첨부 수·createImageBitmap 호출·저장된 에셋: {"items":1,"cib":2,"assets":["assets/aaaaaaa0.png"]}
+PASS [02 ATT_사진올리기_보내기] 사진은 한 번에 최대 3(ATTACH_MAX)
+PASS [02 ATT_사진올리기_보내기] 보조 요청에 실제 사진(multimodals): 방 기록 속 사진 넷(앞 턴 1 + 이번 3)
+PASS [02 ATT_사진올리기_보내기] 못 읽은 사진 줄 없음
+PASS [02 ATT_사진올리기_보내기] 본편 요청엔 사진 데이터 없이 설명 글만
+NOTE [03 ATT_사진못읽음] 못 읽음 줄: "Image 1, 2, 3, 4 could not be loaded; do not describe it."
+PASS [03 ATT_사진못읽음] 저장소에서 못 읽은 사진은 「Image n could not be loaded」 줄로
+NOTE [03 ATT_사진못읽음] 창의 깨진 사진 틀 수(이 창에서 올린 사진은 미리보기 주소가 남아 그대로 보일 수 있음): 0
+NOTE [01 FAIL_톡보내기_채팅저장throw] 걸린 저장 호출 번호: [1]
+NOTE [01 FAIL_톡보내기_채팅저장throw] 보조 호출 수: 0
+NOTE [01 FAIL_톡보내기_채팅저장throw] 화면 글(끝): "연락처\n대화\n공지\n관리\n12\n중립\n10\n기타\n0\n쟈알디\n종합대응팀 · 팀장\n스팡달\n종합대응팀 · 선임 요원\n잼트리\n종합대응팀 · 선임 요원\n에일린\n종합대응팀 · 선임 요원\n고르고디오\n진압팀 · 선임 요원\n큐라스\n진압팀 · 선임 요원\n데드폴\n종합대응팀 · 요원\n게슈간\n종합대응팀 · 요원\n로제몬\n종합대응팀 · 요원\n콘쥬스\n종합대응팀 · 요원\n고그니쟈\n격리팀 · 팀장\n데쥬레\n격리팀 · 연구원\n새로고침\n단톡\n관전\n추가\n전화\n에일린\n종합대응팀 · 선임 요원\n아직 대화가 없어요. 첫 메시지를 보내 보세요."
+NOTE [01 FAIL_톡보내기_채팅저장throw] 저장된 1:1 방: {"id":"dm_c_50303034","kind":"dm","members":["c_50303034"],"people":{"c_50303034":{"id":"c_50303034","name":"에일린","agentId":"P004","english":"Aileen","lore":"에일린","group":"A00","rank":"선임 요원","department":"종합대응팀"}},"messages":[],"draft":"","unread":0,"readThrough":0}
+PASS [01 FAIL_톡보내기_채팅저장throw] 보낸 글이 사라지지 않음: 저장 안 됐으면 입력칸·화면에 남거나 실패 안내
+PASS [01 FAIL_톡보내기_채팅저장throw] 실패 뒤 다시 보내기가 막히지 않음
+NOTE [02 FAIL_톡보내기_채팅저장silent] 걸린 저장 호출 번호: [1]
+NOTE [02 FAIL_톡보내기_채팅저장silent] 보조 호출 수: 0
+NOTE [02 FAIL_톡보내기_채팅저장silent] 화면 글(끝): "대화\n공지\n관리\n12\n중립\n10\n기타\n0\n쟈알디\n종합대응팀 · 팀장\n스팡달\n종합대응팀 · 선임 요원\n잼트리\n종합대응팀 · 선임 요원\n에일린\n종합대응팀 · 선임 요원\n고르고디오\n진압팀 · 선임 요원\n큐라스\n진압팀 · 선임 요원\n데드폴\n종합대응팀 · 요원\n게슈간\n종합대응팀 · 요원\n로제몬\n종합대응팀 · 요원\n콘쥬스\n종합대응팀 · 요원\n고그니쟈\n격리팀 · 팀장\n데쥬레\n격리팀 · 연구원\n새로고침\n단톡\n관전\n추가\n전화\n에일린\n종합대응팀 · 선임 요원\n아직 대화가 없어요. 첫 메시지를 보내 보세요.\n대화 갱신: 대기 중인 대화 요청이 없어요."
+NOTE [02 FAIL_톡보내기_채팅저장silent] 저장된 1:1 방: {"id":"dm_c_50303034","kind":"dm","members":["c_50303034"],"people":{"c_50303034":{"id":"c_50303034","name":"에일린","agentId":"P004","english":"Aileen","lore":"에일린","group":"A00","rank":"선임 요원","department":"종합대응팀"}},"messages":[],"draft":"","unread":0,"readThrough":0}
+FAIL [02 FAIL_톡보내기_채팅저장silent] 보낸 글이 사라지지 않음: 저장 안 됐으면 입력칸·화면에 남거나 실패 안내
+   기대: "남음/안내"
+   실제: {"saved":0,"draft":""}
+PASS [02 FAIL_톡보내기_채팅저장silent] 실패 뒤 다시 보내기가 막히지 않음
+PASS [03 FAIL_기기저장소던짐_탭열기] 기기 저장소가 던져도 톡 보내기·저장은 됨
+PASS [01 STREAM_조각으로_온_답] 조각을 이어 붙인 답이 저장(그래. 들어가.)
+NOTE [02 STREAM_조각_받다_끊김] 화면 끝: "팀 · 선임 요원\n고르고디오\n진압팀 · 선임 요원\n큐라스\n진압팀 · 선임 요원\n데드폴\n종합대응팀 · 요원\n게슈간\n종합대응팀 · 요원\n로제몬\n종합대응팀 · 요원\n콘쥬스\n종합대응팀 · 요원\n고그니쟈\n격리팀 · 팀장\n데쥬레\n격리팀 · 연구원\n새로고침\n단톡\n관전\n추가\n전화\n에일린\n종합대응팀 · 선임 요원\n2025년 3월 14일\n\n스트림 시험.\n\n23:20\n에일린\n\n그래. 들어가.\n\n23:20\n\n끊김 시험.\n\n1\n23:20\n답장을 받지 못했어요.\n다시 시도\n건너뛰기\n대화 갱신: 모델 요청에 실패했어요. Risu의 모델 연결을 확인해 주세요."
+NOTE [02 STREAM_조각_받다_끊김] 대기 상태: {"message":3,"status":"error","action":{"type":"send"},"request":"1795509775644_654198"}
+PASS [02 STREAM_조각_받다_끊김] 반쪽 답이 말풍선으로 들어가지 않음
+PASS [02 STREAM_조각_받다_끊김] 실패로 보이고 다시 시도/건너뛰기 단추가 있음
+PASS [01 THINK_생각블록_안_가짜패치] 생각 블록 밖 패치만 저장(진짜 답), 생각 속 초안은 없음
+PASS [02 THINK_Thoughts꼴_리스AI] <Thoughts> 안 패치는 무시
+PASS [01 OPTS_메인모델] 「메인 모델」이면 mode model
+PASS [02 OPTS_보조모델_기본] 기본 보조 모델(submodel)
+PASS [03 OPTS_생성언어_영어] 고급 「생성 언어」 영어($gen_lang en): Write all output in English.
+PASS [04 OPTS_생성언어_대화언어_기본] 기본(대화 언어): LANGUAGE.KO/EN 줄 없이 괴담톡 LANGUAGE 절
+PASS [05 OPTS_생각단계_적고지움] 생각 단계 「적고 지움」: 요청에 # Thoughts 머리
+PASS [06 OPTS_생각단계_속으로] 「속으로만」: # Thoughts Guideline
+NOTE [07 OPTS_비망록] 첫 system 앞 200자: "# You Are Freya Who Loves User\n\n## Ontology — Why You Are Here\n\nFreya is a dialogue and interlude writer. The dialogue is not an assignment she performs so that a conversation can continue. It is the "
+PASS [07 OPTS_비망록] 비망록 켬: system 앞에 긴 앞글(비망록 페르소나)
+
+69/70 통과, 페이지 오류 1
+[ '시험용 저장 실패' ]

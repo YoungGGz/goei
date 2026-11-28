@@ -1,0 +1,35 @@
+// 재확인 KL: K/나/ 사본 (fixture·OUT 경로만 바꿈)
+// 3차 K4 K-03 대조: 세계 탭엔 기록별 「초기값으로」가 없음 확인 + 점검 「초기화」가 고친 세계(덧쓰기·명부)를 되돌리는지 (T1)
+import { launch, session, STATE, sleep, OUT, check, results } from './na-lib-t1.mjs';
+import { writeFileSync } from 'node:fs';
+const st = STATE('S-관리국-3턴');
+const b = await launch();
+const S = await session(b, { chat: structuredClone(st.data), prefs: JSON.parse(st.t2.pluginStorage['goei:prefs']) });
+await S.openEd('agent');
+await S.act('ed-sel', '스팡달', { wait: 500 });
+const btns = await S.page.evaluate(() => [...document.querySelectorAll('.gw button')].map((b) => b.innerText.trim()).filter((t) => /초기값|기본값|되돌/.test(t)));
+check('K03-01', '세계 탭 요원 기록에 「초기값으로」 단추', '결정표 K-03: 항목 되돌리기 이름은 「초기값으로」 (어느 화면에 둘지는 안 정함)', 'K-03', null, btns);
+const k = '.gw [data-input="ed-field"][data-key="agent|스팡달|intro"]';
+const v0 = await S.val(k);
+let n0 = await S.setChar();
+await S.type(k, `${v0} 시험소개R`);
+await S.type('.gw [data-input="dir"][data-key="rank|스팡달"]', '시험직급R');
+await S.waitSave(n0);
+await sleep(800);
+const d1 = await S.dir();
+const r0 = { intro: String(d1?.세계?.agent?.['스팡달']?.fields?.intro ?? '').includes('시험소개R'), rank: d1?.요원?.['스팡달']?.rank };
+await S.page.evaluate(() => document.querySelector('.gw [data-action="ed-tab"][data-value="manage"]')?.click()); await sleep(300);
+await S.page.evaluate(() => document.querySelector('.gw [data-action="ed-node"][data-value="manage:backup"]')?.click()); await sleep(500);
+n0 = await S.setChar();
+const okBtn = await S.act('set-bar', 'reset', { wait: 500 });
+await S.page.screenshot({ path: `${OUT}K03_초기화확인_PC.png` });
+await S.act('set-bar-yes', 'reset', { wait: 500 });
+await S.waitSave(n0, 5000);
+await sleep(1500);
+const d2 = await S.dir();
+const r1 = { intro: String(d2?.세계?.agent?.['스팡달']?.fields?.intro ?? '').includes('시험소개R'), worldKeys: Object.keys(d2?.세계 ?? {}), rank: d2?.요원?.['스팡달']?.rank };
+const info = await S.text('.gw');
+check('K03-02', '점검 「초기화」 → 고친 세계 덧쓰기(스팡달 소개) 비워짐', '덧쓰기 없음 (도움말 「고친 세계(카드 명부)를 플러그인 원래 값으로」)', 'K-03 · 11-08 사용자 「초기화는 전체 초기화」 (src/ui/editor/index.ts:959)', okBtn && r0.intro && !r1.intro, { before: r0, after: r1 });
+check('K03-03', '점검 「초기화」 뒤 명부 칸(스팡달 직급)', '참고: 도움말은 「카드 명부」까지 되돌린다고 적음', '같은 도움말 (manage.ts:187)', null, { before: r0.rank, after: r1.rank, info: /초기화했어요/.test(info) });
+await b.close();
+writeFileSync(`${OUT}결과_K03.json`, JSON.stringify(results, null, 2));

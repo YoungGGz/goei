@@ -99,9 +99,10 @@ export function nudgeMessages(chat: Chat, pick: (data: string, index: number) =>
 const queues = new Map<string, Promise<unknown>>();
 
 /** 저장 직전에 최신 채팅을 다시 읽고 변경을 적용한다. 다른 곳의 변경을 덮어쓰지 않기 위해서다. */
-export function updateChat(charIndex: number, chatIndex: number, mutate: (chat: Chat) => Chat | null): Promise<Chat | null> {
+/** id 를 주면 그 id 의 채팅에 저장한다: 기다리는 사이 Risu 에서 새 채팅·채팅 지우기·가져오기로 번호가 밀렸으면 같은 id 의 채팅을 찾아 쓰고, 지워져 없으면 저장하지 않는다(null). 3차 점검 R09 */
+export function updateChat(charIndex: number, chatIndex: number, mutate: (chat: Chat) => Chat | null, id?: unknown): Promise<Chat | null> {
   const key = `${charIndex}:${chatIndex}`;
-  const run = (queues.get(key) ?? Promise.resolve()).then(() => saveChat(charIndex, chatIndex, mutate));
+  const run = (queues.get(key) ?? Promise.resolve()).then(() => saveChat(charIndex, chatIndex, mutate, id));
   const tail = run.catch(() => {});
   queues.set(key, tail);
   void tail.then(() => {
@@ -110,9 +111,43 @@ export function updateChat(charIndex: number, chatIndex: number, mutate: (chat: 
   return run;
 }
 
-async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Chat) => Chat | null): Promise<Chat | null> {
-  const latest = (await risuai.getChatFromIndex(charIndex, chatIndex)) as Chat | null;
-  if (!latest) throw new Error('채팅을 찾을 수 없어요. 채팅을 다시 열어 주세요.');
+/** Risu 가 저장을 거절했을 때의 안내 */
+export const SAVE_DENIED = '리스AI 에서 저장을 거절했어요. 새로고침하면 다시 물어요.';
+/** 채팅·로어북을 쓴 바로 뒤에 부른다. Risu 는 「데이터베이스 수정」 권한을 거절하면 쓰기를 조용히 건너뛰니, 쓴 뒤에 그 답을 본다.
+ *  방금 쓰기가 이미 물었으니 여기서는 팝업 없이 그 세션의 답만 돌아온다 (3차 점검 R23·R24) */
+async function written(): Promise<void> {
+  if ((await Promise.resolve(risuai.requestPluginPermission?.('dbWrite')).catch(() => true)) !== false) return;
+  for (const f of deniedListeners) f();
+  throw new Error(SAVE_DENIED);
+}
+// 저장 거절 알림 (창이 맨 위 한 줄로 띄운다. 저장하는 곳마다 따로 알리지 않게 한 곳에서, 사용자 2026-11-26)
+const deniedListeners = new Set<() => void>();
+export function onSaveDenied(f: () => void): () => void {
+  deniedListeners.add(f);
+  return () => deniedListeners.delete(f);
+}
+
+/** 요청을 보낼 때 읽어 둔 채팅(ctx.chat)에 저장한다. 답을 기다린 뒤 저장하는 곳은 모두 이것을 쓴다 (번호가 밀려도 그 채팅에) */
+export const updateChatOf = (ctx: { charIndex: number; chatIndex: number; chat: Chat | null }, mutate: (chat: Chat) => Chat | null): Promise<Chat | null> =>
+  updateChat(ctx.charIndex, ctx.chatIndex, mutate, ctx.chat?.id);
+
+/** 그 번호 자리의 채팅. id 를 주었고 그 자리 채팅의 id 가 다르면 같은 캐릭터에서 그 id 의 채팅을 찾는다 (없으면 null) */
+export async function locateChat(charIndex: number, chatIndex: number, id?: unknown): Promise<{ chatIndex: number; chat: Chat } | null> {
+  const at = (await risuai.getChatFromIndex(charIndex, chatIndex)) as Chat | null;
+  if (typeof id !== 'string' || !id || at?.id === id) return at ? { chatIndex, chat: at } : null;
+  const char = (await risuai.getCharacterFromIndex(charIndex)) as { chats?: ({ id?: unknown } | null)[] } | null;
+  const found = (char?.chats ?? []).findIndex((c) => c?.id === id);
+  if (found < 0) return null;
+  const chat = (await risuai.getChatFromIndex(charIndex, found)) as Chat | null;
+  return chat ? { chatIndex: found, chat } : null;
+}
+
+async function saveChat(charIndex: number, chatIndex0: number, mutate: (chat: Chat) => Chat | null, id?: unknown): Promise<Chat | null> {
+  const loc = await locateChat(charIndex, chatIndex0, id);
+  // id 로 찾았는데 없다: 기다리는 사이 그 채팅이 지워졌다. 다른 채팅에 적지 않고 버린다
+  if (!loc && typeof id === 'string' && id) return null;
+  if (!loc) throw new Error('채팅을 찾을 수 없어요. 채팅을 다시 열어 주세요.');
+  const { chatIndex, chat: latest } = loc;
   latest.message ??= [];
   // 저장 직전에 이 채팅의 값으로 맞춘다 (길이 제한·보관 수·거래 줄 상한·소지품 표와 줄 상한을 다른 채팅 값으로 쓰지 않게.
   // 응답이 끝나기 전에 다른 채팅을 열었어도 그 채팅 값으로 정리하지 않는다)
@@ -129,6 +164,7 @@ async function saveChat(charIndex: number, chatIndex: number, mutate: (chat: Cha
   }
   if (!next) return null;
   await risuai.setChatToIndex(charIndex, chatIndex, next);
+  await written();
   // 열려 있는 채팅을 저장했으면 쓰기가 된 뒤에 저장한 값을 그 채팅 값으로 삼는다 (쓰기가 실패하면 읽은 값 그대로)
   if (shown && shown.key === key) {
     shown = { key, state: next.scriptstate };
@@ -156,6 +192,7 @@ export async function updateCharacterLore(charIndex: number, mutate: (lore: Lore
   const next = mutate(rest);
   if (!next) return false;
   await risuai.setCharacterToIndex(charIndex, { ...latest, globalLore: [...splitAssetCopy(stripVirtual(next)).rest, ...copy] });
+  await written();
   notifyLoreSaved(charIndex);
   return true;
 }
@@ -167,6 +204,7 @@ export async function setAssetCopy(charIndex: number, put: boolean): Promise<Lor
   const { rest } = splitAssetCopy(stripVirtual(latest.globalLore ?? []));
   const copy = put ? makeAssetCopy(withWorldLore(rest)) : [];
   await risuai.setCharacterToIndex(charIndex, { ...latest, globalLore: [...rest, ...copy] });
+  await written();
   return copy;
 }
 

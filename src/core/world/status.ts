@@ -1,6 +1,7 @@
 // 상태창 [▣|날짜|시각|날씨|기온|위치|목표(|동행|투입|신분|잔고)]: 원본은 카드 정규식으로 그려서 칸 하나만 어긋나도 통째로 깨졌다.
 // 플러그인이 너그럽게 읽는다: 칸이 모자라거나 남아도, 전각 기호·공백이 섞여도, 닫는 괄호가 없어도.
 // 칸 구성(statuscols.ts): 이 채팅의 지금 구성·기록된 구성·알려진 모양 중 칸 수가 맞는 것으로 먼저 읽고, 아니면 모양으로 날짜·시각·기온을 찾는다.
+import { stripThoughts } from '../thoughts';
 import { currentShape, parseWalletCell, shapeFor, type ColId } from './statuscols';
 
 export interface StatusTag {
@@ -150,7 +151,8 @@ function fieldsOf(inner: string): Omit<StatusTag, 'raw'> {
 /** 글 속 상태창 태그들 */
 export function findStatusTags(text: string): StatusTag[] {
   if (!hasStatusTag(text)) return [];
-  return [...text.matchAll(TAG_RE)].map((m) => ({ raw: m[0], ...fieldsOf(m[1]) }));
+  // 생각 블록 안의 상태창 초안은 읽지 않는다 (3차 점검 R01: 화면 상자·가계부 잔고 맞춤·시간줄이 생각 속 값을 읽었다)
+  return [...stripThoughts(text).matchAll(TAG_RE)].map((m) => ({ raw: m[0], ...fieldsOf(m[1]) }));
 }
 
 /** 글에서 상태창 태그(findStatusTags 가 알아보는 줄)를 뺀다. 태그만 있던 줄은 줄째 빠진다 (상점·쇼핑몰·망상홈쇼핑 요청의 [최근 본문]에 잔고가 가지 않게, 2026-11-22 사용자) */

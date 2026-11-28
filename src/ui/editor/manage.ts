@@ -16,7 +16,7 @@ import { clearTrace, loadTrace, onTraceChange } from '../../host/trace';
 import { tracePage, traceUi } from './trace';
 import { ensureFlow } from './flow';
 import { flowPage, flowView } from './flowpage';
-import { setAssetCopy, updateCharacterLore, updateChat, type ChatContext } from '../../host/risu';
+import { setAssetCopy, updateCharacterLore, updateChatOf, type ChatContext } from '../../host/risu';
 import { ASSET_COPY_NAME, assetCopyCount, makeAssetCopy, sameAssetCopy } from '../../core/world/assetcopy';
 import { readDirectoryData, withDirectory, type DirectoryData } from '../../core/world/directory';
 import { boardFailures, clearBoardFailures } from '../gnet';
@@ -407,7 +407,7 @@ export async function manageAction(action: string, root: HTMLElement | null, ctx
           if (ctx && canChat && vars.length) {
             // 한꺼번에 바꿀 때의 뒷정리(칸 구성 기록·소지품 「사용」 비움·상점 닫기)를 같이 한다 (전수점검 사소-86)
             let shopOff = false;
-            await updateChat(ctx.charIndex, ctx.chatIndex, (c) => {
+            await updateChatOf(ctx, (c) => {
               const prev = { ...(c.scriptstate ?? {}) };
               const next = { ...prev };
               for (const [k, v] of vars) next[k] = String(v);

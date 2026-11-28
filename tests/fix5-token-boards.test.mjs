@@ -317,6 +317,7 @@ test('위키 자동 작성: 제목 고르기 요청이 요청 토큰 상한을 �
   const stubs = {
     'host/risu': `let chat = null; export const setChat = (c) => { chat = c; };
       export async function updateChat(a, b, f) { chat = f(chat); return chat; }
+      export const updateChatOf = (ctx, f) => updateChat(ctx.charIndex, ctx.chatIndex, f);
       export async function getChar() { return null; } export async function updateCharacterLore() { return true; } export async function setAssetCopy() { return []; }
       export function onLoreSaved() { return () => {}; } export function notifyLoreSaved() {} export async function loadContext() { return null; }`,
     'host/llm': `export const calls = []; export class LlmError extends Error {}

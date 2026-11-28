@@ -30,7 +30,7 @@ import { assetNames, facePic, hasAsset, mainPic, moduleAssetStamp } from '../hos
 import { readWorld } from '../core/world/output';
 import { placeWhere } from '../core/world/geo';
 import { factionList } from '../core/factions';
-import { updateChat, type ChatContext } from '../host/risu';
+import { updateChatOf, type ChatContext } from '../host/risu';
 import { isPhone, zpx, zrect } from './media';
 
 /** 위키는 문서만 (2026-10-29: 이 채팅의 인물·개인 기록·세력·기록 문서 화면은 왼쪽 메뉴 「기록」으로 옮겼다, ui/records.ts) */
@@ -236,7 +236,7 @@ async function generate(ctx: ChatContext, env: WikiEnv, title: string, regenerat
       primarySources: prompt.primarySources.length ? prompt.primarySources : inherited, writingRequest, direct,
       ...(docRequest.trim() ? { docRequest: docRequest.trim() } : {}),
     };
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => saveDoc(chat, meta, body));
+    await updateChatOf(ctx, (chat) => saveDoc(chat, meta, body));
     // 아직 그 작성 화면을 보고 있으면 문서로 넘어간다
     if (here() && (wiki.view === 'compose' || wiki.view === 'doc') && wiki.title === title) Object.assign(wiki, { view: 'doc', rewrite: null, docReq: '' });
   } catch (error) {
@@ -271,7 +271,7 @@ export async function autoWriteWiki(ctx: ChatContext, messageIndex: number, open
   if (!data.trim()) return;
   const stamp = turnKeyAt(ctx.chat, messageIndex);
   if (String(ctx.chat.scriptstate?.[NW_AUTO_LAST] ?? '') === stamp) return;
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [NW_AUTO_LAST]: stamp } }));
+  const saved = await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [NW_AUTO_LAST]: stamp } }));
   if (!saved) return;
   const cur = { ...ctx, chat: saved };
   const env = liveEnv ?? quietEnv;
@@ -333,7 +333,7 @@ export function wikiOpenCheck(ctx: ChatContext, env: WikiEnv): void {
 }
 
 async function setVar(ctx: ChatContext, env: WikiEnv, key: string, value: string) {
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [key]: value } }));
+  await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [key]: value } }));
   await env.refresh();
 }
 
@@ -1098,7 +1098,7 @@ export async function handleWiki(action: string, value: string | undefined, ctx:
       }
       wiki.confirmDelete = null;
       if (wiki.title === v && wiki.view === 'doc' && !baseDocs(ctx.char.globalLore).some((d) => d.title === v)) Object.assign(wiki, { view: 'home', title: '', history: [] });
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => deleteDoc(chat, v));
+      await updateChatOf(ctx, (chat) => deleteDoc(chat, v));
       await env.refresh();
       return true;
     case 'wiki-jump': {

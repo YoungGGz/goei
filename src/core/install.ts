@@ -303,6 +303,15 @@ function directoryGapCount(lore: LoreEntry[]): number {
   return data ? fillDirectory(cur, installData().directory).gaps : 0;
 }
 
+/** 점검 「초기화」: 카드의 명부를 설치 기본 명부로 바꾼다 (고친 칸·직접 추가한 요원·조직·세계 덧쓰기 모두 버린다. 사용자 2026-11-26, 3차 점검 R55).
+ *  명부가 없는 카드면 null (설치가 할 일) */
+export function resetDirectoryLore(lore: LoreEntry[]): LoreEntry[] | null {
+  const dir = directoryEntries(lore);
+  if (!dir.length) return null;
+  const content = JSON.stringify(installData().directory);
+  return lore.filter((e) => e === dir[0] || !dir.includes(e)).map((e) => (e === dir[0] ? { ...e, comment: DIRECTORY_COMMENT, content } : e));
+}
+
 /**
  * 로어북 심기: 없는 것만 만든다 (⚙️설정 폴더 → Directory(기본 명부) → Plugin manifest). 있는 항목은 그대로.
  * 매니페스트는 늘 다시 써서 폴더 key·인사말 번호를 맞춘다

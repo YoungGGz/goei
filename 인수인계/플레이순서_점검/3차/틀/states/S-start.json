@@ -1,0 +1,39 @@
+{
+ "type": "risuChat",
+ "ver": 2,
+ "data": {
+  "message": [],
+  "note": "",
+  "name": "S-start",
+  "localLore": [],
+  "fmIndex": -1,
+  "id": "621ca651-1a70-4646-901c-2a6a0f983a3f"
+ },
+ "folders": [],
+ "t2": {
+  "name": "S-start",
+  "plugin": "0.21.34",
+  "goeiCommit": "5279cff",
+  "risuCommit": "996a5535fdb4629258331955982693a74ea209de",
+  "order": 1,
+  "flow": "설치만",
+  "made": "setup() — 카드·플러그인 가져오기, 모델 설정, 캐릭터 고르기. 출발 전(시작 패널을 열지 않음)",
+  "contents": {
+   "faction": null,
+   "player": null,
+   "pointsOn": null,
+   "wallet": null,
+   "lastStatus": null,
+   "messages": 0,
+   "people": 0,
+   "turns": 0
+  },
+  "exportedAt": "2026-11-24T03:29:52.428Z",
+  "fromChatPage": 0,
+  "nChatsAtExport": 1,
+  "charName": "괴이 ː ANOMALY",
+  "cardLoreHash": -224935923,
+  "cardLoreLen": 229605,
+  "pluginStorage": {}
+ }
+}

@@ -1,0 +1,40 @@
+// I 구간 run9: 지난 응답 읽기(backfill). 상한 넘겨 거부된 응답 뒤에 정상 턴을 하나 더 → 그 앞의 안 읽은 응답이 「지난 응답」으로 남음 → 상한을 올리고 「지난 응답 읽기」. PC 1280x800
+import { open, responder, people, diag, OUT, sleep, recorder, setVars, STATES, EMPTY_UPD } from './common.mjs';
+const R = recorder('run9');
+const t = await open({ width: 1280, height: 800 });
+const rsp = responder(OUT + '/calls-run9.jsonl');
+rsp.plan.upd = () => JSON.stringify(EMPTY_UPD);
+const ST = '[▣|2025.03.14|09:30 AM|☀️|12°C|서울 종로구 관리국 본부 면담실|없음|쟈알디|없음|관리국/신입|140000]';
+const act = (action, value) => t.feval(([a, v]) => { const b = document.createElement('button'); b.dataset.action = a; if (v != null) b.dataset.value = v; b.style.display = 'none'; document.querySelector('.gx').appendChild(b); b.click(); b.remove(); }, [action, value ?? null]).then(() => sleep(1000));
+const btn = (action) => t.feval((a) => { const b = [...document.querySelectorAll(`.gx [data-action="${a}"]`)].find((e) => e.offsetParent !== null); if (!b) return null; b.scrollIntoView({ block: 'center' }); b.click(); return b.dataset.value ?? ''; }, action).then(async (v) => { await sleep(1000); return v; });
+const bar = () => t.feval(() => [...document.querySelectorAll('.gx .pp-upgrp')].map((e) => e.innerText.replace(/\s+/g, ' ')).join(' | '));
+try {
+  await t.setup();
+  await t.loadState(STATES + 'S-관리국-3턴.json');
+  await setVars(t, { '$pp_span_cap': '3000' });
+  rsp.plan.main = () => '쟈알디가 긴 이야기를 시작했다. ' + '관리국의 역사는 길고 복잡했다. '.repeat(240) + '\n' + ST;
+  await t.send('이야기를 듣는다.');
+  await sleep(6000);
+  rsp.plan.main = () => '쟈알디가 이야기를 마쳤다. "이상이다."\n' + ST;
+  let c0 = rsp.maxSeq();
+  await t.send('고개를 끄덕인다.');
+  for (let i = 0; i < 40 && !rsp.since(c0).some((c) => c.kind === 'upd'); i++) await sleep(500);
+  await sleep(2500);
+  await t.openWindow('.gx'); await sleep(800);
+  await act('rec-people'); await sleep(800);
+  const b1 = await bar();
+  await t.shot('../../I/out/run9-backfill-shown');
+  R.step('1 거부된 응답 뒤 정상 턴', '목록 위에 「지난 응답 1개 안 읽음」+「지난 응답 읽기」', '코스 I-1 지난 기록 채우기·I-12', { bar: b1 }, /지난 응답/.test(b1));
+  await t.closeWindow();
+  await setVars(t, { '$pp_span_cap': '20000' });
+  await t.openWindow('.gx'); await sleep(800);
+  await act('rec-people'); await sleep(800);
+  c0 = rsp.maxSeq();
+  const v = await btn('pp-backfill');
+  for (let i = 0; i < 40 && !rsp.since(c0).some((c) => c.kind === 'upd'); i++) await sleep(500);
+  await sleep(3000);
+  const dg = (await diag(t)).at(-1);
+  const b2 = await bar();
+  await t.shot('../../I/out/run9-backfill-after');
+  R.step('2 상한 올리고 지난 응답 읽기', '갱신기 1회(backfill), 지난 응답 표시 사라짐', '코스 I-1', { clicked: v, updCalls: rsp.since(c0).filter((c) => c.kind === 'upd').length, diag: dg && { reason: dg.reason, ok: dg.ok, stage: dg.stage }, bar: b2 }, v !== null && !/지난 응답/.test(b2));
+} catch (e) { R.step('예외', '', '', String(e?.stack ?? e).slice(0, 1200), false); } finally { await rsp.stop(); await t.close(); }

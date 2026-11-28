@@ -9,7 +9,7 @@ import { defGroups, type Wire } from './setrow';
 import { HOMESHOP_SET, HS_DEF_TEXT, HS_FLAG, HS_PAIRS, HS_RETRY_KEY, HS_TEL_KEY } from '../core/setdef/homeshop';
 export { HS_RETRY_KEY, HS_TEL_KEY };
 import type { ChatContext } from '../host/risu';
-import { updateChat } from '../host/risu';
+import { updateChat, updateChatOf } from '../host/risu';
 import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { broadcastMaterial, emptyShop, lastBot, operatorPrompt, programPrompt, shopBlocked, turnKey, type ShopState } from '../core/shop';
@@ -172,7 +172,7 @@ async function ask(ctx: ChatContext, env: HsEnv): Promise<void> {
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
     const key = lastBot(cur.chat)?.key ?? '';
-    await updateChat(cur.charIndex, cur.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...applyShow(readShow(chat.scriptstate), value, key, hsSettings(chat.scriptstate).keep.prev), tk: turnKey(chat) }), [HS_AT_VAR]: turnKey(chat) } }));
+    await updateChatOf(cur, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...applyShow(readShow(chat.scriptstate), value, key, hsSettings(chat.scriptstate).keep.prev), tk: turnKey(chat) }), [HS_AT_VAR]: turnKey(chat) } }));
     ui.retried = 0;
   } catch (error) {
     failed = true;
@@ -205,7 +205,7 @@ export function homeshopOpenCheck(ctx: ChatContext, env: HsEnv): void {
   const key = turnKey(ctx.chat);
   // 본편 턴이 넘어갔으면 편성 한 칸 (보던 부는 지나간다). 모델 호출이 없으니 수동이어도 넘긴다 (전수검사 11-13)
   if (turnStep(show, s.turn, key)) {
-    void updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+    void updateChatOf(ctx, (chat) => {
       const cur = readShow(chat.scriptstate);
       if (!cur.loaded || cur.tk === turnKey(chat)) return null;
       return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...cur, at: Math.min(cur.at + 1, cur.parts.length), tk: turnKey(chat) }) } };
@@ -315,7 +315,7 @@ function advance(at: number): void {
   if (!env || !ctx) return;
   // 부가 넘어가기 전에 지금까지 본 것을 적는다 (시청 기록)
   playerFlush();
-  void updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  void updateChatOf(ctx, (chat) => {
     const show = readShow(chat.scriptstate);
     if (!show.loaded || show.at >= at) return null;
     return { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...showVars({ ...show, at: Math.min(at, show.parts.length) }) } };
@@ -384,7 +384,7 @@ function soldOut(at: number): void {
   if (!env || !ctx) return;
   env.render();
   const key = readShow(ctx.chat.scriptstate).key;
-  void whenIdle().then(() => updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  void whenIdle().then(() => updateChatOf(ctx, (chat) => {
     const show = readShow(chat.scriptstate);
     const part = show.parts[at];
     if (!show.loaded || show.key !== key || !part || part.out) return null;
@@ -396,7 +396,7 @@ function soldOut(at: number): void {
 const hungLine = (part: HsPart): string => part.hung ?? (ui.call?.pid === part.item.id ? ui.call.hung : undefined) ?? '';
 /** 상담원이 전화를 끊었을 때: 그 부에 끊김(마지막 말)을 적는다 (창을 다시 열어도, 화면을 새로 그려도 그대로) */
 function hangUp(ctx: ChatContext, env: HsEnv, show: HsShow, pid: string, line: string): void {
-  void whenIdle().then(() => updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  void whenIdle().then(() => updateChatOf(ctx, (chat) => {
     const cur = readShow(chat.scriptstate);
     if (!sameProgram(cur, show)) return null;
     const at = cur.parts.findIndex((p) => p.item.id === pid);
@@ -578,7 +578,7 @@ async function order(ctx: ChatContext, env: HsEnv, said?: HsLogEntry[]): Promise
   playerFlush();
   const buyer = userInfo().name || guideTxt('Hs', 'SAY_ME_NICK');
   const start = getPrefs().walletStart ?? WALLET_START_DEFAULT;
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const show = readShow(chat.scriptstate);
     const part = show.loaded ? show.parts[show.at] : null;
     if (!part || part.out || part.hung || part.item.id !== pre.part!.item.id) return null;
@@ -641,7 +641,7 @@ async function order(ctx: ChatContext, env: HsEnv, said?: HsLogEntry[]): Promise
 
 /** 소지품에서 택배 상자 열기: 상자가 빠지고 실제 물건이 들어간다 (모델 호출 없음). 여는 것이 곧 구매를 받아들이는 것이라, 출연이 걸린 주문은 이때 호출 턴이 잡힌다 */
 async function openBox(ctx: ChatContext, env: HsEnv, boxId: string): Promise<void> {
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const alive = aliveAnchors(chat);
     const o = boxOrder(chat.scriptstate, boxId, alive);
     if (!o) return null;
@@ -667,7 +667,7 @@ async function audience(ctx: ChatContext, env: HsEnv): Promise<void> {
   if (!ui.agree || !hsSettings(ctx.chat.scriptstate).aud || !hsReach(ctx.chat)) return;
   const no = String(1000 + Math.floor(Math.random() * 9000));
   const name = userInfo().name || '';
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [HS_AUD_VAR]: JSON.stringify({ anchor: lastBot(chat)?.key ?? '', no, name }) } }));
+  await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [HS_AUD_VAR]: JSON.stringify({ anchor: lastBot(chat)?.key ?? '', no, name }) } }));
   ui.audNo = no;
   playerSay(guideTxt('Hs', 'PLAYER_SYS_NICK'), guideTxt('Hs', 'PLAYER_SYS_AUDIENCE', { no }), 'sys');
   await env.refresh();
@@ -1215,7 +1215,7 @@ export function homeshopSettingsPane(ctx: ChatContext): string {
 async function homeshopSettingsAction(action: string, value: string | undefined, ctx: ChatContext, env: HsEnv): Promise<boolean> {
   if (!['hs-cfg', 'hs-num', 'hs-text', 'hs-retry'].includes(action)) return false;
   const set = async (vars: Record<string, string>) => {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (Object.entries(vars).every(([k, v]) => String(chat.scriptstate?.[k] ?? '') === v) ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+    await updateChatOf(ctx, (chat) => (Object.entries(vars).every(([k, v]) => String(chat.scriptstate?.[k] ?? '') === v) ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
     await env.refresh();
     return true;
   };

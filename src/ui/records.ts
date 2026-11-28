@@ -6,7 +6,7 @@
 import { stepNext } from '../core/stepval';
 import { setRow, stepIn } from './setrow';
 import {
-  JOURNAL_KIND_LABEL, JR, JR_JOURNAL_CAP, JR_LIST_PAGE, JR_PEOPLE_MAX, JR_REPORT_CAP, JR_TRADES_MAX, JR_TRAIL_MAX, journalClock, journalNewestFirst, journalSettings, jrValue, pinReport, readJournal, readReports, reportVars,
+  JOURNAL_KIND_LABEL, JR, JR_JOURNAL_CAP, JR_LIST_PAGE, JR_PEOPLE_MAX, JR_REPORT_CAP, JR_TRADES_MAX, JR_TRAIL_MAX, journalClock, journalNewestFirst, journalSettings, jrValue, pinReport, liveJournal, liveReports, readReports, reportVars,
   type JournalKind, type JournalRow, type Report,
   buildChronicle, CHRON_KIND_LABEL, type ChronEntry, type ChronKind, durLabel, reportBadge, reportEndLabel,
 } from '../core/journal';
@@ -20,7 +20,7 @@ import type { Chat } from '../core/types';
 import { formatDelta, formatWon } from '../core/wallet';
 import { factionNames, locName, parseCatalog, readWorld, worldOn } from '../core/world';
 import { playerAgent } from '../core/player';
-import { updateChat, type ChatContext } from '../host/risu';
+import { updateChatOf, type ChatContext } from '../host/risu';
 import { onOffSwitch } from './controls';
 import { drawerBox } from './drawer';
 import { walletPane, walletTools } from './wallet';
@@ -210,8 +210,8 @@ function journalTools(): string {
 }
 
 function journalPane(ctx: ChatContext): string {
-  const rows = readJournal(ctx.chat).rows;
-  const reports = readReports(ctx.chat).items;
+  const rows = liveJournal(ctx.chat).rows;
+  const reports = liveReports(ctx.chat).items;
   const now = nowMinute(ctx, rows);
   const todayKey = now === null ? '' : dayOf(now);
   const todayRows = todayKey ? rows.filter((r) => dayOf(r.at) === todayKey) : [];
@@ -234,7 +234,7 @@ function journalPane(ctx: ChatContext): string {
 
 /** 일지 목록만 (찾기 칸을 칠 때 이 부분만 다시 그린다) */
 export function journalList(ctx: ChatContext): string {
-  const rows = readJournal(ctx.chat).rows;
+  const rows = liveJournal(ctx.chat).rows;
   const q = rec.q.trim().toLowerCase();
   const pass = (r: JournalRow) => (rec.filter === 'mine' ? r.mine : rec.filter === 'bg' ? !r.mine : true)
     && (!q || `${r.name} ${locName(r.loc)} ${r.agents.map((a) => a.name).join(' ')} ${r.result}`.toLowerCase().includes(q));
@@ -243,7 +243,7 @@ export function journalList(ctx: ChatContext): string {
   if (!shown.length) return `<p class="gx-wt-empty">${rows.length ? '맞는 줄이 없어요.' : '아직 종료된 상황이 없어요. 괴이·사건·특수가 종료되면 여기에 한 줄씩 쌓여요.'}</p>`;
   // 보고서 저장소는 한 번만 읽는다 — 줄마다 읽으면 찾기 칸이 버벅인다 (전수검사 11-13)
   const reps = new Map<string, Report>();
-  for (const x of readReports(ctx.chat).items) if (!reps.has(x.id)) reps.set(x.id, x);
+  for (const x of liveReports(ctx.chat).items) if (!reps.has(x.id)) reps.set(x.id, x);
   const groups: { day: string; rows: JournalRow[] }[] = [];
   for (const r of shown) {
     const day = dayOf(r.at);
@@ -301,7 +301,7 @@ function chroniclePane(ctx: ChatContext): string {
     if (g && g.day === e.day) g.rows.push(e);
     else groups.push({ day: e.day, rows: [e] });
   }
-  const repIds = new Set(readReports(ctx.chat).items.map((r) => r.id)); // 한 번만 읽기 (전수검사 11-13)
+  const repIds = new Set(liveReports(ctx.chat).items.map((r) => r.id)); // 한 번만 읽기 (전수검사 11-13)
   const line = (e: ChronEntry) => {
     const act = e.rpt && repIds.has(e.rpt) ? ` data-action="rec-chron-open" data-value="${esc(e.rpt)}"`
       : e.person ? ` data-action="rec-person" data-value="${esc(e.person)}"`
@@ -327,7 +327,7 @@ const walletSum = (r: Report) => {
 // ── 보고서 페이지 ──
 
 function reportPage(ctx: ChatContext, id: string): string {
-  const r = readReports(ctx.chat).items.find((x) => x.id === id);
+  const r = liveReports(ctx.chat).items.find((x) => x.id === id);
   const back = '';
   if (!r) return `<section class="gx-rpt"><header class="gx-rpt-head">${back}<b>보고서</b></header><p class="gx-wt-empty">이 보고서는 상한에 밀려 지워졌거나 되감겨서 없어요.</p></section>`;
   const h = r.head;
@@ -378,7 +378,7 @@ function reportPage(ctx: ChatContext, id: string): string {
 
 /** 종료 줄 → 보고서 지름길 (같은 종류·장소의 최신 일지 줄. 이름이 같은 줄이 있으면 그것) */
 export function endedReport(chat: Chat, kind: JournalKind, name: string, loc: string): { rpt?: string; mine: boolean } | null {
-  const rows = readJournal(chat).rows;
+  const rows = liveJournal(chat).rows;
   let loose: JournalRow | null = null;
   for (let i = rows.length - 1; i >= 0; i--) {
     const r = rows[i];
@@ -407,7 +407,7 @@ function closeHit(chat: Chat): { rpt: string; name: string } | null {
     const pos = at.get(anchor);
     return pos !== undefined && pos >= last;
   };
-  const rows = readJournal(chat).rows;
+  const rows = liveJournal(chat).rows;
   const hit = [...rows].reverse().find((r) => r.mine && r.rpt && recent(r.anchor));
   return hit && hit.rpt ? { rpt: hit.rpt, name: hit.name } : null;
 }
@@ -482,7 +482,7 @@ export async function handleRecords(action: string, value: string | undefined, c
     case 'rec-open':
     case 'rec-chron-open':
       closeToast();
-      if (!readReports(ctx.chat).items.some((r) => r.id === v)) {
+      if (!liveReports(ctx.chat).items.some((r) => r.id === v)) {
         rec.notice = '이 보고서는 상한에 밀려 지워졌거나 되감겨서 없어요.';
         break;
       }
@@ -522,10 +522,10 @@ export async function handleRecords(action: string, value: string | undefined, c
       break;
     case 'rec-pin': {
       if (rec.busy || !v) return true;
-      const on = !readReports(ctx.chat).items.find((r) => r.id === v)?.pin;
+      const on = !liveReports(ctx.chat).items.find((r) => r.id === v)?.pin;
       rec.busy = true;
       try {
-        await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...reportVars(pinReport(readReports(chat), v, on)) } }));
+        await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...reportVars(pinReport(readReports(chat), v, on)) } }));
         rec.info = on ? '고정했어요. 상한에 밀려 지워지지 않아요.' : '고정을 풀었어요.';
       } catch (error) {
         rec.notice = error instanceof Error ? error.message : String(error);
@@ -536,7 +536,7 @@ export async function handleRecords(action: string, value: string | undefined, c
     }
     case 'rec-png': {
       if (rec.busy || !v) return true;
-      const r = readReports(ctx.chat).items.find((x) => x.id === v);
+      const r = liveReports(ctx.chat).items.find((x) => x.id === v);
       if (!r) return true;
       rec.busy = true;
       rec.notice = '';
@@ -629,7 +629,7 @@ async function setVars(ctx: ChatContext, env: RecordsEnv, vars: Record<string, s
   rec.busy = true;
   rec.notice = '';
   try {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+    await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
   } catch (error) {
     rec.notice = error instanceof Error ? error.message : String(error);
   }

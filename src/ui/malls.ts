@@ -9,7 +9,7 @@ import { stepNext } from '../core/stepval';
 import { setGroup, setRow, stepIn } from './setrow';
 import { needAttr } from './needfill';
 import type { ChatContext } from '../host/risu';
-import { updateChat } from '../host/risu';
+import { updateChatOf } from '../host/risu';
 import { generate, type LlmMessage } from '../host/llm';
 import { genSettings } from '../core/advanced';
 import { addWalletEntry, aliveAnchors, freshWalletId, formatWon, readWallet, walletBalance, walletVars, WALLET_START_DEFAULT } from '../core/wallet';
@@ -126,7 +126,7 @@ const jobs = new Set<string>();
 
 /** 진열대 짜기 / 운영자에게 묻기. 같은 채팅을 보고 있을 때만 저장 */
 /** 시그니처 상품 → 진열 물건 (할인 전 값이 더 크면 ※할인!※ 딱지) */
-const fixedItem = (f: CosFixed): Omit<ShopItem, 'id'> => ({ name: f.name.trim(), desc: f.desc, effect: f.effect, use: false, price: f.price, truth: f.truth.trim() || '?', ...(f.was && f.was > f.price ? { tag: 'sale' as const, was: f.was } : {}) });
+const fixedItem = (f: CosFixed): Omit<ShopItem, 'id'> => ({ name: f.name.trim(), desc: f.desc, effect: f.effect, use: false, price: f.price, truth: f.truth.trim() || '?', fixed: true, ...(f.was && f.was > f.price ? { tag: 'sale' as const, was: f.was } : {}) });
 
 /** 팔기 확정 (「판매」 단추와 운영자의 <deal/> 가 같이 쓴다): 가계부 수입 + 소지품에서 뺌 + 판 것 목록. 팔 수 없으면 null */
 function saleDone<C extends ChatContext['chat']>(chat: C, site: MallSite, itemId: string): C | null {
@@ -217,7 +217,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
     const sale = deal ? next.sell : null;
     let sold = false;
     let merged = next;
-    await updateChat(cur.charIndex, cur.chatIndex, (chat) => {
+    await updateChatOf(cur, (chat) => {
       // 기다리는 동안 결제·판매 취소한 것을 되돌리지 않게 지금 상태와 합친다 (전수검사 11-13)
       // 요청 전 상태(st0)와 같은 기준(살아 있는 응답)으로 읽는다: 산 응답이 지워진 물건을 「기다리는 동안 산 것」으로 잘못 보지 않게 (재검토 11-14)
       const now = lateNow(chat, site);
@@ -242,7 +242,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
       // 내 말은 적어 뒀으니 답이 안 왔으면 되돌린다
       const cur = env.current();
       if (cur && chatKey(cur) === chatKey(ctx)) {
-        await updateChat(cur.charIndex, cur.chatIndex, (chat) => {
+        await updateChatOf(cur, (chat) => {
           const now = readMall(chat.scriptstate, site, aliveAnchors(chat));
           const last = now.talk[now.talk.length - 1];
           if (!last || last.who !== 'me') return null;
@@ -266,7 +266,7 @@ async function ask(ctx: ChatContext, env: MallEnv, site: MallSite, kind: 'shelf'
 function markSeen(ctx: ChatContext, site: MallSite): void {
   if (!mallUnseen(ctx.chat.scriptstate, site, readMall(ctx.chat.scriptstate, site, aliveAnchors(ctx.chat)).loaded)) return;
   const at = String(ctx.chat.scriptstate?.[atKey(site)] ?? '');
-  void updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[atKey(site)] ?? '') !== at || String(chat.scriptstate?.[mallSeenKey(site)] ?? '') === at ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [mallSeenKey(site)]: at } })).catch(() => null);
+  void updateChatOf(ctx, (chat) => (String(chat.scriptstate?.[atKey(site)] ?? '') !== at || String(chat.scriptstate?.[mallSeenKey(site)] ?? '') === at ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [mallSeenKey(site)]: at } })).catch(() => null);
 }
 
 /** 사이트를 열 때: 「창을 열 때」이고 마지막 응답 뒤로 아직 안 짰으면 한 번 (처음이면 늘) */
@@ -316,7 +316,7 @@ export function previewMallShelf(ctx: ChatContext, site: MallSite): LlmMessage[]
 async function buy(ctx: ChatContext, site: MallSite, ids: string[]): Promise<ShopItem[] | null> {
   const start = getPrefs().walletStart ?? WALLET_START_DEFAULT;
   let got: ShopItem[] | null = null;
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const now = readMall(chat.scriptstate, site, aliveAnchors(chat));
     const list = ids.map((id) => now.items.find((x) => x.id === id && !x.sold)).filter((x): x is ShopItem => !!x);
     if (!list.length || list.length !== ids.length) return null;
@@ -431,7 +431,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       // 답을 기다리던 말이 새로고침 등으로 끊겨 답 없이 남았으면 떼고 입력칸에 돌려준다 (실패했을 때와 같게)
       if (!jobs.has(`${chatKey(ctx)}:${site}`) && dropPending(st.talk)) {
         let back = '';
-        await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+        await updateChatOf(ctx, (chat) => {
           const now = readMall(chat.scriptstate, site, aliveAnchors(chat));
           const d = dropPending(now.talk);
           if (!d) return null;
@@ -466,7 +466,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       const next = startSell(st, { itemId: mine.id, name: mine.name, desc: mine.desc, effect: mine.effect, ...(mine.truth ? { truth: mine.truth } : {}), use: mine.use, ...(left !== undefined ? { uses: left } : {}), ...(mine.equip ? { equip: mine.equip } : {}), ...(mine.icon ? { icon: mine.icon } : {}), ...(paidWon(mine) !== undefined ? { paid: paidWon(mine) } : {}) });
       v.selling = false;
       v.chip = '';
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, next) } }));
+      await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, next) } }));
       await env.refresh();
       return true;
     }
@@ -475,7 +475,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       const n = (st.notes ?? []).find((x) => x.id === value && !x.bought);
       if (site !== 'cos' || !n || v.loading) return true;
       let ok = false; let short = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const now = readMall(chat.scriptstate, site, aliveAnchors(chat));
         const nextShop = buyNote(now, n.id, lastBot(chat)?.key ?? '');
         if (!nextShop) return null;
@@ -498,7 +498,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       const q = (st.quotes ?? []).find((x) => x.id === value && quoteOpen(x));
       if (site !== 'cos' || !q || v.loading) return true;
       let ok = false; let short = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const now = readMall(chat.scriptstate, site, aliveAnchors(chat));
         // 주문한 응답이 지워진 견적은 readMall(reviveShop)이 이미 다시 열어 둔다. 주문 기록이 정리돼 없어진 것은 다시 열지 않는다 (전수점검 보통-30)
         const nextShop = acceptQuote(now, q.id, lastBot(chat)?.key ?? '');
@@ -525,7 +525,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       const o = liveOrders(ctx.chat.scriptstate, aliveAnchors(ctx.chat)).find((x) => x.id === value);
       if (site !== 'cos' || !o || !orderReady(o, worldMinute(ctx.chat), lastBot(ctx.chat)?.key ?? '')) return true;
       let ok = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const list = liveOrders(chat.scriptstate, aliveAnchors(chat));
         const cur = list.find((x) => x.id === o.id);
         if (!cur || cur.taken) return null;
@@ -553,7 +553,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       let n = 0;
       let first = '';
       let went = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const alive = aliveAnchors(chat);
         const anchor = lastBot(chat)?.key ?? '';
         if (bmPickupConfirm(chat.scriptstate)) {
@@ -581,7 +581,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       return true;
     }
     case 'mall-sell-cancel':
-      if (st.sell) await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, cancelSell(readMall(chat.scriptstate, site, aliveAnchors(chat)))) } }));
+      if (st.sell) await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, cancelSell(readMall(chat.scriptstate, site, aliveAnchors(chat)))) } }));
       await env.refresh();
       return true;
     case 'mall-sell': {
@@ -589,7 +589,7 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
       if (!st.sell || typeof st.sell.price !== 'number' || v.loading) return true;
       const o = st.sell;
       let sold = false;
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const done = saleDone(chat, site, o.itemId);
         if (done) sold = true;
         return done;
@@ -646,13 +646,15 @@ async function mallMoney(action: string, value: string | undefined, ctx: ChatCon
         if (saved) await deskRun({ ...ctx, chat: saved }, env, 'talk', next);
         return true;
       }
-      if (site !== 'cos' || !said || v.loading || !st.loaded || st.closed) return true;
+      // 팔 물건을 고른 뒤에는 글이 없어도 보낸다 (물건만 내민다. 장면 속 상점 shop-say 와 같다, 3차 점검 R12). 값이 나온 뒤에는 「판매」 단추가 있으니 빈 말은 안 보낸다. 그때 내 말 꼴은 지침 「우주 쇼핑몰」의 ASK_SELL_BARE 절
+      const bare = !said && st.sell && typeof st.sell.price !== 'number' ? guideTxt('Cos', 'ASK_SELL_BARE', { item: st.sell.name }) : '';
+      if (site !== 'cos' || (!said && !bare) || v.loading || !st.loaded || st.closed) return true;
       const chip = st.items.find((x) => x.id === v.chip && !x.sold);
-      const next = stampLastLine(sayToOwner(st, chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said, shopLimits(ctx.chat.scriptstate)), lastBot(ctx.chat)?.key ?? '');
+      const next = stampLastLine(sayToOwner(st, bare || (chip ? guideTxt('Cos', 'ASK_CHIP', { item: chip.name, said }) : said), shopLimits(ctx.chat.scriptstate)), lastBot(ctx.chat)?.key ?? '');
       v.input = '';
       v.chip = '';
       v.picking = false;
-      const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, next) } }));
+      const saved = await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...mallVarsOf(site, next) } }));
       if (!saved) return true;
       await ask({ ...ctx, chat: saved }, env, site, 'talk', next, { input: said, chip: chip?.id ?? '' });
       return true;
@@ -677,7 +679,7 @@ export function deskSource(ctx: ChatContext): DeskSource {
 }
 
 async function saveDesk(ctx: ChatContext, st: DeskState) {
-  return updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...deskVars(st) } }));
+  return updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...deskVars(st) } }));
 }
 
 // 11-09 사용자: 상담원 신분(실명·직급·부서)은 손님에게 드러나지 않는다 — 화면엔 번호 호칭만
@@ -719,12 +721,14 @@ async function deskRun(ctx: ChatContext, env: MallEnv, kind: 'make' | 'talk', st
       build = (key, late) => {
         const wait = pendingMe(st0.talk);
         const said = st0.talk.map((l, i) => (i >= st0.talk.length - wait ? lateLine({ ...l, k: key }, late) : l));
-        return { ...st0, talk: [...said, ...value.say.map((t) => lateLine<DeskLine>({ who: 'op', text: t, k: key }, late)), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
+        return { ...st0, anchor: key, talk: [...said, ...value.say.map((t) => lateLine<DeskLine>({ who: 'op', text: t, k: key }, late)), ...(value.ended ? [{ who: 'sys' as const, text: DESK_ENDED }] : [])].slice(-shopLimits(vars).talk), ...(value.ended ? { ended: true } : {}) };
       };
     }
     const cur = env.current();
     if (!cur || chatKey(cur) !== chatKey(ctx)) return;
-    await saveDesk(cur, build(lastBot(cur.chat)?.key ?? '', useLocked(cur.charIndex, cur.chatIndex)));
+    // 마지막 응답 키는 저장하는 그 채팅(updateChat 이 새로 읽은 것)에서 읽는다. 창을 닫아 둔 사이 본편이 넘어가면 env.current() 는 닫기 전의 낡은 채팅이라,
+    // 줄 키가 앞 턴 키로 남아 다음 본편에 안 가고, 다시 열면 「본편이 넘어간 상담」으로 보고 새 상담사를 붙였다 (3차 점검 R14)
+    await updateChatOf(cur, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...deskVars(build(lastBot(chat)?.key ?? '', useLocked(cur.charIndex, cur.chatIndex))) } }));
   } catch (error) {
     v.notice = error instanceof Error ? error.message : String(error);
     v.failRaw = deskRawSafe(String((error as { raw?: string }).raw ?? ''));
@@ -909,7 +913,7 @@ function cosAsk(ctx: ChatContext, st: ShopState, v: View, mobile: boolean): stri
   return `<div class="cs-win cs-askwin" role="dialog" aria-label="운영자에게 질문"${at}><div class="cs-wt"><b>★ 운영자에게 질문 ★ - Netscape</b><button data-action="mall-ask-close" aria-label="닫기">×</button></div>
     <div class="q-hd">${ufo}<div><b>${esc(MALL_OWNER.cos)}</b><small>● 운영자 여기에 있음, 지금</small></div></div>
     <div class="q-lg" data-chatlog="cos">${log}${wait}${shutLine}</div>${failBox(v, 'q-fail')}${pickList}${sellList}${sellCard}${chip ? `<div class="q-card"><i class="q-th">${pic(chip)}</i><span>붙인 상품</span><button class="cs-ln" data-action="mall-show" data-value="${esc(chip.id)}">${esc(chip.name)} <b>${won(chip.price)}</b></button><button class="q-x" data-action="mall-chip" data-value="" aria-label="상품 떼기">×</button></div>` : ''}
-    <div class="q-in"><button class="cs-btn" data-action="mall-pick" aria-pressed="${v.picking}"${shut ? ' disabled' : ''}>상품 붙이기</button><button class="cs-btn" data-action="mall-sell-open" aria-pressed="${v.selling}"${shut ? ' disabled' : ''}>내 물건 팔기</button><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${shut ? '문의가 끊겼어요' : o ? (offered ? '값을 다시 불러 보거나 그냥 팔아라' : '값을 부르거나 그냥 보내라') : '넣어라 질문, 여기에'}" aria-label="질문"${v.loading || shut ? ' disabled' : ''}><button class="cs-btn" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, !!v.loading || !st.loaded || shut)}>전송</button></div><i class="cs-rs" aria-hidden="true"></i></div>`;
+    <div class="q-in"><button class="cs-btn" data-action="mall-pick" aria-pressed="${v.picking}"${shut ? ' disabled' : ''}>상품 붙이기</button><button class="cs-btn" data-action="mall-sell-open" aria-pressed="${v.selling}"${shut ? ' disabled' : ''}>내 물건 팔기</button><input name="mall-say" data-input="mall-say" data-enter="mall-say" value="${esc(v.input)}" placeholder="${shut ? '문의가 끊겼어요' : o ? (offered ? '값을 다시 불러 보거나 그냥 팔아라' : '값을 부르거나 그냥 보내라') : '넣어라 질문, 여기에'}" aria-label="질문"${v.loading || shut ? ' disabled' : ''}><button class="cs-btn" data-action="mall-say" data-take="mall-say"${needAttr('mall-say', v.input, !!v.loading || !st.loaded || shut, !!o && !offered)}>전송</button></div><i class="cs-rs" aria-hidden="true"></i></div>`;
 }
 
 function cosHtml(ctx: ChatContext, mobile: boolean): string {
@@ -1248,7 +1252,7 @@ export async function mallSettingsAction(action: string, value: string | undefin
     if (k === 'min' && n > s.size[1]) extra[mallKey('$sh_max', site)] = v;
     if (k === 'max' && n < s.size[0]) extra[mallKey('$sh_min', site)] = v;
   }
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[varName] ?? '') === v && !Object.keys(extra).length ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [varName]: v, ...extra } }));
+  await updateChatOf(ctx, (chat) => (String(chat.scriptstate?.[varName] ?? '') === v && !Object.keys(extra).length ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [varName]: v, ...extra } }));
   await env.refresh();
   return true;
 }
@@ -1256,7 +1260,7 @@ export async function mallSettingsAction(action: string, value: string | undefin
 /** 1:1 상담 설정: ms-cfg 「bm:desk_on=1」·「bm:desk_again=1」·「bm:desk_end=1」 · ms-desk 「axes=글」 · ms-desk-step ± · ms-desk-reset */
 async function deskSettingsAction(action: string, value: string | undefined, ctx: ChatContext, env: MallEnv): Promise<boolean> {
   const set = async (vars: Record<string, string>) => {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+    await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
     await env.refresh();
     return true;
   };
@@ -1346,7 +1350,7 @@ export const bmDeskWinSpec: PopSpec = {
 /** 진열 배정·시그니처 상품 설정 (우주몰만). ms-cfg 「cos:roll_on=1」·「cos:roll_useful=auto」·「cos:fx_on:ID=1」 · ms-roll 「genres=글」 · ms-fx 「ID:키=값」 · ms-fx-add/del · ms-roll-reset */
 async function cosExtraAction(action: string, value: string | undefined, ctx: ChatContext, env: MallEnv): Promise<boolean> {
   const set = async (vars: Record<string, string>) => {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
+    await updateChatOf(ctx, (chat) => ({ ...chat, scriptstate: { ...(chat.scriptstate ?? {}), ...vars } }));
     await env.refresh();
     return true;
   };
@@ -1364,7 +1368,7 @@ async function cosExtraAction(action: string, value: string | undefined, ctx: Ch
     m.splice(1, 1); // 아래는 우주몰 전용 (truth·fx_on)
     if (m[1] === 'ready') {
       // 설정을 바꾸면 채팅의 완성 표식도 바로 맞춘다 (끄면 카드가 사라지고 켜면 다시 붙는다)
-      await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+      await updateChatOf(ctx, (chat) => {
         const next = { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [COS_READY_KEY]: m[2] === 'both' ? '' : m[2] } };
         const message = settleReady(next, cosReadyMode(next.scriptstate) !== 'off');
         return message ? { ...next, message } : next;

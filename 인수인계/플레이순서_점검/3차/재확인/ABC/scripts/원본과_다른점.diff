@@ -1,0 +1,32 @@
+--- "/home/user/goei/\354\235\270\354\210\230\354\235\270\352\263\204/\355\224\214\353\240\210\354\235\264\354\210\234\354\204\234_\354\240\220\352\262\200/3\354\260\250/ABC/runCommon.mjs"	2026-11-24 10:14:11.208105231 +0000
++++ runCommon.mjs	2026-11-24 10:32:08.950415947 +0000
+@@ -153,7 +153,7 @@
+     await sleep(2500);
+     const fab = await t.R(() => document.querySelector('[x-goei-fab]')?.style.display ?? null);
+     step('다른 봇: 유령 단추', '안 보임(공-22)', fab, fab !== 'block');
+-    await t.fake('rules/add', { rule: { id: 'ob', route: 'main', match: '다른 봇 인사', reply: '안녕.\n\n[▣|2025.03.14|10:00 AM|☀️|12°C|어딘가|없음|없음|없음|무소속|0]\n[AN|서울특별시 노원구|명일 아파트|활성|D|없음|무엇]' } });
++    await t.fake('rules/add', { rule: { id: 'ob', route: 'main', match: '다른 봇 인사', reply: '안녕.\n\n[▣|2025.03.14|10:00 AM|☀️|12°C|어딘가|없음|없음|없음|무소속|0]\n[AN|서울특별시 노원구|명일 아파트|활성|D|없음|무엇]\n[shop: 다른 가게|다른 주인]' } });
+     const s0 = await t.fakeSeq();
+     await t.send('다른 봇 인사');
+     await quietAux(t);
+@@ -164,6 +164,8 @@
+     step('다른 봇: 저장된 답', '태그 그대로(손 안 댐)', String(st.message.at(-1)?.data).slice(-120), /\[AN\|/.test(String(st.message.at(-1)?.data)) && /\[▣\|/.test(String(st.message.at(-1)?.data)));
+     const scr = (await t.screenMessages()).at(-1)?.text ?? '';
+     step('다른 봇: 화면', '(관찰) 상태창 줄 [▣ 이 카드로 그려지는지(표식만으로 그리는 길)', scr.slice(-160), null);
++    const dom = await t.R(() => { const b = [...document.querySelectorAll('.default-chat-screen .risu-chat[data-chat-index]')].sort((a, b) => Number(b.dataset.chatIndex) - Number(a.dataset.chatIndex))[0]; return { statusBoxes: b?.querySelectorAll('[data-goei-status]').length ?? 0, shopCard: /상점 열기/.test(b?.innerText ?? ''), rawStatus: /\[▣\|/.test(b?.innerText ?? ''), rawShop: /\[shop:/.test(b?.innerText ?? ''), userMark: !!b?.querySelector('[data-goei-user]'), charName: document.querySelector('.default-chat-screen')?.innerText?.includes('다른봇') }; });
++    step('다른 봇: 화면 DOM(재확인)', '상태창 상자·상점 카드가 그려지는지', dom, null);
+     const aux = await t.fakeLog(s0, 'aux');
+     step('다른 봇: 보조 호출', '없음', aux.length, aux.length === 0);
+     await t.shot(`${tag}`);
+--- "/home/user/goei/\354\235\270\354\210\230\354\235\270\352\263\204/\355\224\214\353\240\210\354\235\264\354\210\234\354\204\234_\354\240\220\352\262\200/3\354\260\250/ABC/lib.mjs"	2026-11-24 10:14:11.203230772 +0000
++++ lib.mjs	2026-11-24 10:28:07.703281194 +0000
+@@ -2,7 +2,8 @@
+ import { writeFileSync, mkdirSync } from 'node:fs';
+ import { fileURLToPath } from 'node:url';
+ export const HERE = fileURLToPath(new URL('.', import.meta.url));
+-export const OUT = HERE + 'out';
++export const OUT = '/tmp/claude-0/-home-user/16087847-a906-5c84-b8d3-cf81709eb728/scratchpad/re-ABC/out';
++import { DEFAULTS as __D } from '../틀/risu-t2.mjs'; __D.out = '/tmp/claude-0/-home-user/16087847-a906-5c84-b8d3-cf81709eb728/scratchpad/re-ABC/shots';
+ mkdirSync(OUT, { recursive: true });
+ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+ export const redact = (s) => String(s).replace(/(Age:)(?! \[생략\])[^\\"\n]*/g, '$1 [생략]');

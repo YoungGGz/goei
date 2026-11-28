@@ -53,9 +53,35 @@ export function varDefaultsToLoad(prefixes: string[], state: Record<string, unkn
   return { set, drop };
 }
 
-/** 고친 값을 합쳐 저장한다 */
+/** 기기 저장소 쓰기 실패. shown = 화면(설정 창)이 이미 알림을 띄웠다 */
+export class PrefsSaveError extends Error {
+  shown = false;
+}
+const failSeen: ((message: string) => boolean)[] = [];
+/** 저장 실패를 화면에 알릴 곳을 건다 (설정 창). 알렸으면 true 를 돌려준다 */
+export function onPrefsSaveFail(f: (message: string) => boolean): void {
+  failSeen.push(f);
+}
+
+/** 고친 값을 합쳐 저장한다.
+ *  기기 저장소에 못 쓰면 메모리 값(지침·추가 규칙 사본까지, setPrefs 가 같이 맞춘다)을 쓰기 전으로 되돌리고 던진다:
+ *  전에는 메모리만 바뀐 채 넘어가, 이번 세션에만 적용되고 다시 켜면 말없이 되돌아갔다 (3차 점검 R16). 화면에 보이는 값과 저장된 값이 늘 같다 */
 export async function savePrefs(change: (p: Prefs) => Prefs): Promise<Prefs> {
-  const next = setPrefs(change(structuredClone(getPrefs())));
-  await risuai.pluginStorage.setItem(KEY, JSON.stringify(next));
+  const prev = structuredClone(getPrefs());
+  const next = setPrefs(change(structuredClone(prev)));
+  try {
+    await risuai.pluginStorage.setItem(KEY, JSON.stringify(next));
+  } catch (error) {
+    setPrefs(prev);
+    const e = new PrefsSaveError(`이 기기에 저장하지 못했어요. 바꾼 값은 적용되지 않았어요 (${error instanceof Error ? error.message : String(error)})`);
+    for (const f of failSeen) {
+      try {
+        if (f(e.message)) e.shown = true;
+      } catch {
+        /* 알림을 못 띄워도 실패는 그대로 던진다 */
+      }
+    }
+    throw e;
+  }
   return next;
 }

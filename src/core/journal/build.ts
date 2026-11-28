@@ -13,7 +13,7 @@ import { codesToNames, type AnEntry, type ClosedEvent, type InEntry, type MsEntr
 import { findStatusTags } from '../world/status';
 import { isMine, periodOf } from './mine';
 import { journalSettings, type JournalSettings } from './settings';
-import { journalHash, readJournal, readReports, reportVars, trimJournal, trimReports } from './store';
+import { journalHash, liveReports, readJournal, readReports, reportVars, trimJournal, trimReports } from './store';
 import {
   RESULT_REPORT_MAX, RESULT_ROW_MAX,
   type JournalAgent, type JournalRow, type JournalStore, type Report, type ReportPerson, type ReportStore, type ReportTrade, type TrailStep,
@@ -133,7 +133,8 @@ function snapshot(input: BuildInput, ev: ClosedEvent, anchor: string, now: strin
   const result = prefix + (lastText || '처리 완료');
   const { from, to } = periodOf(chat, index, e);
   const mine = isMine(chat, from, to, { name, presetName: an?.presetName || undefined, agentNames: agents.map((a) => a.name), touched: e.touched });
-  const id = journalHash(`${ev.kind}|${name}|${e.loc}|${e.born ?? ''}|${ev.epoch}`);
+  // 기준 응답의 열쇠도 넣는다: 같은 상황을 다시 굴린 응답이 또 끝내면 다른 줄이다 (버린 응답의 줄은 가려 두고, ◀ 로 돌아오면 그 줄이 다시 보인다)
+  const id = journalHash(`${ev.kind}|${name}|${e.loc}|${e.born ?? ''}|${ev.epoch}|${anchor}`);
   const tags = findStatusTags(text(chat.message?.[index]));
   const last = tags[tags.length - 1];
   const at = ev.minute;
@@ -171,12 +172,14 @@ export function buildClosures(input: BuildInput): BuildResult {
   const rows: JournalRow[] = [];
   const added: Report[] = [];
   const have = new Set(journal.rows.map((r) => r.id));
+  const shown = liveReports(chat).items;
   for (const ev of closed) {
     const { row, report } = snapshot(input, ev, anchor, now);
     if (have.has(row.id)) continue;
     have.add(row.id);
     const day = mmdd(report.head.at, now);
-    const n = reports.items.filter((r) => r.no.startsWith(`RPT-${day}-`)).length + added.filter((r) => r.no.startsWith(`RPT-${day}-`)).length + 1;
+    // 번호는 보이는 보고서만 센다 (사라진 응답이 만든 것은 빼고 — 다시 굴려도 번호가 건너뛰지 않게)
+    const n = shown.filter((r) => r.no.startsWith(`RPT-${day}-`)).length + added.filter((r) => r.no.startsWith(`RPT-${day}-`)).length + 1;
     report.no = `RPT-${day}-${two(n)}`;
     rows.push(row);
     added.push(report);

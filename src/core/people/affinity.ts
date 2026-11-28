@@ -1,5 +1,5 @@
 // 호감 계산: 시작값 + 살아 있는 계기의 합. 계기마다 저장된 변화량은 없고 매번 순서대로 다시 계산한다.
-// 규칙(리수폿 수치 체계): 계기 이름 → 기본값, 성격 계수·설정 배율, 기준 메시지 하나 안의 합은 ±10 (예외 계기 제외), 범위 -100~300, 고정은 그 값으로 덮음.
+// 규칙(리수폿 수치 체계): 계기 이름 → 기본값, 성격 계수·설정 배율, 기준 메시지 하나 안의 합은 ±10 (예외 계기 제외), 범위 -100~300, 직접 수정은 그 값으로 덮고 이어서 더함 (세력 평판 고정은 그 뒤 계기를 무시).
 import { AFF_MAX, AFF_MIN, CUE_VALUE, DEFAULT_TEMPER, EXCEPTION_CUES, FACTION_MAX, FACTION_MIN, OPENNESS_MAX, OPENNESS_MIN, OPENNESS_TURN, TASTE_MAX, TASTE_MIN, TURN_CAP, factionStage, factionWho, stageOf, type Change, type Person, type Temper } from './types';
 
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -12,6 +12,8 @@ export interface AffinityOpts {
   speedDown?: number;
   /** 설정 「메시지당 변화 상한」. 0 = 한도 없음. 없으면 기본 10 */
   turnCap?: number;
+  /** 고정(pin) 뒤의 계기를 무시한다 (세력 평판). 없으면 고정값에서 이어서 더한다 (인물 호감 — 사용자 2026-11-28: 직접 고친 뒤에도 계속 움직이게) */
+  hold?: boolean;
 }
 
 /** 계기 하나의 변화량 (배율 적용, 상한 전) */
@@ -24,7 +26,7 @@ export function cueDelta(c: Change, o: AffinityOpts = {}): number {
   return base * (base >= 0 ? t.open : t.grudge) * (base >= 0 ? o.speed ?? 1 : o.speedDown ?? o.speed ?? 1);
 }
 
-/** 계기 합 (호감·세력 공용): 시작값 + 살아 있는 계기, 기준 메시지당 ±10, 고정은 덮음 */
+/** 계기 합 (호감·세력 공용): 시작값 + 살아 있는 계기, 기준 메시지당 ±10. 고정(pin)은 그때까지의 값을 그 값으로 덮는다. 그 뒤 계기는 이어서 더하고, o.hold 면 무시한다 */
 export function sumCues(who: string, base: number, changes: Change[], folded: number, min: number, max: number, o: AffinityOpts = {}): number {
   let value = clamp(base + folded, min, max);
   let pinned = false;
@@ -38,7 +40,7 @@ export function sumCues(who: string, base: number, changes: Change[], folded: nu
     for (const c of list) {
       if (c.pin !== undefined) {
         value = clamp(c.pin, min, max);
-        pinned = true;
+        if (o.hold) pinned = true;
         normal = 0;
         extra = 0;
         continue;
@@ -56,7 +58,7 @@ export function sumCues(who: string, base: number, changes: Change[], folded: nu
 
 /**
  * 인물 → 유저 호감 현재값. changes 는 살아 있는 것만, 기준 메시지 순서로 정렬된 것 (store.liveChanges).
- * manual pin 을 만나면 그 값으로 덮고 그 뒤 자동 계기는 무시한다 (고정 해제 = pin 변경을 void).
+ * 직접 수정(manual pin)을 만나면 그 값으로 덮고, 그 뒤 계기는 그 값에서 이어서 더한다 (사용자 2026-11-28. 직접 수정 취소 = pin 변경을 void).
  */
 export function affinityOf(person: Person, changes: Change[], folded = 0, o: AffinityOpts = {}): number {
   return sumCues(person.name, person.affinity.base, changes, folded, AFF_MIN, AFF_MAX, o);
@@ -105,7 +107,7 @@ export function opennessOf(person: Person, changes: Change[]): number | null {
 
 /** 세력 → 유저 평판 현재값: 시작값(조직×조직 표) + 살아 있는 계기. 세력 성격 계수는 1, 설정 속도는 적용 */
 export function factionOf(code: string, base: number, changes: Change[], folded = 0, o: AffinityOpts = {}): number {
-  return sumCues(factionWho(code), base, changes, folded, FACTION_MIN, FACTION_MAX, { speed: o.speed, speedDown: o.speedDown, turnCap: o.turnCap });
+  return sumCues(factionWho(code), base, changes, folded, FACTION_MIN, FACTION_MAX, { speed: o.speed, speedDown: o.speedDown, turnCap: o.turnCap, hold: true });
 }
 
 export function factionView(code: string, base: number, changes: Change[], folded = 0, o: AffinityOpts = {}, bounds?: readonly number[]) {

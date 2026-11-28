@@ -77,6 +77,29 @@ test('14-2: 다음 턴이 응답을 받기 전에 시작한 앞 턴의 뒤 작�
   Prog.resetProgress();
 });
 
+test('R60: 앞 턴이 시작한 위키 단계의 다음 호출은 새 턴이 응답을 받은 뒤여도 앞 턴 것', async () => {
+  Prog.resetProgress();
+  const WIKI = { id: 'wiki', label: '위키', group: 'update', match: ['위키 제목', '위키 글'] };
+  await Tr.traceBegin();
+  Prog.progressPlan([WIKI]);
+  Tr.traceReply('A 응답');
+  const a = Prog.progressTurn();
+  const t1 = Prog.progressCallStart('위키 제목', 'aux', 0); // A 의 위키 제목이 도는 중
+  await Tr.traceBegin();
+  Prog.progressPlan([WIKI]);
+  const b = Prog.progressTurn();
+  Tr.traceReply('B 응답');
+  Prog.progressCallEnd(t1, { ok: true, ms: 10 });
+  assert.equal(Prog.callOwner('위키 글'), 'prev');
+  const g = Prog.progressCallStart('위키 글', 'aux', 0);
+  assert.ok(a.calls.some((c) => c.id === g));
+  assert.equal(Prog.callOwner('위키 글 다시 묻기 1'), 'prev');
+  // 새 턴 자기 것: 앞 턴이 이미 부른 이름
+  assert.equal(Prog.callOwner('위키 제목'), 'turn');
+  assert.equal(b.calls.length, 0);
+  Prog.resetProgress();
+});
+
 test('14-3: 채팅 턴 중에 단추로 부른 호출(AI 상담)은 그 턴 합계·「지난 턴」에 들지 않는다', async () => {
   Prog.resetProgress();
   await Tr.traceBegin();

@@ -1,0 +1,119 @@
+{
+  "results": [
+    {
+      "part": "FAULT_",
+      "step": "01 FAULT_스트림_조각",
+      "what": "조각 답으로 글 3개 저장",
+      "ok": true,
+      "expect": 3,
+      "actual": {
+        "calls": 1,
+        "posts": 3
+      },
+      "why": ""
+    },
+    {
+      "part": "FAULT_",
+      "step": "02 FAULT_스트림_끊김",
+      "what": "반쪽 답은 저장 안 되고 실패 안내",
+      "ok": true,
+      "expect": "0·안내",
+      "actual": {
+        "calls": 2,
+        "posts": 0,
+        "txt": "괴담넷\n.net\n커뮤니티\n쪽지함\n랭킹\n글 목록\n전체 글\n\n아직 글이 없어요.\n\n내 메뉴\n쪽지함\n내가 쓴 글\n스크랩\n\n모델 요청에 실패했어요. Risu의 모델 연결을 확인해 주세요. no mock\n\n최근 실패 원문\n전체\n글쓰기\n최신\n랭킹\n댓글순\n\n게시글이 없어요.\n\n새로고침"
+      },
+      "why": ""
+    },
+    {
+      "part": "FAULT_",
+      "step": "03 FAULT_채팅저장_throw",
+      "what": "저장 못 했으면 글이 있는 것처럼 보이지 않거나 실패 안내",
+      "ok": true,
+      "expect": "안내",
+      "actual": {
+        "calls": 1,
+        "shown": false,
+        "txt": "괴담넷\n.net\n커뮤니티\n쪽지함\n랭킹\n글 목록\n전체 글\n\n아직 글이 없어요.\n\n내 메뉴\n쪽지함\n내가 쓴 글\n스크랩\n전체\n글쓰기\n최신\n랭킹\n댓글순\n\n게시글이 없어요.\n\n새로고침\n시험용 저장 실패"
+      },
+      "why": ""
+    },
+    {
+      "part": "FAULT_",
+      "step": "03 FAULT_채팅저장_throw",
+      "what": "실패를 끈 뒤 새로고침은 됨",
+      "ok": true,
+      "expect": 3,
+      "actual": 3,
+      "why": ""
+    },
+    {
+      "part": "FAULT_",
+      "step": "04 FAULT_채팅저장_silent",
+      "what": "저장 못 했으면 글이 있는 것처럼 보이지 않거나 실패 안내",
+      "ok": true,
+      "expect": "안내",
+      "actual": {
+        "calls": 1,
+        "shown": false,
+        "txt": "괴담넷\n.net\n커뮤니티\n쪽지함\n랭킹\n글 목록\n전체 글\n\n아직 글이 없어요.\n\n내 메뉴\n쪽지함\n내가 쓴 글\n스크랩\n전체\n글쓰기\n최신\n랭킹\n댓글순\n\n게시글이 없어요.\n\n새로고침"
+      },
+      "why": ""
+    },
+    {
+      "part": "FAULT_",
+      "step": "04 FAULT_채팅저장_silent",
+      "what": "실패를 끈 뒤 새로고침은 됨",
+      "ok": true,
+      "expect": 3,
+      "actual": 3,
+      "why": ""
+    },
+    {
+      "part": "FAULT_",
+      "step": "05 FAULT_생각블록_답",
+      "what": "생각 블록 밖 답만 저장",
+      "ok": true,
+      "expect": "밖만",
+      "actual": "GN1\nQ|1846003\nP|1846003|2025.03.14 22:40|야근요정|중림 지하상가 B구역 또 셔터 내림|1820|64|오늘 B구역 셔터 또 내려감. 누가 들어갔는지 아는 사람?|0|현장|0|0|0\nC|1846003|0|단가충|그쪽 회사 차 두 대 봄|0|0|2025.03.14 22:51\nC|1846003|1|abc92|단가 얼마래|0|0|20",
+      "why": ""
+    }
+  ],
+  "notes": [
+    {
+      "part": "FAULT_",
+      "step": "02 FAULT_스트림_끊김",
+      "what": "화면",
+      "actual": "괴담넷\n.net\n커뮤니티\n쪽지함\n랭킹\n글 목록\n전체 글\n\n아직 글이 없어요.\n\n내 메뉴\n쪽지함\n내가 쓴 글\n스크랩\n\n모델 요청에 실패했어요. Risu의 모델 연결을 확인해 주세요. no mock\n\n최근 실패 원문\n전체\n글쓰기\n최신\n랭킹\n댓글순\n\n게시글이 없어요.\n\n새로고침"
+    },
+    {
+      "part": "FAULT_",
+      "step": "03 FAULT_채팅저장_throw",
+      "what": "걸린 저장 호출",
+      "actual": [
+        1
+      ]
+    },
+    {
+      "part": "FAULT_",
+      "step": "03 FAULT_채팅저장_throw",
+      "what": "화면",
+      "actual": "괴담넷\n.net\n커뮤니티\n쪽지함\n랭킹\n글 목록\n전체 글\n\n아직 글이 없어요.\n\n내 메뉴\n쪽지함\n내가 쓴 글\n스크랩\n전체\n글쓰기\n최신\n랭킹\n댓글순\n\n게시글이 없어요.\n\n새로고침\n시험용 저장 실패"
+    },
+    {
+      "part": "FAULT_",
+      "step": "04 FAULT_채팅저장_silent",
+      "what": "걸린 저장 호출",
+      "actual": [
+        1
+      ]
+    },
+    {
+      "part": "FAULT_",
+      "step": "04 FAULT_채팅저장_silent",
+      "what": "화면",
+      "actual": "괴담넷\n.net\n커뮤니티\n쪽지함\n랭킹\n글 목록\n전체 글\n\n아직 글이 없어요.\n\n내 메뉴\n쪽지함\n내가 쓴 글\n스크랩\n전체\n글쓰기\n최신\n랭킹\n댓글순\n\n게시글이 없어요.\n\n새로고침"
+    }
+  ],
+  "pageErrors": []
+}

@@ -251,9 +251,55 @@ async function redrawLast(doc: Root['doc'], charIndex: number, chatIndex: number
   await flip(false);
 }
 
+// ── 메시지 목록이 바뀌면 다시 그린다 (3차 점검 R34) ──
+// 리수는 메시지를 지워도 알려 주지 않는다. 「사용」을 걸고 보낸 답을 지우면 그 사용은 다시 「안 보낸 것」이 되는데, 칩을 다시 그릴 계기가 없어 새로고침할 때까지 안 보였다.
+// 리수 채팅 화면의 메시지 목록(메시지 칸들의 부모)에 화면 변화 감시를 하나 걸고, 칸이 들고 날 때(답을 기다리는 중이 아니면) 이 채팅의 상자를 다시 그린다.
+let watchId = '';
+let watchSeq = 0;
+let watchObs: { disconnect(): Promise<void> } | null = null;
+let watchTimer: ReturnType<typeof setTimeout> | undefined;
+let watchBusy = false;
+async function watchList(): Promise<void> {
+  try {
+    const root = await body();
+    if (!root) return;
+    const { doc } = root;
+    // 이미 건 목록이 화면에 그대로 있으면 그만 (캐릭터를 바꾸면 리수가 목록을 새로 만든다 → 다시 건다)
+    if (watchId && (await elements(doc, `[x-goei-usewatch="${watchId}"]`)).length) return;
+    const first = (await elements(doc, '.chat-message-container'))[0] as unknown as { getParent?: () => Promise<{ setAttribute(k: string, v: string): Promise<void> } | null> } | undefined;
+    const list = first?.getParent ? await first.getParent() : null;
+    if (!list) return;
+    const id = String(++watchSeq);
+    await list.setAttribute('x-goei-usewatch', id);
+    await watchObs?.disconnect().catch(() => {});
+    const obs = await risuai.createMutationObserver(() => {
+      if (watchTimer) clearTimeout(watchTimer);
+      watchTimer = setTimeout(() => void listChanged(), 400);
+    });
+    await obs.observe(list as never, { childList: true });
+    watchObs = obs;
+    watchId = id;
+  } catch {
+    /* 감시를 못 걸어도 그만: 전처럼 새로고침·채팅 바꿈 때 다시 그려진다 */
+  }
+}
+async function listChanged(): Promise<void> {
+  // 답을 기다리는 중(받는 동안 칸이 계속 갈린다)과 다시 그리는 중에는 건너뛴다: 그때는 요청·응답 처리가 제때 다시 그린다
+  if (watchBusy || !where || isWaiting()) return;
+  watchBusy = true;
+  try {
+    await refreshUseBox(where.charIndex, where.chatIndex);
+  } catch {
+    /* 못 그려도 그만 */
+  } finally {
+    watchBusy = false;
+  }
+}
+
 /** 이 채팅 상태로 상자를 다시 그린다 (채팅 바꿈·사용 누름·응답 뒤). known 이 있으면 다시 읽지 않는다 */
 export async function refreshUseBox(charIndex: number, chatIndex: number, known?: Chat | null): Promise<void> {
   if (charIndex < 0 || chatIndex < 0) return hideUseBox();
+  void watchList();
   const chat = known ?? ((await risuai.getChatFromIndex(charIndex, chatIndex)) as Chat | null);
   const hold = sentUseIds(chat, charIndex, chatIndex);
   // 보낸 뒤 새로 놓은 것이 있으면 그것만(다음 메시지에 사용), 없으면 보낸 것을 「보내는 중」으로 둔다

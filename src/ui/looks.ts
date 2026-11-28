@@ -5,7 +5,7 @@ import { LOOK_GENDERS, LOOK_KEY, lookId, looksOf, pickLookAct, pickLookGap, type
 import { playerAgent } from '../core/player';
 import { idleOf, lookActs, looksStatus, lookRows, ensureLooks, type ActLook, type IdleLook } from '../host/looks';
 import { savePrefs } from '../host/prefs';
-import { updateChat, type ChatContext } from '../host/risu';
+import { updateChatOf, type ChatContext } from '../host/risu';
 import { ICONS } from './icons';
 import { josaRo } from '../core/josa';
 
@@ -222,7 +222,7 @@ export async function lookAction(action: string, value: string | undefined, ctx:
   // 고를 때마다 앞 실패 안내를 비우고, 이 채팅에 적지 못했으면 새 채팅 기본값도 바꾸지 않는다 (전수점검 보통-72)
   lookUi.notice = '';
   let failed = false;
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => (String(chat.scriptstate?.[LOOK_KEY] ?? '') === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [LOOK_KEY]: value } })).catch((error) => {
+  await updateChatOf(ctx, (chat) => (String(chat.scriptstate?.[LOOK_KEY] ?? '') === value ? null : { ...chat, scriptstate: { ...(chat.scriptstate ?? {}), [LOOK_KEY]: value } })).catch((error) => {
     failed = true;
     lookUi.notice = error instanceof Error ? error.message : String(error);
     return null;

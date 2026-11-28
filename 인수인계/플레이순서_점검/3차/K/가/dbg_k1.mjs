@@ -1,0 +1,22 @@
+// 디버그: 첫 전송 뒤 설정 창 범위
+import { session, sleep } from './lib.mjs';
+const S = await session('dbgK1');
+const { t } = S;
+await S.fakeReset();
+await t.setup();
+await S.loadState('S-start.json');
+await t.startPanel({ fac: 'A00', player: '', scene: '면접' });
+await sleep(2500);
+await S.winOpen();
+await S.click('[data-action="prefs-open"]', 1200);
+await S.ed('set:adv');
+await S.winClose();
+await S.turn('인사한다.');
+await S.winOpen();
+console.log('view', await S.fe(() => ({ gw: !!document.querySelector('.gw'), gx: document.querySelector('.gx')?.className, head: document.querySelector('.gx header')?.textContent?.replace(/\s+/g, ' ').slice(0, 80), acts: [...document.querySelectorAll('[data-action]')].slice(0, 30).map((e) => e.dataset.action + ':' + (e.dataset.value ?? '')) })));
+await t.shot('dbg1-afterSend-window');
+await S.ed('set:adv');
+await t.shot('dbg2-adv');
+console.log('adv', await S.fe(() => ({ scope: [...document.querySelectorAll('.gw .gx-scope')].map((e) => e.textContent), adv: [...document.querySelectorAll('.gw [data-action="adv-set"]')].length, busy: !!document.querySelector('.gw [disabled]') })));
+await S.close();
+process.exit(0);

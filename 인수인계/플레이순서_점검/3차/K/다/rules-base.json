@@ -1,0 +1,7 @@
+{"rules":[
+ {"id":"k-aux-router","route":"aux","match":"# Router — scene people selection","reply":"{\"selected\":[],\"new_characters\":[]}"},
+ {"id":"k-aux-director","route":"aux","match":"# Scene Director","reply":"{\"notes\":[]}"},
+ {"id":"k-aux","route":"aux","reply":"{}"},
+ {"id":"k-main","route":"main","reply":"K 가짜 본편 답 #{{seq}}. 로비는 조용했다.\n\n[▣|2025.03.14|10:20 AM|☀️|12°C|서울 종로구 관리국 본부 로비|없음|잼트리|없음|관리국/신입|140000]"},
+ {"id":"k-other","route":"any","reply":"(가짜 답 #{{seq}})"}
+]}

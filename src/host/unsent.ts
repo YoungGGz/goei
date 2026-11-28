@@ -6,7 +6,7 @@ import { withdrawUnsent } from '../core/world/output';
 import type { LoreEntry } from '../core/types';
 import { armChatClick, elements, hit, onChatClick } from './chatclicks';
 import { getChar, updateChat } from './risu';
-import { passWaiting } from './waiting';
+import { isWaiting, passWaiting } from './waiting';
 import { timeMs } from '../core/timing';
 import { openRepick } from './openinghint';
 
@@ -35,9 +35,24 @@ export function clearUnsent(chat: Chat): Chat | null {
  * 취소로 채팅이 비면(시작 화면 직접 입력·커스텀 임무를 물린 것) 다시 고르게 시작 화면을 연다 (사용자 11-07: 취소해도 선택 창이 안 열림)
  */
 export async function withdrawUnsentAt(charIndex: number, chatIndex: number, lore: LoreEntry[] | undefined, target?: string): Promise<Chat | null> {
+  const waiting = isWaiting();
   const saved = await updateChat(charIndex, chatIndex, (chat) => withdrawUnsent(chat, lore, target));
+  // 답을 기다리는 중에 물렸다(「취소」 두 번): 그 요청이 살아 있었다면 답이 늦게 온다. 물린 요청의 답이니 붙이지 않게 적어 둔다 (3차 점검 R30)
+  if (saved && waiting) withdrawn = { charIndex, chatIndex, id: String(saved.id ?? '') };
   if (saved && !(saved.message ?? []).length) openRepick();
   return saved;
+}
+
+/** 답을 기다리는 중에 요청을 물린 채팅. 새 본편 요청이 나가면 잊는다 (body.ts onBeforeRequest) */
+let withdrawn: { charIndex: number; chatIndex: number; id: string } | null = null;
+export function forgetWithdrawn(): void {
+  withdrawn = null;
+}
+/** 지금 붙은 답이 물린 요청의 답인가 (body.ts onOutput: 그러면 그 답을 지우고 아무 처리도 하지 않는다). 채팅 id 가 있으면 id 로도 맞춘다 */
+export function wasWithdrawn(charIndex: number, chatIndex: number, chat: Chat | null | undefined): boolean {
+  if (!withdrawn || withdrawn.charIndex !== charIndex || withdrawn.chatIndex !== chatIndex) return false;
+  const id = String(chat?.id ?? '');
+  return !withdrawn.id || !id || withdrawn.id === id;
 }
 
 let busy = false;

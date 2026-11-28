@@ -889,7 +889,7 @@ export function endEvent(w: WorldState, key: string): boolean {
 }
 
 /**
- * 리롤 기준 상태(그 응답이 반영되기 전)에 손 종료를 옮길 때: 그 응답이 처음 띄운 상황은 기준 상태에서 아직 발생 예정이거나 없다.
+ * 다른 응답별 결과(그 상황이 뜨기 전의 것)에 손 종료를 옮길 때 (output.ts manualWorldVars): 마지막 응답이 처음 띄운 상황은 앞 응답의 결과에서 아직 발생 예정이거나 없다.
  * 발생 예정이면 그 예정을 거두고, 이름을 막아(끝낸 것과 같게) 그 응답을 다시 굴려도 손으로 끝낸 상황이 되살아나지 않게 한다. key = activeEvents 의 열쇠
  */
 export function endUpcoming(w: WorldState, key: string): void {
@@ -900,7 +900,7 @@ export function endUpcoming(w: WorldState, key: string): void {
   const born = parts[parts.length - 1];
   const name = parts.slice(2, -1).join('|');
   if (kind !== 'an' && kind !== 'in' && kind !== 'ms') return;
-  // 같은 자리의 발생 예정, 또는 같은 자리·같은 이름이면 같은 항목이다 (한 자리에는 한 항목만 있다. 발생 시각은 처음 뜰 때 채워지기도 해서 기준 상태와 다를 수 있다)
+  // 같은 자리의 발생 예정, 또는 같은 자리·같은 이름이면 같은 항목이다 (한 자리에는 한 항목만 있다. 발생 시각은 처음 뜰 때 채워지기도 해서 앞 응답의 결과와 다를 수 있다)
   const same = (e: { loc: string; name: string; born: number | null; state: string }) => e.loc === loc && (e.state === '발생대기' || e.name === name || (e.born !== null && String(e.born) === born));
   if (kind === 'an') w.an = w.an.filter((e) => !same(e));
   else if (kind === 'in') w.inc = w.inc.filter((e) => !same(e));

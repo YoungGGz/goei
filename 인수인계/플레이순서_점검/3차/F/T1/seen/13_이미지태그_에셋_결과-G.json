@@ -1,0 +1,88 @@
+[
+  {
+    "group": "G",
+    "step": "G01 괴담넷_새로고침_사진목록",
+    "what": "사진 목록: 최근 본문에 나온 잼트리·스팡달(인물, 표정 가능)이 들어감 (사용자 11-14: 요청에 나온 이름만)",
+    "ok": true,
+    "info": false,
+    "expect": "잼트리·스팡달",
+    "actual": "People (may add _expression): 스팡달, 잼트리\nExpressions: default, angry, annoyed, bored, confused, contemptuous, crying, curious, dumbfounded, embarrassed, excited, exhausted, happy, laughing, lovestruck, lustful, nervous, proud, sad, scared, serious, shy, smile, smirk, smug, surprised, thinking, suspicious, worried, relieved, disgusted, determined, jealous, pleading, forced smiling, indifferent, guilty, pouting, angry smile, expressionless, tormented, crazy smile\nincomingAllowed=false: return incoming=[]; generate no private message.",
+    "why": ""
+  },
+  {
+    "group": "G",
+    "step": "G01 괴담넷_새로고침_사진목록",
+    "what": "[참고] 장소(중림 지하상가) 사진 목록 줄",
+    "ok": true,
+    "info": true,
+    "expect": "기록",
+    "actual": "(없음)",
+    "why": "info"
+  },
+  {
+    "group": "G",
+    "step": "G01 괴담넷_새로고침_사진목록",
+    "what": "자리표 __SITE_PICS__ 가 남지 않음",
+    "ok": true,
+    "info": false,
+    "expect": "없음",
+    "actual": false,
+    "why": ""
+  },
+  {
+    "group": "G",
+    "step": "G02 글열기_사진그림",
+    "what": "[사진:잼트리_smile]·[사진:Spangdal_forced_smiling]·[사진:에일린] 은 실제 그림, 표식 원문이 화면에 남지 않음",
+    "ok": true,
+    "info": false,
+    "expect": "그림 3+",
+    "actual": {
+      "imgs": [
+        {
+          "src": "blob:null/3ced9443-aa34-4a6f-b",
+          "alt": ""
+        },
+        {
+          "src": "blob:null/29389a73-8025-462e-b",
+          "alt": ""
+        },
+        {
+          "src": "blob:null/0a5875c6-b509-4c06-9",
+          "alt": ""
+        }
+      ]
+    },
+    "why": ""
+  },
+  {
+    "group": "G",
+    "step": "G02 글열기_사진그림",
+    "what": "목록에 없는 이름(박철수)은 사진 설명 틀(표정 꼬리 떼고)",
+    "ok": true,
+    "info": false,
+    "expect": "박철수 틀",
+    "actual": [
+      "중림 지하상가",
+      "박철수",
+      "잼트리"
+    ],
+    "why": ""
+  },
+  {
+    "group": "G",
+    "step": "G02 글열기_사진그림",
+    "what": "[참고] 세트 밖 표정(잼트리_neutral)·장소(중림 지하상가)",
+    "ok": true,
+    "info": true,
+    "expect": "기록",
+    "actual": {
+      "frames": [
+        "중림 지하상가",
+        "박철수",
+        "잼트리"
+      ],
+      "n": 3
+    },
+    "why": "info"
+  }
+]

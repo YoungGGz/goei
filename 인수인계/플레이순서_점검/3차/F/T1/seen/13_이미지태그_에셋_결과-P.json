@@ -1,0 +1,44 @@
+[
+  {
+    "group": "P",
+    "step": "P01 폰_출발직후_끔",
+    "what": "[물을것] 폰·출발 직후 끔 → 「새 채팅 기본값」에만 적히고 이 채팅 첫 요청엔 이미지 지침이 그대로",
+    "ok": true,
+    "info": true,
+    "expect": "기록",
+    "actual": {
+      "off0": true,
+      "chatVar": "1",
+      "prefs": {
+        "assetOn": false
+      },
+      "mainPrompt": true
+    },
+    "why": "info"
+  },
+  {
+    "group": "P",
+    "step": "P02 폰_첫턴뒤_끔켬",
+    "what": "폰: 이미지 페이지 단추로 끔 → 숨김, 켬 → 보임, 요청 끝 지침",
+    "ok": true,
+    "info": false,
+    "expect": "모두",
+    "actual": {
+      "offOk": true,
+      "onOk": true,
+      "cssOff": ":is(.gim,.x-risu-gim,.ib-asset-hover,.x-risu-ib-asset-hover){display:none!important}",
+      "cssOn": ":is(.gim,.x-risu-gim,.ib-asset-hover,.x-risu-ib-asset-hover){display:block!important;box-s"
+    },
+    "why": ""
+  },
+  {
+    "group": "P",
+    "step": "P02 폰_첫턴뒤_끔켬",
+    "what": "폰: 태그 그림 칸",
+    "ok": true,
+    "info": false,
+    "expect": "칸",
+    "actual": [],
+    "why": ""
+  }
+]

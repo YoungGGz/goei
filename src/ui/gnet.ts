@@ -34,7 +34,7 @@ import { fitPrompt } from '../core/budget';
 import { personaText } from '../host/user';
 import { playerSource } from '../core/player';
 import { defaultsAction, defaultsButtons, defaultsConfirm } from './defaults';
-import { updateChat, type ChatContext } from '../host/risu';
+import { SAVE_DENIED, updateChatOf, type ChatContext } from '../host/risu';
 import { BOARD_NAME, BOARD_REF_CFG, BOARD_SITE_VAR, BOARD_SITES, boardView, boardWrite, isBoardSite, type BoardSite } from '../core/boards';
 import { JOINT_VAR, jointOn } from '../core/netjoint';
 import { siteLogo } from './browser';
@@ -108,7 +108,7 @@ function siteCtx(ctx: ChatContext, site: BoardSite): SiteCtx {
 /** 비춘 채팅으로 고치고, 원래 채팅에 되돌려 저장. 돌려주는 것도 비춘 채팅 */
 async function upd(ctx: ChatContext, f: (chat: Chat) => Chat | null | undefined): Promise<Chat | null> {
   const site = siteOf(ctx);
-  const saved = await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  const saved = await updateChatOf(ctx, (chat) => {
     const r = f(boardView(chat, site));
     return r ? boardWrite(chat, r, site) : null;
   });
@@ -227,7 +227,7 @@ async function run(ctx: ChatContext, env: GnetEnv, label: string, work: () => Pr
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     const ui = jobUi(env, site);
-    ui.notice = msg;
+    if (msg !== SAVE_DENIED) ui.notice = msg; // 저장 거절은 창 맨 위 한 줄이 알린다
     const raw = (error as { raw?: string }).raw;
     if (raw) ui.failure = { label, reason: msg, raw };
   } finally {

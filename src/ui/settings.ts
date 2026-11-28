@@ -16,14 +16,14 @@ import {
   AGENT_MAX, basicDefaults, CONSULT_CHATS_RANGE, CONSULT_LINES_RANGE, DIM_DEFAULT, FOLD_FILL_DEFAULT, FOLD_FILL_RANGE, FOLD_ZOOM_DEFAULT, FOLD_ZOOM_RANGE, TRACE_KEEP_RANGE, basicSettings, basicVars, type BasicSettings, getPrefs, isChatSettingVar, type Prefs, type StatusStyle, type Theme, WORLD_SPEC, type WorldField, wgKey, worldDefaults, worldSettings,
 } from '../core/settings';
 import type { WorldSettings } from '../core/world/engine';
-import { savePrefs, saveVarDefaults, varDefaultsToLoad } from '../host/prefs';
+import { PrefsSaveError, savePrefs, saveVarDefaults, varDefaultsToLoad } from '../host/prefs';
 import { keepTurns } from '../host/trace';
 import { consultKeep } from '../core/consult';
 import { activeBooksRow, advSections } from './advanced';
 import { ASSET_NOTE } from '../core/asset';
 import { IMG_FOLD, IMG_RECENT, IMG_SIZE, imgFold, imgRecent, imgSize, setImgHidden } from '../core/imgtag';
 import type { Chat, ScriptState } from '../core/types';
-import { parseCatalog, PREV_KEY, readWorld, startWorldVars, WORLD_KEY, worldOn, worldVars } from '../core/world';
+import { parseCatalog, TURNS_KEY, readWorld, startWorldVars, WORLD_KEY, worldOn, worldVars } from '../core/world';
 import { AUTO, AUTO_HIDE, COL_LOG_VAR, colConfig, colVar, isPointsOrg, POINTS_ON_VAR, pointsAuto, STATUS_COLS, usedCols, withColLog, type ColConfig, type ColId, type ColMode } from '../core/world/statuscols';
 import { pointsFlagFor } from '../core/points';
 import { readIconMisses } from '../core/iconmatch';
@@ -39,7 +39,7 @@ import { SHOP_AMOUNTS, isGiveKey, isGiveShop, isShopAmount, isShopFn, shopAmount
 import { SHOP_SHELF_HI, SHOP_SHELF_LO, SHOP_SHELF_VAR, SHOP_COUNT_VAR, SHOP_CTX_VAR, SHOP_FEATURE_VAR, SHOP_MAX_VAR, SHOP_MIN_VAR, SHOP_SIZE_HI, SHOP_SIZE_LO, SHOP_DIVERSE_VAR, SHOP_KICK_VAR, SHOP_TALK_STOCK_VAR, SHOP_MODEL_VAR, SHOP_ON_VAR, SHOP_PREV_VAR, SHOP_PRICE_VAR, SHOP_REFS_VAR, SHOP_THOUGHTS_VAR, SHOP_TURNS_VAR, SHOP_VAR, SHOP_WHERE_VAR, SHOP_JUDGE_VAR, SHOP_OWN_VAR, OWN_MAX, ownShops, type OwnShop, shopJudgeBy, hasShopTag, shopSettings, stripShopTags, SHOP_LIMITS, isShopLimit } from '../core/shop';
 import { BM_ORDERS_KEEP_VAR, COS_ORDERS_KEEP_VAR, ORDERS_KEEP_RANGE } from '../core/orders';
 import { aliveAnchors, formatWon, parseWon, readWallet, WALLET_EDIT_VAR, WALLET_LOOSE_VAR, WALLET_VAR, WALLET_MAX, WALLET_RECENT_MAX, WALLET_RECENT_VAR, WALLET_SYNC_VAR, walletBalance, walletEditable, walletLoose, walletRecentN, walletStarted, walletSyncOn, walletVars, WALLET_START_DEFAULT, WALLET_CAP_MAX, WALLET_CAP_MIN, WALLET_CAP_VAR, walletCapOf } from '../core/wallet';
-import { updateChat, type ChatContext } from '../host/risu';
+import { updateChatOf, type ChatContext } from '../host/risu';
 import { barButtons, directoryBar, directoryDone, directoryDoneClear, directorySearch, directoryView } from './directory';
 import { drawerBox } from './drawer';
 import { toast } from './toast';
@@ -222,8 +222,8 @@ const wonInput = (n: number, busy: boolean, locked = false) =>
 
 /** 상황판을 끈다: 상태와 보고를 비운다 (원본 clearIntegratedControlState. 다시 켜도 복원하지 않음) */
 function worldOffVars(): ScriptState {
-  // 리롤 기준 상태도 비운다 (다시 켠 뒤 응답을 다시 굴리거나 지워도 끄기 전 상황판이 되살아나지 않게)
-  return { $st_anomaly_on: '0', [WORLD_KEY]: '', [PREV_KEY]: '', $an_report: '', $in_report: '', $ms_report: '', $ag_report: '' };
+  // 응답별 결과도 비운다 (다시 켠 뒤 응답을 다시 굴리거나 지워도 끄기 전 상황판이 되살아나지 않게)
+  return { $st_anomaly_on: '0', [WORLD_KEY]: '', [TURNS_KEY]: '', $an_report: '', $in_report: '', $ms_report: '', $ag_report: '' };
 }
 
 export type SettingsScope = 'chat' | 'defaults' | 'card';
@@ -293,7 +293,7 @@ const CONFIRM: Record<'chat' | 'card', Record<'save' | 'load' | 'reset', [string
   chat: {
     save: ['지금 설정을 기본값으로 저장할까요? 저장해 둔 기본값을 덮어써서, 앞으로 새로 시작하는 모든 채팅이 이 값으로 시작해요. 덮어쓴 기본값은 되돌릴 수 없어요.', '기본값으로 저장'],
     load: ['저장해 둔 기본값을 지금 채팅에 불러올까요? 지금 채팅의 설정이 기본값으로 바뀌어요. 상황판 켜기·끄기는 그대로 둬요.', '불러오기'],
-    reset: ['지금 채팅의 설정과 저장해 둔 기본값, 고친 지침과 세계를 모두 버리고 플러그인 원래 값으로 초기화할까요? 상황판 켜기·끄기와 추가 규칙은 그대로 둬요.', '초기화'],
+    reset: ['지금 채팅의 설정과 저장해 둔 기본값, 고친 지침과 세계를 모두 버리고 플러그인 원래 값으로 초기화할까요? 명부에서 고친 값과 직접 추가한 요원·조직도 지워져요. 상황판 켜기·끄기와 추가 규칙은 그대로 둬요.', '초기화'],
   },
   card: {
     save: ['고친 명부로 카드에 저장된 명부를 덮어쓸까요? 이 카드의 모든 채팅에 적용돼요.', '덮어쓰기'],
@@ -565,7 +565,7 @@ export async function bulkShopOff(ctx: ChatContext): Promise<void> {
 }
 
 async function dropShopTags(ctx: ChatContext): Promise<void> {
-  await updateChat(ctx.charIndex, ctx.chatIndex, (chat) => {
+  await updateChatOf(ctx, (chat) => {
     const list = chat.message ?? [];
     if (!list.some((m) => m.role === 'char' && hasShopTag(String(m.data ?? '')))) return null;
     return { ...chat, message: list.map((m) => (m.role === 'char' && hasShopTag(String(m.data ?? '')) ? { ...m, data: stripShopTags(String(m.data)) } : m)) };
@@ -613,7 +613,7 @@ async function save(ctx: ChatContext, env: SettingsEnv, change: (chat: Chat) => 
   settingsUi.notice = '';
   env.render();
   try {
-    await updateChat(ctx.charIndex, ctx.chatIndex, (latest) => {
+    await updateChatOf(ctx, (latest) => {
       const vars = change(latest);
       return vars ? { ...latest, scriptstate: { ...(latest.scriptstate ?? {}), ...vars } } : null;
     });
@@ -641,7 +641,8 @@ async function saveDefaults(env: SettingsEnv, change: (p: Prefs) => Prefs): Prom
   try {
     await savePrefs(change);
   } catch (error) {
-    settingsUi.notice = `기본값을 저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
+    // 기기 저장소 쓰기 실패는 설정 창이 제 알림 줄에 이미 띄웠다 (host/prefs.ts PrefsSaveError). 기기 설정(메뉴 위치 등)에 「기본값을…」이라는 다른 일의 말이 뜨지 않게 (3차 점검 R16)
+    if (!(error instanceof PrefsSaveError && error.shown)) settingsUi.notice = error instanceof PrefsSaveError ? error.message : `기본값을 저장하지 못했어요: ${error instanceof Error ? error.message : String(error)}`;
   }
   settingsUi.busy = false;
   env.render();

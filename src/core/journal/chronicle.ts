@@ -13,7 +13,7 @@ import { liveChanges, liveness, peopleStore } from '../people/store';
 import { lastStatusFields } from '../world/tags';
 import { locName } from '../world/geo';
 import { readDirectory } from '../world/directory';
-import { readJournal } from './store';
+import { liveJournal } from './store';
 import { durLabel } from './line';
 import { JOURNAL_KIND_LABEL, type JournalKind } from './types';
 
@@ -83,7 +83,7 @@ export function buildChronicle(chat: Chat, lore: LoreEntry[] | undefined): Chron
   const day = dayLabels(chat);
   const live = liveness(chat);
   // 1) 내가 나간 사건: 종료 한 줄 (일지와 같은 말: 직접 종료·시간 경과·클리어)
-  for (const r of readJournal(chat).rows) {
+  for (const r of liveJournal(chat).rows) {
     if (!r.mine || r.kind === 'fd') continue;
     const dur = r.at !== null && r.since !== null ? Math.max(0, r.at - r.since) : null;
     const durText = dur === null ? '' : `소요 ${durLabel(dur)}`;
@@ -112,7 +112,7 @@ export function buildChronicle(chat: Chat, lore: LoreEntry[] | undefined): Chron
     const base = isFac ? factionBase(code, uf) : store.people[who].affinity.base;
     const folded = store.folded[who] ?? 0;
     // 감소 승수도 인물·세력 화면과 같게 (전수검사 11-13)
-    const o = isFac ? { speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap } : { temper: temperOf(who), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap };
+    const o = isFac ? { speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap, hold: true } : { temper: temperOf(who), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap };
     const [min, max] = isFac ? [FACTION_MIN, FACTION_MAX] : [AFF_MIN, AFF_MAX];
     const label = (v: number) => (isFac ? factionStage(v, s.factionBounds).label : stageOf(v).label);
     let prev = label(sumCues(who, base, [], folded, min, max, o));

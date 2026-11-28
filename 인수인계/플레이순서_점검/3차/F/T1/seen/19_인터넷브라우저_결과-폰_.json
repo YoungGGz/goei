@@ -1,0 +1,228 @@
+{
+  "results": [
+    {
+      "part": "폰_",
+      "step": "41 폰_서랍_사이트",
+      "what": "폰 서랍: 사이트 전부(관리국이라 포인트몰 없음)",
+      "ok": true,
+      "expect": "bm 없는 6+",
+      "actual": [
+        "gn",
+        "gal",
+        "wpf",
+        "sm",
+        "cos",
+        "wk"
+      ],
+      "why": "사용자 11-08 폰 서랍"
+    },
+    {
+      "part": "폰_",
+      "step": "41 폰_서랍_사이트",
+      "what": "서랍 괴담넷 → 인터넷 탭이 괴담넷",
+      "ok": true,
+      "expect": "br-p-gn",
+      "actual": "br-page br-p-gn",
+      "why": ""
+    },
+    {
+      "part": "폰_",
+      "step": "41 폰_서랍_사이트",
+      "what": "폰은 주소줄 ‹ › 새로고침 단추가 안 보임(PC 전용)",
+      "ok": true,
+      "expect": "안 보임",
+      "actual": false,
+      "why": ""
+    },
+    {
+      "part": "폰_",
+      "step": "42 폰_탭목록_새탭_위키",
+      "what": "탭 수 단추 → 탭 목록 1장",
+      "ok": true,
+      "expect": 1,
+      "actual": 1,
+      "why": ""
+    },
+    {
+      "part": "폰_",
+      "step": "42 폰_탭목록_새탭_위키",
+      "what": "탭 목록 「새 탭」 → 새 탭 화면, 탭 수 2",
+      "ok": true,
+      "expect": "2",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 1,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": false,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": ""
+    },
+    {
+      "part": "폰_",
+      "step": "42 폰_탭목록_새탭_위키",
+      "what": "둘째 탭에서 위키 문서",
+      "ok": true,
+      "expect": "/w/…",
+      "actual": "goei.wiki/w/중림 지하상가",
+      "why": ""
+    },
+    {
+      "part": "폰_",
+      "step": "43 폰_쓸어서_뒤로",
+      "what": "뒤로 쓸기 1: 같은 탭 위키 대문",
+      "ok": true,
+      "expect": "위키 대문",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "괴이위키:대문 - 괴이위키"
+          }
+        ],
+        "cur": 1,
+        "url": "goei.wiki/w/괴이위키:대문",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": true,
+        "fwd": true,
+        "page": "br-page br-p-wk",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": ""
+    },
+    {
+      "part": "폰_",
+      "step": "43 폰_쓸어서_뒤로",
+      "what": "뒤로 쓸기 2: 같은 탭 새 탭 화면",
+      "ok": true,
+      "expect": "새 탭 화면",
+      "actual": {
+        "tabs": [
+          {
+            "on": false,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": true,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 1,
+        "url": "검색어 또는 URL 입력",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "back": false,
+        "fwd": true,
+        "page": "br-page br-p-home",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": ""
+    },
+    {
+      "part": "폰_",
+      "step": "43 폰_쓸어서_뒤로",
+      "what": "뒤로 쓸기 3: 이 탭 처음이라 더 안 감 (괴담넷 탭으로 건너가지 않음)",
+      "ok": false,
+      "expect": "그대로",
+      "actual": {
+        "tabs": [
+          {
+            "on": true,
+            "title": "괴담넷 - 자유게시판"
+          },
+          {
+            "on": false,
+            "title": "새 탭"
+          }
+        ],
+        "cur": 0,
+        "url": "goedam.net/board/free",
+        "bms": [
+          "gn",
+          "gal",
+          "wpf",
+          "sm",
+          "cos",
+          "wk"
+        ],
+        "ntp": [],
+        "back": false,
+        "fwd": false,
+        "page": "br-page br-p-gn",
+        "prof": "로그인",
+        "pcNavBack": true,
+        "tabN": "2"
+      },
+      "why": "사용자 11-10 「탭별로 움직여야 한다」(app.ts 346 주석, PC 마우스 제스처는 탭 기록만)"
+    },
+    {
+      "part": "폰_",
+      "step": "44 폰_가로넘침",
+      "what": "폰 가로 넘침 없음",
+      "ok": true,
+      "expect": false,
+      "actual": false,
+      "why": ""
+    }
+  ],
+  "notes": []
+}

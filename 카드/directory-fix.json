@@ -7,7 +7,7 @@
   {"id": "T01", "name": "관리", "visible_for": ["A00"], "name_by_faction": {"B00": "가짜"}},
   {"id": "T02", "name": "가짜", "visible_for": ["B00"], "name_by_faction": {"B00": "관리"}},
   {"id": "T03", "name": "백일", "visible_for": ["C00"]},
-  {"id": "T04", "name": "중립", "visible_for": ["A00", "B00", "C00", "E00"]},
+  {"id": "T04", "name": "이면의 주민들", "visible_for": ["A00", "B00", "C00", "E00"]},
   {"id": "T05", "name": "기타", "visible_for": ["A00", "B00", "C00", "D00", "E00"]},
   {"id": "X01", "name": "괴이", "visible_for": ["A00", "B00", "C00", "D00", "E00"]}
  ]}
