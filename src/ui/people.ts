@@ -706,7 +706,7 @@ export function factionView(ctx: ChatContext, code: string): string {
         ? `<label>단계 <select class="gx-select" data-change="pp-aff-stage">${stageIds.map((id) => `<option value="${id}" ${(peopleUi.affStage || f.stage.id) === id ? 'selected' : ''}>${esc(FACTION_STAGES[id].label)}</option>`).join('')}</select></label>`
         : `<label>숫자 <input class="gx-search ph-pct" type="number" min="${FACTION_MIN}" max="${FACTION_MAX}" data-input="pp-aff-num" name="pp-aff-num" value="${esc(peopleUi.affNum)}" placeholder="${f.value}"></label>`}</div>
         <input class="gx-search" data-input="pp-aff-reason" name="pp-aff-reason" maxlength="80" placeholder="이유 (필수)" value="${esc(peopleUi.affReason)}">
-        <p class="ps-note">${qual ? '고정하면 그 단계로 두고, 갱신기가 다음에 다시 판단할 때까지 유지돼요.' : '고정하면 그 값으로 덮고, 이후 자동 계기는 무시해요. 변경 기록에서 취소하면 다시 자동 계산으로 돌아가요.'}</p>
+        <p class="ps-note">${qual ? '고정하면 그 단계로 두고, 갱신기가 다음에 다시 판단할 때까지 유지돼요.' : '저장하면 그 값으로 바꾸고, 이후 계기는 그 값에서 이어서 더해요. 변경 기록에서 취소하면 고치기 전으로 돌아가요.'}</p>
         <div class="gx-row-btns"><button class="gx-mini ps-save" data-action="pp-fac-save" data-value="${esc(code)}" ${peopleUi.busy ? 'disabled' : ''}>저장</button><button class="gx-mini" data-action="pp-aff-cancel">취소</button></div></div>`
     : `<div class="gx-row-btns"><button class="gx-mini" data-action="pp-aff-edit">${qual ? '단계 직접 고정' : '값 직접 고정'}</button>${!qual && last ? `<small class="ps-note">마지막 계기: ${esc(last.cue ?? '')}${last.reason ? ` — ${esc(last.reason)}` : ''}</small>` : ''}</div>`;
   // 정성 모드: 숫자 막대 대신 단계 + 갱신기가 적은 이유
@@ -865,7 +865,7 @@ function extraCards(ctx: ChatContext, p: Person, changes: Change[]): string {
 function changeRow(ctx: ChatContext, c: Change, live: Liveness): string {
   const alive = isAlive(c, live);
   const no = msgNo(c.anchor, live);
-  const what = c.kind === 'taste' ? `취향 띠 → ${(c.band ?? 0) > 0 ? '+' : ''}${c.band ?? 0}` : c.kind === 'openness' ? (typeof c.init === 'number' ? `음란도 시작값 ${c.init}` : `음란도 ${(c.delta ?? 0) > 0 ? '+' : ''}${c.delta ?? 0}`) : c.kind === 'cue' ? (c.pin !== undefined ? (c.who.startsWith('세력:') ? `평판 → ${factionStageLabel(ctx, c.pin)}${peopleSettings(ctx.chat.scriptstate).factionQual ? '' : ` (${c.pin})`}` : `호감 고정 ${c.pin}`) : `호감 · ${c.cue ?? ''}`) : c.kind === 'address' ? `호칭 「${c.toUser ?? ''}」${c.register ? ` · ${c.register}` : ''}` : c.kind === 'identity' ? `신분 ${[c.faction, c.rank].filter(Boolean).join(' ')}` : `메모 ${c.now ?? ''}`;
+  const what = c.kind === 'taste' ? `취향 띠 → ${(c.band ?? 0) > 0 ? '+' : ''}${c.band ?? 0}` : c.kind === 'openness' ? (typeof c.init === 'number' ? `음란도 시작값 ${c.init}` : `음란도 ${(c.delta ?? 0) > 0 ? '+' : ''}${c.delta ?? 0}`) : c.kind === 'cue' ? (c.pin !== undefined ? (c.who.startsWith('세력:') ? `평판 → ${factionStageLabel(ctx, c.pin)}${peopleSettings(ctx.chat.scriptstate).factionQual ? '' : ` (${c.pin})`}` : `호감 직접 수정 ${c.pin}`) : `호감 · ${c.cue ?? ''}`) : c.kind === 'address' ? `호칭 「${c.toUser ?? ''}」${c.register ? ` · ${c.register}` : ''}` : c.kind === 'identity' ? `신분 ${[c.faction, c.rank].filter(Boolean).join(' ')}` : `메모 ${c.now ?? ''}`;
   const key = `chg|${c.id}`;
   return `<li class="pp-entry${!alive && !c.void ? ' dead' : ''}${c.void ? ' void' : ''}">
     <div class="pp-entry-main">${srcIcon(c.src)}<span class="pp-text"><b title="${esc(KIND_HELP[c.kind])}">${esc(KIND_LABEL[c.kind])}</b> ${esc(what)}${c.reason ? ` <small>— ${esc(c.reason)}</small>` : ''}</span></div>
@@ -893,7 +893,7 @@ export function personView(ctx: ChatContext, name: string): string {
     ? `<div class="pp-edit"><div class="pp-edit-row"><label>단계 <select class="gx-select" data-change="pp-aff-stage">${'<option value="">(직접 숫자)</option>'}${stageOptions}</select></label>
         <label>숫자 <input class="gx-search ph-pct" type="number" min="${AFF_MIN}" max="${AFF_MAX}" data-input="pp-aff-num" name="pp-aff-num" value="${esc(peopleUi.affNum)}" placeholder="${aff.value}"></label></div>
         <input class="gx-search" data-input="pp-aff-reason" name="pp-aff-reason" maxlength="80" placeholder="이유 (필수)" value="${esc(peopleUi.affReason)}">
-        <p class="ps-note">고정하면 그 값으로 덮고, 이후 자동 계기는 무시해요. 변경 기록에서 취소하면 다시 자동 계산으로 돌아가요.</p>
+        <p class="ps-note">저장하면 그 값으로 바꾸고, 이후 계기는 그 값에서 이어서 더해요. 변경 기록에서 취소하면 고치기 전으로 돌아가요.</p>
         <div class="gx-row-btns"><button class="gx-mini ps-save" data-action="pp-aff-save" data-value="${esc(name)}" ${peopleUi.busy ? 'disabled' : ''}>저장</button><button class="gx-mini" data-action="pp-aff-cancel">취소</button></div></div>`
     : `<div class="gx-row-btns"><button class="gx-mini" data-action="pp-aff-edit">호감 직접 수정</button>${aff.last ? `<small class="ps-note">마지막 계기: ${esc(aff.last.cue ?? '')}${aff.last.reason ? ` — ${esc(aff.last.reason)}` : ''}</small>` : ''}</div>`;
   const addrEdit = peopleUi.addrEdit
@@ -1339,7 +1339,7 @@ export async function handlePeople(action: string, value: string | undefined, ct
         return putChange(store, { id: changeId(v, 'cue', anchor, seq, `pin:${pin}:${reason}`), anchor, seq, src: 'manual', who: v, kind: 'cue', pin, reason: plain(reason, 80) });
       });
       peopleUi.affEdit = false;
-      peopleUi.info = `호감을 ${pin}(${stageOf(pin).label})${roOf(stageOf(pin).label)} 고정했어요.`;
+      peopleUi.info = `호감을 ${pin}(${stageOf(pin).label})${roOf(stageOf(pin).label)} 바꿨어요.`;
       env.render();
       return true;
     }

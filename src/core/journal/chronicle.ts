@@ -112,7 +112,7 @@ export function buildChronicle(chat: Chat, lore: LoreEntry[] | undefined): Chron
     const base = isFac ? factionBase(code, uf) : store.people[who].affinity.base;
     const folded = store.folded[who] ?? 0;
     // 감소 승수도 인물·세력 화면과 같게 (전수검사 11-13)
-    const o = isFac ? { speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap } : { temper: temperOf(who), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap };
+    const o = isFac ? { speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap, hold: true } : { temper: temperOf(who), speed: s.speed, speedDown: s.speedDown, turnCap: s.turnCap };
     const [min, max] = isFac ? [FACTION_MIN, FACTION_MAX] : [AFF_MIN, AFF_MAX];
     const label = (v: number) => (isFac ? factionStage(v, s.factionBounds).label : stageOf(v).label);
     let prev = label(sumCues(who, base, [], folded, min, max, o));

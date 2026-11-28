@@ -86,7 +86,7 @@ export function foldCues(store: PeopleStore, chat: Chat, o: { speed: number; spe
     if (code !== null) {
       if (!code) return null;
       const base = factionBase(code, uf);
-      return sumCues(who, base, cues, folded, FACTION_MIN, FACTION_MAX, o) - base;
+      return sumCues(who, base, cues, folded, FACTION_MIN, FACTION_MAX, { ...o, hold: true }) - base;
     }
     const p = store.people[who];
     if (!p) return null;

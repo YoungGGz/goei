@@ -46,7 +46,8 @@ test('호감: 성격 계수·속도 배율, 고정(pin)과 취소(void)', () => 
   assert.equal(A.affinityOf(p, S.liveChanges(store, live), 0, { speed: 2 }), 6 - 8);
   store.log.push({ id: 'pin', anchor: 'c2', seq: 0, src: 'manual', who: '데쥬레', kind: 'cue', reason: '사용자', pin: 150 });
   store.log.push(cue('데쥬레', '헌신', 'c2', 1));
-  assert.equal(A.affinityOf(p, S.liveChanges(store, live)), 150, '고정 뒤 계기는 무시');
+  assert.equal(A.affinityOf(p, S.liveChanges(store, live)), 150 + 10, '직접 수정 뒤 계기는 그 값에서 이어서 더한다 (메시지당 상한 10)');
+  assert.equal(A.sumCues('데쥬레', 0, S.liveChanges(store, live), 0, -100, 300, { hold: true }), 150, '세력 평판 고정은 그 뒤 계기를 무시');
   store.log[2].void = true;
   assert.equal(A.affinityOf(p, S.liveChanges(store, live)), -1 + 10, '고정을 취소하면 다시 계산');
 });
