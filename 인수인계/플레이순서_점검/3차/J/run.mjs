@@ -37,7 +37,10 @@ async function openTab(v) { if (!F() || !(await F().$('.gx'))) await t.openWindo
 async function reopen() { await t.closeWindow(); await t.openWindow('.gx'); await sleep(1000); }
 
 
-const rows = async () => { const st = await t.chatState(true); let j = null, r = null; try { j = JSON.parse(st.scriptstate?.$goei_journal ?? 'null'); } catch {} try { r = JSON.parse(st.scriptstate?.$goei_reports ?? 'null'); } catch {} return { j, r }; };
+const rows = async () => { const st = await t.chatState(true); let j = null, r = null; try { j = JSON.parse(st.scriptstate?.$goei_journal ?? 'null'); } catch {} try { r = JSON.parse(st.scriptstate?.$goei_reports ?? 'null'); } catch {}
+  // 플러그인이 보여 주는 것과 같게 (2026-11-28 liveJournal·liveReports): 사라진 응답($goei_turns 에 결과가 있지만 채팅에 없는 응답)이 만든 자동 종료 줄은 가린다. 저장값에는 남아 있다 (◀ 로 돌아오면 다시 보임)
+  try { const tn = JSON.parse(st.scriptstate?.$goei_turns || 'null'); const alive = new Set(st.message.map((m, i) => m.chatId || `#${i + 1}`)); const dead = new Set((tn?.list ?? []).map((x) => x.k).filter((k) => !k.startsWith('#') && !alive.has(k))); const hide = (x) => (x.cause === 'model' || x.cause === 'ttl') && dead.has(x.anchor); if (dead.size) { if (j?.rows) j = { ...j, rows: j.rows.filter((x) => !hide(x)) }; if (r?.items) r = { ...r, items: r.items.filter((x) => !hide(x)) }; } } catch {}
+  return { j, r }; };
 const repList = (r) => (r?.items ?? r?.list ?? (Array.isArray(r) ? r : Object.values(r ?? {}).find(Array.isArray) ?? [])).map((x) => ({ id: x.id, name: x.name ?? x.title ?? x.target, pin: !!x.pin, made: x.made ?? null }));
 try {
   await boot();
